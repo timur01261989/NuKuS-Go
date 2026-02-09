@@ -54,12 +54,7 @@ export default function App() {
     }
 
     export default App;
-    // Service Worker-ni ro'yxatdan o'tkazish
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js');
-    }
-  }, []);
-
+    
   return (
     // ... mavjud kodingiz
   );
