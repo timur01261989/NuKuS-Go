@@ -52,9 +52,7 @@ export default function App() {
         </div>
       );
     }
-
-    export default App;
-    
+      
   return (
     // ... mavjud kodingiz
   );
@@ -141,4 +139,6 @@ export default function App() {
       </BrowserRouter>
 </ConfigProvider>
   );
+
+export default App;
 }
