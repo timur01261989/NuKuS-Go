@@ -45,3 +45,7 @@ body.night-mode-active .ant-card {
   background: #1a1a1a !important;
   border: 1px solid #333 !important;
 }
+/* Marker silliq harakatlanishi uchun */
+.leaflet-marker-icon {
+  transition: transform 2s linear !important;
+}
