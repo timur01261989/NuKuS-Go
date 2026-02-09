@@ -397,4 +397,4 @@ export default function Dashboard() {
       </div>
     </ConfigProvider>
   );
-}//deploy qilish uchun
+}//deploy qilish
