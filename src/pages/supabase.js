@@ -1,17 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY // yoki VITE_SUPABASE_PUBLISHABLE_KEY
 
-// Agar URL yoki KEY bo'sh bo'lsa, xato bermasligi uchun tekshiruv
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error("Supabase URL yoki Anon Key topilmadi! Secrets bo'limini tekshiring.");
+if (!supabaseUrl || !supabaseKey) {
+  console.error("Supabase URL yoki Key topilmadi! Vercel -> Settings -> Environment Variables ni tekshiring.")
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  realtime: {
-    params: {
-      eventsPerSecond: 10,
-    },
-  },
-})
+export const supabase = createClient(supabaseUrl, supabaseKey)
