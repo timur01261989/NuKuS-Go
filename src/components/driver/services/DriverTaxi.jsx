@@ -12,7 +12,7 @@ import "leaflet-routing-machine";
 import "leaflet/dist/leaflet.css";
 import { supabase } from "../../../pages/supabase";
 
-import ChatComponent from '../ChatComponent';
+import ChatComponent from '../../ChatComponent';
 const openExternalMap = (destination) => {
   const lat = destination[0];
   const lon = destination[1];
