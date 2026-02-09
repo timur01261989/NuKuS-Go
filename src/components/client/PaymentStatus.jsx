@@ -10,7 +10,8 @@ import successAnim from "../../assets/lottie/sdk_gas_lottie_pay2connect.json";
 
 const { Title, Text } = Typography;
 
-export default function PaymentStatus({ status }) {
+// ✅ Named export ham bo'ldi (ClientOrderCreate.jsx dagi { PaymentStatus } uchun)
+export function PaymentStatus({ status }) {
 
   // Statusga qarab qaysi animatsiyani ko'rsatishni aniqlash
   const currentAnimation = useMemo(() => {
@@ -61,3 +62,6 @@ export default function PaymentStatus({ status }) {
     </div>
   );
 }
+
+// ✅ Default export ham o'z holicha qoldi (agar boshqa joylarda default import ishlatilsa)
+export default PaymentStatus;
