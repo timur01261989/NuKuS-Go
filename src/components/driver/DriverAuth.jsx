@@ -81,10 +81,7 @@ export default function DriverAuth({ onBack }) {
     }
   }, [navigate, onBack]);
 
-  // Sahifa ochilganda ishga tushadi
-  useEffect(() => {
-    checkDriverStatus();
-  }, [checkDriverStatus]);
+  
 
   // --- YORDAMCHI FUNKSIYALAR ---
 
@@ -203,6 +200,10 @@ export default function DriverAuth({ onBack }) {
           </div>
       );
   }
+// Sahifa ochilganda ishga tushadi
+  useEffect(() => {
+    checkDriverStatus();
+  }, [checkDriverStatus]);
 
   return null;
 }
