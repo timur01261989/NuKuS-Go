@@ -6,7 +6,7 @@ import 'leaflet/dist/leaflet.css'
 import RideHistory from './components/shared/RideHistory';
 import './shared/styles/fonts.css';
 
-function App() {
+function MainApp() {
   const [view, setView] = useState('map'); // 'map' yoki 'history'
 
   return (
