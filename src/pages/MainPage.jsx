@@ -11,7 +11,7 @@ import L from 'leaflet';
 import 'leaflet-routing-machine';
 import 'leaflet/dist/leaflet.css';
 
-import { playAliceVoice, calculateDistance } from '../utils/audioPlayer';
+import { playAliceVoice, calculateDistance } from '../utils/AudioPlayer';
 import SearchRadar from '../components/map/SearchRadar';
 import { startTracking } from '../hooks/useLocation';
 import { setupNotifications } from '../services/fcmService';
