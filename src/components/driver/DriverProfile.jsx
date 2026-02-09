@@ -10,50 +10,15 @@ import { supabase } from '../../pages/supabase';
 // Komponentlarni import qilish
 import DriverWallet from './DriverWallet'; 
 import ActivityChart from './ActivityChart';
-// DriverProfile.jsx faylining yuqori qismida import qiling
 import Leaderboard from './Leaderboard'; 
 import { TrophyFilled } from '@ant-design/icons'; // Reyting belgisi uchun
+
+const { Title, Text } = Typography;
 
 export default function DriverProfile({ onBack, onLogout }) {
   // Reyting sahifasi ochiq yoki yopiqligini nazorat qilish uchun state
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
-  // 1. Agar Leaderboard ochiq bo'lsa, uni ko'rsatamiz
-  if (leaderboardOpen) {
-    return <Leaderboard onBack={() => setLeaderboardOpen(false)} />;
-  }
-
-  // 2. Aks holda oddiy profil sahifasi ko'rinadi
-  return (
-    <div style={{ padding: '20px', background: '#f8f9fa' }}>
-      {/* ... Header va Asosiy karta qismlari ... */}
-
-      {/* MENU LIST ICHIDA REYTING TUGMASI */}
-      <Card style={{ borderRadius: 20, border: 'none', marginTop: 20 }}>
-        <List itemLayout="horizontal">
-
-          {/* REYTING SAHIFASINI OCHUVCHI ELEMENT */}
-          <List.Item 
-            onClick={() => setLeaderboardOpen(true)} 
-            style={{ cursor: 'pointer' }}
-          >
-            <List.Item.Meta 
-              avatar={<TrophyFilled style={{ color: '#FFD700', fontSize: 22 }} />} 
-              title={<b>Top haydovchilar</b>} 
-              description="Nukus Go reytingida o'z o'rningizni ko'ring"
-            />
-          </List.Item>
-
-          {/* ... Hamyon va boshqa menyular ... */}
-        </List>
-      </Card>
-    </div>
-  );
-}
-
-const { Title, Text } = Typography;
-
-export default function DriverProfile({ onBack, onLogout }) {
   const [driverData, setDriverData] = useState(null);
   const [stats, setStats] = useState({ total_trips: 0, rating: 5.0 });
   const [walletOpen, setWalletOpen] = useState(false);
@@ -67,6 +32,7 @@ export default function DriverProfile({ onBack, onLogout }) {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       setUserId(user.id);
+
       const { data } = await supabase
         .from('drivers')
         .select('first_name, car_model, car_color, plate_number, avatar_url, average_rating, rating_count')
@@ -85,10 +51,17 @@ export default function DriverProfile({ onBack, onLogout }) {
     }
   };
 
+  // 1. Agar Leaderboard ochiq bo'lsa, uni ko'rsatamiz
+  if (leaderboardOpen) {
+    return <Leaderboard onBack={() => setLeaderboardOpen(false)} />;
+  }
+
+  // 2. Agar Hamyon ochiq bo'lsa, uni ko'rsatamiz
   if (walletOpen) {
     return <DriverWallet onBack={() => setWalletOpen(false)} />;
   }
 
+  // 3. Aks holda oddiy profil sahifasi ko'rinadi
   return (
     <div style={{ padding: '20px', background: '#f8f9fa', minHeight: '100vh' }}>
       {/* HEADER */}
@@ -128,10 +101,10 @@ export default function DriverProfile({ onBack, onLogout }) {
         </Col>
       </Row>
 
-      {/* 📈 FAAOLLIK GRAFIGI (Yangi qo'shilgan joyi) */}
+      {/* 📈 FAAOLLIK GRAFIGI */}
       {userId && <ActivityChart driverId={userId} />}
 
-      <div style={{ marginBottom: 20 }} /> {/* Grafikdan keyin bo'shliq */}
+      <div style={{ marginBottom: 20 }} />
 
       {/* AVTOMOBIL MA'LUMOTLARI */}
       <Card title={<><CarOutlined /> Mashina ma'lumotlari</>} style={{ borderRadius: 20, marginBottom: 20, border: 'none' }}>
@@ -152,6 +125,19 @@ export default function DriverProfile({ onBack, onLogout }) {
       {/* MENU LIST */}
       <Card style={{ borderRadius: 20, border: 'none', marginBottom: 20 }}>
         <List itemLayout="horizontal">
+
+          {/* REYTING SAHIFASINI OCHUVCHI ELEMENT */}
+          <List.Item 
+            onClick={() => setLeaderboardOpen(true)} 
+            style={{ cursor: 'pointer' }}
+          >
+            <List.Item.Meta 
+              avatar={<TrophyFilled style={{ color: '#FFD700', fontSize: 22 }} />} 
+              title={<b>Top haydovchilar</b>} 
+              description="Nukus Go reytingida o'z o'rningizni ko'ring"
+            />
+          </List.Item>
+
           <List.Item onClick={() => setWalletOpen(true)} style={{ cursor: 'pointer' }}>
             <List.Item.Meta 
                 avatar={<WalletOutlined style={{ color: '#FFD700', fontSize: 20 }} />} 
@@ -159,6 +145,7 @@ export default function DriverProfile({ onBack, onLogout }) {
                 description="Daromadlarni ko'rish va pul yechish"
             />
           </List.Item>
+
           <List.Item style={{ cursor: 'pointer' }} onClick={onLogout}>
             <List.Item.Meta avatar={<LogoutOutlined style={{ color: 'red' }} />} title={<Text type="danger">Tizimdan chiqish</Text>} />
           </List.Item>
