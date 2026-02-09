@@ -106,7 +106,8 @@ export default function Dashboard() {
 
   // --- SAHIFALAR ALMASHINUVI ---
   if (currentView === "driver") return <DriverAuth onBack={() => setCurrentView("dashboard")} />;
-if (currentView === "taxi") return <ClientOrderCreate onBack={() => setCurrentView("dashboard")} />;
+
+  if (currentView === "taxi") return <ClientOrderCreate onBack={() => setCurrentView("dashboard")} />;
   if (currentView === "interProv") return <ClientInterProvincial onBack={() => setCurrentView("dashboard")} />;
   if (currentView === "interDist") return <ClientInterDistrict onBack={() => setCurrentView("dashboard")} />;
   if (currentView === "freight") return <ClientFreight onBack={() => setCurrentView("dashboard")} />;
@@ -158,7 +159,7 @@ if (currentView === "taxi") return <ClientOrderCreate onBack={() => setCurrentVi
             size="large"
             style={{ background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}
             icon={<MenuOutlined style={{ fontSize: 20 }} />}
-onClick={() => setOpen(true)}
+            onClick={() => setOpen(true)}
           />
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Button
@@ -231,7 +232,7 @@ onClick={() => setOpen(true)}
                       left: 0,
                       width: "100%",
                       height: "100%",
-                      backgroundImage: url(${service.image}),
+                      backgroundImage: `url(${service.image})`,
                       backgroundSize: "cover",
                       backgroundPosition: "center",
                     }}
@@ -252,7 +253,7 @@ onClick={() => setOpen(true)}
                       position: "relative",
                       zIndex: 2,
                       height: "100%",
-display: "flex",
+                      display: "flex",
                       flexDirection: "column",
                       justifyContent: "flex-end",
                       padding: "16px",
@@ -330,7 +331,7 @@ display: "flex",
                     </div>
                     <div>
                       <Text strong style={{ color: ad.textColor, display: "block", lineHeight: 1.2, fontSize: 13 }}>
-{ad.title}
+                        {ad.title}
                       </Text>
                       <Text style={{ color: ad.textColor, fontSize: 10, opacity: 0.8 }}>
                         {ad.desc}
