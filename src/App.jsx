@@ -1,36 +1,41 @@
-import React, { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { ConfigProvider } from 'antd';
+import React, { useEffect } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { ConfigProvider } from "antd";
 
-import { appConfig } from './shared/config/appConfig';
-import GaragePage from './pages/SuperPro/GaragePage';
-import PaymentsPage from './pages/SuperPro/PaymentsPage';
-import SearchOnRoutePage from './pages/SuperPro/SearchOnRoutePage';
+import { appConfig } from "./shared/config/appConfig";
+import GaragePage from "./pages/SuperPro/GaragePage";
+import PaymentsPage from "./pages/SuperPro/PaymentsPage";
+import SearchOnRoutePage from "./pages/SuperPro/SearchOnRoutePage";
 
 // --- SAHIFALAR (PAGES) ---
-import Login from './pages/Auth';
-import Register from './pages/Register';
-import ResetPassword from './pages/ResetPassword';
-import Dashboard from './pages/Dashboard';
-import MainPage from './pages/MainPage';
+import Login from "./pages/Auth";
+import Register from "./pages/Register";
+import ResetPassword from "./pages/ResetPassword";
+import Dashboard from "./pages/Dashboard";
+import MainPage from "./pages/MainPage";
 
 // --- MIJOZ KOMPONENTLARI ---
 import ClientFreight from "./features/client/components/ClientFreight";
-import ClientInterDistrict from './features/client/components/ClientInterDistrict';
+import ClientInterDistrict from "./features/client/components/ClientInterDistrict";
 
 // --- HAYDOVCHI MODE ---
-import DriverAuth from './features/driver/components/DriverAuth';
-import DriverHome from './features/driver/components/DriverHome';
-import { prioritizeAssets } from './utils/BaselineProfile';
-import { OrderRealtimeDebug } from './features/taxi/components/OrderRealtimeDebug.jsx';
-import { ProviderSwitchPanel } from './feature/debug/components/ProviderSwitchPanel.jsx';
+import DriverAuth from "./features/driver/components/DriverAuth";
+import DriverHome from "./features/driver/components/DriverHome";
+
+import { prioritizeAssets } from "./utils/BaselineProfile";
+
+// Debug komponentlar (named exports)
+import { OrderRealtimeDebug } from "./features/taxi/components/OrderRealtimeDebug";
+import { ProviderSwitchPanel } from "./features/debug/components/ProviderSwitchPanel";
 
 // Sahifalar almashganda skrolni tepaga qaytarish
 function ScrollToTop() {
   const { pathname } = useLocation();
+
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [pathname]);
+
   return null;
 }
 
@@ -43,21 +48,21 @@ export default function App() {
   // Night mode (20:00 - 06:00)
   useEffect(() => {
     const hour = new Date().getHours();
-    if (hour >= 20 || hour < 6) document.body.classList.add('night-mode-active');
-    else document.body.classList.remove('night-mode-active');
+    if (hour >= 20 || hour < 6) document.body.classList.add("night-mode-active");
+    else document.body.classList.remove("night-mode-active");
   }, []);
 
   const qp = new URLSearchParams(window.location.search);
-  const debugProviders = qp.get('debugProviders') === '1';
-  const debugRealtime = qp.get('debugRealtime') === '1';
+  const debugProviders = qp.get("debugProviders") === "1";
+  const debugRealtime = qp.get("debugRealtime") === "1";
 
   return (
     <ConfigProvider
       theme={{
         token: {
-          colorPrimary: '#FFD700',
+          colorPrimary: "#FFD700",
           borderRadius: 12,
-          fontFamily: 'YangoHeadline, Inter, -apple-system, system-ui, sans-serif',
+          fontFamily: "YangoHeadline, Inter, -apple-system, system-ui, sans-serif",
         },
         components: {
           Button: {
@@ -67,7 +72,7 @@ export default function App() {
           },
           Card: {
             borderRadiusLG: 24,
-            boxShadowTertiary: '0 12px 32px rgba(0,0,0,0.12)',
+            boxShadowTertiary: "0 12px 32px rgba(0,0,0,0.12)",
           },
           Input: {
             controlHeightLG: 55,
@@ -105,21 +110,34 @@ export default function App() {
           <Route path="/dashboard" element={<Dashboard />} />
 
           {/* CLIENT SERVICES */}
-          <Route path="/freight" element={<ClientFreight onBack={() => window.history.back()} />} />
-          <Route path="/inter-district" element={<ClientInterDistrict onBack={() => window.history.back()} />} />
+          <Route
+            path="/freight"
+            element={<ClientFreight onBack={() => window.history.back()} />}
+          />
+          <Route
+            path="/inter-district"
+            element={<ClientInterDistrict onBack={() => window.history.back()} />}
+          />
           <Route path="/main" element={<MainPage />} />
 
           {/* DRIVER MODE */}
-          <Route path="/driver-mode" element={<DriverAuth onBack={() => window.history.back()} />} />
+          <Route
+            path="/driver-mode"
+            element={<DriverAuth onBack={() => window.history.back()} />}
+          />
           <Route path="/driver-home" element={<DriverHome />} />
 
           {/* SUPER PRO PAGES */}
-          {appConfig.features.garage && <Route path="/garage" element={<GaragePage />} />}
-          {appConfig.features.payments && <Route path="/payments" element={<PaymentsPage />} />}
-          {appConfig.features.searchOnRoute && <Route path="/search-route" element={<SearchOnRoutePage />} />}
+          {appConfig.features.garage ? <Route path="/garage" element={<GaragePage />} /> : null}
+          {appConfig.features.payments ? (
+            <Route path="/payments" element={<PaymentsPage />} />
+          ) : null}
+          {appConfig.features.searchOnRoute ? (
+            <Route path="/search-route" element={<SearchOnRoutePage />} />
+          ) : null}
 
           {/* XATO YO'NALISH */}
-          <Route path="*" element={<Navigate to="/login" />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>
     </ConfigProvider>
