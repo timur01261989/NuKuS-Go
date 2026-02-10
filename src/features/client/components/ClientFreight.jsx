@@ -8,7 +8,7 @@ import {
   ClockCircleOutlined, ShopOutlined, 
   CheckCircleOutlined, DeploymentUnitOutlined 
 } from "@ant-design/icons";
-import { supabase } from "../../pages/supabase"; 
+import { supabase } from "../../../lib/supabase";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
