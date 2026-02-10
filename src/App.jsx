@@ -15,16 +15,15 @@ import Dashboard from './pages/Dashboard';
 import MainPage from './pages/MainPage';
 
 // --- MIJOZ KOMPONENTLARI ---
-import ClientFreight from './components/client/ClientFreight';
-import ClientInterDistrict from './components/client/ClientInterDistrict';
+import ClientFreight from "./features/client/components/ClientFreight";
+import ClientInterDistrict from './features/client/components/ClientInterDistrict';
 
 // --- HAYDOVCHI MODE ---
-import DriverAuth from './components/driver/DriverAuth';
-import DriverHome from './components/driver/DriverHome';
-
+import DriverAuth from './features/driver/components/DriverAuth;
+import DriverHome from '../features/driver/components/DriverHome;
 import { prioritizeAssets } from './utils/BaselineProfile';
-import { OrderRealtimeDebug } from './components/taxi/OrderRealtimeDebug.jsx';
-import { ProviderSwitchPanel } from './components/debug/ProviderSwitchPanel.jsx';
+import { OrderRealtimeDebug } from './features/taxi/components/OrderRealtimeDebug.jsx';
+import { ProviderSwitchPanel } from './feature/debug/components/ProviderSwitchPanel.jsx';
 
 // Sahifalar almashganda skrolni tepaga qaytarish
 function ScrollToTop() {
