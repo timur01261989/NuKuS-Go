@@ -18,13 +18,13 @@ import { supabase } from "./supabase";
 import { translations } from "./translations";
 
 // --- KOMPONENTLAR ---
-import DriverAuth from "../components/driver/DriverAuth";
+import DriverAuth from "../features/driver/components/DriverAuth";
 
-import ClientInterProvincial from "../components/client/ClientInterProvincial";
-import ClientInterDistrict from "../components/client/ClientInterDistrict";
-import ClientFreight from "../components/client/ClientFreight";
-import ClientDelivery from "../components/client/ClientDelivery";
-import ClientOrderCreate from "../components/client/ClientOrderCreate";
+import ClientInterProvincial from "../features/client/components/ClientInterProvincial";
+import ClientInterDistrict from "../features/client/components/ClientInterDistrict";
+import ClientFreight from "../features/client/components/ClientFreight";
+import ClientDelivery from "../features/client/components/ClientDelivery";
+import ClientOrderCreate from "../features/client/components/ClientOrderCreate";
 
 // --- RASMLAR ---
 import taxiImg from "../assets/taxi.jpg";
@@ -59,342 +59,348 @@ export default function Dashboard() {
     return () => clearTimeout(timer);
   }, [navigate]);
 
-  const getLabel = (key) => {
-    const labels = { uz_lotin: "UZ", uz_kirill: "ЎЗ", qq_lotin: "QQ", qq_kirill: "ҚҚ", ru: "RU", en: "EN" };
-    return labels[key] || "UZ";
+  const toggleDrawer = () => setOpen(!open);
+
+  // Tilni almashtirish
+  const changeLang = (newLang) => {
+    setLangKey(newLang);
+    localStorage.setItem("appLang", newLang);
+    message.success(t.languageChanged);
   };
 
-  const [currentLangText, setCurrentLangText] = useState(getLabel(savedLang));
+  // Logout
+  const logout = async () => {
+    await supabase.auth.signOut();
+    message.success(t.loggedOut);
+    navigate("/");
+  };
 
-  const languages = [
-    { key: "uz_lotin", label: "O'zbek (Lotin)" },
-    { key: "uz_kirill", label: "Ўзбек (Кирилл)" },
-    { key: "qq_lotin", label: "Qaraqalpaq (Lotin)" },
-    { key: "qq_kirill", label: "Қарақалпақ (Кирилл)" },
-    { key: "ru", label: "Русский" },
-    { key: "en", label: "English" }
+  // Yon menyu elementlari
+  const menuItems = [
+    { key: "dashboard", icon: <HomeOutlined />, label: t.dashboard },
+    { key: "orders", icon: <HistoryOutlined />, label: t.ordersHistory },
+    { key: "settings", icon: <SettingOutlined />, label: t.settings },
+    { key: "support", icon: <CustomerServiceOutlined />, label: t.support },
+    { key: "logout", icon: <LogoutOutlined />, label: t.logout, danger: true, onClick: logout },
   ];
 
-  const handleLangChange = ({ key }) => {
-    setLangKey(key);
-    localStorage.setItem("appLang", key);
-    setCurrentLangText(getLabel(key));
-    message.success("Til o'zgartirildi");
+  const langMenu = {
+    items: [
+      { key: "uz_lotin", label: "O‘zbek (lotin)", onClick: () => changeLang("uz_lotin") },
+      { key: "uz_kiril", label: "Ўзбек (кирил)", onClick: () => changeLang("uz_kiril") },
+      { key: "ru", label: "Русский", onClick: () => changeLang("ru") },
+    ],
   };
 
-  // --- HAQIQIY LOGOUT FUNKSIYASI ---
-  const handleLogout = async () => {
-    try {
-      setLoading(true);
-      // 1. Supabase sessiyasini uzish
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+  // Bosh sahifadagi xizmat kartalari
+  const services = [
+    {
+      key: "taxi",
+      title: t.taxi,
+      desc: t.taxiDesc,
+      icon: <CarOutlined style={{ fontSize: 28 }} />,
+      img: taxiImg,
+      view: "taxi",
+      color: "#FFD700",
+    },
+    {
+      key: "interProv",
+      title: t.interProvincial,
+      desc: t.interProvincialDesc,
+      icon: <GlobalOutlined style={{ fontSize: 28 }} />,
+      img: cityImg,
+      view: "interProvincial",
+      color: "#4CAF50",
+    },
+    {
+      key: "interDist",
+      title: t.interDistrict,
+      desc: t.interDistrictDesc,
+      icon: <EnvironmentOutlined style={{ fontSize: 28 }} />,
+      img: villageImg,
+      view: "interDistrict",
+      color: "#2196F3",
+    },
+    {
+      key: "freight",
+      title: t.freight,
+      desc: t.freightDesc,
+      icon: <ContainerOutlined style={{ fontSize: 28 }} />,
+      img: truckImg,
+      view: "freight",
+      color: "#FF5722",
+    },
+    {
+      key: "delivery",
+      title: t.delivery,
+      desc: t.deliveryDesc,
+      icon: <RocketOutlined style={{ fontSize: 28 }} />,
+      img: deliveryImg,
+      view: "delivery",
+      color: "#9C27B0",
+    },
+    {
+      key: "driver",
+      title: t.driverMode,
+      desc: t.driverModeDesc,
+      icon: <UserAddOutlined style={{ fontSize: 28 }} />,
+      img: cityImg,
+      view: "driver",
+      color: "#3F51B5",
+    },
+    {
+      key: "chat",
+      title: t.chat,
+      desc: t.chatDesc,
+      icon: <MessageOutlined style={{ fontSize: 28 }} />,
+      img: taxiImg,
+      view: "chat",
+      color: "#00BCD4",
+    },
+    {
+      key: "promo",
+      title: t.promotions,
+      desc: t.promotionsDesc,
+      icon: <GiftOutlined style={{ fontSize: 28 }} />,
+      img: villageImg,
+      view: "promo",
+      color: "#E91E63",
+    },
+    {
+      key: "market",
+      title: t.autoMarket,
+      desc: t.autoMarketDesc,
+      icon: <ShopOutlined style={{ fontSize: 28 }} />,
+      img: truckImg,
+      view: "market",
+      color: "#607D8B",
+    },
+    {
+      key: "popular",
+      title: t.popularServices,
+      desc: t.popularServicesDesc,
+      icon: <FireOutlined style={{ fontSize: 28 }} />,
+      img: deliveryImg,
+      view: "popular",
+      color: "#FF9800",
+    },
+    {
+      key: "notify",
+      title: t.notifications,
+      desc: t.notificationsDesc,
+      icon: <NotificationOutlined style={{ fontSize: 28 }} />,
+      img: taxiImg,
+      view: "notify",
+      color: "#795548",
+    },
+    {
+      key: "switch",
+      title: t.switchService,
+      desc: t.switchServiceDesc,
+      icon: <SwapOutlined style={{ fontSize: 28 }} />,
+      img: cityImg,
+      view: "switch",
+      color: "#8BC34A",
+    },
+  ];
 
-      // 2. Lokal xotirani tozalash
-      localStorage.clear();
+  const renderDashboard = () => (
+    <>
+      <Row gutter={[16, 16]}>
+        {services.map((s) => (
+          <Col xs={24} sm={12} md={8} lg={6} key={s.key}>
+            <Card
+              hoverable
+              style={{
+                borderRadius: 20,
+                overflow: "hidden",
+                border: `1px solid ${s.color}33`,
+              }}
+              onClick={() => setCurrentView(s.view)}
+              cover={
+                <div style={{ height: 120, background: `url(${s.img}) center/cover no-repeat` }} />
+              }
+            >
+              <Space align="center">
+                <Avatar style={{ background: s.color }} icon={s.icon} />
+                <div>
+                  <Title level={5} style={{ margin: 0 }}>
+                    {s.title}
+                  </Title>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    {s.desc}
+                  </Text>
+                </div>
+              </Space>
+              <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
+                <RightOutlined />
+              </div>
+            </Card>
+          </Col>
+        ))}
+      </Row>
+    </>
+  );
 
-      // 3. Login sahifasiga yo'naltirish
-      message.success("Tizimdan muvaffaqiyatli chiqildi");
-      navigate("/");
-    } catch (err) {
-      console.error("Chiqishda xatolik:", err);
-      message.error("Xatolik yuz berdi");
-    } finally {
-      setLoading(false);
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <div style={{ padding: 20 }}>
+          <Skeleton active paragraph={{ rows: 10 }} />
+        </div>
+      );
+    }
+
+    switch (currentView) {
+      case "taxi":
+        return <ClientOrderCreate onBack={() => setCurrentView("dashboard")} />;
+      case "interProvincial":
+        return <ClientInterProvincial onBack={() => setCurrentView("dashboard")} />;
+      case "interDistrict":
+        return <ClientInterDistrict onBack={() => setCurrentView("dashboard")} />;
+      case "freight":
+        return <ClientFreight onBack={() => setCurrentView("dashboard")} />;
+      case "delivery":
+        return <ClientDelivery onBack={() => setCurrentView("dashboard")} />;
+      case "driver":
+        return <DriverAuth onBack={() => setCurrentView("dashboard")} />;
+      case "chat":
+        return (
+          <div style={{ padding: 20 }}>
+            <Title level={4}>{t.chat}</Title>
+            <Text type="secondary">{t.chatComingSoon}</Text>
+          </div>
+        );
+      case "promo":
+        return (
+          <div style={{ padding: 20 }}>
+            <Title level={4}>{t.promotions}</Title>
+            <Text type="secondary">{t.promotionsComingSoon}</Text>
+          </div>
+        );
+      case "market":
+        return (
+          <div style={{ padding: 20 }}>
+            <Title level={4}>{t.autoMarket}</Title>
+            <Text type="secondary">{t.autoMarketComingSoon}</Text>
+          </div>
+        );
+      case "popular":
+        return (
+          <div style={{ padding: 20 }}>
+            <Title level={4}>{t.popularServices}</Title>
+            <Text type="secondary">{t.popularServicesComingSoon}</Text>
+          </div>
+        );
+      case "notify":
+        return (
+          <div style={{ padding: 20 }}>
+            <Title level={4}>{t.notifications}</Title>
+            <Text type="secondary">{t.notificationsComingSoon}</Text>
+          </div>
+        );
+      case "switch":
+        return (
+          <div style={{ padding: 20 }}>
+            <Title level={4}>{t.switchService}</Title>
+            <Text type="secondary">{t.switchServiceComingSoon}</Text>
+          </div>
+        );
+      default:
+        return renderDashboard();
     }
   };
 
-  // --- SAHIFALAR ALMASHINUVI ---
-  if (currentView === "driver") return <DriverAuth onBack={() => setCurrentView("dashboard")} />;
-
-  if (currentView === "taxi") return <ClientOrderCreate onBack={() => setCurrentView("dashboard")} />;
-  if (currentView === "interProv") return <ClientInterProvincial onBack={() => setCurrentView("dashboard")} />;
-  if (currentView === "interDist") return <ClientInterDistrict onBack={() => setCurrentView("dashboard")} />;
-  if (currentView === "freight") return <ClientFreight onBack={() => setCurrentView("dashboard")} />;
-  if (currentView === "delivery") return <ClientDelivery onBack={() => setCurrentView("dashboard")} />;
-
-  const services = [
-    { key: "taxi", title: t?.taxi || "Taksi buyurtma", span: 24, icon: <CarOutlined style={{ fontSize: 28 }} />, image: taxiImg },
-    { key: "interProv", title: t?.interProvincial || "Viloyatlar aro", span: 12, icon: <GlobalOutlined style={{ fontSize: 24 }} />, image: cityImg },
-    { key: "interDist", title: t?.interDistrict || "Tumanlar aro", span: 12, icon: <EnvironmentOutlined style={{ fontSize: 24 }} />, image: villageImg },
-    { key: "freight", title: t?.freight || "Yuk tashish", span: 12, icon: <ContainerOutlined style={{ fontSize: 24 }} />, image: truckImg },
-    { key: "delivery", title: t?.delivery || "Eltish xizmati", span: 12, icon: <RocketOutlined style={{ fontSize: 24 }} />, image: deliveryImg },
-  ];
-
-  const adsList = [
-    { id: 1, type: "gradient", bg: "linear-gradient(135deg, #FFD700, #FFA500)", title: "50% CHEGIRMA!", desc: "Birinchi 3 ta yurish uchun.", icon: <FireOutlined style={{ fontSize: 30, opacity: 0.9 }} />, textColor: "#000" },
-    { id: 2, type: "gradient", bg: "linear-gradient(135deg, #52c41a, #95de64)", title: "Haydovchi bo'ling!", desc: "Daromad topishni boshlang.", icon: <CarOutlined style={{ fontSize: 30, opacity: 0.9, color: "#fff" }} />, textColor: "#fff" },
-    { id: 3, type: "image", bg: "url('https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=1000&auto=format&fit=crop')", title: "EVOS - Mazali taomlar", desc: "Hamkorimizdan buyurtma.", icon: <ShopOutlined style={{ fontSize: 25, color: "#fff" }} />, textColor: "#fff" },
-    { id: 4, type: "solid", bg: "#f0f5ff", title: "Do'stingizni chaqiring", desc: "Bonuslarga ega bo'ling.", icon: <UserAddOutlined style={{ fontSize: 25, color: "#1890ff" }} />, textColor: "#000" },
-  ];
-
-  const sidebarMenu = [
-    { key: "driver", icon: <SwapOutlined />, title: t?.workAsDriver || "Haydovchi bo'lib ishlash", color: "#52c41a", bold: true },
-    { key: "address", icon: <HomeOutlined />, title: t?.myAddress || "Mening manzilim" },
-    { key: "history", icon: <HistoryOutlined />, title: t?.history || "Tarix" },
-    { key: "bonus", icon: <GiftOutlined />, title: t?.bonuses || "Bonuslar", color: "#faad14" },
-    { key: "referral", icon: <UserAddOutlined />, title: t?.referral || "Do'stlarni chaqirish" },
-    { key: "chat", icon: <MessageOutlined />, title: t?.chat || "Chat" },
-    { key: "support", icon: <CustomerServiceOutlined />, title: t?.support || "Qo'llab-quvvatlash" },
-    { key: "settings", icon: <SettingOutlined />, title: t?.settings || "Sozlamalar" },
-  ];
-
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: "#FFD700", borderRadius: 12 } }}>
-      <div
-        style={{
-          padding: "20px",
-          background: "#f8f9fa",
-          minHeight: "100vh",
-          paddingBottom: "120px",
-          overflowY: "auto",
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        }}
-      >
-        {/* HEADER */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+    <ConfigProvider
+      theme={{
+        token: {
+          colorPrimary: "#FFD700",
+          borderRadius: 14,
+          fontFamily: "YangoHeadline, Inter, system-ui, sans-serif",
+        },
+      }}
+    >
+      <div style={{ minHeight: "100vh", background: "#f5f5f5" }}>
+        {/* Header */}
+        <div
+          style={{
+            height: 60,
+            background: "#fff",
+            display: "flex",
+            alignItems: "center",
+            padding: "0 16px",
+            borderBottom: "1px solid #eee",
+            position: "sticky",
+            top: 0,
+            zIndex: 10,
+          }}
+        >
           <Button
             type="text"
-            shape="circle"
-            size="large"
-            style={{ background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}
-            icon={<MenuOutlined style={{ fontSize: 20 }} />}
-            onClick={() => setOpen(true)}
+            icon={<MenuOutlined />}
+            onClick={toggleDrawer}
+            style={{ marginRight: 10 }}
           />
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Button
-              type="text"
-              shape="circle"
-              size="large"
-              style={{ background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}
-              icon={<NotificationOutlined style={{ fontSize: 20 }} />}
-              onClick={() => message.info("Bildirishnomalar yo'q")}
-            />
-            <Dropdown menu={{ items: languages, onClick: handleLangChange }} trigger={["click"]}>
-              <Button
-                size="large"
-                icon={<GlobalOutlined />}
-                shape="round"
-                style={{ fontWeight: 700, boxShadow: "0 4px 12px rgba(0,0,0,0.08)", border: "none" }}
-              >
-                {currentLangText}
-              </Button>
-            </Dropdown>
-          </div>
+          <Title level={5} style={{ margin: 0, flex: 1 }}>
+            {t.appName}
+          </Title>
+
+          <Dropdown menu={langMenu} placement="bottomRight" trigger={["click"]}>
+            <Button type="text" icon={<GlobalOutlined />} />
+          </Dropdown>
         </div>
 
-        {/* SALOMLASHISH */}
-        <div style={{ marginBottom: 20 }}>
-          {loading ? (
-            <Skeleton active paragraph={{ rows: 1 }} />
-          ) : (
-            <>
-              <Title level={5} style={{ margin: 0, opacity: 0.5, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px" }}>
-                {t?.greeting || "Xayrli kun!"}
-              </Title>
-              <Title level={2} style={{ margin: 0, fontWeight: 900, color: "#222" }}>
-                Nukus Go
-              </Title>
-            </>
-          )}
-        </div>
-
-        {/* XIZMATLAR GRID */}
-        <Row gutter={[12, 12]} style={{ marginBottom: 30 }}>
-          {services.map((service) => (
-            <Col span={service.span} key={service.key}>
-              {loading ? (
-                <Skeleton.Button active block style={{ height: service.key === "taxi" ? 180 : 130, borderRadius: 24 }} />
-              ) : (
-                <Card
-                  hoverable
-                  bordered={false}
-                  style={{
-                    height: service.key === "taxi" ? 180 : 130,
-                    borderRadius: "24px",
-                    overflow: "hidden",
-                    position: "relative",
-                    border: "none",
-                    boxShadow: "0 8px 20px rgba(0,0,0,0.06)",
-                    transition: "transform 0.1s",
-                  }}
-                  bodyStyle={{ padding: 0, height: "100%" }}
-                  onClick={() => setCurrentView(service.key)}
-                  onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.98)")}
-                  onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                  onTouchStart={(e) => (e.currentTarget.style.transform = "scale(0.98)")}
-                  onTouchEnd={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                >
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      width: "100%",
-                      height: "100%",
-                      backgroundImage: `url(${service.image})`,
-                      backgroundSize: "cover",
-                      backgroundPosition: "center",
-                    }}
-                  />
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      width: "100%",
-                      height: "100%",
-                      background: "linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.1) 60%)",
-                      zIndex: 1,
-                    }}
-                  />
-                  <div
-                    style={{
-                      position: "relative",
-                      zIndex: 2,
-                      height: "100%",
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "flex-end",
-                      padding: "16px",
-                      color: "#fff",
-                    }}
-                  >
-                    <div
-                      style={{
-                        background: "rgba(255,255,255,0.2)",
-                        width: 48,
-                        height: 48,
-                        borderRadius: "14px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        marginBottom: 10,
-                        backdropFilter: "blur(8px)",
-                        border: "1px solid rgba(255,255,255,0.1)",
-                      }}
-                    >
-                      {service.icon}
-                    </div>
-                    <Text strong style={{ color: "#fff", fontSize: 17, lineHeight: 1.2 }}>
-                      {service.title}
-                    </Text>
-                  </div>
-                </Card>
-              )}
-            </Col>
-          ))}
-        </Row>
-
-        {/* REKLAMALAR */}
-        <div style={{ marginTop: 20 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <Title level={5} style={{ margin: 0, fontWeight: 700 }}>
-              {t?.offersForYou || "Maxsus takliflar"}
-            </Title>
-            <RightOutlined style={{ fontSize: 12, opacity: 0.5 }} />
-          </div>
-
-          <div style={{ display: "flex", gap: "12px", overflowX: "auto", paddingBottom: "10px", scrollSnapType: "x mandatory", msOverflowStyle: "none", scrollbarWidth: "none" }}>
-            {loading ? (
-              [1, 2, 3].map((i) => <Skeleton.Button key={i} active style={{ width: 160, height: 100, borderRadius: 16 }} />)
-            ) : (
-              adsList.map((ad) => (
-                <div
-                  key={ad.id}
-                  onClick={() => message.info("Aksiya ochildi")}
-                  style={{
-                    minWidth: "160px",
-                    height: "100px",
-                    borderRadius: "16px",
-                    background: ad.type === "image" ? "transparent" : ad.bg,
-                    position: "relative",
-                    overflow: "hidden",
-                    cursor: "pointer",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                    scrollSnapAlign: "start",
-                    transition: "transform 0.1s",
-                  }}
-                  onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.95)")}
-                  onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                  onTouchStart={(e) => (e.currentTarget.style.transform = "scale(0.95)")}
-                  onTouchEnd={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                >
-                  {ad.type === "image" && (
-                    <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", backgroundImage: ad.bg, backgroundSize: "cover", backgroundPosition: "center" }}>
-                      <div style={{ width: "100%", height: "100%", background: "rgba(0,0,0,0.4)" }} />
-                    </div>
-                  )}
-                  <div style={{ position: "relative", zIndex: 2, padding: "12px", height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                    <div style={{ alignSelf: "flex-start", background: "rgba(255,255,255,0.2)", padding: 5, borderRadius: "50%", backdropFilter: "blur(4px)" }}>
-                      {ad.icon}
-                    </div>
-                    <div>
-                      <Text strong style={{ color: ad.textColor, display: "block", lineHeight: 1.2, fontSize: 13 }}>
-                        {ad.title}
-                      </Text>
-                      <Text style={{ color: ad.textColor, fontSize: 10, opacity: 0.8 }}>
-                        {ad.desc}
-                      </Text>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div style={{ marginTop: 20, padding: "20px", textAlign: "center", border: "1px dashed #ddd", borderRadius: "12px", color: "#999" }}>
-          <Text type="secondary">Yana reklamalar joylash uchun bo'sh joy...</Text>
-        </div>
-
-        {/* SIDEBAR DRAWER */}
-        <Drawer placement="left" onClose={() => setOpen(false)} open={open} width={280} closable={false} bodyStyle={{ padding: 0 }}>
-          <div style={{ textAlign: "center", padding: "60px 20px 30px", background: "linear-gradient(135deg, #FFD700, #FFC107)", borderRadius: "0 0 30px 30px" }}>
-            <Avatar size={70} icon={<UserOutlined />} style={{ border: "4px solid rgba(255,255,255,0.6)", marginBottom: 10, background: "#fff", color: "#000" }} />
-            <Title level={4} style={{ margin: 0, color: "#000" }}>Timur Xalmuratov</Title>
-            <Text style={{ opacity: 0.7, color: "#000", fontWeight: 500 }}>+998 90 123 45 67</Text>
-          </div>
-
+        {/* Drawer menu */}
+        <Drawer
+          title={
+            <Space>
+              <Avatar icon={<UserOutlined />} />
+              <div>
+                <div style={{ fontWeight: 700 }}>{t.menu}</div>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {t.chooseSection}
+                </Text>
+              </div>
+            </Space>
+          }
+          placement="left"
+          onClose={toggleDrawer}
+          open={open}
+          bodyStyle={{ padding: 0 }}
+        >
           <List
-            style={{ padding: "15px" }}
-            dataSource={sidebarMenu}
+            dataSource={menuItems}
             renderItem={(item) => (
               <List.Item
-                style={{ padding: "12px 15px", cursor: "pointer", border: "none", borderRadius: "12px", marginBottom: 5, transition: "background 0.2s" }}
+                style={{
+                  cursor: "pointer",
+                  padding: "12px 16px",
+                  color: item.danger ? "#ff4d4f" : "inherit",
+                }}
                 onClick={() => {
-                  if (item.key === "driver") setCurrentView("driver");
-                  else message.info("Tez kunda...");
                   setOpen(false);
+                  if (item.onClick) {
+                    item.onClick();
+                  } else {
+                    setCurrentView(item.key);
+                  }
                 }}
               >
-                <Space size="middle">
-                  <span style={{ fontSize: 20, color: item.color || "#555" }}>{item.icon}</span>
-                  <div>
-                    <Text strong={item.bold} style={{ display: "block", fontSize: 15, color: "#333" }}>
-                      {item.title}
-                    </Text>
-                  </div>
+                <Space>
+                  {item.icon}
+                  <span>{item.label}</span>
                 </Space>
               </List.Item>
             )}
           />
-
-          {/* CHIQISH TUGMASI */}
-          <div style={{ padding: "20px" }}>
-            <Button
-              danger
-              block
-              type="text"
-              icon={<LogoutOutlined />}
-              onClick={handleLogout}
-              style={{ height: 45, borderRadius: 12, fontWeight: "bold", background: "#fff1f0", color: "#ff4d4f" }}
-            >
-              {t?.logout || "Chiqish"}
-            </Button>
-          </div>
         </Drawer>
+
+        {/* Content */}
+        <div style={{ padding: 16 }}>
+          {renderContent()}
+        </div>
       </div>
     </ConfigProvider>
   );
-}//deploy qilish
+}
