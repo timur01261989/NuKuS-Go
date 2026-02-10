@@ -5,7 +5,7 @@ import {
   RocketOutlined, ShopOutlined, ArrowLeftOutlined 
 } from "@ant-design/icons";
 import { translations } from "../../../pages/translations";
-import { supabase } from "../../../pages/supabase";
+import { supabase } from "../../../lib/supabase";
 
 // Xizmatlarni import qilamiz
 import ClientInterProvincial from "./ClientInterProvincial";
