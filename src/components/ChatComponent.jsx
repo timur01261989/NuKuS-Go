@@ -12,15 +12,6 @@ export default function ChatComponent({ orderId, userId, visible, onClose }) {
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState("");
   const scrollRef = useRef(null);
-  // ChatComponent.jsx ichida xabar statusi:
-  <div style={{ fontSize: '10px', textAlign: 'right' }}>
-    {msg.is_read ? (
-      <span style={{ color: '#1890ff' }}><CheckOutlined /><CheckOutlined /></span>
-    ) : (
-      <CheckOutlined />
-    )}
-  </div>
-
   // 1. XABARLARNI YUKLASH VA REAL-TIME KUZATISH
   useEffect(() => {
     if (!orderId || !visible) return;

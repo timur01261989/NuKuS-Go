@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, Button, Typography, Avatar, message, Tag, Skeleton, Result, Rate, Input, Badge } from 'antd';
-import {
-  ArrowLeftOutlined, CarOutlined, PhoneOutlined, SearchOutlined,
+import { 
+  ArrowLeftOutlined, CarOutlined, PhoneOutlined, SearchOutlined, 
   EnvironmentFilled, AimOutlined, UserOutlined,
   CheckCircleOutlined, ClockCircleOutlined, CloseOutlined, LoadingOutlined,
   EnvironmentOutlined, SoundOutlined, MessageOutlined, StarFilled
@@ -10,32 +10,15 @@ import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-lea
 import L from 'leaflet';
 import 'leaflet-routing-machine';
 import 'leaflet/dist/leaflet.css';
-import { supabase } from "../../pages/supabase";
+import { supabase } from "../../pages/supabase"; 
 
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
 // Chat va Rating komponentlari
-import ChatComponent from '../ChatComponent';
-import RatingModal from '../RatingModal';
+import ChatComponent from '../ChatComponent'; 
+import RatingModal from '../RatingModal'; 
 
-/**
- * ⚠️ Siz oldin shunday yozgansiz:
- * import { PaymentStatus } from './PaymentStatus';
- * Lekin sizning PaymentStatus.jsx faylingiz default export qiladi.
- * Shuning uchun to‘g‘risi: default import.
- */
-import PaymentStatus from './PaymentStatus';
-
-// Siz yozgan: import AddressAutocomplete from './AddressAutocomplete';
-import AddressAutocomplete from './AddressAutocomplete';
-
-// Radar uchun (siz snippet’da Lottie va radarAnim ishlatgansiz)
-// Agar sizda boshqa path bo‘lsa o‘zingiz moslab qo‘ying:
-import Lottie from "lottie-react";
-import radarAnim from "../../assets/lottie/radar_animation.json";
-
-/* =================== MAP STYLE =================== */
 const getMapStyle = () => {
   const hour = new Date().getHours();
   const isNight = hour >= 20 || hour < 6;
@@ -49,13 +32,11 @@ const getMapStyle = () => {
   // Kunduzgi professional uslub
   return "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
 };
-
-/* =================== ICONS =================== */
-const carIcon = L.divIcon({
-  html: '<div class="smooth-car-wrapper" style="font-size: 35px; transition: all 1.5s linear; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));">🚖</div>',
+// --- ICONS ---
+const carIcon = L.divIcon({ 
+  html: '<div class="smooth-car-wrapper" style="font-size: 35px; transition: all 1.5s linear; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));">🚖</div>', 
   className: 'car-marker-container', iconSize: [35, 35], iconAnchor: [17, 17]
 });
-
 let DefaultIcon = L.icon({ iconUrl: icon, shadowUrl: iconShadow, iconSize: [25, 41], iconAnchor: [12, 41] });
 L.Marker.prototype.options.icon = DefaultIcon;
 
@@ -67,7 +48,7 @@ const TARIFFS = [
   { id: 'delivery', name: 'Yetkazish', basePrice: 10000, time: '10 min', icon: <EnvironmentOutlined /> },
 ];
 
-/* =================== ROUTING =================== */
+// --- ROUTING ---
 function RoutingMachine({ from, to, color = '#1890ff' }) {
   const map = useMap();
   useEffect(() => {
@@ -77,44 +58,32 @@ function RoutingMachine({ from, to, color = '#1890ff' }) {
       waypoints: [L.latLng(from), L.latLng(to)],
       lineOptions: { styles: [{ color: color, weight: 6, opacity: 0.8, dashArray: '5, 10' }] },
       createMarker: () => null, addWaypoints: false, show: false, fitSelectedRoutes: true,
-      router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' })
+      router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }) 
     }).addTo(map);
-    return () => { try { map.removeControl(control) } catch (e) { } };
+    return () => { try { map.removeControl(control) } catch(e){} };
   }, [map, from, to, color]);
   return null;
 }
 
 function MapFlyTo({ center, trigger }) {
-  const map = useMap();
-  useEffect(() => { if (center && trigger) map.flyTo(center, 16, { animate: true, duration: 1.5 }); }, [trigger, center, map]);
-  return null;
+    const map = useMap();
+    useEffect(() => { if (center && trigger) map.flyTo(center, 16, { animate: true, duration: 1.5 }); }, [trigger, center, map]);
+    return null;
 }
 
 const speak = (text) => {
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'uz-UZ';
-    utterance.rate = 1.0;
-    window.speechSynthesis.speak(utterance);
-  }
-};
-
-// Siz snippet’da ishlatgansiz: playSound("success")
-// Men buni crash bo‘lmasin deb universal qilib qo‘ydim.
-// Agar sizda mp3 yo‘li boshqacha bo‘lsa, shu yerda moslaysiz.
-const playSound = (name) => {
-  try {
-    // misol: public/assets/sounds/success.mp3 bo‘lsa ishlaydi
-    const audio = new Audio(`/assets/sounds/${name}.mp3`);
-    audio.play().catch(() => {});
-  } catch (e) {}
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'uz-UZ'; 
+        utterance.rate = 1.0; 
+        window.speechSynthesis.speak(utterance);
+    }
 };
 
 export default function ClientOrderCreate({ onBack }) {
-  const [mode, setMode] = useState('main');
-  const [statusState, setStatusState] = useState(null); // statusni saqlab turish uchun (snippetingizdagi status ishlashi uchun)
-  const [userLoc, setUserLoc] = useState([42.4619, 59.6166]);
+  const [mode, setMode] = useState('main'); 
+  const [userLoc, setUserLoc] = useState([42.4619, 59.6166]); 
   const [destLoc, setDestLoc] = useState(null);
   const [driverLoc, setDriverLoc] = useState(null);
   const [realDriver, setRealDriver] = useState(null);
@@ -140,30 +109,30 @@ export default function ClientOrderCreate({ onBack }) {
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id));
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(p => {
-        const pos = [p.coords.latitude, p.coords.longitude];
-        setUserLoc(pos);
-        checkActiveOrder();
-        setFlyTrigger(prev => prev + 1);
-      });
+        navigator.geolocation.getCurrentPosition(p => {
+            const pos = [p.coords.latitude, p.coords.longitude];
+            setUserLoc(pos);
+            checkActiveOrder();
+            setFlyTrigger(prev => prev + 1);
+        });
     }
   }, []);
 
   const checkActiveOrder = async () => {
-    const savedOrderId = localStorage.getItem('activeOrderId');
-    if (!savedOrderId) return;
-    const { data } = await supabase.from('orders').select('id, status, price, driver_id, client_id').eq('id', savedOrderId).single();
-    if (data) {
-      setCurrentOrderId(data.id);
-      handleStatusChange(data.status, data);
-    }
+      const savedOrderId = localStorage.getItem('activeOrderId');
+      if (!savedOrderId) return;
+      const { data } = await supabase.from('orders').select('id, status, price, driver_id, client_id').eq('id', savedOrderId).single();
+      if (data) {
+          setCurrentOrderId(data.id);
+          handleStatusChange(data.status, data);
+      }
   };
 
   useEffect(() => {
     if (!currentOrderId) return;
     const channel = supabase.channel(`client-order-${currentOrderId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${currentOrderId}` },
-        (payload) => { handleStatusChange(payload.new.status, payload.new); })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${currentOrderId}` }, 
+      (payload) => { handleStatusChange(payload.new.status, payload.new); })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [currentOrderId]);
@@ -171,257 +140,148 @@ export default function ClientOrderCreate({ onBack }) {
   useEffect(() => {
     if (!realDriver?.id) return;
     const driverChannel = supabase.channel(`driver-gps-${realDriver.id}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'drivers', filter: `id=eq.${realDriver.id}` },
-        (payload) => {
-          const { current_lat, current_lng } = payload.new;
-          if (current_lat && current_lng) setDriverLoc([current_lat, current_lng]);
-        })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'drivers', filter: `id=eq.${realDriver.id}` }, 
+      (payload) => {
+        const { current_lat, current_lng } = payload.new;
+        if (current_lat && current_lng) setDriverLoc([current_lat, current_lng]);
+      })
       .subscribe();
     return () => { supabase.removeChannel(driverChannel); };
   }, [realDriver]);
 
   const handleStatusChange = (status, data) => {
-    setStatusState(status);
-
-    if (status === 'accepted') {
-      setMode('coming');
-      if (data.driver_id) fetchDriverInfo(data.driver_id);
-      speak("Buyurtma qabul qilindi.");
-    }
-    if (status === 'arrived' && mode !== 'arrived') {
-      setMode('arrived');
-      speak("Haydovchi yetib keldi.");
-    }
-    if (status === 'in_progress' && mode !== 'in_progress') {
-      setMode('in_progress');
-      speak("Safar boshlandi.");
-    }
-
-    // Siz snippet’da shunday yozgansiz:
-    // if (status === 'completed') { setMode('payment_success'); playSound('success'); }
-    // Men aynan shuni qoldirdim, faqat component ichida ishlaydigan qilib qo‘ydim.
-    if (status === 'completed') {
-      setFinalPrice(data.price || 0);
-      setRatingVisible(true);
-      localStorage.removeItem('activeOrderId');
-
-      // ✅ Siz xohlagan "payment_success" rejim
-      setMode('payment_success');
-      playSound('success');
-    }
+      if (status === 'accepted') {
+          setMode('coming');
+          if (data.driver_id) fetchDriverInfo(data.driver_id);
+          speak("Buyurtma qabul qilindi.");
+      }
+      if (status === 'arrived' && mode !== 'arrived') {
+          setMode('arrived');
+          speak("Haydovchi yetib keldi.");
+      }
+      if (status === 'in_progress' && mode !== 'in_progress') {
+          setMode('in_progress');
+          speak("Safar boshlandi.");
+      }
+      if (status === 'completed') {
+          setMode('completed');
+          setFinalPrice(data.price || 0);
+          setRatingVisible(true); 
+          localStorage.removeItem('activeOrderId');
+      }
   };
 
   useEffect(() => {
-    let interval;
-    if (mode === 'arrived') interval = setInterval(() => setWaitTime(t => t + 1), 1000);
-    return () => clearInterval(interval);
+      let interval;
+      if (mode === 'arrived') interval = setInterval(() => setWaitTime(t => t + 1), 1000);
+      return () => clearInterval(interval);
   }, [mode]);
 
   const fetchDriverInfo = async (driverId) => {
-    const { data } = await supabase.from('drivers').select('*').eq('id', driverId).single();
-    if (data) setRealDriver(data);
+      const { data } = await supabase.from('drivers').select('*').eq('id', driverId).single();
+      if (data) setRealDriver(data);
   };
 
   const startOrder = async () => {
-    setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    const dropoffText = destLoc ? `Lat: ${destLoc[0]}, Lng: ${destLoc[1]}` : null;
-    const { data } = await supabase.from('orders').insert([{
-      pickup_location: pinAddress, dropoff_location: dropoffText,
-      price: selectedTariff.basePrice, status: 'pending', service_type: 'taxi', client_id: user?.id,
-      created_at: new Date().toISOString()
-    }]).select();
-    if (data) {
-      setCurrentOrderId(data[0].id);
-      localStorage.setItem('activeOrderId', data[0].id);
-
-      // Sizda bor: setMode('searching');
-      setMode('searching');
-      setStatusState('searching');
-    }
-    setLoading(false);
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      const dropoffText = destLoc ? `Lat: ${destLoc[0]}, Lng: ${destLoc[1]}` : null;
+      const { data } = await supabase.from('orders').insert([{ 
+          pickup_location: pinAddress, dropoff_location: dropoffText, 
+          price: selectedTariff.basePrice, status: 'pending', service_type: 'taxi', client_id: user?.id,
+          created_at: new Date().toISOString()
+      }]).select();
+      if (data) {
+          setCurrentOrderId(data[0].id);
+          localStorage.setItem('activeOrderId', data[0].id);
+          setMode('searching');
+      }
+      setLoading(false);
   };
 
   const cancelOrder = async () => {
-    if (currentOrderId) await supabase.from('orders').update({ status: 'cancelled' }).eq('id', currentOrderId);
-    localStorage.removeItem('activeOrderId');
-    setMode('main'); setCurrentOrderId(null);
-    setStatusState(null);
+      if (currentOrderId) await supabase.from('orders').update({ status: 'cancelled' }).eq('id', currentOrderId);
+      localStorage.removeItem('activeOrderId');
+      setMode('main'); setCurrentOrderId(null);
   };
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#fff' }}>
-      <div style={{ flex: 1, position: 'relative' }}>
-        <MapContainer center={userLoc} zoom={16} zoomControl={false} style={{ height: '100%', width: '100%' }}>
-          {/* TUNGI REJIM INTEGRATSIYASI */}
-          <TileLayer url={getMapStyle()} />
-          <MapFlyTo center={userLoc} trigger={flyTrigger} />
+        <div style={{ flex: 1, position: 'relative' }}>
+            <MapContainer center={userLoc} zoom={16} zoomControl={false} style={{ height: '100%', width: '100%' }}>
+                {/* TUNGI REJIM INTEGRATSIYASI */}
+                <TileLayer url={getMapStyle()} />
+                <MapFlyTo center={userLoc} trigger={flyTrigger} />
+                <Marker position={userLoc} icon={L.divIcon({ className: 'user-pulse-marker', html: `<div style="width: 18px; height: 18px; background: #1890ff; border-radius: 50%; border: 3px solid white;"></div>` })} />
+                {(mode === 'coming' || mode === 'arrived' || mode === 'in_progress') && (
+                    <Marker position={driverLoc || [userLoc[0]+0.003, userLoc[1]+0.003]} icon={carIcon} />
+                )}
+            </MapContainer>
 
-          <Marker
-            position={userLoc}
-            icon={L.divIcon({
-              className: 'user-pulse-marker',
-              html: `<div style="width: 18px; height: 18px; background: #1890ff; border-radius: 50%; border: 3px solid white;"></div>`
-            })}
-          />
+            {['coming', 'arrived', 'in_progress'].includes(mode) && (
+              <Badge dot={false} style={{ position: 'absolute', bottom: 320, right: 20, zIndex: 1000 }}>
+                <Button 
+                  shape="circle" size="large" icon={<MessageOutlined />} 
+                  onClick={() => setChatVisible(true)}
+                  style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.15)', border: 'none' }}
+                />
+              </Badge>
+            )}
 
-          {(mode === 'coming' || mode === 'arrived' || mode === 'in_progress') && (
-            <Marker position={driverLoc || [userLoc[0] + 0.003, userLoc[1] + 0.003]} icon={carIcon} />
-          )}
-        </MapContainer>
+            <Button icon={<ArrowLeftOutlined />} shape="circle" size="large" onClick={onBack} style={{ position: 'absolute', top: 15, left: 15, zIndex: 999 }} />
+        </div>
 
-        {['coming', 'arrived', 'in_progress'].includes(mode) && (
-          <Badge dot={false} style={{ position: 'absolute', bottom: 320, right: 20, zIndex: 1000 }}>
-            <Button
-              shape="circle" size="large" icon={<MessageOutlined />}
-              onClick={() => setChatVisible(true)}
-              style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.15)', border: 'none' }}
-            />
-          </Badge>
+        {mode === 'main' && (
+            <Card style={{ borderRadius: '24px 24px 0 0', border: 'none' }}>
+                <div onClick={() => { setDestLoc([userLoc[0] + 0.008, userLoc[1] + 0.008]); setPinAddress("Nukus, Berdaq"); }} style={{ background: '#f5f5f5', padding: 15, borderRadius: 16, marginBottom: 20 }}>
+                    <SearchOutlined style={{ marginRight: 10 }} />
+                    <Text strong>{destLoc ? pinAddress : "Qayerga boramiz?"}</Text>
+                </div>
+                <Button type="primary" block size="large" onClick={startOrder} {...btnTouchProps} style={{ height: 60, borderRadius: 20, background: '#FFD700', color: '#000', fontWeight: '900' }}> BUYURTMA BERISH </Button>
+            </Card>
         )}
 
-        <Button icon={<ArrowLeftOutlined />} shape="circle" size="large" onClick={onBack} style={{ position: 'absolute', top: 15, left: 15, zIndex: 999 }} />
-      </div>
+        {['coming', 'arrived', 'in_progress'].includes(mode) && (
+            <Card style={{ borderRadius: '24px 24px 0 0', border: 'none', boxShadow: '0 -10px 40px rgba(0,0,0,0.1)' }}>
+               <div style={{ display: 'flex', gap: 15, alignItems: 'center' }}>
+                  <Avatar size={60} src={realDriver?.avatar_url} icon={<UserOutlined />} style={{ border: '3px solid #FFD700' }} />
+                  <div>
+                     <div style={{ fontWeight: '900' }}>{realDriver?.first_name || 'Haydovchi'}</div>
+                     <Text type="secondary">{realDriver?.car_model} • {realDriver?.plate_number}</Text>
+                  </div>
+                  <Button icon={<PhoneOutlined />} shape="circle" style={{ marginLeft: 'auto' }} />
+               </div>
+            </Card>
+        )}
 
-      {/* ===================== SIZNING RADAR SNIPPETINGIZ (TO‘G‘RI JOYGA KO‘CHIRILDI) ===================== */}
-      {statusState === 'searching' && (
-        <div className="radar-container" style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          zIndex: 1200,
-          pointerEvents: 'none'
-        }}>
-          <Lottie animationData={radarAnim} loop={true} style={{ width: 300, height: 300 }} />
-          {/* Bu yerda o'sha APK'dan olingan radar signali chiqadi */}
-        </div>
-      )}
-
-      {/* ===================== PAYMENT SUCCESS (SIZ SO‘RAGAN) ===================== */}
-      {mode === 'payment_success' && (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', background: '#fff' }}>
-          <PaymentStatus status="success" />
-          <div style={{ padding: '0 20px' }}>
-            <Button
-              type="primary"
-              block
-              size="large"
-              onClick={() => setMode('main')}
-              style={{ height: 55, borderRadius: 16, background: '#000', border: 'none' }}
-            >
-              YOPISH
-            </Button>
+        {mode === 'completed' && (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Result status="success" title="Safar yakunlandi!" subTitle={`To'lov: ${finalPrice.toLocaleString()} so'm`} 
+              extra={[<Button type="primary" key="close" onClick={() => setMode('main')}>Yopish</Button>]} />
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ===================== MAIN MODE (SIZ SO‘RAGAN AddressAutocomplete) ===================== */}
-      {mode === 'main' && (
-        <Card style={{ borderRadius: '24px 24px 0 0', border: 'none', padding: '10px 5px' }}>
-          <div style={{ marginBottom: 20 }}>
-            {/* Eskisini AddressAutocomplete ga almashtiramiz */}
-            <AddressAutocomplete onSelect={(place) => {
-              setDestLoc([place.lat, place.lng]);
-              setPinAddress(place.name);
-              // Xaritani o'sha joyga uchiramiz
-              setFlyTrigger(prev => prev + 1);
-            }} />
-          </div>
+        <ChatComponent 
+          orderId={currentOrderId} 
+          userId={userId} 
+          visible={chatVisible} 
+          onClose={() => setChatVisible(false)} 
+        />
 
-          <Button
-            type="primary"
-            block
-            size="large"
-            onClick={startOrder}
-            style={{ height: 60, borderRadius: 20, background: '#FFD700', color: '#000', fontWeight: '900' }}
-          >
-            BUYURTMA BERISH
-          </Button>
-        </Card>
-      )}
+        <RatingModal 
+          visible={ratingVisible} 
+          order={{ id: currentOrderId, client_id: userId, driver_id: realDriver?.id }}
+          onFinish={() => {
+            setRatingVisible(false);
+            setMode('main');
+          }}
+        />
 
-      {/* ===================== OLD MAIN PANEL (SIZ YOZGAN, O‘CHIRILMADI) ===================== */}
-      {/* Sizda oldin bosilganda pinAddress set qiladigan demo bor edi, men uni ham saqladim: */}
-      {/* Agar AddressAutocomplete ishlatilsa, bu panel sizga kerak bo‘lmasa ham, o‘chirmadim. */}
-      {mode === 'main' && (
-        <Card style={{ borderRadius: '24px 24px 0 0', border: 'none' }}>
-          <div
-            onClick={() => { setDestLoc([userLoc[0] + 0.008, userLoc[1] + 0.008]); setPinAddress("Nukus, Berdaq"); }}
-            style={{ background: '#f5f5f5', padding: 15, borderRadius: 16, marginBottom: 20 }}
-          >
-            <SearchOutlined style={{ marginRight: 10 }} />
-            <Text strong>{destLoc ? pinAddress : "Qayerga boramiz?"}</Text>
-          </div>
-          <Button
-            type="primary"
-            block
-            size="large"
-            onClick={startOrder}
-            {...btnTouchProps}
-            style={{ height: 60, borderRadius: 20, background: '#FFD700', color: '#000', fontWeight: '900' }}
-          >
-            BUYURTMA BERISH
-          </Button>
-        </Card>
-      )}
-
-      {/* ===================== COMING/ARRIVED/IN_PROGRESS PANEL ===================== */}
-      {['coming', 'arrived', 'in_progress'].includes(mode) && (
-        <Card style={{ borderRadius: '24px 24px 0 0', border: 'none', boxShadow: '0 -10px 40px rgba(0,0,0,0.1)' }}>
-          <div style={{ display: 'flex', gap: 15, alignItems: 'center' }}>
-            <Avatar size={60} src={realDriver?.avatar_url} icon={<UserOutlined />} style={{ border: '3px solid #FFD700' }} />
-            <div>
-              <div style={{ fontWeight: '900' }}>{realDriver?.first_name || 'Haydovchi'}</div>
-              <Text type="secondary">{realDriver?.car_model} • {realDriver?.plate_number}</Text>
-            </div>
-            <Button icon={<PhoneOutlined />} shape="circle" style={{ marginLeft: 'auto' }} />
-          </div>
-
-          <div style={{ marginTop: 12, display: 'flex', gap: 10 }}>
-            <Button danger onClick={cancelOrder}>Bekor qilish</Button>
-          </div>
-        </Card>
-      )}
-
-      {/* ===================== OLD COMPLETED UI (SIZ YOZGAN, O‘CHIRILMADI) ===================== */}
-      {mode === 'completed' && (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Result
-            status="success"
-            title="Safar yakunlandi!"
-            subTitle={`To'lov: ${finalPrice.toLocaleString()} so'm`}
-            extra={[<Button type="primary" key="close" onClick={() => setMode('main')}>Yopish</Button>]}
-          />
-        </div>
-      )}
-
-      {/* ===================== CHAT + RATING ===================== */}
-      <ChatComponent
-        orderId={currentOrderId}
-        userId={userId}
-        visible={chatVisible}
-        onClose={() => setChatVisible(false)}
-      />
-
-      <RatingModal
-        visible={ratingVisible}
-        order={{ id: currentOrderId, client_id: userId, driver_id: realDriver?.id }}
-        onFinish={() => {
-          setRatingVisible(false);
-          setMode('main');
-        }}
-      />
-
-      <style>{`
-        .leaflet-marker-icon { transition: transform 1.5s linear !important; }
-        .user-pulse-marker { animation: pulse 2s infinite; }
-        @keyframes pulse {
-          0% { box-shadow: 0 0 0 0 rgba(24,144,255,0.4); }
-          70% { box-shadow: 0 0 0 20px rgba(24,144,255,0); }
-          100% { box-shadow: 0 0 0 0 rgba(24,144,255,0); }
-        }
-      `}</style>
+        <style>{`
+          .leaflet-marker-icon { transition: transform 1.5s linear !important; }
+          .user-pulse-marker { animation: pulse 2s infinite; }
+          @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(24,144,255,0.4); } 70% { box-shadow: 0 0 0 20px rgba(24,144,255,0); } 100% { box-shadow: 0 0 0 0 rgba(24,144,255,0); } }
+        `}</style>
     </div>
   );
 }

@@ -2,52 +2,12 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Button, Result, Card, Skeleton, message, Typography } from "antd"; 
 import { ClockCircleOutlined, StopOutlined, ReloadOutlined, ArrowLeftOutlined } from "@ant-design/icons"; 
 import { useNavigate } from "react-router-dom";
-
-// SUPABASE
-import { supabase } from "../../pages/supabase"; 
-
-// YO'NALTIRILADIGAN KOMPONENTLAR
-import DriverRegister from "./DriverRegister"; // Ro'yxatdan o'tish
-import DriverHome from "./DriverHome";         // Asosiy Ish stoli (Menu, Xarita)
-import DriverVerification from "./DriverVerification"; // Siz returnda ishlatyapsiz
-
-const { Title, Text } = Typography;
-
 export default function DriverAuth({ onBack }) { 
   const navigate = useNavigate();
-
-  // DriverAuth.jsx yoki DriverHome.jsx ichida:
-  const [isVerified, setIsVerified] = useState(false);
-  const [checking, setChecking] = useState(true);
 
   // Statuslar: 'loading' | 'none' | 'pending' | 'active' | 'blocked'
   const [status, setStatus] = useState("loading"); 
   const [loading, setLoading] = useState(false); // Tugma uchun loading
-
-  // ✅ userId sizning returnda ishlatilgan (DriverVerification userId=...)
-  // Sizning supabase auth’dan user olinyapti, shuni state qilib qo'ydim (logikani o‘zgartirmasdan).
-  const [userId, setUserId] = useState(null);
-
-  useEffect(() => {
-    const checkStatus = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUserId(user.id);
-
-        const { data } = await supabase
-          .from('drivers')
-          .select('is_verified') // Admin tomonidan beriladigan status
-          .eq('id', user.id)
-          .single();
-
-        if (data?.is_verified) {
-          setIsVerified(true);
-        }
-      }
-      setChecking(false);
-    };
-    checkStatus();
-  }, []);
 
   // --- 1. HAYDOVCHI STATUSINI TEKSHIRISH (LOGIKA) ---
   const checkDriverStatus = useCallback(async () => {
@@ -60,9 +20,6 @@ export default function DriverAuth({ onBack }) {
          if (onBack) onBack(); else navigate("/");
          return;
       }
-
-      // ✅ userId state (sizning oldingi logikangizga mos)
-      setUserId(user.id);
 
       // 2. Bazadan haydovchini qidiramiz
       const { data, error } = await supabase
@@ -113,10 +70,6 @@ export default function DriverAuth({ onBack }) {
     }, 1000);
   };
 
-  // ✅ Sizning early returnlaringiz endi TO‘G‘RI joyda (component ichida)
-  if (checking) return <Skeleton active />;
-  if (!isVerified) return <DriverVerification userId={userId} onFinish={() => message.info("Hujjatlar yuborildi!")} />;
-
   // --- RENDER QISMI (ROUTER) ---
 
   // 1. YUKLANMOQDA (SKELETON)
@@ -132,6 +85,8 @@ export default function DriverAuth({ onBack }) {
 
   // 2. AKTIV HAYDOVCHI -> ISH STOLIGA (DRIVER HOME)
   if (status === "active") {
+      // Eng muhim joyi: Agar active bo'lsa, biz boshqaruvni DriverHome ga beramiz.
+      // onLogout funksiyasi DriverHome dagi "Chiqish" tugmasi uchun.
       return <DriverHome onLogout={goBackMain} />;
   }
 
@@ -148,6 +103,7 @@ export default function DriverAuth({ onBack }) {
                     Asosiy menyuga qaytish
                 </Button>
             </div>
+            {/* Ro'yxatdan o'tib bo'lgach, statusni 'pending' ga o'zgartiramiz */}
             <DriverRegister onRegisterSuccess={() => setStatus("pending")} />
         </div>
       );

@@ -2,41 +2,6 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Button, Result, Card, Skeleton, message, Typography } from "antd"; 
 import { ClockCircleOutlined, StopOutlined, ReloadOutlined, ArrowLeftOutlined } from "@ant-design/icons"; 
 import { useNavigate } from "react-router-dom";
-// DriverAuth.jsx yoki DriverHome.jsx ichida:
-const [isVerified, setIsVerified] = useState(false);
-const [checking, setChecking] = useState(true);
-
-useEffect(() => {
-  const checkStatus = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data } = await supabase
-        .from('drivers')
-        .select('is_verified') // Admin tomonidan beriladigan status
-        .eq('id', user.id)
-        .single();
-
-      if (data?.is_verified) {
-        setIsVerified(true);
-      }
-    }
-    setChecking(false);
-  };
-  checkStatus();
-}, []);
-
-if (checking) return <Skeleton active />;
-if (!isVerified) return <DriverVerification userId={userId} onFinish={() => message.info("Hujjatlar yuborildi!")} />;
-
-// SUPABASE
-import { supabase } from "../../pages/supabase"; 
-
-// YO'NALTIRILADIGAN KOMPONENTLAR
-import DriverRegister from "./DriverRegister"; // Ro'yxatdan o'tish
-import DriverHome from "./DriverHome";         // Asosiy Ish stoli (Menu, Xarita)
-
-const { Title, Text } = Typography;
-
 export default function DriverAuth({ onBack }) { 
   const navigate = useNavigate();
 
