@@ -1,2 +1,2 @@
 // ImageUpload.jsx ichida
-import { supabase } from '../../../supabase.js'; // Fayl yo'liga e'tibor bering
+import { supabase } from '../../../lib/supabase.js'; // Fayl yo'liga e'tibor bering
