@@ -16,7 +16,7 @@ import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
 // Chat va Rating komponentlari
-import ChatComponent from '../ChatComponent'; 
+import ChatComponent from '../../chat/components/ChatComponent'; 
 import RatingModal from '../RatingModal'; 
 
 const getMapStyle = () => {
