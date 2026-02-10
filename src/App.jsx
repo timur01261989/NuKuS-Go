@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { ConfigProvider } from "antd";
 
@@ -40,18 +40,82 @@ function ScrollToTop() {
   return null;
 }
 
+/**
+ * Night mode boshqaruvi:
+ * - default: AUTO (20:00-06:00)
+ * - manual ON/OFF: localStorage orqali saqlanadi
+ * - URL orqali tez yoqish/o‘chirish:
+ *    ?night=1  -> majburan yoqadi (manual)
+ *    ?night=0  -> majburan o‘chiradi (manual)
+ *    ?night=auto -> manualni tozalaydi, auto rejimga qaytadi
+ */
+function applyNightModeClass(enabled) {
+  if (enabled) document.body.classList.add("night-mode-active");
+  else document.body.classList.remove("night-mode-active");
+}
+
 export default function App() {
   // Ilova yuklanishi bilan optimizatsiyalar
   useEffect(() => {
     prioritizeAssets();
   }, []);
 
-  // Night mode (20:00 - 06:00)
+  // Night mode state:
+  // mode: "auto" | "on" | "off"
+  const [nightMode, setNightMode] = useState("auto");
+
+  // App start: localStorage’dan o‘qib olish
   useEffect(() => {
-    const hour = new Date().getHours();
-    if (hour >= 20 || hour < 6) document.body.classList.add("night-mode-active");
-    else document.body.classList.remove("night-mode-active");
+    const saved = localStorage.getItem("nightMode"); // "auto" | "on" | "off" | null
+    if (saved === "on" || saved === "off" || saved === "auto") {
+      setNightMode(saved);
+    } else {
+      setNightMode("auto");
+    }
   }, []);
+
+  // URL query orqali tez boshqarish (reloadsiz ham ishlaydi, lekin sizda hozir query doimiy emas)
+  useEffect(() => {
+    const qp = new URLSearchParams(window.location.search);
+    const qNight = qp.get("night"); // "1" | "0" | "auto" | null
+
+    if (qNight === "1") {
+      setNightMode("on");
+      localStorage.setItem("nightMode", "on");
+    } else if (qNight === "0") {
+      setNightMode("off");
+      localStorage.setItem("nightMode", "off");
+    } else if (qNight === "auto") {
+      setNightMode("auto");
+      localStorage.setItem("nightMode", "auto");
+    }
+  }, []);
+
+  // Night mode qo‘llash (auto yoki manual)
+  useEffect(() => {
+    if (nightMode === "on") {
+      applyNightModeClass(true);
+      return;
+    }
+
+    if (nightMode === "off") {
+      applyNightModeClass(false);
+      return;
+    }
+
+    // AUTO: 20:00 - 06:00
+    const updateAuto = () => {
+      const hour = new Date().getHours();
+      const enabled = hour >= 20 || hour < 6;
+      applyNightModeClass(enabled);
+    };
+
+    updateAuto();
+
+    // Har 1 daqiqada tekshirib turadi (vaqt o‘zgarsa avtomatik almashadi)
+    const interval = setInterval(updateAuto, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [nightMode]);
 
   const qp = new URLSearchParams(window.location.search);
   const debugProviders = qp.get("debugProviders") === "1";

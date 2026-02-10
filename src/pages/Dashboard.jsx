@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
-  Card, Row, Col, Button, Drawer, Avatar, List,
-  Space, message, Dropdown, ConfigProvider, Skeleton, Typography
+  Card, Button, Drawer, Avatar, List,
+  Space, message, Dropdown, ConfigProvider, Skeleton, Typography, Switch, Segmented
 } from "antd";
 import {
   MenuOutlined, UserOutlined, HomeOutlined, HistoryOutlined,
@@ -11,7 +11,6 @@ import {
   NotificationOutlined, FireOutlined, ShopOutlined, RightOutlined
 } from "@ant-design/icons";
 
-// YANGI IMPORTLAR (Navigatsiya va Supabase uchun)
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import ClientDashboard from "../features/client/components/ClientDashboard";
@@ -20,7 +19,6 @@ import { translations } from "./translations";
 
 // --- KOMPONENTLAR ---
 import DriverAuth from "../features/driver/components/DriverAuth";
-
 import ClientInterProvincial from "../features/client/components/ClientInterProvincial";
 import ClientInterDistrict from "../features/client/components/ClientInterDistrict";
 import ClientFreight from "../features/client/components/ClientFreight";
@@ -36,8 +34,13 @@ import deliveryImg from "../assets/delivery.jpg";
 
 const { Title, Text } = Typography;
 
+function applyNightModeClass(enabled) {
+  if (enabled) document.body.classList.add("night-mode-active");
+  else document.body.classList.remove("night-mode-active");
+}
+
 export default function Dashboard() {
-  const navigate = useNavigate(); // Navigatsiya uchun
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [currentView, setCurrentView] = useState("dashboard");
   const [loading, setLoading] = useState(true);
@@ -46,13 +49,49 @@ export default function Dashboard() {
   const [langKey, setLangKey] = useState(savedLang);
   const t = translations[langKey] || translations["uz_lotin"];
 
+  // ✅ Night mode mode: "auto" | "on" | "off"
+  const [nightMode, setNightMode] = useState("auto");
+
+  // localStorage’dan o‘qish
   useEffect(() => {
-    // Sessiyani tekshirish (Agar sessiya yo'q bo'lsa, login sahifasiga otib yuboradi)
+    const saved = localStorage.getItem("nightMode");
+    if (saved === "on" || saved === "off" || saved === "auto") {
+      setNightMode(saved);
+    } else {
+      setNightMode("auto");
+      localStorage.setItem("nightMode", "auto");
+    }
+  }, []);
+
+  // night mode qo‘llash
+  useEffect(() => {
+    localStorage.setItem("nightMode", nightMode);
+
+    if (nightMode === "on") {
+      applyNightModeClass(true);
+      return;
+    }
+    if (nightMode === "off") {
+      applyNightModeClass(false);
+      return;
+    }
+
+    // AUTO
+    const updateAuto = () => {
+      const hour = new Date().getHours();
+      const enabled = hour >= 20 || hour < 6;
+      applyNightModeClass(enabled);
+    };
+
+    updateAuto();
+    const interval = setInterval(updateAuto, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [nightMode]);
+
+  useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        navigate("/");
-      }
+      if (!session) navigate("/");
     };
     checkSession();
 
@@ -62,21 +101,18 @@ export default function Dashboard() {
 
   const toggleDrawer = () => setOpen(!open);
 
-  // Tilni almashtirish
   const changeLang = (newLang) => {
     setLangKey(newLang);
     localStorage.setItem("appLang", newLang);
     message.success(t.languageChanged);
   };
 
-  // Logout
   const logout = async () => {
     await supabase.auth.signOut();
     message.success(t.loggedOut);
     navigate("/");
   };
 
-  // Yon menyu elementlari
   const menuItems = [
     { key: "dashboard", icon: <HomeOutlined />, label: t.dashboard },
     { key: "orders", icon: <HistoryOutlined />, label: t.ordersHistory },
@@ -88,12 +124,12 @@ export default function Dashboard() {
   const langMenu = {
     items: [
       { key: "uz_lotin", label: "O‘zbek (lotin)", onClick: () => changeLang("uz_lotin") },
-      { key: "uz_kiril", label: "Ўзбек (кирил)", onClick: () => changeLang("uz_kiril") },
+      { key: "uz_kiril", label: "Ўzbek (kiril)", onClick: () => changeLang("uz_kiril") },
       { key: "ru", label: "Русский", onClick: () => changeLang("ru") },
     ],
   };
 
-  // Bosh sahifadagi xizmat kartalari (eski grid)
+  // Eski grid (qoladi)
   const services = [
     {
       key: "taxi",
@@ -264,15 +300,8 @@ export default function Dashboard() {
     }
 
     switch (currentView) {
-      /* ✅ INTEGRATSIYA: dashboard ochilganda ClientDashboard chiqadi */
       case "dashboard":
-        return (
-          <ClientDashboard
-            onBackToMain={() => {
-              navigate("/main");
-            }}
-          />
-        );
+        return <ClientDashboard onBackToMain={() => navigate("/main")} />;
 
       case "taxi":
         return <ClientOrderCreate onBack={() => setCurrentView("dashboard")} />;
@@ -347,7 +376,6 @@ export default function Dashboard() {
             <Text type="secondary">
               Bu bo‘lim hali ulanmagan. Bu yerga buyurtmalar tarixini chiqaramiz.
             </Text>
-
             <div style={{ marginTop: 14 }}>
               <Button type="primary" onClick={() => setCurrentView("dashboard")}>
                 {t.dashboard}
@@ -364,6 +392,45 @@ export default function Dashboard() {
               Bu bo‘limda profil, til, tungi rejim va boshqa sozlamalar bo‘ladi.
             </Text>
 
+            {/* ✅ TUNGI REJIM BLOKI (TO‘LIQ) */}
+            <div
+              style={{
+                marginTop: 18,
+                padding: 14,
+                borderRadius: 14,
+                background: "#fff",
+                border: "1px solid #eee",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+              }}
+            >
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <Text strong>Tungi rejim</Text>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Auto (20:00–06:00) yoki qo‘lda ON/OFF
+                </Text>
+
+                <div style={{ marginTop: 10 }}>
+                  <Segmented
+                    value={nightMode}
+                    onChange={(val) => setNightMode(val)}
+                    options={[
+                      { label: "Auto", value: "auto" },
+                      { label: "On", value: "on" },
+                      { label: "Off", value: "off" },
+                    ]}
+                  />
+                </div>
+              </div>
+
+              <Switch
+                checked={nightMode === "on"}
+                onChange={(v) => setNightMode(v ? "on" : "off")}
+              />
+            </div>
+
             <div style={{ marginTop: 14 }}>
               <Button onClick={() => setCurrentView("dashboard")}>
                 {t.dashboard}
@@ -379,7 +446,6 @@ export default function Dashboard() {
             <Text type="secondary">
               Qo‘llab-quvvatlash bo‘limi. Telefon/Telegram/Chat qo‘shiladi.
             </Text>
-
             <div style={{ marginTop: 14 }}>
               <Button onClick={() => setCurrentView("dashboard")}>
                 {t.dashboard}
@@ -462,11 +528,8 @@ export default function Dashboard() {
                 }}
                 onClick={() => {
                   setOpen(false);
-                  if (item.onClick) {
-                    item.onClick();
-                  } else {
-                    setCurrentView(item.key);
-                  }
+                  if (item.onClick) item.onClick();
+                  else setCurrentView(item.key);
                 }}
               >
                 <Space>
