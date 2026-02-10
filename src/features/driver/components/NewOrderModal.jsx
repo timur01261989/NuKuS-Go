@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { playAliceVoice } from '../../utils/audioPlayer';
+import { playAliceVoice } from '../../../utils/AudioPlayer';
 
 const NewOrderModal = ({ order, onAccept, onDecline }) => {
   useEffect(() => {
