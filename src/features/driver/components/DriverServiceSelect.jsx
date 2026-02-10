@@ -8,7 +8,7 @@ import {
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { translations } from "../../pages/translations";
-import { supabase } from "../../pages/supabase"; 
+import { supabase } from "../lib/supabase";
 
 const { Title, Text } = Typography;
 

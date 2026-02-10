@@ -9,7 +9,8 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 import { translations } from "../../pages/translations";
-import { supabase } from "../../pages/supabase"; 
+import { supabase } from "../lib/supabase";
+
 
 // --- MAP ICON FIX ---
 import icon from 'leaflet/dist/images/marker-icon.png';

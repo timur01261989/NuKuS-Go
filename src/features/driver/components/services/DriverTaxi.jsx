@@ -10,7 +10,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet-routing-machine";
 import "leaflet/dist/leaflet.css";
-import { supabase } from "../../../pages/supabase";
+import { supabase } from "../../../lib/supabase";
 
 import ChatComponent from '../ChatComponent';
 const openExternalMap = (destination) => {

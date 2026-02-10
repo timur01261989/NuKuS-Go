@@ -6,7 +6,7 @@ import {
   CarOutlined, NumberOutlined, UserOutlined, 
   UploadOutlined, CheckCircleOutlined, CameraOutlined, IdcardOutlined, FileTextOutlined 
 } from "@ant-design/icons";
-import { supabase } from "../../pages/supabase"; 
+import { supabase } from "../lib/supabase";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
