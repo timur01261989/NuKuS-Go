@@ -56,17 +56,6 @@ export default function Dashboard() {
     };
     checkSession();
 
-case "dashboard":
-  return (
-    <ClientDashboard
-      onBackToMain={() => {
-        // ClientDashboard ichidagi orqaga tugma bosilganda
-        // Siz "main" sahifaga qaytishini xohlaysiz (xaritaga o‘xshash):
-        navigate("/main");
-      }}
-    />
-  );
-
     const timer = setTimeout(() => setLoading(false), 1000);
     return () => clearTimeout(timer);
   }, [navigate]);
@@ -104,7 +93,7 @@ case "dashboard":
     ],
   };
 
-  // Bosh sahifadagi xizmat kartalari
+  // Bosh sahifadagi xizmat kartalari (eski grid)
   const services = [
     {
       key: "taxi",
@@ -275,6 +264,16 @@ case "dashboard":
     }
 
     switch (currentView) {
+      /* ✅ INTEGRATSIYA: dashboard ochilganda ClientDashboard chiqadi */
+      case "dashboard":
+        return (
+          <ClientDashboard
+            onBackToMain={() => {
+              navigate("/main");
+            }}
+          />
+        );
+
       case "taxi":
         return <ClientOrderCreate onBack={() => setCurrentView("dashboard")} />;
 
@@ -340,10 +339,6 @@ case "dashboard":
             <Text type="secondary">{t.switchServiceComingSoon}</Text>
           </div>
         );
-
-      /* ============================
-         ✅ QO‘SHILGAN SIDEBAR SAHIFALAR
-      ============================ */
 
       case "orders":
         return (
