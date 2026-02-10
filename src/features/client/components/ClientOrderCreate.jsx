@@ -17,7 +17,7 @@ import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
 // Chat va Rating komponentlari
 import ChatComponent from '../../chat/components/ChatComponent'; 
-import RatingModal from '../RatingModal'; 
+import RatingModal from '../../shared/components/RatingModal'; 
 
 const getMapStyle = () => {
   const hour = new Date().getHours();
