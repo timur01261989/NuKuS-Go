@@ -1,55 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Avatar, Typography, Row, Col, Statistic, Button, List, Divider, Rate, message, Tag } from 'antd';
-import { 
-  UserOutlined, CarOutlined, StarFilled, 
+import { Card, Avatar, Typography, Row, Col, Statistic, Button, List, Rate, Tag } from 'antd';
+import {
+  UserOutlined, CarOutlined, StarFilled,
   WalletOutlined, HistoryOutlined, SettingOutlined,
-  LogoutOutlined, CameraOutlined, ArrowLeftOutlined 
+  LogoutOutlined, CameraOutlined, ArrowLeftOutlined,
+  TrophyFilled
 } from '@ant-design/icons';
-import { supabase } from '../../pages/supabase';
+
+// ✅ TO‘G‘RI IMPORT (sizda src/lib/supabase.js bor)
+import { supabase } from '../../lib/supabase';
 
 // Komponentlarni import qilish
-import DriverWallet from './DriverWallet'; 
+import DriverWallet from './DriverWallet';
 import ActivityChart from './ActivityChart';
-// DriverProfile.jsx faylining yuqori qismida import qiling
-import Leaderboard from './Leaderboard'; 
-import { TrophyFilled } from '@ant-design/icons'; // Reyting belgisi uchun
-
-export default function DriverProfile({ onBack, onLogout }) {
-  // Reyting sahifasi ochiq yoki yopiqligini nazorat qilish uchun state
-  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
-
-  // 1. Agar Leaderboard ochiq bo'lsa, uni ko'rsatamiz
-  if (leaderboardOpen) {
-    return <Leaderboard onBack={() => setLeaderboardOpen(false)} />;
-  }
-
-  // 2. Aks holda oddiy profil sahifasi ko'rinadi
-  return (
-    <div style={{ padding: '20px', background: '#f8f9fa' }}>
-      {/* ... Header va Asosiy karta qismlari ... */}
-
-      {/* MENU LIST ICHIDA REYTING TUGMASI */}
-      <Card style={{ borderRadius: 20, border: 'none', marginTop: 20 }}>
-        <List itemLayout="horizontal">
-
-          {/* REYTING SAHIFASINI OCHUVCHI ELEMENT */}
-          <List.Item 
-            onClick={() => setLeaderboardOpen(true)} 
-            style={{ cursor: 'pointer' }}
-          >
-            <List.Item.Meta 
-              avatar={<TrophyFilled style={{ color: '#FFD700', fontSize: 22 }} />} 
-              title={<b>Top haydovchilar</b>} 
-              description="Nukus Go reytingida o'z o'rningizni ko'ring"
-            />
-          </List.Item>
-
-          {/* ... Hamyon va boshqa menyular ... */}
-        </List>
-      </Card>
-    </div>
-  );
-}
+import Leaderboard from './Leaderboard';
 
 const { Title, Text } = Typography;
 
@@ -57,16 +21,22 @@ export default function DriverProfile({ onBack, onLogout }) {
   const [driverData, setDriverData] = useState(null);
   const [stats, setStats] = useState({ total_trips: 0, rating: 5.0 });
   const [walletOpen, setWalletOpen] = useState(false);
-  const [userId, setUserId] = useState(null); // User ID uchun state
+  const [userId, setUserId] = useState(null);
+
+  // ✅ Reyting sahifasi
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
   useEffect(() => {
     fetchProfileData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchProfileData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
+
     if (user) {
       setUserId(user.id);
+
       const { data } = await supabase
         .from('drivers')
         .select('first_name, car_model, car_color, plate_number, avatar_url, average_rating, rating_count')
@@ -81,12 +51,21 @@ export default function DriverProfile({ onBack, onLogout }) {
         .eq('driver_id', user.id)
         .eq('status', 'completed');
 
-      setStats({ total_trips: count || 0, rating: data?.average_rating || 5.0 });
+      setStats({
+        total_trips: count || 0,
+        rating: data?.average_rating || 5.0
+      });
     }
   };
 
+  // ✅ Wallet ochilsa
   if (walletOpen) {
     return <DriverWallet onBack={() => setWalletOpen(false)} />;
+  }
+
+  // ✅ Leaderboard ochilsa
+  if (leaderboardOpen) {
+    return <Leaderboard onBack={() => setLeaderboardOpen(false)} />;
   }
 
   return (
@@ -102,11 +81,11 @@ export default function DriverProfile({ onBack, onLogout }) {
       <Card style={{ borderRadius: 24, textAlign: 'center', marginBottom: 20, border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.05)' }}>
         <div style={{ position: 'relative', display: 'inline-block' }}>
           <Avatar size={100} src={driverData?.avatar_url} icon={<UserOutlined />} style={{ border: '4px solid #FFD700' }} />
-          <Button 
-            shape="circle" 
-            size="small" 
-            icon={<CameraOutlined />} 
-            style={{ position: 'absolute', bottom: 5, right: 5, background: '#FFD700', border: 'none' }} 
+          <Button
+            shape="circle"
+            size="small"
+            icon={<CameraOutlined />}
+            style={{ position: 'absolute', bottom: 5, right: 5, background: '#FFD700', border: 'none' }}
           />
         </div>
         <Title level={3} style={{ marginTop: 15, marginBottom: 5 }}>{driverData?.first_name || 'Haydovchi'}</Title>
@@ -123,15 +102,15 @@ export default function DriverProfile({ onBack, onLogout }) {
         </Col>
         <Col span={12}>
           <Card style={{ borderRadius: 20, textAlign: 'center', border: 'none' }}>
-            <Statistic title="Reyting" value={stats.rating} precision={1} prefix={<StarFilled style={{color: '#FFD700'}} />} />
+            <Statistic title="Reyting" value={stats.rating} precision={1} prefix={<StarFilled style={{ color: '#FFD700' }} />} />
           </Card>
         </Col>
       </Row>
 
-      {/* 📈 FAAOLLIK GRAFIGI (Yangi qo'shilgan joyi) */}
+      {/* 📈 FAAOLLIK GRAFIGI */}
       {userId && <ActivityChart driverId={userId} />}
 
-      <div style={{ marginBottom: 20 }} /> {/* Grafikdan keyin bo'shliq */}
+      <div style={{ marginBottom: 20 }} />
 
       {/* AVTOMOBIL MA'LUMOTLARI */}
       <Card title={<><CarOutlined /> Mashina ma'lumotlari</>} style={{ borderRadius: 20, marginBottom: 20, border: 'none' }}>
@@ -152,16 +131,34 @@ export default function DriverProfile({ onBack, onLogout }) {
       {/* MENU LIST */}
       <Card style={{ borderRadius: 20, border: 'none', marginBottom: 20 }}>
         <List itemLayout="horizontal">
-          <List.Item onClick={() => setWalletOpen(true)} style={{ cursor: 'pointer' }}>
-            <List.Item.Meta 
-                avatar={<WalletOutlined style={{ color: '#FFD700', fontSize: 20 }} />} 
-                title={<b>Hamyon va balans</b>} 
-                description="Daromadlarni ko'rish va pul yechish"
+
+          {/* ✅ REYTING SAHIFASINI OCHUVCHI ELEMENT */}
+          <List.Item
+            onClick={() => setLeaderboardOpen(true)}
+            style={{ cursor: 'pointer' }}
+          >
+            <List.Item.Meta
+              avatar={<TrophyFilled style={{ color: '#FFD700', fontSize: 22 }} />}
+              title={<b>Top haydovchilar</b>}
+              description="Nukus Go reytingida o'z o'rningizni ko'ring"
             />
           </List.Item>
-          <List.Item style={{ cursor: 'pointer' }} onClick={onLogout}>
-            <List.Item.Meta avatar={<LogoutOutlined style={{ color: 'red' }} />} title={<Text type="danger">Tizimdan chiqish</Text>} />
+
+          <List.Item onClick={() => setWalletOpen(true)} style={{ cursor: 'pointer' }}>
+            <List.Item.Meta
+              avatar={<WalletOutlined style={{ color: '#FFD700', fontSize: 20 }} />}
+              title={<b>Hamyon va balans</b>}
+              description="Daromadlarni ko'rish va pul yechish"
+            />
           </List.Item>
+
+          <List.Item style={{ cursor: 'pointer' }} onClick={onLogout}>
+            <List.Item.Meta
+              avatar={<LogoutOutlined style={{ color: 'red' }} />}
+              title={<Text type="danger">Tizimdan chiqish</Text>}
+            />
+          </List.Item>
+
         </List>
       </Card>
     </div>
