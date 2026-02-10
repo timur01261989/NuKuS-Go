@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Card, Button, Typography, Upload, message, Steps, Space } from 'antd';
 import { CameraOutlined, IdcardOutlined, FileTextOutlined, CheckCircleOutlined } from '@ant-design/icons';
-import { supabase } from "../lib/supabase";
+import { supabase } from "../../../lib/supabase";
 // Faylning yuqori qismida import qiling
 import { compressImage } from '../../utils/imageUtils'; 
 

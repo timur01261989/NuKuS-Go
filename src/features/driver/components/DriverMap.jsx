@@ -5,7 +5,7 @@ import NewOrderModal from "./NewOrderModal";
 import { MapContainer, TileLayer, Marker } from "react-leaflet";
 
 // supabase importi sizda qayerda bo'lsa o'shani qo'ying:
-// import { supabase } from "../lib/supabase";
+// import { supabase } from "../../../lib/supabase";
 
 const DriverMap = () => {
   // Modal va order state'lar
