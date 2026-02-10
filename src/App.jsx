@@ -11,7 +11,7 @@ import SearchOnRoutePage from "./pages/SuperPro/SearchOnRoutePage";
 import Login from "./pages/Auth";
 import Register from "./pages/Register";
 import ResetPassword from "./pages/ResetPassword";
-import Dashboard from "./pages/Dashboard";
+import ClientDashboard from "../features/client/components/ClientDashboard";
 import MainPage from "./pages/MainPage";
 
 // --- MIJOZ KOMPONENTLARI ---
@@ -32,6 +32,17 @@ import { ProviderSwitchPanel } from "./features/debug/components/ProviderSwitchP
 // Sahifalar almashganda skrolni tepaga qaytarish
 function ScrollToTop() {
   const { pathname } = useLocation();
+
+case "dashboard":
+  return (
+    <ClientDashboard
+      onBackToMain={() => {
+        // ClientDashboard ichidagi orqaga tugma bosilganda
+        // Siz "main" sahifaga qaytishini xohlaysiz (xaritaga o‘xshash):
+        navigate("/main");
+      }}
+    />
+  );
 
   useEffect(() => {
     window.scrollTo(0, 0);
