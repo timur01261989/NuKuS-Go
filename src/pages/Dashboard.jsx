@@ -205,53 +205,53 @@ export default function Dashboard() {
   ];
 
   const renderDashboard = () => (
-  <>
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-        gap: 16,
-      }}
-    >
-      {services.map((s) => (
-        <Card
-          key={s.key}
-          hoverable
-          style={{
-            borderRadius: 20,
-            overflow: "hidden",
-            border: `1px solid ${s.color}33`,
-            width: "100%",
-          }}
-          onClick={() => setCurrentView(s.view)}
-          cover={
-            <div
-              style={{
-                height: 120,
-                background: `url(${s.img}) center/cover no-repeat`,
-              }}
-            />
-          }
-        >
-          <Space align="center">
-            <Avatar style={{ background: s.color }} icon={s.icon} />
-            <div>
-              <Title level={5} style={{ margin: 0 }}>
-                {s.title}
-              </Title>
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                {s.desc}
-              </Text>
+    <>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+          gap: 16,
+        }}
+      >
+        {services.map((s) => (
+          <Card
+            key={s.key}
+            hoverable
+            style={{
+              borderRadius: 20,
+              overflow: "hidden",
+              border: `1px solid ${s.color}33`,
+              width: "100%",
+            }}
+            onClick={() => setCurrentView(s.view)}
+            cover={
+              <div
+                style={{
+                  height: 120,
+                  background: `url(${s.img}) center/cover no-repeat`,
+                }}
+              />
+            }
+          >
+            <Space align="center">
+              <Avatar style={{ background: s.color }} icon={s.icon} />
+              <div>
+                <Title level={5} style={{ margin: 0 }}>
+                  {s.title}
+                </Title>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {s.desc}
+                </Text>
+              </div>
+            </Space>
+            <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
+              <RightOutlined />
             </div>
-          </Space>
-          <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
-            <RightOutlined />
-          </div>
-        </Card>
-      ))}
-    </div>
-  </>
-);
+          </Card>
+        ))}
+      </div>
+    </>
+  );
 
   const renderContent = () => {
     if (loading) {
@@ -265,16 +265,22 @@ export default function Dashboard() {
     switch (currentView) {
       case "taxi":
         return <ClientOrderCreate onBack={() => setCurrentView("dashboard")} />;
+
       case "interProvincial":
         return <ClientInterProvincial onBack={() => setCurrentView("dashboard")} />;
+
       case "interDistrict":
         return <ClientInterDistrict onBack={() => setCurrentView("dashboard")} />;
+
       case "freight":
         return <ClientFreight onBack={() => setCurrentView("dashboard")} />;
+
       case "delivery":
         return <ClientDelivery onBack={() => setCurrentView("dashboard")} />;
+
       case "driver":
         return <DriverAuth onBack={() => setCurrentView("dashboard")} />;
+
       case "chat":
         return (
           <div style={{ padding: 20 }}>
@@ -282,6 +288,7 @@ export default function Dashboard() {
             <Text type="secondary">{t.chatComingSoon}</Text>
           </div>
         );
+
       case "promo":
         return (
           <div style={{ padding: 20 }}>
@@ -289,6 +296,7 @@ export default function Dashboard() {
             <Text type="secondary">{t.promotionsComingSoon}</Text>
           </div>
         );
+
       case "market":
         return (
           <div style={{ padding: 20 }}>
@@ -296,6 +304,7 @@ export default function Dashboard() {
             <Text type="secondary">{t.autoMarketComingSoon}</Text>
           </div>
         );
+
       case "popular":
         return (
           <div style={{ padding: 20 }}>
@@ -303,6 +312,7 @@ export default function Dashboard() {
             <Text type="secondary">{t.popularServicesComingSoon}</Text>
           </div>
         );
+
       case "notify":
         return (
           <div style={{ padding: 20 }}>
@@ -310,6 +320,7 @@ export default function Dashboard() {
             <Text type="secondary">{t.notificationsComingSoon}</Text>
           </div>
         );
+
       case "switch":
         return (
           <div style={{ padding: 20 }}>
@@ -317,6 +328,59 @@ export default function Dashboard() {
             <Text type="secondary">{t.switchServiceComingSoon}</Text>
           </div>
         );
+
+      /* ============================
+         ✅ QO‘SHILGAN SIDEBAR SAHIFALAR
+      ============================ */
+
+      case "orders":
+        return (
+          <div style={{ padding: 20 }}>
+            <Title level={4}>{t.ordersHistory}</Title>
+            <Text type="secondary">
+              Bu bo‘lim hali ulanmagan. Bu yerga buyurtmalar tarixini chiqaramiz.
+            </Text>
+
+            <div style={{ marginTop: 14 }}>
+              <Button type="primary" onClick={() => setCurrentView("dashboard")}>
+                {t.dashboard}
+              </Button>
+            </div>
+          </div>
+        );
+
+      case "settings":
+        return (
+          <div style={{ padding: 20 }}>
+            <Title level={4}>{t.settings}</Title>
+            <Text type="secondary">
+              Bu bo‘limda profil, til, tungi rejim va boshqa sozlamalar bo‘ladi.
+            </Text>
+
+            <div style={{ marginTop: 14 }}>
+              <Button onClick={() => setCurrentView("dashboard")}>
+                {t.dashboard}
+              </Button>
+            </div>
+          </div>
+        );
+
+      case "support":
+        return (
+          <div style={{ padding: 20 }}>
+            <Title level={4}>{t.support}</Title>
+            <Text type="secondary">
+              Qo‘llab-quvvatlash bo‘limi. Telefon/Telegram/Chat qo‘shiladi.
+            </Text>
+
+            <div style={{ marginTop: 14 }}>
+              <Button onClick={() => setCurrentView("dashboard")}>
+                {t.dashboard}
+              </Button>
+            </div>
+          </div>
+        );
+
       default:
         return renderDashboard();
     }
