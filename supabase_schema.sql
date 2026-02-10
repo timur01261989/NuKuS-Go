@@ -38,3 +38,28 @@ create table if not exists orders (
 
 create index if not exists idx_listings_created_at on market_listings(created_at desc);
 create index if not exists idx_orders_created_at on orders(created_at desc);
+
+-- DRIVERS (driver akkaunt)
+create table if not exists drivers (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid unique references users(id) on delete cascade,
+  full_name text,
+  car_model text,
+  car_number text,
+  is_online boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_drivers_is_online on drivers(is_online);
+
+-- DRIVER LOCATIONS (realtime joylashuv)
+create table if not exists driver_locations (
+  driver_id uuid primary key references drivers(id) on delete cascade,
+  lat double precision not null,
+  lng double precision not null,
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_driver_locations_updated_at on driver_locations(updated_at desc);
+create index if not exists idx_driver_locations_lat_lng on driver_locations(lat, lng);
+

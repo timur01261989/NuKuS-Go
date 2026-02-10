@@ -21,6 +21,7 @@ import ClientInterDistrict from "./features/client/components/ClientInterDistric
 // --- HAYDOVCHI MODE ---
 import DriverAuth from "./features/driver/components/DriverAuth";
 import DriverHome from "./features/driver/components/DriverHome";
+import DriverMap from "./features/driver/components/DriverMap";
 
 import { prioritizeAssets } from "./utils/BaselineProfile";
 
@@ -108,30 +109,27 @@ export default function App() {
 
           {/* DASHBOARD */}
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/main" element={<MainPage />} />
 
           {/* CLIENT SERVICES */}
-          <Route
-            path="/freight"
-            element={<ClientFreight onBack={() => window.history.back()} />}
-          />
+          <Route path="/freight" element={<ClientFreight onBack={() => window.history.back()} />} />
           <Route
             path="/inter-district"
             element={<ClientInterDistrict onBack={() => window.history.back()} />}
           />
-          <Route path="/main" element={<MainPage />} />
 
-          {/* DRIVER MODE */}
+          {/* DRIVER MODE ✅ */}
+          <Route path="/driver" element={<Navigate to="/driver-mode" replace />} />
           <Route
             path="/driver-mode"
             element={<DriverAuth onBack={() => window.history.back()} />}
           />
           <Route path="/driver-home" element={<DriverHome />} />
+          <Route path="/driver/map" element={<DriverMap />} />
 
           {/* SUPER PRO PAGES */}
           {appConfig.features.garage ? <Route path="/garage" element={<GaragePage />} /> : null}
-          {appConfig.features.payments ? (
-            <Route path="/payments" element={<PaymentsPage />} />
-          ) : null}
+          {appConfig.features.payments ? <Route path="/payments" element={<PaymentsPage />} /> : null}
           {appConfig.features.searchOnRoute ? (
             <Route path="/search-route" element={<SearchOnRoutePage />} />
           ) : null}
