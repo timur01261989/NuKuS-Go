@@ -13,7 +13,7 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { translations } from "../../../../pages/translations";
-import { supabase } from "../../../lib/supabase"; 
+import { supabase } from "../../../../lib/supabase"; 
 
 const { Title, Text } = Typography;
 const { Option } = Select;
