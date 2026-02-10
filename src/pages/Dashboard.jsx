@@ -205,42 +205,53 @@ export default function Dashboard() {
   ];
 
   const renderDashboard = () => (
-    <>
-      <Row gutter={[16, 16]}>
-        {services.map((s) => (
-          <Col xs={24} sm={12} md={8} lg={6} key={s.key}>
-            <Card
-              hoverable
+  <>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+        gap: 16,
+      }}
+    >
+      {services.map((s) => (
+        <Card
+          key={s.key}
+          hoverable
+          style={{
+            borderRadius: 20,
+            overflow: "hidden",
+            border: `1px solid ${s.color}33`,
+            width: "100%",
+          }}
+          onClick={() => setCurrentView(s.view)}
+          cover={
+            <div
               style={{
-                borderRadius: 20,
-                overflow: "hidden",
-                border: `1px solid ${s.color}33`,
+                height: 120,
+                background: `url(${s.img}) center/cover no-repeat`,
               }}
-              onClick={() => setCurrentView(s.view)}
-              cover={
-                <div style={{ height: 120, background: `url(${s.img}) center/cover no-repeat` }} />
-              }
-            >
-              <Space align="center">
-                <Avatar style={{ background: s.color }} icon={s.icon} />
-                <div>
-                  <Title level={5} style={{ margin: 0 }}>
-                    {s.title}
-                  </Title>
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    {s.desc}
-                  </Text>
-                </div>
-              </Space>
-              <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
-                <RightOutlined />
-              </div>
-            </Card>
-          </Col>
-        ))}
-      </Row>
-    </>
-  );
+            />
+          }
+        >
+          <Space align="center">
+            <Avatar style={{ background: s.color }} icon={s.icon} />
+            <div>
+              <Title level={5} style={{ margin: 0 }}>
+                {s.title}
+              </Title>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {s.desc}
+              </Text>
+            </div>
+          </Space>
+          <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
+            <RightOutlined />
+          </div>
+        </Card>
+      ))}
+    </div>
+  </>
+);
 
   const renderContent = () => {
     if (loading) {
