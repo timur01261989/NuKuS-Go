@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
 import 'leaflet/dist/leaflet.css'
-import RideHistory from './components/shared/RideHistory';
+import RideHistory from "./features/shared/components/RideHistory";
 import './shared/styles/fonts.css';
 
 function MainApp() {
