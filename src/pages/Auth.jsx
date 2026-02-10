@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { LockOutlined, GlobalOutlined, PhoneOutlined } from "@ant-design/icons";
 
 import { translations } from "./translations"; 
-import { supabase } from "./supabase"; 
+import { supabase } from "../lib/supabase"; 
 
 const { Title, Text } = Typography;
 
