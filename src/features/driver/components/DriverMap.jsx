@@ -1,79 +1,100 @@
-import React, { useState, useEffect } from 'react';
-import NewOrderModal from './NewOrderModal';
+import React, { useState, useEffect, useCallback } from "react";
+import NewOrderModal from "./NewOrderModal";
+
+// Agar react-leaflet ishlatayotgan bo'lsangiz:
+import { MapContainer, TileLayer, Marker } from "react-leaflet";
+
+// supabase importi sizda qayerda bo'lsa o'shani qo'ying:
+// import { supabase } from "../../supabaseClient";
 
 const DriverMap = () => {
-  // Boshida oyna yopiq turadi (false)
+  // Modal va order state'lar
   const [showModal, setShowModal] = useState(false);
   const [currentOrder, setCurrentOrder] = useState(null);
 
-  // ... davomi pastda
+  // Sizning loyihangizdagi mavjud qiymatlar (misol uchun):
+  // const myLocation = ...
+  // const myId = ...
+  // const driverIcon = ...
+  // const userIcon = ...
+  // const routePoints = ...
+  // const setDestination = ...
+  // const playAliceVoice = ...
+  // const RouteLine = ...
+
+  // Buyurtmani qabul qilish funksiyasi (return'dan oldin bo'lishi shart)
+  const handleAcceptOrder = useCallback(async (order) => {
+    if (!order) return;
+
+    // 1) Oynani yopish
+    setShowModal(false);
+
+    // 2) Ovoz (agar mavjud bo'lsa)
+    if (typeof playAliceVoice === "function") {
+      playAliceVoice("RouteStarted");
+    }
+
+    // 3) Supabase'ga update
+    const { error } = await supabase
+      .from("orders")
+      .update({ status: "accepted", driver_id: myId })
+      .eq("id", order.id);
+
+    if (error) {
+      console.error("Order update error:", error);
+      return;
+    }
+
+    // 4) Yo'nalish uchun destination sozlash
+    if (typeof setDestination === "function") {
+      setDestination(order.pickup_location);
+    }
+  }, []);
+
+  // Real-time buyurtma tinglash
   useEffect(() => {
-    // Buyurtmalarni kuzatuvchi funksiya (Real-time)
     const subscription = supabase
-      .from('orders')
-      .on('INSERT', (payload) => {
-        // Yangi buyurtma tushganida:
-        setCurrentOrder(payload.new); // Ma'lumotni saqlaymiz
-        setShowModal(true);           // Oynani ochamiz (Kalitni buraymiz!)
+      .from("orders")
+      .on("INSERT", (payload) => {
+        setCurrentOrder(payload.new);
+        setShowModal(true);
       })
       .subscribe();
 
-    return () => supabase.removeSubscription(subscription);
+    return () => {
+      // eski supabase versiyalarda shunday bo'ladi:
+      supabase.removeSubscription(subscription);
+    };
   }, []);
-  return (
-    <div className="map-wrapper">
-      {/* Xarita komponenti */}
-      <MapContainer />
 
-      {/* SHART: faqat showModal true bo'lgandagina oyna ko'rinadi */}
-      {showModal && (
-        <NewOrderModal 
-          order={currentOrder} 
-          onAccept={() => {
-            setShowModal(false); // Tugma bosilgach oynani yopamiz
-            // ... qabul qilish mantig'i
-          }}
-          onDecline={() => setShowModal(false)} // Rad etilsa ham yopiladi
-        />
-      )}
-    </div>
-  );
+  // === Bitta return: hammasi shu yerda ===
   return (
-    <div style={{ position: 'relative', height: '100vh' }}>
-      <MapContainer center={myLocation} zoom={15}>
+    <div style={{ position: "relative", height: "100vh" }}>
+      <MapContainer center={myLocation} zoom={15} style={{ height: "100%", width: "100%" }}>
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-        {/* 1. Haydovchi va Mijoz markerlari */}
+        {/* 1) Haydovchi marker */}
         <Marker position={myLocation} icon={driverIcon} />
-        {currentOrder && <Marker position={currentOrder.pickup_location} icon={userIcon} />}
 
-        {/* 2. Yo'nalish chizig'i */}
+        {/* 2) Mijoz marker */}
+        {currentOrder && (
+          <Marker position={currentOrder.pickup_location} icon={userIcon} />
+        )}
+
+        {/* 3) Yo'nalish chizig'i */}
         {routePoints && <RouteLine points={routePoints} />}
       </MapContainer>
 
-      {/* 3. Yangi buyurtma oynasi (Ovozli va miltillovchi) */}
+      {/* 4) Modal */}
       {showModal && (
-        <NewOrderModal 
-          order={currentOrder} 
+        <NewOrderModal
+          order={currentOrder}
           onAccept={() => handleAcceptOrder(currentOrder)}
           onDecline={() => setShowModal(false)}
         />
       )}
     </div>
   );
-  const handleAcceptOrder = async (order) => {
-    // 1. Oynani yopish
-    setShowModal(false);
+};
 
-    // 2. Alisa paketidan "Yo'nalish tuzildi" ovozini chaqirish
-    playAliceVoice('RouteStarted');
-
-    // 3. Bazada buyurtma holatini yangilash (Supabase)
-    const { error } = await supabase
-      .from('orders')
-      .update({ status: 'accepted', driver_id: myId })
-      .eq('id', order.id);
-
-    // 4. Xaritada yo'nalishni chizish uchun koordinatalarni sozlash
-    setDestination(order.pickup_location); 
-  };
+export default DriverMap;
