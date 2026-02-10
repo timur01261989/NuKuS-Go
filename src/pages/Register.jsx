@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Form, Input, Button, Typography, Card, message, ConfigProvider } from "antd";
 import { useNavigate } from "react-router-dom";
 import { UserOutlined, PhoneOutlined, ArrowLeftOutlined, LockOutlined, CheckCircleOutlined, SafetyCertificateOutlined } from "@ant-design/icons";
-import { supabase } from "./supabase"; 
+import { supabase } from "../lib/supabase";
 
 const { Title, Text } = Typography;
 
