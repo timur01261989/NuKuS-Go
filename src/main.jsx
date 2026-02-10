@@ -2,6 +2,9 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 
+// ✅ Ant Design CSS (v5) — layout (Row/Col) va Card/Button stillari uchun SHART
+import "antd/dist/reset.css";
+
 import "./index.css";
 import "./shared/styles/fonts.css";
 import "leaflet/dist/leaflet.css";

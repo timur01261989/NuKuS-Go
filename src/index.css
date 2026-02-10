@@ -1,79 +1,75 @@
-/* 1. Shriftni tizimga tanitish */
+/* ================================
+   0) Global Reset / Base
+================================ */
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+/* ================================
+   1) Shriftni tizimga tanitish
+   Eslatma: fayl yo‘li to‘g‘ri bo‘lishi shart!
+================================ */
 @font-face {
   font-family: 'YangoHeadline';
-  /* Fayl src/assets/fonts papkasida bo'lishi tavsiya etiladi */
   src: url('./assets/fonts/yango-headline-multi.woff') format('woff');
-  font-weight: bold;
+  font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
 
-/* 2. Global matn sozlamalari */
-body, h1, h2, h3, h4, .ant-typography {
-  /* YangoHeadline sarlavhalar uchun, Inter yoki sans-serif matnlar uchun */
+/* ================================
+   2) Global shrift sozlamalari
+================================ */
+body,
+h1, h2, h3, h4, h5,
+.ant-typography,
+.ant-btn,
+.ant-card-head-title {
   font-family: 'YangoHeadline', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* 3. Maxsus Yandex uslubidagi sarlavha klassi */
+/* ================================
+   3) Maxsus Yandex uslubidagi sarlavhalar
+================================ */
 .yango-header {
   font-family: 'YangoHeadline', sans-serif !important;
-  letter-spacing: -0.8px; /* Yandex sarlavhalari bir-biriga yaqinroq turadi */
+  letter-spacing: -0.8px;
   line-height: 1.1;
   font-weight: 800;
   color: #000000;
 }
 
-/* 4. Dashboard kartochkalari sarlavhalari uchun */
-.ant-card-head-title {
+.yango-title {
   font-family: 'YangoHeadline', sans-serif !important;
+  letter-spacing: -0.8px;
+  line-height: 1.1;
+  font-weight: 700;
+}
+
+/* ================================
+   4) Ant Design Card head sozlamalari
+================================ */
+.ant-card-head-title {
   font-size: 18px;
   letter-spacing: -0.5px;
 }
-/* index.css */
 
-/* 1. Shriftni yuklash */
-@font-face {
-  font-family: 'YangoHeadline';
-  /* Fayl yo'li loyihangizdagi assets papkasiga mos ekanligini tekshiring */
-  src: url('./assets/fonts/yango-headline-multi.woff') format('woff');
-  font-weight: bold;
-  font-style: normal;
-  font-display: swap; /* Shrift yuklanguncha matn ko'rinib turishi uchun */
-}
-
-/* 2. Global shrift sozlamalari */
-body, 
-h1, h2, h3, h4, h5, 
-.ant-typography, 
-.ant-btn, 
-.ant-card-head-title {
-  /* YangoHeadline asosiy shrift, agar u yuklanmasa tizim shriftlariga o'tadi */
-  font-family: 'YangoHeadline', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* 3. Maxsus Yandex uslubidagi sarlavhalar uchun */
-.yango-title {
-  font-family: 'YangoHeadline', sans-serif !important;
-  letter-spacing: -0.8px; /* Yandex-dagi kabi jipslashgan ko'rinish */
-  line-height: 1.1;
-  font-weight: bold;
-}
-
-/* 4. Dashboard kartochkalari uchun qo'shimcha silliqlik */
 .ant-card-head {
   border-bottom: none;
 }
-/* Yandex Go Cubemap Reflection simulyatsiyasi */
+
+/* ================================
+   5) Yandex Go Cubemap Reflection simulyatsiyasi
+================================ */
 .smooth-car-marker {
   position: relative;
-  /* Atrofdagi yorug'likni aks ettirish effekti */
   filter: drop-shadow(0 4px 10px rgba(0,0,0,0.2));
 }
 
+/* Cubemap aks ettirish chizig‘i */
 .smooth-car-marker::after {
   content: '';
   position: absolute;
@@ -81,37 +77,41 @@ h1, h2, h3, h4, h5,
   left: 10%;
   width: 80%;
   height: 40%;
-  /* Cubemap aks etish chizig'i */
   background: linear-gradient(180deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 100%);
   border-radius: 50% 50% 0 0;
   pointer-events: none;
 }
 
-/* Xarita uchun HDR qatlami */
+/* ================================
+   6) Leaflet xarita HDR qatlami
+================================ */
 .leaflet-container {
   filter: contrast(1.1) saturate(1.2);
   background: #f0f0f0 !important;
 }
-/* HDR Night Mode effektlari uchun */
+
+/* ================================
+   7) Night Mode (HDR Night Mode)
+================================ */
 .night-mode-active {
-  filter: contrast(1.1) brightness(0.9); /* Ranglarni HDR kabi o'tkirroq qiladi */
+  filter: contrast(1.1) brightness(0.9);
 }
 
-/* Navigatsiya chizig'ini (Route Line) neon rangga o'tkazish */
+/* Navigatsiya chizig'ini neon rangga o'tkazish */
 .night-mode-active .leaflet-ant-path {
-  stroke: #00f2ff; /* Neon ko'k */
+  stroke: #00f2ff;
   filter: drop-shadow(0 0 8px #00f2ff);
 }
-/* Tungi rejim uchun HDR filtrlar */
+
+/* Tungi rejim uchun umumiy background va rang */
 body.night-mode-active {
   background-color: #0d0d0d !important;
   color: #ffffff !important;
-  /* Ranglarni HDR kabi o'tkirroq va neon ranglarni yorqinroq qiladi */
   filter: contrast(1.1) brightness(0.95) saturate(1.1);
 }
 
-/* Tungi rejimda barcha Card va Panellarni qoraytirish */
-body.night-mode-active .ant-card, 
+/* Tungi rejimda Card va List qorayishi */
+body.night-mode-active .ant-card,
 body.night-mode-active .ant-list-item {
   background-color: #1a1a1a !important;
   border-color: #333 !important;
@@ -122,16 +122,17 @@ body.night-mode-active .ant-list-item-meta-title {
   color: #e0e0e0 !important;
 }
 
-/* Navigatsiya chizig'ini (Route Path) neon ko'k qilish */
+/* Leaflet interaktiv elementlarga neon drop shadow */
 body.night-mode-active .leaflet-interactive {
   filter: drop-shadow(0 0 5px #00f2ff);
 }
-/* Tungi rejimda xaritani yanada HDR qilish */
+
+/* Tungi rejimda xaritani invert qilib "night map" ko‘rinish berish */
 .night-mode-active .leaflet-container {
-    filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+  filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
 }
 
-/* Markerlarga neon effekt berish */
-.smooth-car-marker {
-    filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.8));
+/* Markerlarga neon effekt (tungi rejimda) */
+body.night-mode-active .smooth-car-marker {
+  filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.8));
 }
