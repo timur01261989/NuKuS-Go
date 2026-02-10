@@ -19,8 +19,8 @@ import ClientFreight from "./features/client/components/ClientFreight";
 import ClientInterDistrict from './features/client/components/ClientInterDistrict';
 
 // --- HAYDOVCHI MODE ---
-import DriverAuth from './features/driver/components/DriverAuth;
-import DriverHome from '../features/driver/components/DriverHome;
+import DriverAuth from './features/driver/components/DriverAuth';
+import DriverHome from './features/driver/components/DriverHome';
 import { prioritizeAssets } from './utils/BaselineProfile';
 import { OrderRealtimeDebug } from './features/taxi/components/OrderRealtimeDebug.jsx';
 import { ProviderSwitchPanel } from './feature/debug/components/ProviderSwitchPanel.jsx';
