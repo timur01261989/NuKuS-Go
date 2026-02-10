@@ -14,6 +14,7 @@ import {
 // YANGI IMPORTLAR (Navigatsiya va Supabase uchun)
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import ClientDashboard from "../features/client/components/ClientDashboard";
 
 import { translations } from "./translations";
 
@@ -54,6 +55,17 @@ export default function Dashboard() {
       }
     };
     checkSession();
+
+case "dashboard":
+  return (
+    <ClientDashboard
+      onBackToMain={() => {
+        // ClientDashboard ichidagi orqaga tugma bosilganda
+        // Siz "main" sahifaga qaytishini xohlaysiz (xaritaga o‘xshash):
+        navigate("/main");
+      }}
+    />
+  );
 
     const timer = setTimeout(() => setLoading(false), 1000);
     return () => clearTimeout(timer);
