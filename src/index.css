@@ -10,6 +10,19 @@ body {
   margin: 0;
   padding: 0;
 }
+/* =========================================
+   0.2) BRAND TOKEN (PRIMARY COLOR)
+   AntD theme colorPrimary = var(--brand)
+   Shu token bo‘lmasa rang qora bo‘lib qoladi.
+========================================= */
+:root {
+  --brand: #1677ff; /* 🔵 Ko‘k primary */
+}
+
+/* Agar night mode bo‘lsa ham ko‘k bo‘lsin */
+body.night-mode-active {
+  --brand: #4096ff; /* 🔷 Dark uchun yumshoqroq ko‘k */
+}
 
 /* =========================================
    0.1) DAY/NIGHT COLORS (KO‘CHIRILDI)
