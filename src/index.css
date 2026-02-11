@@ -208,3 +208,15 @@ body.night-mode-active .leaflet-container {
 body.night-mode-active .smooth-car-marker {
   filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.8));
 }
+/* ==============================
+   SINGLE SOURCE TEXT COLORS
+   (hamma qora card ichida oq bo‘lsin)
+============================== */
+.dark-card,
+.dark-card * {
+  color: rgba(255,255,255,0.92) !important;
+}
+
+.dark-card .ant-typography-secondary {
+  color: rgba(255,255,255,0.70) !important;
+}
