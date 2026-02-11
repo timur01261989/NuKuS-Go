@@ -3,7 +3,7 @@ import { Button, Card, Modal, Space, Typography } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import { listMarketCars, formatPriceUZS, getMarketConfig } from "../../../services/marketService.js";
 import { useLanguage } from "../../../shared/i18n/useLanguage.js";
-import PostAdForm from "../components/PostAdForm.jsx";
+import PostAdForm from "./components/PostAdForm.jsx";
 const { Title, Text } = Typography;
 
 // Raqamlarni “safe” olish uchun yordamchi
