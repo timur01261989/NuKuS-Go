@@ -5,7 +5,7 @@ import { listMarketCars, formatPriceUZS, getMarketConfig } from "@services/marke
 import { useLanguage } from "@shared/i18n/useLanguage";
 
 // ✅ QO‘SHING (pathni kerak bo‘lsa moslang)
-import { PostAdForm } from "./PostAdForm";
+import { PostAdForm } from "../components/PostAdForm";
 
 const { Title, Text } = Typography;
 
