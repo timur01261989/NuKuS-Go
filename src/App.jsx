@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { ConfigProvider } from "antd";
+import { LanguageProvider } from "@shared/i18n/LanguageContext";
+import RoleGate from "@shared/routes/RoleGate";
 
 import { appConfig } from "./shared/config/appConfig";
 import GaragePage from "./pages/SuperPro/GaragePage";
@@ -13,15 +15,31 @@ import Register from "./features/auth/pages/Register";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import MainPage from "./pages/MainPage";
+import DriverOrders from "@features/driver/pages/DriverOrders";
+import DriverDashboard from "@features/driver/pages/DriverDashboard";
+import DriverPending from "./pages/DriverPending";
+import Logout from "./pages/Logout";
+import Support from "./pages/Support";
+import ClientOrders from "./pages/ClientOrders";
+import MyAddresses from "./pages/MyAddresses";
+import Settings from "@features/settings/pages/Settings";
+import AutoMarketPage from "@features/market/pages/AutoMarketPage";
+import ClientHome from "@features/client/pages/ClientHome";
 
 // --- MIJOZ KOMPONENTLARI ---
 import ClientFreight from "./features/client/components/ClientFreight";
+import ClientDelivery from "./features/client/components/ClientDelivery";
 import ClientInterDistrict from "./features/client/components/ClientInterDistrict";
 
 // --- HAYDOVCHI MODE ---
 import DriverAuth from "./features/driver/components/DriverAuth";
 import DriverHome from "./features/driver/components/DriverHome";
 import DriverMap from "./features/driver/components/DriverMap";
+import DriverDelivery from "./features/driver/components/services/DriverDelivery";
+import DriverFreight from "./features/driver/components/services/DriverFreight";
+import DriverInterProvincial from "./features/driver/components/services/DriverInterProvincial";
+import DriverInterDistrict from "./features/driver/components/services/DriverInterDistrict";
+import DriverTaxi from "./features/driver/components/services/DriverTaxi";
 
 import { prioritizeAssets } from "./utils/BaselineProfile";
 
@@ -138,58 +156,185 @@ export default function App() {
           Card: {
             borderRadiusLG: 24,
             boxShadowTertiary: "0 12px 32px rgba(0,0,0,0.12)",
-          },
-          Input: {
-            controlHeightLG: 55,
-            borderRadiusLG: 14,
-          },
-        },
-      }}
-    >
-      <BrowserRouter>
-        <ScrollToTop />
+   <Routes>
+      <LanguageProvider>
 
-        {/* Debug panellar (URL orqali yoqiladi) */}
-        {debugProviders ? (
-          <div className="p-3">
-            <ProviderSwitchPanel />
-          </div>
-        ) : null}
-
-        {debugRealtime ? (
-          <div className="p-3">
-            <OrderRealtimeDebug />
-          </div>
-        ) : null}
-
-        <Routes>
-          {/* ASOSIY YO'NALISH */}
+          {/* START */}
           <Route path="/" element={<Navigate to="/login" replace />} />
 
           {/* AUTH */}
           <Route path="/login" element={<Auth />} />
           <Route path="/register" element={<Register />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/logout" element={<Logout />} />
 
-          {/* DASHBOARD */}
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/main" element={<MainPage />} />
-
-          {/* CLIENT SERVICES */}
-          <Route path="/freight" element={<ClientFreight onBack={() => window.history.back()} />} />
+          {/* CLIENT (yolovchi) */}
           <Route
-            path="/inter-district"
-            element={<ClientInterDistrict onBack={() => window.history.back()} />}
+            path="/client"
+            element={
+              <RoleGate allow={{ client: true, driver: true }}>
+                <ClientHome />
+              </RoleGate>
+            }
+          />
+          <Route
+            path="/client/taxi"
+            element={
+              <RoleGate allow={{ client: true, driver: true }}>
+                <MainPage />
+              </RoleGate>
+            }
+          />
+          <Route
+            path="/client/inter-provincial"
+            element={
+              <RoleGate allow={{ client: true, driver: true }}>
+                <ClientInterProvincial onBack={() => window.history.back()} />
+              </RoleGate>
+            }
+          />
+          <Route
+            path="/client/inter-district"
+            element={
+              <RoleGate allow={{ client: true, driver: true }}>
+                <ClientInterDistrict onBack={() => window.history.back()} />
+              </RoleGate>
+            }
+          />
+          <Route
+            path="/client/freight"
+            element={
+              <RoleGate allow={{ client: true, driver: true }}>
+                <ClientFreight onBack={() => window.history.back()} />
+              </RoleGate>
+            }
+          />
+          <Route
+            path="/client/delivery"
+            element={
+              <RoleGate allow={{ client: true, driver: true }}>
+                <ClientDelivery onBack={() => window.history.back()} />
+              </RoleGate>
+            }
           />
 
-          {/* DRIVER MODE ✅ */}
-          <Route path="/driver" element={<Navigate to="/driver-mode" replace />} />
+          {/* COMMON */}
+          <Route
+            path="/auto-market"
+            element={
+              <RoleGate allow={{ client: true, driver: true }}>
+                <AutoMarketPage />
+              </RoleGate>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <RoleGate allow={{ client: true, driver: true }}>
+                <Settings />
+              </RoleGate>
+            }
+          />
+          <Route
+            path="/addresses"
+            element={
+              <RoleGate allow={{ client: true, driver: true }}>
+                <MyAddresses />
+              </RoleGate>
+            }
+          />
+          <Route
+            path="/orders"
+            element={
+              <RoleGate allow={{ client: true, driver: true }}>
+                <ClientOrders />
+              </RoleGate>
+            }
+          />
+          <Route
+            path="/support"
+            element={
+              <RoleGate allow={{ client: true, driver: true }}>
+                <Support />
+              </RoleGate>
+            }
+          />
+
+          {/* DRIVER */}
           <Route
             path="/driver-mode"
-            element={<DriverAuth onBack={() => window.history.back()} />}
+            element={
+              <RoleGate allow={{ client: true, driver: true }}>
+                <DriverAuth onBack={() => window.history.back()} />
+              </RoleGate>
+            }
           />
-          <Route path="/driver-home" element={<DriverHome />} />
-          <Route path="/driver/map" element={<DriverMap />} />
+          <Route path="/driver-pending" element={<DriverPending />} />
+          <Route
+            path="/driver"
+            element={
+              <RoleGate allow={{ client: false, driver: true, requireDriverApproved: true }}>
+                <DriverDashboard />
+              </RoleGate>
+            }
+          />
+          <Route
+            path="/driver/orders"
+            element={
+              <RoleGate allow={{ client: false, driver: true, requireDriverApproved: true }}>
+                <DriverOrders />
+              </RoleGate>
+            }
+          />
+          <Route
+            path="/driver/taxi"
+            element={
+              <RoleGate allow={{ client: false, driver: true, requireDriverApproved: true }}>
+                <DriverTaxi onBack={() => window.history.back()} />
+              </RoleGate>
+            }
+          />
+          <Route
+            path="/driver/inter-provincial"
+            element={
+              <RoleGate allow={{ client: false, driver: true, requireDriverApproved: true }}>
+                <DriverInterProvincial onBack={() => window.history.back()} />
+              </RoleGate>
+            }
+          />
+          <Route
+            path="/driver/inter-district"
+            element={
+              <RoleGate allow={{ client: false, driver: true, requireDriverApproved: true }}>
+                <DriverInterDistrict onBack={() => window.history.back()} />
+              </RoleGate>
+            }
+          />
+          <Route
+            path="/driver/freight"
+            element={
+              <RoleGate allow={{ client: false, driver: true, requireDriverApproved: true }}>
+                <DriverFreight onBack={() => window.history.back()} />
+              </RoleGate>
+            }
+          />
+          <Route
+            path="/driver/delivery"
+            element={
+              <RoleGate allow={{ client: false, driver: true, requireDriverApproved: true }}>
+                <DriverDelivery onBack={() => window.history.back()} />
+              </RoleGate>
+            }
+          />
+
+          {/* LEGACY / SUPER PRO */}
+          {appConfig.features.garage ? <Route path="/garage" element={<GaragePage />} /> : null}
+          {appConfig.features.payments ? <Route path="/payments" element={<PaymentsPage />} /> : null}
+          {appConfig.features.searchOnRoute ? <Route path="/search-route" element={<SearchOnRoutePage />} /> : null}
+
+          {/* FALLBACK */}
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>/>
 
           {/* SUPER PRO PAGES */}
           {appConfig.features.garage ? <Route path="/garage" element={<GaragePage />} /> : null}
@@ -202,6 +347,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>
-    </ConfigProvider>
+          </LanguageProvider>
+</ConfigProvider>
   );
 }

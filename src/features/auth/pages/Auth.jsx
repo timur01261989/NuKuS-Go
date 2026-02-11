@@ -11,6 +11,7 @@ import {
   Dropdown,
 } from "antd";
 import { useNavigate } from "react-router-dom";
+import { useLanguage } from "@shared/i18n/useLanguage";
 import { LockOutlined, GlobalOutlined, PhoneOutlined } from "@ant-design/icons";
 
 import { translations } from "@i18n/translations";
@@ -22,9 +23,7 @@ export default function Auth() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
-  const savedLang = localStorage.getItem("appLang") || "uz_lotin";
-  const [langKey, setLangKey] = useState(savedLang);
-  const t = translations[langKey] || translations["uz_lotin"];
+  const { langKey, setLangKey, t } = useLanguage();
 
   const languages = [
     { key: "uz_lotin", label: "O'zbek (Lotin)" },
@@ -39,15 +38,14 @@ export default function Auth() {
     const checkSession = async () => {
       if (!supabase?.auth) return;
       const { data } = await supabase.auth.getSession();
-      if (data?.session) navigate("/dashboard");
+      if (data?.session) navigate("/client");
     };
     checkSession();
   }, [navigate]);
 
   const handleLangChange = ({ key }) => {
     setLangKey(key);
-    localStorage.setItem("appLang", key);
-    message.success("Til o'zgartirildi");
+        message.success("Til o'zgartirildi");
   };
 
   const formatUzPhone = (rawPhone) => {
@@ -71,7 +69,7 @@ export default function Auth() {
       if (error) throw error;
 
       message.success(t?.greeting || "Xush kelibsiz!");
-      navigate("/dashboard");
+      navigate("/client");
     } catch {
       message.error("Telefon raqam yoki parol noto'g'ri!");
     } finally {
