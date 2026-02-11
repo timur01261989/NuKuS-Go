@@ -24,7 +24,6 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@lib/supabase";
 import { useLanguage } from "@shared/i18n/useLanguage";
 
-// ✅ shu import sende to‘g‘ri bo‘lsa qoldir
 import { startTracking } from "../components/services/locationService";
 
 const { Title, Text } = Typography;
@@ -78,6 +77,7 @@ export default function DriverDashboard() {
   // =========================
   useEffect(() => {
     let mounted = true;
+
     (async () => {
       try {
         const { data: u, error: uErr } = await supabase.auth.getUser();
@@ -94,7 +94,6 @@ export default function DriverDashboard() {
             .select("full_name, avatar_url")
             .eq("id", user.id)
             .single();
-
           if (p?.full_name) fullName = p.full_name;
           if (p?.avatar_url) avatarUrl = p.avatar_url;
         } catch {
@@ -127,7 +126,7 @@ export default function DriverDashboard() {
   };
 
   // =========================
-  // ONLINE tracking (same lifecycle as DriverHome)
+  // ONLINE tracking
   // =========================
   const API_BASE = (import.meta?.env?.VITE_API_BASE || "").replace(/\/$/, "");
 
@@ -220,7 +219,6 @@ export default function DriverDashboard() {
     try {
       const { data: u, error: uErr } = await supabase.auth.getUser();
       if (uErr) throw uErr;
-
       const user = u?.user;
       if (!user) return;
 
@@ -298,8 +296,7 @@ export default function DriverDashboard() {
 
   const rubberBandLeft = (dx, maxLeft) => {
     if (dx >= maxLeft) return dx;
-    const over = dx - maxLeft; // negative
-    return maxLeft - Math.abs(over) * 0.35;
+    return maxLeft - Math.abs(dx - maxLeft) * 0.35;
   };
 
   const setDrawerTranslate = (px, withTransition) => {
@@ -355,9 +352,7 @@ export default function DriverDashboard() {
     touchRef.current.velocity = v;
 
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    rafRef.current = requestAnimationFrame(() => {
-      setDrawerTranslate(translate, false);
-    });
+    rafRef.current = requestAnimationFrame(() => setDrawerTranslate(translate, false));
   };
 
   const onDrawerTouchEnd = () => {
@@ -367,7 +362,7 @@ export default function DriverDashboard() {
 
     touchRef.current.dragging = false;
 
-    const dx = touchRef.current.dx;        // negative
+    const dx = touchRef.current.dx; // negative
     const velocity = touchRef.current.velocity; // negative when flick left
 
     const distanceThreshold = -90;
@@ -489,10 +484,7 @@ export default function DriverDashboard() {
                   </Space>
 
                   {active && (
-                    <Tag
-                      color="green"
-                      style={{ marginTop: 2, borderRadius: 999, fontWeight: 800, padding: "2px 10px" }}
-                    >
+                    <Tag color="green" style={{ marginTop: 2, borderRadius: 999, fontWeight: 800, padding: "2px 10px" }}>
                       {t?.active || "Active"}
                     </Tag>
                   )}
@@ -503,7 +495,7 @@ export default function DriverDashboard() {
         </Space>
       </div>
 
-      {/* DRAWER (LEFT) */}
+      {/* DRAWER */}
       <Drawer
         placement="left"
         open={drawerOpen}
@@ -565,12 +557,7 @@ export default function DriverDashboard() {
               {t?.settings || "Sozlamalar"}
             </Button>
 
-            <Button
-              block
-              icon={<HistoryOutlined />}
-              style={{ height: 44, borderRadius: 12, textAlign: "left", marginTop: 8 }}
-              onClick={() => go("/driver/orders")}
-            >
+            <Button block icon={<HistoryOutlined />} style={{ height: 44, borderRadius: 12, textAlign: "left", marginTop: 8 }} onClick={() => go("/driver/orders")}>
               {t?.orderHistoryDriver || "Buyurtmalar tarixi"}
             </Button>
 

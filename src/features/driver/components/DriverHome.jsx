@@ -26,17 +26,14 @@ import {
   SearchOutlined,
 } from "@ant-design/icons";
 
-// --- SAHIFALAR VA XIZMATLAR ---
 import DriverTaxi from "./services/DriverTaxi";
 import DriverInterDistrict from "./services/DriverInterDistrict";
 import DriverInterProvincial from "./services/DriverInterProvincial";
 import DriverFreight from "./services/DriverFreight";
 import DriverDelivery from "./services/DriverDelivery";
 
-// PROFIL KOMPONENTI
 import DriverProfile from "./DriverProfile";
 
-// ✅ Supabase + GPS tracking
 import { supabase } from "@lib/supabase";
 import { startTracking } from "./services/locationService";
 
@@ -53,16 +50,16 @@ export default function DriverHome({ onLogout }) {
   );
   const [profileOpen, setProfileOpen] = useState(false);
 
+  // Online flag (persist)
   const [isOnline, setIsOnline] = useState(() => {
     const v = localStorage.getItem("driverOnline");
     return v === "1";
   });
 
-  // API base (bo‘lmasa "/api/..." ishlaydi)
   const API_BASE = (import.meta?.env?.VITE_API_BASE || "").replace(/\/$/, "");
 
   // =========================
-  // HELPERS
+  // PRESS ANIMATION
   // =========================
   const btnTouchProps = {
     onMouseDown: (e) => (e.currentTarget.style.transform = "scale(0.97)"),
@@ -72,6 +69,9 @@ export default function DriverHome({ onLogout }) {
     onTouchEnd: (e) => (e.currentTarget.style.transform = "scale(1)"),
   };
 
+  // =========================
+  // ACTIVE BADGE (selectedService)
+  // =========================
   const selectService = (key) => {
     setSelectedService(key);
     localStorage.setItem("driverActiveService", key);
@@ -83,7 +83,7 @@ export default function DriverHome({ onLogout }) {
   };
 
   // =========================
-  // ONLINE => realtime heartbeat + location
+  // HEARTBEAT + LOCATION (ONLINE)
   // =========================
   const lastGeoRef = useRef({ lat: null, lng: null, bearing: null, speed: null });
   const watchIdRef = useRef(null);
@@ -129,7 +129,7 @@ export default function DriverHome({ onLogout }) {
   };
 
   const stopTracking = () => {
-    // startTracking() watchId qaytarmagan bo‘lishi mumkin, navigator watchId bo‘lsa ham clear qilamiz.
+    // stop geolocation watch
     if (watchIdRef.current !== null && watchIdRef.current !== undefined) {
       try {
         navigator.geolocation?.clearWatch?.(watchIdRef.current);
@@ -139,6 +139,7 @@ export default function DriverHome({ onLogout }) {
     }
     watchIdRef.current = null;
 
+    // stop heartbeat interval
     if (heartbeatTimerRef.current) {
       clearInterval(heartbeatTimerRef.current);
       heartbeatTimerRef.current = null;
@@ -146,12 +147,9 @@ export default function DriverHome({ onLogout }) {
   };
 
   const startOnlineLoop = async (userId) => {
-    // 1) state
     await sendDriverState(userId, true);
 
-    // 2) gps tracking
     const watchId = startTracking((pos) => {
-      // pos = { lat, lng, heading, speed } bo‘lishi kutiladi
       lastGeoRef.current = {
         lat: pos?.lat ?? null,
         lng: pos?.lng ?? null,
@@ -162,10 +160,8 @@ export default function DriverHome({ onLogout }) {
 
     watchIdRef.current = watchId ?? null;
 
-    // 3) darhol heartbeat
     await sendHeartbeat(userId, true);
 
-    // 4) interval heartbeat
     heartbeatTimerRef.current = setInterval(() => {
       const uid = userIdRef.current;
       if (!uid) return;
@@ -185,7 +181,7 @@ export default function DriverHome({ onLogout }) {
 
       userIdRef.current = user.id;
 
-      // drivers jadvaliga yozib ko‘ramiz (ustun bo‘lmasa ham UI buzilmaydi)
+      // try update drivers table (optional)
       try {
         await supabase
           .from("drivers")
@@ -200,7 +196,6 @@ export default function DriverHome({ onLogout }) {
         // ignore
       }
 
-      // state endpoint
       await sendDriverState(user.id, next);
 
       message.success(next ? "Online" : "Offline");
@@ -228,13 +223,10 @@ export default function DriverHome({ onLogout }) {
           return;
         }
 
-        // online start
         stopTracking();
         await startOnlineLoop(user.id);
 
-        if (cancelled) {
-          stopTracking();
-        }
+        if (cancelled) stopTracking();
       } catch {
         // ignore
       }
@@ -247,19 +239,15 @@ export default function DriverHome({ onLogout }) {
   }, [isOnline]);
 
   // =========================
-  // PROFILE DRAWER SWIPE (RIGHT) rubber band + velocity
+  // RIGHT DRAWER SWIPE CLOSE (rubber band + velocity)
   // =========================
   const drawerInnerRef = useRef(null);
   const rafRef = useRef(0);
-
-  const drawerWidthPxRef = useRef(
-    typeof window !== "undefined" ? window.innerWidth : 360
-  );
+  const drawerWidthPxRef = useRef(typeof window !== "undefined" ? window.innerWidth : 360);
 
   useEffect(() => {
     const onResize = () => {
-      drawerWidthPxRef.current =
-        typeof window !== "undefined" ? window.innerWidth : 360;
+      drawerWidthPxRef.current = typeof window !== "undefined" ? window.innerWidth : 360;
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
@@ -271,13 +259,12 @@ export default function DriverHome({ onLogout }) {
     lastX: 0,
     dx: 0,
     lastT: 0,
-    velocity: 0, // px/ms
+    velocity: 0,
   });
 
   const rubberBandRight = (dx, maxRight) => {
     if (dx <= maxRight) return dx;
-    const over = dx - maxRight;
-    return maxRight + over * 0.35;
+    return maxRight + (dx - maxRight) * 0.35;
   };
 
   const setDrawerTranslate = (px, withTransition) => {
@@ -315,7 +302,7 @@ export default function DriverHome({ onLogout }) {
     const x = e.touches?.[0]?.clientX ?? 0;
     const tNow = performance.now();
 
-    let dx = x - touchRef.current.startX;
+    let dx = x - touchRef.current.startX; // right to close => positive
     if (dx < 0) dx = 0;
 
     const maxRight = drawerWidthPxRef.current;
@@ -332,9 +319,7 @@ export default function DriverHome({ onLogout }) {
     touchRef.current.velocity = v;
 
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    rafRef.current = requestAnimationFrame(() => {
-      setDrawerTranslate(translate, false);
-    });
+    rafRef.current = requestAnimationFrame(() => setDrawerTranslate(translate, false));
   };
 
   const onProfileTouchEnd = () => {
@@ -368,7 +353,7 @@ export default function DriverHome({ onLogout }) {
   }, [profileOpen]);
 
   // =========================
-  // CONTENT: service yoki menu
+  // CONTENT RENDER
   // =========================
   const content = useMemo(() => {
     if (selectedService === "taxi") return <DriverTaxi onBack={backToMenu} />;
@@ -379,6 +364,9 @@ export default function DriverHome({ onLogout }) {
     return null;
   }, [selectedService]);
 
+  // =========================
+  // MENU UI
+  // =========================
   const menuUi = (
     <div
       style={{
@@ -421,7 +409,7 @@ export default function DriverHome({ onLogout }) {
           </Text>
         </div>
 
-        {/* Online/Offline chip + icons */}
+        {/* ✅ Online/Offline chip headerda */}
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <div
             onClick={() => toggleOnline(!isOnline)}
@@ -471,6 +459,7 @@ export default function DriverHome({ onLogout }) {
             {...btnTouchProps}
           />
 
+          {/* PROFIL */}
           <Button
             icon={<UserOutlined />}
             shape="circle"
@@ -488,7 +477,7 @@ export default function DriverHome({ onLogout }) {
         </div>
       </div>
 
-      {/* MENYU */}
+      {/* MENYU KARTOCHKALARI */}
       <Row gutter={[15, 15]}>
         <Col span={24}>
           <Card
