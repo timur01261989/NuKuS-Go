@@ -2,60 +2,67 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ================================
-   0) Global Reset / Base
-================================ */
-html, body {
+/* =========================================
+   0) GLOBAL RESET
+========================================= */
+html,
+body {
   margin: 0;
   padding: 0;
 }
 
-/* ================================
-   1) Shriftni tizimga tanitish
-   Eslatma: fayl yo‘li to‘g‘ri bo‘lishi shart!
-================================ */
+/* =========================================
+   1) FONT FACE
+   Fayl yo‘li to‘g‘ri ekanini tekshiring
+========================================= */
 @font-face {
-  font-family: 'YangoHeadline';
-  src: url('./assets/fonts/yango-headline-multi.woff') format('woff');
+  font-family: "YangoHeadline";
+  src: url("./assets/fonts/yango-headline-multi.woff") format("woff");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
 
-/* ================================
-   2) Global shrift sozlamalari
-================================ */
+/* =========================================
+   2) GLOBAL FONT SYSTEM
+========================================= */
 body,
-h1, h2, h3, h4, h5,
+h1,
+h2,
+h3,
+h4,
+h5,
 .ant-typography,
 .ant-btn,
 .ant-card-head-title {
-  font-family: 'YangoHeadline', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-family: "YangoHeadline", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, sans-serif !important;
+
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ================================
-   3) Maxsus Yandex uslubidagi sarlavhalar
-================================ */
+/* =========================================
+   3) YANDEX STYLE HEADERS
+========================================= */
 .yango-header {
-  font-family: 'YangoHeadline', sans-serif !important;
+  font-family: "YangoHeadline", sans-serif !important;
   letter-spacing: -0.8px;
   line-height: 1.1;
   font-weight: 800;
-  color: #000000;
+  color: #000;
 }
 
 .yango-title {
-  font-family: 'YangoHeadline', sans-serif !important;
+  font-family: "YangoHeadline", sans-serif !important;
   letter-spacing: -0.8px;
   line-height: 1.1;
   font-weight: 700;
 }
 
-/* ================================
-   4) Ant Design Card head sozlamalari
-================================ */
+/* =========================================
+   4) ANT DESIGN CARD FIXES
+========================================= */
 .ant-card-head-title {
   font-size: 18px;
   letter-spacing: -0.5px;
@@ -65,56 +72,56 @@ h1, h2, h3, h4, h5,
   border-bottom: none;
 }
 
-/* ================================
-   5) Yandex Go Cubemap Reflection simulyatsiyasi
-================================ */
+/* =========================================
+   5) CAR MARKER (CUBEMAP REFLECTION)
+========================================= */
 .smooth-car-marker {
   position: relative;
-  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.2));
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.2));
 }
 
-/* Cubemap aks ettirish chizig‘i */
+/* Reflection highlight */
 .smooth-car-marker::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 10%;
   left: 10%;
   width: 80%;
   height: 40%;
-  background: linear-gradient(180deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 100%);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.4) 0%,
+    rgba(255, 255, 255, 0) 100%
+  );
   border-radius: 50% 50% 0 0;
   pointer-events: none;
 }
 
-/* ================================
-   6) Leaflet xarita HDR qatlami
-================================ */
+/* =========================================
+   6) LEAFLET HDR LAYER (DAY MODE)
+========================================= */
 .leaflet-container {
-  filter: contrast(1.1) saturate(1.2);
+  filter: contrast(1.1) saturate(1.15);
   background: #f0f0f0 !important;
 }
 
-/* ================================
-   7) Night Mode (HDR Night Mode)
-================================ */
-.night-mode-active {
-  filter: contrast(1.1) brightness(0.9);
-}
+/* =========================================
+   7) NIGHT MODE SYSTEM
+   body ga class qo‘shiladi: night-mode-active
+========================================= */
 
-/* Navigatsiya chizig'ini neon rangga o'tkazish */
-.night-mode-active .leaflet-ant-path {
-  stroke: #00f2ff;
-  filter: drop-shadow(0 0 8px #00f2ff);
-}
-
-/* Tungi rejim uchun umumiy background va rang */
+/* === GLOBAL NIGHT BASE === */
 body.night-mode-active {
   background-color: #0d0d0d !important;
   color: #ffffff !important;
-  filter: contrast(1.1) brightness(0.95) saturate(1.1);
 }
 
-/* Tungi rejimda Card va List qorayishi */
+/* HDR adjustment (global) */
+.night-mode-active {
+  filter: contrast(1.05) brightness(0.95) saturate(1.05);
+}
+
+/* === ANT DESIGN NIGHT FIX === */
 body.night-mode-active .ant-card,
 body.night-mode-active .ant-list-item {
   background-color: #1a1a1a !important;
@@ -126,17 +133,34 @@ body.night-mode-active .ant-list-item-meta-title {
   color: #e0e0e0 !important;
 }
 
-/* Leaflet interaktiv elementlarga neon drop shadow */
+/* Buttons */
+body.night-mode-active .ant-btn {
+  border-color: #333;
+}
+
+/* =========================================
+   8) NIGHT MODE – LEAFLET EFFECTS
+========================================= */
+
+/* Neon navigation path */
+body.night-mode-active .leaflet-ant-path {
+  stroke: #00f2ff;
+  filter: drop-shadow(0 0 8px #00f2ff);
+}
+
+/* Interactive glow */
 body.night-mode-active .leaflet-interactive {
   filter: drop-shadow(0 0 5px #00f2ff);
 }
 
-/* Tungi rejimda xaritani invert qilib "night map" ko‘rinish berish */
-.night-mode-active .leaflet-container {
+/* Map invert night simulation */
+body.night-mode-active .leaflet-container {
   filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
 }
 
-/* Markerlarga neon effekt (tungi rejimda) */
+/* =========================================
+   9) NIGHT MODE – MARKER GLOW
+========================================= */
 body.night-mode-active .smooth-car-marker {
   filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.8));
 }

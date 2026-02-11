@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { Navigate, useLocation } from "react-router-dom";
+import { Spin } from "antd";
 import { supabase } from "@lib/supabase";
 
 /**
@@ -8,16 +9,40 @@ import { supabase } from "@lib/supabase";
  *  - driver: true/false
  *  - requireDriverApproved: true/false
  */
-export default function RoleGate({ children, allow, redirectTo="/login" }) {
+export default function RoleGate({ children, allow, redirectTo = "/login" }) {
+  const location = useLocation();
+
   const [loading, setLoading] = useState(true);
   const [ok, setOk] = useState(false);
   const [reason, setReason] = useState(null);
 
+  // allow object har renderda yangi bo‘lib qolsa effect qayta-qayta ishlamasin
+  const allowKey = useMemo(() => {
+    const a = allow || {};
+    return JSON.stringify({
+      client: !!a.client,
+      driver: !!a.driver,
+      requireDriverApproved: !!a.requireDriverApproved,
+    });
+  }, [allow]);
+
   useEffect(() => {
     let mounted = true;
-    (async () => {
+
+    const run = async () => {
       try {
-        const { data: s } = await supabase.auth.getSession();
+        setLoading(true);
+        setReason(null);
+
+        const { data: s, error: sessionErr } = await supabase.auth.getSession();
+        if (sessionErr) {
+          if (!mounted) return;
+          setOk(false);
+          setReason("session-error");
+          setLoading(false);
+          return;
+        }
+
         const session = s?.session;
         if (!session) {
           if (!mounted) return;
@@ -27,32 +52,61 @@ export default function RoleGate({ children, allow, redirectTo="/login" }) {
           return;
         }
 
-        // profiles may not exist in some installs; fallback to allow.client
+        // defaults
         let role = "client";
         let approved = true;
+        let profileExists = true;
 
-        try {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("role, driver_approved")
-            .eq("id", session.user.id)
-            .single();
+        // profiles bo‘lmasligi yoki RLS bloklashi mumkin
+        const { data: profile, error: profileErr } = await supabase
+          .from("profiles")
+          .select("role, driver_approved")
+          .eq("id", session.user.id)
+          // ✅ profil bo‘lmasa error qilmaydi
+          .maybeSingle();
 
+        if (profileErr) {
+          // RLS yoki boshqa sabab: profilni o‘qiy olmadi
+          // fallback: client deb qoladi, lekin driver route bo‘lsa bu muammo bo‘lishi mumkin
+          profileExists = false;
+        } else if (!profile) {
+          profileExists = false;
+        } else {
           if (profile?.role) role = profile.role;
           if (typeof profile?.driver_approved === "boolean") approved = profile.driver_approved;
-        } catch {
-          // ignore
         }
 
+        // access decision
+        const a = allow || {};
         let allowed = false;
-        if (role === "client" && allow?.client) allowed = true;
-        if (role === "driver" && allow?.driver) {
-          if (allow?.requireDriverApproved && !approved) {
+
+        if (role === "client") {
+          allowed = !!a.client;
+        }
+
+        if (role === "driver") {
+          if (!a.driver) {
+            allowed = false;
+            if (!mounted) return;
+            setReason("driver-not-allowed");
+          } else if (a.requireDriverApproved && !approved) {
             allowed = false;
             if (!mounted) return;
             setReason("driver-not-approved");
           } else {
             allowed = true;
+          }
+        }
+
+        // Agar profile yo‘q bo‘lsa va siz driver route ochmoqchi bo‘lsangiz,
+        // bu ko‘pincha DB’da profile yaratish triggeri yo‘qligidan bo‘ladi.
+        // Shuni reason bilan ajratib qo‘yamiz:
+        if (!profileExists && a.driver) {
+          // user driver bo‘lishi kerak bo‘lgan flow bo‘lishi mumkin
+          // ammo profil yo‘q => client fallback ishladi => noto‘g‘ri redirect bo‘ladi.
+          // Siz xohlasangiz bu holatda /driver-mode ga yuborish mumkin.
+          if (!allowed) {
+            setReason((r) => r || "no-profile");
           }
         }
 
@@ -65,16 +119,39 @@ export default function RoleGate({ children, allow, redirectTo="/login" }) {
         setReason("error");
         setLoading(false);
       }
-    })();
-    return () => { mounted = false; };
-  }, [allow]);
+    };
 
-  if (loading) return null;
+    run();
 
-  if (!ok) {
-    if (reason === "driver-not-approved") return <Navigate to="/driver-pending" replace />;
-    return <Navigate to={redirectTo} replace />;
+    return () => {
+      mounted = false;
+    };
+  }, [allowKey]);
+
+  // ✅ loading paytida oq ekran emas, spinner
+  if (loading) {
+    return (
+      <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Spin size="large" />
+      </div>
+    );
   }
 
-  return children;
+  if (!ok) {
+    // driver approved bo‘lmasa pendingga
+    if (reason === "driver-not-approved") {
+      return <Navigate to="/driver-pending" replace />;
+    }
+
+    // profil yo‘q bo‘lsa, driver roli set qilinmagan bo‘lishi mumkin:
+    // xohlasangiz driver-mode (ro‘yxatdan o‘tish / rol tanlash)ga yuboring
+    if (reason === "no-profile") {
+      return <Navigate to="/driver-mode" replace />;
+    }
+
+    // login redirect (oldingi pathni state’da olib boramiz)
+    return <Navigate to={redirectTo} replace state={{ from: location.pathname, reason }} />;
+  }
+
+  return <>{children}</>;
 }

@@ -30,7 +30,7 @@ import ClientHome from "@features/client/pages/ClientHome";
 import ClientFreight from "./features/client/components/ClientFreight";
 import ClientDelivery from "./features/client/components/ClientDelivery";
 import ClientInterDistrict from "./features/client/components/ClientInterDistrict";
-import ClientInterProvincial from "./features/client/components/ClientInterProvincial"; // Bu import yetishmayotgan edi, qo'shildi
+import ClientInterProvincial from "./features/client/components/ClientInterProvincial";
 
 // --- HAYDOVCHI MODE ---
 import DriverAuth from "./features/driver/components/DriverAuth";
@@ -61,6 +61,10 @@ function applyNightModeClass(enabled) {
   else document.body.classList.remove("night-mode-active");
 }
 
+function safeNightModeValue(v) {
+  return v === "on" || v === "off" || v === "auto" ? v : "auto";
+}
+
 export default function App() {
   // Ilova yuklanishi bilan optimizatsiyalar
   useEffect(() => {
@@ -74,15 +78,11 @@ export default function App() {
 
   // App start: localStorage’dan o‘qib olish
   useEffect(() => {
-    const saved = localStorage.getItem("nightMode");
-    if (saved === "on" || saved === "off" || saved === "auto") {
-      setNightMode(saved);
-    } else {
-      setNightMode("auto");
-    }
+    const saved = safeNightModeValue(localStorage.getItem("nightMode"));
+    setNightMode(saved);
   }, []);
 
-  // URL query orqali tez boshqarish
+  // URL query orqali tez boshqarish (night=1/0/auto)
   useEffect(() => {
     const qp = new URLSearchParams(window.location.search);
     const qNight = qp.get("night");
@@ -90,13 +90,42 @@ export default function App() {
     if (qNight === "1") {
       setNightMode("on");
       localStorage.setItem("nightMode", "on");
+      window.dispatchEvent(new Event("nightModeChanged"));
     } else if (qNight === "0") {
       setNightMode("off");
       localStorage.setItem("nightMode", "off");
+      window.dispatchEvent(new Event("nightModeChanged"));
     } else if (qNight === "auto") {
       setNightMode("auto");
       localStorage.setItem("nightMode", "auto");
+      window.dispatchEvent(new Event("nightModeChanged"));
     }
+  }, []);
+
+  // ✅ MUHIM: Settings’dan o‘zgarganda App ham darhol bilsin
+  useEffect(() => {
+    const syncFromStorage = () => {
+      const v = safeNightModeValue(localStorage.getItem("nightMode"));
+      setNightMode(v);
+    };
+
+    // boshqa tab/oynada o‘zgarsa
+    const onStorage = (e) => {
+      if (e.key === "nightMode") syncFromStorage();
+    };
+
+    // shu tab ichida Settings o‘zgartirganda
+    const onCustom = () => {
+      syncFromStorage();
+    };
+
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("nightModeChanged", onCustom);
+
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("nightModeChanged", onCustom);
+    };
   }, []);
 
   // Night mode qo‘llash
@@ -149,7 +178,7 @@ export default function App() {
         <BrowserRouter>
           <ScrollToTop />
           {debugProviders && <ProviderSwitchPanel />}
-          
+
           <Routes>
             {/* START */}
             <Route path="/" element={<Navigate to="/login" replace />} />
