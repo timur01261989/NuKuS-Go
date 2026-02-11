@@ -3,6 +3,14 @@ import { Card, Typography, Tag } from "antd";
 import { supabase } from "@lib/supabase";
 
 const { Title, Text } = Typography;
+const { data, error } = await supabase
+  .from("orders")
+  .select("*")
+  .eq("driver_id", uid)
+  .order("created_at", { ascending: false })
+  .limit(100);
+
+if (error) console.error("orders error:", error);
 
 export default function DriverOrders() {
   const [items, setItems] = useState([]);
