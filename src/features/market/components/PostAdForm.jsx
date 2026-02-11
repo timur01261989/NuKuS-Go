@@ -20,9 +20,9 @@ function compressToDataUrl(file, quality = 0.75, maxW = 1280) {
     };
 
     img.onload = () => {
-      const scale = Math.min(1, maxW / img.width);
-      const w = Math.max(1, Math.round(img.width * scale));
-      const h = Math.max(1, Math.round(img.height * scale));
+      const scale = Math.min(1, maxW / (img.width || 1));
+      const w = Math.max(1, Math.round((img.width || 1) * scale));
+      const h = Math.max(1, Math.round((img.height || 1) * scale));
 
       const canvas = document.createElement("canvas");
       canvas.width = w;
@@ -35,16 +35,17 @@ function compressToDataUrl(file, quality = 0.75, maxW = 1280) {
       resolve(out);
     };
 
-    // Agar rasm yuklanmasa ham, hech bo‘lmasa originalni qaytarish
     img.onerror = () => {
-      resolve(reader.result);
+      resolve(reader.result); // hech bo‘lmasa original dataURL
     };
+
+    reader.onerror = () => resolve(null);
 
     reader.readAsDataURL(file);
   });
 }
 
-// ✅ DEFAULT EXPORT
+// ✅ DEFAULT EXPORT (muhim!)
 export default function PostAdForm({ onDone }) {
   const [params, setParams] = useState(null);
   const [remote, setRemote] = useState(null);
@@ -110,10 +111,16 @@ export default function PostAdForm({ onDone }) {
     if (!files.length) return;
 
     const next = [...images];
+
     for (const f of files) {
       if (next.length >= maxImages) break;
-      const dataUrl = await compressToDataUrl(f, quality, maxW);
-      next.push(dataUrl);
+
+      try {
+        const dataUrl = await compressToDataUrl(f, quality, maxW);
+        if (dataUrl) next.push(dataUrl);
+      } catch (err) {
+        console.error("Image compress error:", err);
+      }
     }
 
     setImages(next);
