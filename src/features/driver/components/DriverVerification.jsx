@@ -3,7 +3,7 @@ import { Card, Button, Typography, Upload, message, Steps, Space } from 'antd';
 import { CameraOutlined, IdcardOutlined, FileTextOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { supabase } from "../../../lib/supabase";
 // Faylning yuqori qismida import qiling
-import { compressImage } from '../../utils/imageUtils'; 
+import { compressImage } from '../../../utils/imageUtils';
 
 // ... komponent ichida
 const handleUpload = async (file, type) => {

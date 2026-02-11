@@ -9,12 +9,14 @@ import { setupNotifications } from "../services/notifications";
 
 // ✅ Sizdagi real map components (screenshotdagi papka)
 import MapCenterPicker from "../features/map/components/MapCenterPicker";
-import RoutingMachine from "../features/map/components/RoutingMachine";
 import UserMarker from "../features/map/components/UserMarker";
 import SearchRadar from "../features/map/components/SearchRadar";
 
 import CenterPin from "../features/map/components/CenterPin";
 import TargetMarker from "../features/map/components/TargetMarker";
+
+import RouteLine from "../features/map/components/RouteLine";
+import { buildRoute } from "../providers/route/index.js";
 
 import useRealtimeDrivers from "../features/driver/hooks/useRealtimeDrivers";
 import DriverMarker from "../features/driver/components/DriverMarker";
@@ -46,6 +48,7 @@ export default function MainPage() {
 
   // ===================== ROUTE STATE =====================
   const [distanceMeters, setDistanceMeters] = useState(0);
+  const [routePoints, setRoutePoints] = useState([]); // [[lat,lng], ...] for RouteLine
 
   const distanceKm = useMemo(() => (distanceMeters / 1000).toFixed(1), [distanceMeters]);
 
@@ -146,6 +149,54 @@ export default function MainPage() {
   const showRoute = useMemo(() => {
     return showPricing && !!userLoc?.length && !!targetLoc?.length;
   }, [showPricing, userLoc, targetLoc]);
+
+  // ===================== ROUTE (OSRM/Yandex/Google) via buildRoute =====================
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run() {
+      if (!showRoute) {
+        setRoutePoints([]);
+        setDistanceMeters(0);
+        return;
+      }
+      if (!userLoc?.length || !targetLoc?.length) return;
+
+      try {
+        // MainPage uses Leaflet coords: [lat, lng]  → provider expects {lat,lng}
+        const pickup = { lat: userLoc[0], lng: userLoc[1] };
+        const dropoff = { lat: targetLoc[0], lng: targetLoc[1] };
+
+        const r = await buildRoute({
+          pickup,
+          dropoff,
+          overview: 'full',
+          geometries: 'geojson',
+        });
+
+        if (cancelled) return;
+
+        const meters = Number(r?.distance_m ?? (r?.distance_km ? r.distance_km * 1000 : 0)) || 0;
+        setDistanceMeters(meters);
+
+        // OSRM geojson: coordinates = [[lng,lat], ...]  → Leaflet wants [[lat,lng], ...]
+        const coords = r?.coordinates || r?.geometry?.coordinates || r?.polyline?.coordinates || [];
+        const points = Array.isArray(coords)
+          ? coords.map((c) => Array.isArray(c) ? [c[1], c[0]] : c).filter((p) => Array.isArray(p) && p.length === 2)
+          : [];
+        setRoutePoints(points);
+      } catch (e) {
+        if (!cancelled) {
+          console.error('[buildRoute] error:', e);
+          setRoutePoints([]);
+          setDistanceMeters(0);
+        }
+      }
+    }
+
+    run();
+    return () => { cancelled = true; };
+  }, [showRoute, userLoc?.[0], userLoc?.[1], targetLoc?.[0], targetLoc?.[1]]);
 
   // ===================== UI HELPERS =====================
   const toggleSelecting = useCallback(() => {
@@ -250,10 +301,8 @@ export default function MainPage() {
           onHaptic={haptic}
         />
 
-        {/* ROUTING MACHINE */}
-        {showRoute ? (
-          <RoutingMachine from={userLoc} to={targetLoc} onDistanceMeters={onRouteDistanceMeters} />
-        ) : null}
+        {/* ROUTE LINE (OSRM) */}
+        {showRoute && routePoints?.length > 1 ? <RouteLine points={routePoints} /> : null}
       </MapContainer>
 
       {/* UBER STYLE CENTER PIN (overlay) */}

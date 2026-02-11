@@ -7,7 +7,7 @@ import {
   GlobalOutlined, EnvironmentOutlined, ArrowLeftOutlined, PoweroffOutlined 
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import { translations } from "../../../pages/translations";
+import { translations } from '@i18n/translations';
 import { supabase } from "../../../lib/supabase";
 
 const { Title, Text } = Typography;

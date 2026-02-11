@@ -8,8 +8,8 @@ import PaymentsPage from "./pages/SuperPro/PaymentsPage";
 import SearchOnRoutePage from "./pages/SuperPro/SearchOnRoutePage";
 
 // --- SAHIFALAR (PAGES) ---
-import Login from "./pages/Auth";
-import Register from "./pages/Register";
+import Auth from "./features/auth/pages/Auth";
+import Register from "./features/auth/pages/Register";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import MainPage from "./pages/MainPage";
@@ -26,7 +26,7 @@ import DriverMap from "./features/driver/components/DriverMap";
 import { prioritizeAssets } from "./utils/BaselineProfile";
 
 // Debug komponentlar (named exports)
-import { OrderRealtimeDebug } from "./features/taxi/components/OrderRealtimeDebug";
+//import { OrderRealtimeDebug } from "./features/taxi/components/OrderRealtimeDebug";
 import { ProviderSwitchPanel } from "./features/debug/components/ProviderSwitchPanel";
 
 // Sahifalar almashganda skrolni tepaga qaytarish
@@ -167,7 +167,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/login" replace />} />
 
           {/* AUTH */}
-          <Route path="/login" element={<Login />} />
+          <Route path="/login" element={<Auth />} />
           <Route path="/register" element={<Register />} />
           <Route path="/reset-password" element={<ResetPassword />} />
 

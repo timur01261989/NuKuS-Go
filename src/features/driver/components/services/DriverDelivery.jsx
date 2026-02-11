@@ -9,7 +9,7 @@ import {
   CheckCircleOutlined, RocketOutlined, DeleteOutlined
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-import { translations } from "../../../../pages/translations";
+import { translations } from '@i18n/translations';
 import { supabase } from "../../../../lib/supabase";
  
 

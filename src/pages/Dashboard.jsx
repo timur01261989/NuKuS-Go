@@ -15,7 +15,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import ClientDashboard from "../features/client/components/ClientDashboard";
 
-import { translations } from "./translations";
+import { translations } from "@i18n/translations";
 
 // --- KOMPONENTLAR ---
 import DriverAuth from "../features/driver/components/DriverAuth";

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Input, List, Typography, Card } from 'antd';
 import { EnvironmentFilled, SearchOutlined, ClockCircleOutlined } from '@ant-design/icons';
-import { NUKUS_PLACES } from '../../utils/NukusPlaces';
+import { NUKUS_PLACES } from '../../../utils/NukusPlaces';
 
 const { Text } = Typography;
 

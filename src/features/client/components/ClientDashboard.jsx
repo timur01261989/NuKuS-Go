@@ -4,7 +4,7 @@ import {
   GlobalOutlined, EnvironmentOutlined, CarOutlined, 
   RocketOutlined, ShopOutlined, ArrowLeftOutlined 
 } from "@ant-design/icons";
-import { translations } from "../../../pages/translations";
+import { translations } from '@i18n/translations';
 import { supabase } from "../../../lib/supabase";
 
 // Xizmatlarni import qilamiz

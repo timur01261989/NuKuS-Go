@@ -8,8 +8,8 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-import { translations } from "../../pages/translations";
-import { supabase } from "../lib/supabase";
+import { translations } from '@i18n/translations';
+import { supabase } from "../../../lib/supabase";
 
 
 // --- MAP ICON FIX ---

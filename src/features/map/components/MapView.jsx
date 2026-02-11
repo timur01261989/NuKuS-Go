@@ -1,15 +1,12 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { MapContainer, TileLayer } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
 import UserMarker from "./UserMarker";
 import MapCenterPicker from "./MapCenterPicker";
-import RoutingMachine from "./RoutingMachine";
-
-// agar sizda SearchRadar eski joyda bo‘lsa yo‘lini moslang:
-import SearchRadar from "../../../components/map/SearchRadar"; 
-// agar endi ham features ichiga ko‘chirsangiz:
-// import SearchRadar from "../components/SearchRadar";
+import SearchRadar from "./SearchRadar";
+import RouteLine from "./RouteLine";
+import { buildRoute } from "../../../providers/route/index.js";
 
 export default function MapView({
   userLoc,
@@ -20,6 +17,42 @@ export default function MapView({
   onRouteDistanceMeters,
   isSearching
 }) {
+  const [routePoints, setRoutePoints] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run() {
+      if (!showRoute) {
+        setRoutePoints([]);
+        if (typeof onRouteDistanceMeters === "function") onRouteDistanceMeters(0);
+        return;
+      }
+      if (!userLoc?.lat || !userLoc?.lng || !targetLoc?.lat || !targetLoc?.lng) return;
+
+      try {
+        const r = await buildRoute({ pickup: userLoc, dropoff: targetLoc });
+        if (cancelled) return;
+
+        const coords = r?.coordinates || r?.geometry?.coordinates || [];
+        setRoutePoints(coords);
+
+        if (typeof onRouteDistanceMeters === "function") {
+          onRouteDistanceMeters(Number(r?.distance_m || 0));
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setRoutePoints([]);
+          if (typeof onRouteDistanceMeters === "function") onRouteDistanceMeters(0);
+          // console.warn("Route build failed:", e);
+        }
+      }
+    }
+
+    run();
+    return () => { cancelled = true; };
+  }, [showRoute, userLoc?.lat, userLoc?.lng, targetLoc?.lat, targetLoc?.lng, onRouteDistanceMeters]);
+
   return (
     <>
       <MapContainer center={userLoc} zoom={16} zoomControl={false} style={{ width: "100%", height: "100%" }}>
@@ -29,9 +62,9 @@ export default function MapView({
 
         <MapCenterPicker enabled={selectingFromMap} onPick={onTargetChange} />
 
-        {showRoute && (
-          <RoutingMachine from={userLoc} to={targetLoc} onDistanceMeters={onRouteDistanceMeters} />
-        )}
+        {showRoute && routePoints?.length > 1 ? (
+          <RouteLine points={routePoints} />
+        ) : null}
       </MapContainer>
 
       <SearchRadar isVisible={isSearching} />
