@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, Card, CardHeader, CardContent, Button } from '../../../shared/ui/index.js';
-import { PostAdForm } from './PostAdForm.jsx';
+import PostAdForm from "./PostAdForm.jsx";
 import { getMarketTiles } from '../../../services/marketMetaService.js';
 import { listMarketCars, formatPriceUZS, getMarketConfig } from '../../../services/marketService.js';
 
