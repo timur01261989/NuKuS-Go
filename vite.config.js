@@ -1,28 +1,27 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { fileURLToPath, URL } from "node:url";
 
-// https://vitejs.dev/config/
 export default defineConfig({
+  plugins: [react()],
   resolve: {
     alias: {
-      '@': '/src',
-      '@features': '/src/features',
-      '@services': '/src/services',
-      '@utils': '/src/utils',
-      '@lib': '/src/lib',
-      '@i18n': '/src/i18n',
-      '@providers': '/src/providers',
-      '@shared': '/src/shared'
-    }
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "@features": fileURLToPath(new URL("./src/features", import.meta.url)),
+      "@services": fileURLToPath(new URL("./src/services", import.meta.url)),
+      "@utils": fileURLToPath(new URL("./src/utils", import.meta.url)),
+      "@lib": fileURLToPath(new URL("./src/lib", import.meta.url)),
+      "@i18n": fileURLToPath(new URL("./src/i18n", import.meta.url)),
+      "@providers": fileURLToPath(new URL("./src/providers", import.meta.url)),
+      "@shared": fileURLToPath(new URL("./src/shared", import.meta.url)),
+    },
   },
-
-  plugins: [react()],
   server: {
-    host: '0.0.0.0',
+    host: "0.0.0.0",
     allowedHosts: true,
-    port: 5173 // Portni aniq belgilab qo'yamiz
+    port: 5173,
   },
   optimizeDeps: {
-    force: true // Har gal yurgizganda keshni yangilashga majburlash
-  }
-})
+    force: true,
+  },
+});
