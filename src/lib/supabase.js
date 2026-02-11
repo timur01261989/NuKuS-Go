@@ -1,6 +1,15 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://jhqzrbvsyvyhsyfkqvow.supabase.co'
-const supabaseKey = 'sb_publishable_0HX0Eg-vfkoaNW4mlIQyMA_jWlwdtE9'
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseKey)
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error("Supabase URL yoki Anon Key topilmadi! Vercel -> Settings -> Environment Variables ni tekshiring.");
+}
+
+export const supabase =
+  supabaseUrl && supabaseAnonKey
+    ? createClient(supabaseUrl, supabaseAnonKey, {
+        realtime: { params: { eventsPerSecond: 10 } },
+      })
+    : null;
