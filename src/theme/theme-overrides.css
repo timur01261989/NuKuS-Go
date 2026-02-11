@@ -1,5 +1,13 @@
 /* ===============================
    AntD + Premium Black Cards default
+   MAQSAD:
+   - Card’lar default premium qora bo‘lsin ✅
+   - Lekin Divider/Input/Button butun app bo‘ylab buzilib ketmasin ✅
+   - Night mode ham body.night-mode-active bilan ishlasin ✅
+=============================== */
+
+/* ===============================
+   1) CARD — premium black default
 =============================== */
 
 /* Card umumiy ko‘rinishi */
@@ -30,38 +38,113 @@
   color: var(--card-text-2) !important;
 }
 
-/* Buttonlar (premium card ichida ham chiroyli bo‘lsin) */
-.ant-btn {
-  border-radius: 16px;
-}
+/* ===============================
+   2) INPUT / SELECT / PICKER
+   TUZATISH:
+   - Global inputlar page token’lari bilan ishlaydi (day mode’da oq ko‘rinadi)
+   - Premium inputlar faqat Card/Modal/Drawer ichida qora bo‘ladi
+=============================== */
 
-/* Input / Select (premium card ichida) */
+/* --------- GLOBAL (PAGE) INPUTS --------- */
+/* Day layout’da inputlar oq bo‘lishi uchun: bg-elevated ishlatamiz */
 .ant-input,
 .ant-input-affix-wrapper,
 .ant-select-selector,
 .ant-picker {
+  background: var(--bg-elevated) !important;
+  border-color: rgba(0,0,0,0.12) !important;
+  color: var(--text) !important;
+}
+
+/* Select ichidagi textlar (MUHIM!) */
+.ant-select-selection-item,
+.ant-select-selection-placeholder {
+  color: var(--text) !important;
+}
+
+/* Placeholder token */
+.ant-input::placeholder {
+  color: var(--placeholder) !important;
+}
+
+/* --------- PREMIUM (CARD / MODAL / DRAWER) INPUTS --------- */
+.ant-card .ant-input,
+.ant-card .ant-input-affix-wrapper,
+.ant-card .ant-select-selector,
+.ant-card .ant-picker,
+.ant-modal-content .ant-input,
+.ant-modal-content .ant-input-affix-wrapper,
+.ant-modal-content .ant-select-selector,
+.ant-modal-content .ant-picker,
+.ant-drawer-content .ant-input,
+.ant-drawer-content .ant-input-affix-wrapper,
+.ant-drawer-content .ant-select-selector,
+.ant-drawer-content .ant-picker {
   background: var(--field-bg) !important;
   border-color: var(--field-border) !important;
   color: var(--card-text) !important;
 }
 
-.ant-input::placeholder {
-  color: rgba(255,255,255,0.45) !important;
+/* Premium select textlar */
+.ant-card .ant-select-selection-item,
+.ant-card .ant-select-selection-placeholder,
+.ant-modal-content .ant-select-selection-item,
+.ant-modal-content .ant-select-selection-placeholder,
+.ant-drawer-content .ant-select-selection-item,
+.ant-drawer-content .ant-select-selection-placeholder {
+  color: var(--card-text) !important;
 }
 
-/* Modal / Drawer ham premium */
+/* Premium placeholder */
+.ant-card .ant-input::placeholder,
+.ant-modal-content .ant-input::placeholder,
+.ant-drawer-content .ant-input::placeholder {
+  color: var(--card-placeholder) !important;
+}
+
+/* ===============================
+   3) BUTTON
+=============================== */
+.ant-btn {
+  border-radius: 16px;
+}
+
+/* ===============================
+   4) MODAL / DRAWER — premium
+=============================== */
 .ant-modal-content {
   background: var(--card-bg-strong) !important;
   border: 1px solid var(--card-border) !important;
   box-shadow: var(--shadow-hard) !important;
   border-radius: var(--radius-xl) !important;
+  color: var(--card-text) !important;
 }
 
+/* Drawer container */
 .ant-drawer-content {
   background: var(--card-bg-strong) !important;
+  color: var(--card-text) !important;
 }
 
-/* Divider */
+/* Drawer header/body text */
+.ant-drawer .ant-typography,
+.ant-drawer .ant-drawer-title,
+.ant-drawer .ant-drawer-body {
+  color: var(--card-text) !important;
+}
+
+/* ===============================
+   5) DIVIDER
+   TUZATISH:
+   - Global divider: page divider (day’da qora, night’da oq)
+   - Card/Modal/Drawer ichida: card divider
+=============================== */
 .ant-divider {
-  border-color: rgba(255,255,255,0.12) !important;
+  border-color: var(--divider) !important;
+}
+
+.ant-card .ant-divider,
+.ant-modal-content .ant-divider,
+.ant-drawer-content .ant-divider {
+  border-color: var(--card-divider) !important;
 }
