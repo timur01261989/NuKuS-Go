@@ -12,24 +12,18 @@ body {
 }
 
 /* =========================================
-   0.1) DAY BASE COLORS (MUHIM!)
-   Yozuvlar day mode’da ko‘rinmay qolmasin
+   0.1) DAY/NIGHT COLORS (KO‘CHIRILDI)
+   Endi ranglar bitta joydan boshqariladi:
+   ✅ src/theme/tokens.css
+   Shuning uchun bu faylda body background/text rang bermaymiz,
+   aks holda tokenlar bilan urishib ketadi.
 ========================================= */
+/*
 body {
   background: #f0f2f5;
   color: rgba(0, 0, 0, 0.88);
 }
-
-/* Ant default text rangini aniq qilib qo‘yamiz */
-.ant-typography,
-.ant-card,
-.ant-list,
-.ant-list-item,
-.ant-card-head-title,
-.ant-list-item-meta-title,
-.ant-list-item-meta-description {
-  color: rgba(0, 0, 0, 0.88);
-}
+*/
 
 /* =========================================
    1) FONT FACE
@@ -44,7 +38,10 @@ body {
 }
 
 /* =========================================
-   2) GLOBAL FONT SYSTEM
+   2) GLOBAL FONT SYSTEM (Bitta joydan)
+   Font-family endi tokenlardan keladi:
+   ✅ --font-sans (tokens.css)
+   Agar tokens bo‘lmasa fallback ishlaydi.
 ========================================= */
 body,
 h1,
@@ -55,8 +52,7 @@ h5,
 .ant-typography,
 .ant-btn,
 .ant-card-head-title {
-  font-family: "YangoHeadline", -apple-system, BlinkMacSystemFont, "Segoe UI",
-    Roboto, sans-serif !important;
+  font-family: var(--font-sans, "YangoHeadline", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif) !important;
 
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -64,24 +60,29 @@ h5,
 
 /* =========================================
    3) YANDEX STYLE HEADERS
+   Ranglarni bu yerda qotirib bermaymiz,
+   currentColor ishlatsin (theme o‘zi beradi).
 ========================================= */
 .yango-header {
-  font-family: "YangoHeadline", sans-serif !important;
+  font-family: var(--font-sans, "YangoHeadline", sans-serif) !important;
   letter-spacing: -0.8px;
   line-height: 1.1;
   font-weight: 800;
-  color: #000;
+  color: currentColor;
 }
 
 .yango-title {
-  font-family: "YangoHeadline", sans-serif !important;
+  font-family: var(--font-sans, "YangoHeadline", sans-serif) !important;
   letter-spacing: -0.8px;
   line-height: 1.1;
   font-weight: 700;
+  color: currentColor;
 }
 
 /* =========================================
-   4) ANT DESIGN CARD FIXES
+   4) ANT DESIGN CARD FIXES (SAFE)
+   Bu yerda rang bermaymiz (theme hal qiladi),
+   faqat layout/typography fix qoladi.
 ========================================= */
 .ant-card-head-title {
   font-size: 18px;
@@ -94,6 +95,7 @@ h5,
 
 /* =========================================
    5) CAR MARKER (CUBEMAP REFLECTION)
+   Bu theme bilan urishmaydi, qoldiramiz.
 ========================================= */
 .smooth-car-marker {
   position: relative;
@@ -118,105 +120,72 @@ h5,
 }
 
 /* =========================================
-   6) LEAFLET HDR LAYER (DAY MODE)
-   Day mode’da map biroz “premium” ko‘rinsin
+   6) LEAFLET BASE
+   Map filter’lar (night/day) endi tokens.css’da bo‘ladi.
+   Bu yerda faqat xavfsiz default background qoldiramiz.
 ========================================= */
 .leaflet-container {
-  filter: contrast(1.1) saturate(1.15);
   background: #f0f0f0 !important;
 }
 
 /* =========================================
-   7) NIGHT MODE SYSTEM
-   body ga class qo‘shiladi: night-mode-active
+   7) NIGHT MODE SYSTEM (KO‘CHIRILDI)
+   Endi night mode ranglari va o‘zgarishlari:
+   ✅ src/theme/tokens.css
+   AntD rang/text fixlari esa:
+   ✅ src/theme/theme-overrides.css
 ========================================= */
-
-/* === GLOBAL NIGHT BASE === */
+/*
 body.night-mode-active {
   background-color: #0d0d0d !important;
   color: rgba(255, 255, 255, 0.92) !important;
 }
-
-/* === MUHIM: Night filter’ni hamma UI’ga bermaymiz!
-   Sizda oldin: .night-mode-active { filter: ... } bor edi.
-   Bu body ga qo‘shilganda text/card hammasini buzardi.
-   Shuning uchun uni yo‘q qilib, faqat kerakli joyga beramiz.
-*/
-
-/* (O‘CHIRILDI) */
-/*
-.night-mode-active {
-  filter: contrast(1.05) brightness(0.95) saturate(1.05);
-}
-*/
-
-/* === ANT DESIGN NIGHT FIX === */
 body.night-mode-active .ant-card,
 body.night-mode-active .ant-list-item {
   background-color: #1a1a1a !important;
   border-color: #333 !important;
 }
-
-/* Card header/body text ham ko‘rinsin */
-body.night-mode-active .ant-card-head-title,
-body.night-mode-active .ant-card-body,
-body.night-mode-active .ant-typography,
-body.night-mode-active .ant-list-item-meta-title,
-body.night-mode-active .ant-list-item-meta-description {
-  color: rgba(255, 255, 255, 0.92) !important;
-}
-
-/* Secondary text */
-body.night-mode-active .ant-typography-secondary {
-  color: rgba(255, 255, 255, 0.70) !important;
-}
-
-/* Buttons */
-body.night-mode-active .ant-btn {
-  border-color: #333 !important;
-  color: rgba(255, 255, 255, 0.92) !important;
-}
-
-/* Divider */
-body.night-mode-active .ant-divider {
-  border-color: rgba(255, 255, 255, 0.12) !important;
-}
+*/
 
 /* =========================================
-   8) NIGHT MODE – LEAFLET EFFECTS
+   8) NIGHT MODE – LEAFLET EFFECTS (KO‘CHIRILDI)
+   Neon path / invert map kabi filterlar ham tokens.css’da bo‘lsin.
 ========================================= */
-
-/* Neon navigation path */
+/*
 body.night-mode-active .leaflet-ant-path {
   stroke: #00f2ff;
   filter: drop-shadow(0 0 8px #00f2ff);
 }
 
-/* Interactive glow */
 body.night-mode-active .leaflet-interactive {
   filter: drop-shadow(0 0 5px #00f2ff);
 }
 
-/* Map invert night simulation */
 body.night-mode-active .leaflet-container {
   filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
 }
+*/
 
 /* =========================================
-   9) NIGHT MODE – MARKER GLOW
+   9) NIGHT MODE – MARKER GLOW (KO‘CHIRILDI)
 ========================================= */
+/*
 body.night-mode-active .smooth-car-marker {
   filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.8));
 }
-/* ==============================
-   SINGLE SOURCE TEXT COLORS
-   (hamma qora card ichida oq bo‘lsin)
-============================== */
+*/
+
+/* =========================================
+   10) OPTIONAL HELPER
+   Agar ba’zi joyda “qora card”ni majburan qilsangiz:
+   className="dark-card"
+   (Asosiy default premium card theme-overrides’da turadi.)
+========================================= */
 .dark-card,
 .dark-card * {
-  color: rgba(255,255,255,0.92) !important;
+  color: rgba(255, 255, 255, 0.92) !important;
 }
 
 .dark-card .ant-typography-secondary {
-  color: rgba(255,255,255,0.70) !important;
+  color: rgba(255, 255, 255, 0.70) !important;
 }

@@ -1,0 +1,67 @@
+/* ===============================
+   AntD + Premium Black Cards default
+=============================== */
+
+/* Card umumiy ko‘rinishi */
+.ant-card {
+  background: var(--card-bg) !important;
+  border: 1px solid var(--card-border) !important;
+  box-shadow: var(--shadow-soft) !important;
+  border-radius: var(--radius-xl) !important;
+}
+
+/* Card header chizig‘ini yo‘q qilamiz */
+.ant-card-head {
+  border-bottom: none !important;
+  background: transparent !important;
+}
+
+/* Card title va body textlar */
+.ant-card .ant-typography,
+.ant-card .ant-card-head-title,
+.ant-card .ant-card-body,
+.ant-card .ant-list-item,
+.ant-card .ant-list-item-meta-title,
+.ant-card .ant-list-item-meta-description {
+  color: var(--card-text) !important;
+}
+
+.ant-card .ant-typography-secondary {
+  color: var(--card-text-2) !important;
+}
+
+/* Buttonlar (premium card ichida ham chiroyli bo‘lsin) */
+.ant-btn {
+  border-radius: 16px;
+}
+
+/* Input / Select (premium card ichida) */
+.ant-input,
+.ant-input-affix-wrapper,
+.ant-select-selector,
+.ant-picker {
+  background: var(--field-bg) !important;
+  border-color: var(--field-border) !important;
+  color: var(--card-text) !important;
+}
+
+.ant-input::placeholder {
+  color: rgba(255,255,255,0.45) !important;
+}
+
+/* Modal / Drawer ham premium */
+.ant-modal-content {
+  background: var(--card-bg-strong) !important;
+  border: 1px solid var(--card-border) !important;
+  box-shadow: var(--shadow-hard) !important;
+  border-radius: var(--radius-xl) !important;
+}
+
+.ant-drawer-content {
+  background: var(--card-bg-strong) !important;
+}
+
+/* Divider */
+.ant-divider {
+  border-color: rgba(255,255,255,0.12) !important;
+}

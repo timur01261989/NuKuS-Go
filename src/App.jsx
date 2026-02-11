@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { ConfigProvider } from "antd";
 import { LanguageProvider } from "@shared/i18n/LanguageContext";
@@ -46,6 +46,14 @@ import DriverTaxi from "./features/driver/components/services/DriverTaxi";
 import { prioritizeAssets } from "./utils/BaselineProfile";
 import { ProviderSwitchPanel } from "./features/debug/components/ProviderSwitchPanel";
 
+/**
+ * ✅ Theme system (single source)
+ * - night mode: body.night-mode-active class bilan
+ * - antd theme: bitta joydan
+ */
+import { useThemeMode } from "./theme/useThemeMode";
+import { getAntdTheme } from "./theme/antdTheme";
+
 // Sahifalar almashganda skrolni tepaga qaytarish
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -57,15 +65,6 @@ function ScrollToTop() {
   return null;
 }
 
-function applyNightModeClass(enabled) {
-  if (enabled) document.body.classList.add("night-mode-active");
-  else document.body.classList.remove("night-mode-active");
-}
-
-function safeNightModeValue(v) {
-  return v === "on" || v === "off" || v === "auto" ? v : "auto";
-}
-
 export default function App() {
   // Ilova yuklanishi bilan optimizatsiyalar
   useEffect(() => {
@@ -74,14 +73,12 @@ export default function App() {
     }
   }, []);
 
-  // Night mode state: "auto" | "on" | "off"
-  const [nightMode, setNightMode] = useState("auto");
-
-  // App start: localStorage’dan o‘qib olish
-  useEffect(() => {
-    const saved = safeNightModeValue(localStorage.getItem("nightMode"));
-    setNightMode(saved);
-  }, []);
+  /**
+   * ✅ Night mode bitta joydan:
+   * localStorage("nightMode") => "auto" | "on" | "off"
+   * body.night-mode-active classni hook o‘zi qo‘llaydi
+   */
+  const { nightMode, isDark, setNightMode } = useThemeMode();
 
   // URL query orqali tez boshqarish (night=1/0/auto)
   useEffect(() => {
@@ -90,91 +87,18 @@ export default function App() {
 
     if (qNight === "1") {
       setNightMode("on");
-      localStorage.setItem("nightMode", "on");
-      window.dispatchEvent(new Event("nightModeChanged"));
     } else if (qNight === "0") {
       setNightMode("off");
-      localStorage.setItem("nightMode", "off");
-      window.dispatchEvent(new Event("nightModeChanged"));
     } else if (qNight === "auto") {
       setNightMode("auto");
-      localStorage.setItem("nightMode", "auto");
-      window.dispatchEvent(new Event("nightModeChanged"));
     }
-  }, []);
-
-  // ✅ MUHIM: Settings’dan o‘zgarganda App ham darhol bilsin
-  useEffect(() => {
-    const syncFromStorage = () => {
-      const v = safeNightModeValue(localStorage.getItem("nightMode"));
-      setNightMode(v);
-    };
-
-    // boshqa tab/oynada o‘zgarsa
-    const onStorage = (e) => {
-      if (e.key === "nightMode") syncFromStorage();
-    };
-
-    // shu tab ichida Settings o‘zgartirganda
-    const onCustom = () => {
-      syncFromStorage();
-    };
-
-    window.addEventListener("storage", onStorage);
-    window.addEventListener("nightModeChanged", onCustom);
-
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener("nightModeChanged", onCustom);
-    };
-  }, []);
-
-  // Night mode qo‘llash
-  useEffect(() => {
-    if (nightMode === "on") {
-      applyNightModeClass(true);
-      return;
-    }
-    if (nightMode === "off") {
-      applyNightModeClass(false);
-      return;
-    }
-
-    const updateAuto = () => {
-      const hour = new Date().getHours();
-      const enabled = hour >= 20 || hour < 6;
-      applyNightModeClass(enabled);
-    };
-
-    updateAuto();
-    const interval = setInterval(updateAuto, 60 * 1000);
-    return () => clearInterval(interval);
-  }, [nightMode]);
+  }, [setNightMode]);
 
   const qp = new URLSearchParams(window.location.search);
   const debugProviders = qp.get("debugProviders") === "1";
 
   return (
-    <ConfigProvider
-      theme={{
-        token: {
-          colorPrimary: "#FFD700",
-          borderRadius: 12,
-          fontFamily: "YangoHeadline, Inter, -apple-system, system-ui, sans-serif",
-        },
-        components: {
-          Button: {
-            controlHeightLG: 55,
-            fontWeight: 800,
-            borderRadiusLG: 16,
-          },
-          Card: {
-            borderRadiusLG: 24,
-            boxShadowTertiary: "0 12px 32px rgba(0,0,0,0.12)",
-          },
-        },
-      }}
-    >
+    <ConfigProvider theme={getAntdTheme(isDark)}>
       <LanguageProvider>
         <BrowserRouter>
           <ScrollToTop />
