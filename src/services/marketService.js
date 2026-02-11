@@ -29,7 +29,7 @@ export async function listMarketCars({ limit, sort='newest' } = {}) {
 
   // Prefer backend in production (if VITE_API_BASE set or same-origin empty handled below)
   const base = API_BASE || '';
-  if (base !== null) {
+  if (base) {
     try {
       const qs = new URLSearchParams();
       if (typeof limit === 'number') qs.set('limit', String(limit));

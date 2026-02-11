@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { Button, Card, Modal, Space, Typography } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
-import { listMarketCars, formatPriceUZS, getMarketConfig } from "@services/marketService";
-import { useLanguage } from "@shared/i18n/useLanguage";
+import { listMarketCars, formatPriceUZS, getMarketConfig } from "../../../services/marketService.js";
+import { useLanguage } from "../../../shared/i18n/useLanguage.js";
+import PostAdForm from "../components/PostAdForm";
 
-// ✅ QO‘SHING (pathni kerak bo‘lsa moslang)
-import { PostAdForm } from "../components/PostAdForm";
 
 const { Title, Text } = Typography;
 
