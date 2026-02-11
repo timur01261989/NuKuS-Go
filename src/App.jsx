@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import { ConfigProvider } from "antd";
 import { LanguageProvider } from "@shared/i18n/LanguageContext";
 import RoleGate from "@shared/routes/RoleGate";
+import "./styles/hdr-taxi.css";
 
 import { appConfig } from "./shared/config/appConfig";
 import GaragePage from "./pages/SuperPro/GaragePage";
