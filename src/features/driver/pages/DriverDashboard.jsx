@@ -1,5 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Card, Drawer, Space, Typography, Divider, Switch, Tag, message } from "antd";
+import {
+  Button,
+  Card,
+  Drawer,
+  Space,
+  Typography,
+  Divider,
+  Switch,
+  Tag,
+  message,
+} from "antd";
 import {
   MenuOutlined,
   CarOutlined,
@@ -10,9 +20,15 @@ import {
   CustomerServiceOutlined,
   LogoutOutlined,
 } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@lib/supabase";
 import { useLanguage } from "@shared/i18n/useLanguage";
+
+// ✅ SIZNING LOYIHADA BOR: GPS tracking helper
+// Zip ichida: src/features/driver/components/services/locationService.js
+// DriverDashboard (pages) ichidan to‘g‘ri import:
+//   pages -> ../components/services/...
+import { startTracking } from "../components/services/locationService";
 
 const { Title, Text } = Typography;
 
@@ -25,36 +41,70 @@ function initials(name) {
 
 export default function DriverDashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useLanguage();
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profile, setProfile] = useState({ fullName: "", avatarUrl: "" });
 
-  // ✅ Active service badge uchun
-  const [activeService, setActiveService] = useState(
-    () => localStorage.getItem("driverActiveService") || ""
-  );
-
-  // ✅ Online / Offline indikator
+  // ✅ Online / Offline (saqlab qo'yamiz)
   const [isOnline, setIsOnline] = useState(() => {
     const v = localStorage.getItem("driverOnline");
     return v === "1";
   });
 
-  // Drawer swipe-close uchun refs
-  const drawerInnerRef = useRef(null);
-  const touchRef = useRef({ startX: 0, dx: 0, dragging: false });
+  // =========================
+  // ✅ 1) ACTIVE SERVICE: route’dan avtomatik aniqlash (localStorage emas)
+  // =========================
+  const activeService = useMemo(() => {
+    const p = String(location?.pathname || "");
 
-  const drawerWidth = 300;
-  const swipeThreshold = 90; // px
+    // Sizdagi route’lar:
+    // /driver/taxi
+    // /driver/inter-provincial
+    // /driver/inter-district
+    // /driver/freight
+    // /driver/delivery
+    if (p.startsWith("/driver/taxi")) return "taxi";
+    if (p.startsWith("/driver/inter-provincial")) return "interProv";
+    if (p.startsWith("/driver/inter-district")) return "interDist";
+    if (p.startsWith("/driver/freight")) return "freight";
+    if (p.startsWith("/driver/delivery")) return "delivery";
+    return "";
+  }, [location?.pathname]);
 
   const services = useMemo(
     () => [
-      { key: "taxi", path: "/driver/taxi", icon: <CarOutlined />, title: t?.cityTaxi || "Shahar ichida taksi" },
-      { key: "interProv", path: "/driver/inter-provincial", icon: <EnvironmentOutlined />, title: t?.interProv || "Viloyatlar aro" },
-      { key: "interDist", path: "/driver/inter-district", icon: <RocketOutlined />, title: t?.interDistrict || "Tumanlar aro" },
-      { key: "freight", path: "/driver/freight", icon: <RocketOutlined />, title: t?.freight || "Yuk tashish" },
-      { key: "delivery", path: "/driver/delivery", icon: <RocketOutlined />, title: t?.delivery || "Eltish xizmati" },
+      {
+        key: "taxi",
+        path: "/driver/taxi",
+        icon: <CarOutlined />,
+        title: t?.cityTaxi || "Shahar ichida taksi",
+      },
+      {
+        key: "interProv",
+        path: "/driver/inter-provincial",
+        icon: <EnvironmentOutlined />,
+        title: t?.interProv || "Viloyatlar aro",
+      },
+      {
+        key: "interDist",
+        path: "/driver/inter-district",
+        icon: <RocketOutlined />,
+        title: t?.interDistrict || "Tumanlar aro",
+      },
+      {
+        key: "freight",
+        path: "/driver/freight",
+        icon: <RocketOutlined />,
+        title: t?.freight || "Yuk tashish",
+      },
+      {
+        key: "delivery",
+        path: "/driver/delivery",
+        icon: <RocketOutlined />,
+        title: t?.delivery || "Eltish xizmati",
+      },
     ],
     [t]
   );
@@ -70,7 +120,8 @@ export default function DriverDashboard() {
         const user = u?.user;
         if (!user) return;
 
-        let fullName = user.user_metadata?.full_name || user.user_metadata?.name || "";
+        let fullName =
+          user.user_metadata?.full_name || user.user_metadata?.name || "";
         let avatarUrl = user.user_metadata?.avatar_url || "";
 
         // profiles jadvalidan ham o‘qib ko‘ramiz (bo‘lsa)
@@ -87,7 +138,12 @@ export default function DriverDashboard() {
           // ignore
         }
 
-        if (mounted) setProfile({ fullName: fullName || "Haydovchi", avatarUrl: avatarUrl || "" });
+        if (mounted) {
+          setProfile({
+            fullName: fullName || "Haydovchi",
+            avatarUrl: avatarUrl || "",
+          });
+        }
       } catch {
         // ignore
       }
@@ -104,39 +160,9 @@ export default function DriverDashboard() {
     setTimeout(() => navigate(path), 0);
   };
 
-  // Card tanlanganda active service saqlaymiz
-  const goService = (serviceKey, path) => {
-    setActiveService(serviceKey);
-    localStorage.setItem("driverActiveService", serviceKey);
+  // Service card bosilganda
+  const goService = (path) => {
     navigate(path);
-  };
-
-  // Online / Offline toggle (local + backendga urinib ko‘ramiz)
-  const toggleOnline = async (next) => {
-    setIsOnline(next);
-    localStorage.setItem("driverOnline", next ? "1" : "0");
-
-    try {
-      const { data: u } = await supabase.auth.getUser();
-      const user = u?.user;
-      if (!user) return;
-
-      // ✅ Schema har xil bo‘lishi mumkin, shuning uchun bir nechta maydonni yuboramiz.
-      // Ustun bo‘lmasa Supabase error qaytarishi mumkin — biz UI'ni buzmaymiz.
-      await supabase
-        .from("drivers")
-        .update({
-          is_online: next,
-          online: next,
-          status: next ? "online" : "offline",
-          last_seen_at: new Date().toISOString(),
-        })
-        .eq("id", user.id);
-
-      message.success(next ? (t?.online || "Online") : (t?.offline || "Offline"));
-    } catch {
-      // ignore
-    }
   };
 
   // Kichik "pro" touch animatsiya
@@ -148,11 +174,218 @@ export default function DriverDashboard() {
     onTouchEnd: (e) => (e.currentTarget.style.transform = "scale(1)"),
   };
 
-  // ✅ Drawer swipe-close (chapga surilsa yopiladi)
+  // =========================
+  // ✅ 2) ONLINE bo‘lsa realtime heartbeat + driver-location tracking
+  // =========================
+
+  // API base (agar bo‘lsa). Bo‘lmasa "/api/..." ishlaydi.
+  const API_BASE = (import.meta?.env?.VITE_API_BASE || "").replace(/\/$/, "");
+
+  const lastGeoRef = useRef({
+    lat: null,
+    lng: null,
+    bearing: null,
+    speed: null,
+  });
+
+  const watchIdRef = useRef(null);
+  const heartbeatTimerRef = useRef(null);
+  const userIdRef = useRef(null);
+
+  const postJson = async (path, body) => {
+    const r = await fetch(`${API_BASE}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body ?? {}),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j?.ok === false) {
+      const msg = j?.error || `HTTP ${r.status}`;
+      throw new Error(msg);
+    }
+    return j;
+  };
+
+  const sendDriverState = async (driver_user_id, nextOnline) => {
+    // handlers/driver-state.js: state offline|online|...
+    const state = nextOnline ? "online" : "offline";
+    try {
+      await postJson("/api/driver-state", { driver_user_id, state });
+    } catch {
+      // ignore
+    }
+  };
+
+  const sendHeartbeat = async (driver_user_id, nextOnline) => {
+    const { lat, lng, bearing } = lastGeoRef.current || {};
+    try {
+      await postJson("/api/driver-heartbeat", {
+        driver_user_id,
+        is_online: !!nextOnline,
+        lat: lat ?? undefined,
+        lng: lng ?? undefined,
+        bearing: bearing ?? undefined,
+      });
+    } catch {
+      // ignore
+    }
+  };
+
+  // Online/offline toggle (UI + backend)
+  const toggleOnline = async (next) => {
+    setIsOnline(next);
+    localStorage.setItem("driverOnline", next ? "1" : "0");
+
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      const user = u?.user;
+      if (!user) return;
+
+      // drivers jadvaliga ham yozib ko‘ramiz (ustun bo‘lmasa ham UI buzilmaydi)
+      try {
+        await supabase
+          .from("drivers")
+          .update({
+            is_online: next,
+            online: next,
+            status: next ? "online" : "offline",
+            last_seen_at: new Date().toISOString(),
+          })
+          .eq("id", user.id);
+      } catch {
+        // ignore
+      }
+
+      // Serverless state endpoint (agar ishlasa)
+      await sendDriverState(user.id, next);
+
+      message.success(next ? t?.online || "Online" : t?.offline || "Offline");
+    } catch {
+      // ignore
+    }
+  };
+
+  // Online bo‘lsa: startTracking + heartbeat interval
+  useEffect(() => {
+    let cancelled = false;
+
+    const cleanup = () => {
+      // GPS stop
+      if (watchIdRef.current !== null && watchIdRef.current !== undefined) {
+        try {
+          navigator.geolocation?.clearWatch?.(watchIdRef.current);
+        } catch {
+          // ignore
+        }
+        watchIdRef.current = null;
+      }
+
+      // heartbeat stop
+      if (heartbeatTimerRef.current) {
+        clearInterval(heartbeatTimerRef.current);
+        heartbeatTimerRef.current = null;
+      }
+    };
+
+    (async () => {
+      try {
+        const { data: u } = await supabase.auth.getUser();
+        const user = u?.user;
+        if (!user) return;
+
+        userIdRef.current = user.id;
+
+        // state ni backendga yuboramiz (online/offline)
+        await sendDriverState(user.id, isOnline);
+
+        if (!isOnline) {
+          cleanup();
+          return;
+        }
+
+        // Online: GPS trackingni yoqamiz
+        // startTracking callback { lat, lng, heading, speed }
+        const watchId = startTracking((pos) => {
+          if (cancelled) return;
+
+          lastGeoRef.current = {
+            lat: pos?.lat ?? null,
+            lng: pos?.lng ?? null,
+            bearing: pos?.heading ?? null,
+            speed: pos?.speed ?? null,
+          };
+        });
+
+        watchIdRef.current = watchId ?? null;
+
+        // Heartbeatni darhol yuboramiz
+        await sendHeartbeat(user.id, true);
+
+        // Heartbeat interval (15s)
+        heartbeatTimerRef.current = setInterval(() => {
+          if (cancelled) return;
+          const uid = userIdRef.current;
+          if (!uid) return;
+          sendHeartbeat(uid, true);
+        }, 15000);
+      } catch {
+        // ignore
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      cleanup();
+    };
+  }, [isOnline]);
+
+  // =========================
+  // ✅ 3) DRAWER SWIPE: rubber band + velocity (chapga tortib yopish)
+  // =========================
+
+  const drawerInnerRef = useRef(null);
+  const rafRef = useRef(0);
+
+  const touchRef = useRef({
+    dragging: false,
+    startX: 0,
+    lastX: 0,
+    dx: 0,
+    lastT: 0,
+    velocity: 0, // px/ms
+  });
+
+  // Rubber band: maxLeft (-drawerWidth) dan oshsa sekinlashadi
+  const rubberBandLeft = (dx, maxLeft) => {
+    if (dx >= maxLeft) return dx;
+    const over = dx - maxLeft; // manfiy
+    const absOver = Math.abs(over);
+    const damped = absOver * 0.35; // rezina kuchi
+    return maxLeft - damped;
+  };
+
+  const setDrawerTranslate = (px, withTransition = false) => {
+    if (!drawerInnerRef.current) return;
+    const el = drawerInnerRef.current;
+    el.style.transition = withTransition
+      ? "transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1)"
+      : "none";
+    el.style.transform = `translateX(${px}px)`;
+  };
+
   const onDrawerTouchStart = (e) => {
     if (!drawerInnerRef.current) return;
+    if (!drawerOpen) return;
+
     const x = e.touches?.[0]?.clientX ?? 0;
-    touchRef.current = { startX: x, dx: 0, dragging: true };
+    const tNow = performance.now();
+
+    touchRef.current.dragging = true;
+    touchRef.current.startX = x;
+    touchRef.current.lastX = x;
+    touchRef.current.dx = 0;
+    touchRef.current.lastT = tNow;
+    touchRef.current.velocity = 0;
 
     drawerInnerRef.current.style.transition = "none";
   };
@@ -162,33 +395,61 @@ export default function DriverDashboard() {
     if (!touchRef.current.dragging) return;
 
     const x = e.touches?.[0]?.clientX ?? 0;
-    const dx = x - touchRef.current.startX; // chapga surilsa dx < 0
-    touchRef.current.dx = dx;
+    const tNow = performance.now();
 
-    // Faqat chapga (yopish tomonga) siljitishga ruxsat
-    const translate = Math.max(-drawerWidth, Math.min(0, dx));
-    drawerInnerRef.current.style.transform = `translateX(${translate}px)`;
+    // dx: chapga tortsa manfiy
+    let dx = x - touchRef.current.startX;
+    if (dx > 0) dx = 0; // o‘ngga tortishni bloklaymiz
+
+    const maxLeft = -drawerWidth;
+    let translate = dx;
+
+    // Overdrag bo‘lsa rubber band
+    if (translate < maxLeft) translate = rubberBandLeft(translate, maxLeft);
+
+    // clamp
+    if (translate > 0) translate = 0;
+
+    // velocity: px/ms
+    const dt = Math.max(1, tNow - touchRef.current.lastT);
+    const dX = x - touchRef.current.lastX;
+    const v = dX / dt;
+
+    touchRef.current.lastX = x;
+    touchRef.current.lastT = tNow;
+    touchRef.current.dx = dx;
+    touchRef.current.velocity = v;
+
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      setDrawerTranslate(translate, false);
+    });
   };
 
   const onDrawerTouchEnd = () => {
     if (!drawerInnerRef.current) return;
+    if (!touchRef.current.dragging) return;
 
-    const { dx } = touchRef.current;
     touchRef.current.dragging = false;
 
-    drawerInnerRef.current.style.transition = "transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1)";
+    const dx = touchRef.current.dx; // manfiy
+    const velocity = touchRef.current.velocity; // chapga tez bo‘lsa manfiy
 
-    if (dx < -swipeThreshold) {
-      // Yetarlicha chapga surildi => yopamiz
-      drawerInnerRef.current.style.transform = `translateX(-${drawerWidth}px)`;
-      setTimeout(() => setDrawerOpen(false), 160);
+    const distanceThreshold = -90; // px
+    const velocityThreshold = -0.6; // px/ms (tez siltash)
+    const shouldClose = dx < distanceThreshold || velocity < velocityThreshold;
+
+    if (shouldClose) {
+      setDrawerTranslate(-drawerWidth, true);
+      setTimeout(() => {
+        setDrawerOpen(false);
+      }, 220);
     } else {
-      // Qaytib joyiga
-      drawerInnerRef.current.style.transform = "translateX(0px)";
+      setDrawerTranslate(0, true);
     }
   };
 
-  // Drawer yopilganda transform reset
+  // Drawer yopilganda reset
   useEffect(() => {
     if (!drawerOpen && drawerInnerRef.current) {
       drawerInnerRef.current.style.transition = "none";
@@ -252,7 +513,7 @@ export default function DriverDashboard() {
             }}
           />
           <span style={{ fontSize: 12, fontWeight: 800 }}>
-            {isOnline ? (t?.online || "Online") : (t?.offline || "Offline")}
+            {isOnline ? t?.online || "Online" : t?.offline || "Offline"}
           </span>
         </div>
       </div>
@@ -266,32 +527,43 @@ export default function DriverDashboard() {
         <Space direction="vertical" size={12} style={{ width: "100%" }}>
           {services.map((s) => {
             const active = activeService === s.key;
+
             return (
               <Card
                 key={s.key}
                 hoverable
                 style={{
                   borderRadius: 16,
-                  transition: "transform 0.12s, box-shadow 0.12s, border-color 0.12s",
+                  transition:
+                    "transform 0.12s, box-shadow 0.12s, border-color 0.12s",
                   boxShadow: active ? "0 10px 24px rgba(0,0,0,0.10)" : undefined,
-                  border: active ? "1px solid rgba(82,196,26,0.35)" : "1px solid rgba(0,0,0,0.04)",
+                  border: active
+                    ? "1px solid rgba(82,196,26,0.35)"
+                    : "1px solid rgba(0,0,0,0.04)",
                 }}
-                onClick={() => goService(s.key, s.path)}
+                onClick={() => goService(s.path)}
                 {...btnTouchProps}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 12,
+                  }}
+                >
                   <Space>
                     {s.icon}
                     <div>
                       <Text strong>{s.title}</Text>
                       <br />
                       <Text type="secondary">
-                        {t?.ordersInThisSection || "Buyurtmalar shu bo‘limda chiqadi"}
+                        {t?.ordersInThisSection ||
+                          "Buyurtmalar shu bo‘limda chiqadi"}
                       </Text>
                     </div>
                   </Space>
 
-                  {/* ✅ Active badge */}
+                  {/* ✅ Active badge (route-based) */}
                   {active && (
                     <Tag
                       color="green"
@@ -317,7 +589,8 @@ export default function DriverDashboard() {
             <Text type="secondary" style={{ fontSize: 12 }}>
               {t?.currentService || "Hozirgi xizmat"}:{" "}
               <Text strong>
-                {services.find((x) => x.key === activeService)?.title || activeService}
+                {services.find((x) => x.key === activeService)?.title ||
+                  activeService}
               </Text>
             </Text>
           </div>
@@ -331,13 +604,17 @@ export default function DriverDashboard() {
         onClose={() => setDrawerOpen(false)}
         width={drawerWidth}
         bodyStyle={{ padding: 0 }}
-        // Mask closable swipe bilan birga yaxshi ishlaydi
         maskClosable
       >
-        {/* Swipe close uchun wrapper */}
+        {/* ✅ Swipe close wrapper (rubber band + velocity) */}
         <div
           ref={drawerInnerRef}
-          style={{ height: "100%", background: "#fff", willChange: "transform" }}
+          style={{
+            height: "100%",
+            background: "#fff",
+            willChange: "transform",
+            touchAction: "pan-y",
+          }}
           onTouchStart={onDrawerTouchStart}
           onTouchMove={onDrawerTouchMove}
           onTouchEnd={onDrawerTouchEnd}
@@ -376,21 +653,41 @@ export default function DriverDashboard() {
               </div>
 
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 900 }}>{profile.fullName || "Haydovchi"}</div>
-                <div style={{ opacity: 0.85, fontSize: 12 }}>{t?.driver || "Haydovchi"}</div>
+                <div style={{ fontWeight: 900 }}>
+                  {profile.fullName || "Haydovchi"}
+                </div>
+                <div style={{ opacity: 0.85, fontSize: 12 }}>
+                  {t?.driver || "Haydovchi"}
+                </div>
               </div>
 
-              {/* ✅ Online/Offline switch drawer ichida ham */}
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+              {/* ✅ Online/Offline switch drawer ichida */}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-end",
+                }}
+              >
                 <div style={{ fontSize: 11, opacity: 0.85, marginBottom: 4 }}>
-                  {isOnline ? (t?.online || "Online") : (t?.offline || "Offline")}
+                  {isOnline ? t?.online || "Online" : t?.offline || "Offline"}
                 </div>
-                <Switch size="small" checked={isOnline} onChange={toggleOnline} />
+                <Switch
+                  size="small"
+                  checked={isOnline}
+                  onChange={toggleOnline}
+                />
               </div>
             </div>
           </div>
 
-          <div style={{ padding: 12, position: "relative", minHeight: "calc(100vh - 80px)" }}>
+          <div
+            style={{
+              padding: 12,
+              position: "relative",
+              minHeight: "calc(100vh - 80px)",
+            }}
+          >
             <Button
               block
               icon={<SettingOutlined />}
@@ -403,7 +700,12 @@ export default function DriverDashboard() {
             <Button
               block
               icon={<HistoryOutlined />}
-              style={{ height: 44, borderRadius: 12, textAlign: "left", marginTop: 8 }}
+              style={{
+                height: 44,
+                borderRadius: 12,
+                textAlign: "left",
+                marginTop: 8,
+              }}
               onClick={() => go("/driver/orders")}
             >
               {t?.orderHistoryDriver || "Buyurtmalar tarixi"}
@@ -411,7 +713,7 @@ export default function DriverDashboard() {
 
             <Divider style={{ margin: "12px 0" }} />
 
-            {/* ✅ Active service chip drawer ichida */}
+            {/* ✅ Active service chip drawer ichida (route-based) */}
             {activeService && (
               <div style={{ marginBottom: 10 }}>
                 <Text type="secondary" style={{ fontSize: 12 }}>
@@ -419,14 +721,27 @@ export default function DriverDashboard() {
                 </Text>{" "}
                 <Tag
                   color="green"
-                  style={{ borderRadius: 999, fontWeight: 800, padding: "2px 10px", marginLeft: 6 }}
+                  style={{
+                    borderRadius: 999,
+                    fontWeight: 800,
+                    padding: "2px 10px",
+                    marginLeft: 6,
+                  }}
                 >
-                  {services.find((x) => x.key === activeService)?.title || activeService}
+                  {services.find((x) => x.key === activeService)?.title ||
+                    activeService}
                 </Tag>
               </div>
             )}
 
-            <div style={{ position: "absolute", left: 12, right: 12, bottom: 12 }}>
+            <div
+              style={{
+                position: "absolute",
+                left: 12,
+                right: 12,
+                bottom: 12,
+              }}
+            >
               <Button
                 block
                 icon={<CustomerServiceOutlined />}
@@ -440,7 +755,12 @@ export default function DriverDashboard() {
                 danger
                 block
                 icon={<LogoutOutlined />}
-                style={{ height: 44, borderRadius: 12, textAlign: "left", marginTop: 8 }}
+                style={{
+                  height: 44,
+                  borderRadius: 12,
+                  textAlign: "left",
+                  marginTop: 8,
+                }}
                 onClick={() => go("/logout")}
               >
                 {t?.logout || "Chiqish"}
