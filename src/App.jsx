@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { ConfigProvider } from "antd";
 import { LanguageProvider } from "@shared/i18n/LanguageContext";
@@ -6,6 +6,7 @@ import RoleGate from "@shared/routes/RoleGate";
 import "./styles/hdr-taxi.css";
 
 import { appConfig } from "./shared/config/appConfig";
+import { routes as _routes } from "./app/routes.jsx";
 import GaragePage from "./pages/SuperPro/GaragePage";
 import PaymentsPage from "./pages/SuperPro/PaymentsPage";
 import SearchOnRoutePage from "./pages/SuperPro/SearchOnRoutePage";
@@ -44,6 +45,9 @@ import DriverInterDistrict from "./features/driver/components/services/DriverInt
 import DriverTaxi from "./features/driver/components/services/DriverTaxi";
 
 import { prioritizeAssets } from "./utils/BaselineProfile";
+import { lazy } from "react";
+const DevHub = lazy(() => import("./pages/DevHub.jsx"));
+
 import { ProviderSwitchPanel } from "./features/debug/components/ProviderSwitchPanel";
 
 /**
@@ -96,6 +100,8 @@ export default function App() {
 
   const qp = new URLSearchParams(window.location.search);
   const debugProviders = qp.get("debugProviders") === "1";
+  // keep routes registry warm (no runtime behavior change)
+  void _routes;
 
   return (
     <ConfigProvider theme={getAntdTheme(isDark)}>
@@ -280,7 +286,17 @@ export default function App() {
 
             {/* FALLBACK */}
             <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
+          {/* DEV (hidden) */}
+<Route
+  path="/__dev"
+  element={
+    <Suspense fallback={null}>
+      <DevHub />
+    </Suspense>
+  }
+/>
+
+</Routes>
         </BrowserRouter>
       </LanguageProvider>
     </ConfigProvider>
