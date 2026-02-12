@@ -1,6 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Typography } from "antd";
+import { Button, Typography, Drawer, Divider } from "antd";
 import { useNavigate } from "react-router-dom";
+import {
+  MenuOutlined,
+  EnvironmentOutlined,
+  SettingOutlined,
+  HistoryOutlined,
+  CustomerServiceOutlined,
+  LogoutOutlined,
+  UserOutlined,
+} from "@ant-design/icons";
 
 import { MapContainer, TileLayer } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
@@ -27,6 +36,7 @@ const DEFAULT_LOC = [42.4619, 59.6166]; // fallback
 
 export default function MainPage() {
   const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // ===================== UI STATE =====================
   const [selectingFromMap, setSelectingFromMap] = useState(false);
@@ -225,13 +235,120 @@ export default function MainPage() {
         background: "#f0f0f0",
       }}
     >
-      {/* BACK BUTTON */}
+
+      {/* SIDE MENU (CLIENT) */}
       <Button
-        onClick={() => navigate("/dashboard")}
+        type="text"
+        aria-label="Menu"
+        onClick={() => setMenuOpen(true)}
+        icon={<MenuOutlined style={{ fontSize: 20 }} />}
         style={{
           position: "absolute",
           top: 16,
           left: 16,
+          zIndex: 1006,
+          width: 44,
+          height: 44,
+          borderRadius: 14,
+          background: "rgba(255,255,255,0.92)",
+          boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
+          border: "1px solid rgba(0,0,0,0.06)",
+        }}
+      />
+
+      <Drawer
+        placement="left"
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        width={300}
+        bodyStyle={{ padding: 12 }}
+      >
+        <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 8 }}>Menu</div>
+        <Divider style={{ margin: "10px 0" }} />
+
+        <Button
+          block
+          icon={<UserOutlined />}
+          style={{ height: 44, borderRadius: 12, textAlign: "left" }}
+          onClick={() => {
+            setMenuOpen(false);
+            navigate("/driver-mode");
+          }}
+        >
+          Haydovchi bo‘lib ishlash
+        </Button>
+
+        <Button
+          block
+          icon={<EnvironmentOutlined />}
+          style={{ height: 44, borderRadius: 12, textAlign: "left", marginTop: 8 }}
+          onClick={() => {
+            setMenuOpen(false);
+            navigate("/addresses");
+          }}
+        >
+          Mening manzillarim
+        </Button>
+
+        <Button
+          block
+          icon={<SettingOutlined />}
+          style={{ height: 44, borderRadius: 12, textAlign: "left", marginTop: 8 }}
+          onClick={() => {
+            setMenuOpen(false);
+            navigate("/settings");
+          }}
+        >
+          Sozlamalar
+        </Button>
+
+        <Button
+          block
+          icon={<HistoryOutlined />}
+          style={{ height: 44, borderRadius: 12, textAlign: "left", marginTop: 8 }}
+          onClick={() => {
+            setMenuOpen(false);
+            navigate("/orders");
+          }}
+        >
+          Buyurtmalar tarixi
+        </Button>
+
+        <div style={{ position: "absolute", left: 12, right: 12, bottom: 12 }}>
+          <Button
+            block
+            icon={<CustomerServiceOutlined />}
+            style={{ height: 44, borderRadius: 12, textAlign: "left" }}
+            onClick={() => {
+              setMenuOpen(false);
+              navigate("/support");
+            }}
+          >
+            Qo‘llab-quvvatlash
+          </Button>
+
+          <Button
+            danger
+            block
+            icon={<LogoutOutlined />}
+            style={{ height: 44, borderRadius: 12, textAlign: "left", marginTop: 8 }}
+            onClick={() => {
+              setMenuOpen(false);
+              navigate("/logout");
+            }}
+          >
+            Chiqish
+          </Button>
+        </div>
+      </Drawer>
+
+      {/* BACK BUTTON */}
+      <Button
+        onClick={() => navigate("/client")}
+        style={{
+          position: "absolute",
+          top: 16,
+          left: 72,
           zIndex: 1005,
           borderRadius: 14,
         }}
