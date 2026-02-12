@@ -19,7 +19,6 @@ import { supabase } from "../../../lib/supabase";
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
-// Chat va Rating komponentlari
 import ChatComponent from '../../chat/components/ChatComponent';
 import RatingModal from '../../shared/components/RatingModal';
 
@@ -84,7 +83,7 @@ function MapFlyTo({ center, trigger }) {
   return null;
 }
 
-/** Center picker (Yandex style) */
+/** Center picker */
 function CenterPicker({ enabled, onCenterChanged }) {
   const map = useMap();
 
@@ -98,8 +97,6 @@ function CenterPicker({ enabled, onCenterChanged }) {
 
     map.on('move', emit);
     map.on('moveend', emit);
-
-    // initial
     emit();
 
     return () => {
@@ -127,18 +124,15 @@ const speak = (text) => {
 /** Reverse geocode (address) */
 const reverseGeocode = async (lat, lng) => {
   const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`;
-  const res = await fetch(url, {
-    headers: { "Accept": "application/json" }
-  });
+  const res = await fetch(url, { headers: { "Accept": "application/json" } });
   const json = await res.json();
   return json?.display_name || `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
 };
 
 export default function ClientOrderCreate({ onBack }) {
-  // mode: main -> searching -> coming -> arrived -> in_progress -> completed
   const [mode, setMode] = useState('main');
 
-  const [userLoc, setUserLoc] = useState([42.4619, 59.6166]); // default
+  const [userLoc, setUserLoc] = useState([42.4619, 59.6166]);
   const [destLoc, setDestLoc] = useState(null);
 
   const [selectingDest, setSelectingDest] = useState(false);
@@ -158,18 +152,16 @@ export default function ClientOrderCreate({ onBack }) {
 
   const [selectedTariff, setSelectedTariff] = useState(TARIFFS[0]);
 
-  // Chat va Rating
   const [chatVisible, setChatVisible] = useState(false);
   const [ratingVisible, setRatingVisible] = useState(false);
   const [userId, setUserId] = useState(null);
 
-  // fallback back
   const handleBack = useCallback(() => {
     if (typeof onBack === 'function') onBack();
     else window.history.back();
   }, [onBack]);
 
-  /** initial: get user + geo + resume order */
+  /** initial */
   useEffect(() => {
     let cancelled = false;
 
@@ -177,19 +169,20 @@ export default function ClientOrderCreate({ onBack }) {
       const { data } = await supabase.auth.getUser();
       if (!cancelled) setUserId(data.user?.id || null);
 
+      const resume = async () => { await checkActiveOrder(); };
+
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(async (p) => {
           const pos = [p.coords.latitude, p.coords.longitude];
           if (cancelled) return;
           setUserLoc(pos);
           setFlyTrigger(prev => prev + 1);
-          await checkActiveOrder(); // resume
+          await resume();
         }, async () => {
-          // even if no geo - still try resume
-          await checkActiveOrder();
+          await resume();
         });
       } else {
-        await checkActiveOrder();
+        await resume();
       }
     };
 
@@ -205,7 +198,7 @@ export default function ClientOrderCreate({ onBack }) {
 
     const { data, error } = await supabase
       .from('orders')
-      .select('id, status, price, driver_id, client_id, dropoff_location, service_type')
+      .select('id, status, price, driver_id, client_id, dropoff_location, pickup_location, from_lat, from_lng, to_lat, to_lng, service_type')
       .eq('id', savedOrderId)
       .single();
 
@@ -220,9 +213,15 @@ export default function ClientOrderCreate({ onBack }) {
     }
 
     setCurrentOrderId(data.id);
+
+    if (data.pickup_location && !userLoc) {
+      // no-op
+    }
+
     if (data.dropoff_location) setPinAddress(data.dropoff_location);
 
-    // tarifni ham qaytarib qo‘yamiz
+    if (data.to_lat && data.to_lng) setDestLoc([Number(data.to_lat), Number(data.to_lng)]);
+
     if (data.service_type) {
       const t = TARIFFS.find(x => x.id === data.service_type);
       if (t) setSelectedTariff(t);
@@ -236,9 +235,10 @@ export default function ClientOrderCreate({ onBack }) {
     if (!currentOrderId) return;
 
     const channel = supabase.channel(`client-order-${currentOrderId}`)
-      .on('postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${currentOrderId}` },
-        (payload) => { handleStatusChange(payload.new.status, payload.new); }
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders', filter: `id=eq.${currentOrderId}` },
+        (payload) => { if (payload?.new) handleStatusChange(payload.new.status, payload.new); }
       )
       .subscribe();
 
@@ -251,11 +251,15 @@ export default function ClientOrderCreate({ onBack }) {
     if (!realDriver?.id) return;
 
     const driverChannel = supabase.channel(`driver-gps-${realDriver.id}`)
-      .on('postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'drivers', filter: `id=eq.${realDriver.id}` },
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'drivers', filter: `id=eq.${realDriver.id}` },
         (payload) => {
-          const { current_lat, current_lng } = payload.new;
-          if (current_lat && current_lng) setDriverLoc([current_lat, current_lng]);
+          const row = payload?.new;
+          if (!row) return;
+          const lat = row.current_lat ?? row.lat;
+          const lng = row.current_lng ?? row.lng;
+          if (lat && lng) setDriverLoc([Number(lat), Number(lng)]);
         }
       )
       .subscribe();
@@ -265,11 +269,7 @@ export default function ClientOrderCreate({ onBack }) {
 
   /** Status mapper */
   const handleStatusChange = (status, data) => {
-    if (status === 'pending') {
-      setMode('searching');
-      return;
-    }
-    if (status === 'searching') {
+    if (status === 'pending' || status === 'searching') {
       setMode('searching');
       return;
     }
@@ -301,6 +301,8 @@ export default function ClientOrderCreate({ onBack }) {
       localStorage.removeItem('activeOrderId');
       setMode('main');
       setCurrentOrderId(null);
+      setRealDriver(null);
+      setDriverLoc(null);
       return;
     }
   };
@@ -315,7 +317,12 @@ export default function ClientOrderCreate({ onBack }) {
   /** Fetch driver */
   const fetchDriverInfo = async (driverId) => {
     const { data } = await supabase.from('drivers').select('*').eq('id', driverId).single();
-    if (data) setRealDriver(data);
+    if (data) {
+      setRealDriver(data);
+      const lat = data.current_lat ?? data.lat;
+      const lng = data.current_lng ?? data.lng;
+      if (lat && lng) setDriverLoc([Number(lat), Number(lng)]);
+    }
   };
 
   /** When selectingDest, update address by centerPos (debounced) */
@@ -334,12 +341,11 @@ export default function ClientOrderCreate({ onBack }) {
     return () => clearTimeout(t);
   }, [selectingDest, centerPos]);
 
-  /** Start order (NO auto) */
+  /** Start order (SCHEMA MOS) */
   const startOrder = async () => {
     if (loading) return;
     if (mode !== 'main') return;
 
-    // aktiv order bo‘lsa, yangi yaratmaydi
     if (currentOrderId) {
       message.info("Sizda aktiv buyurtma bor. Avval uni yakunlang yoki bekor qiling.");
       return;
@@ -357,16 +363,32 @@ export default function ClientOrderCreate({ onBack }) {
         return;
       }
 
+      const pickupText = `Lat: ${userLoc[0].toFixed(5)}, Lng: ${userLoc[1].toFixed(5)}`;
+      const dropText = pinAddress || centerAddress || `Lat: ${destLoc[0].toFixed(5)}, Lng: ${destLoc[1].toFixed(5)}`;
+
+      const insertPayload = {
+        // sizning orders schema:
+        client_id: user.id,
+        status: 'pending', // driver tomoni qabul qilganda accepted qiladi
+        price: selectedTariff.basePrice,
+        service_type: selectedTariff.id,
+
+        pickup_location: pickupText,
+        dropoff_location: dropText,
+
+        from_lat: Number(userLoc[0]),
+        from_lng: Number(userLoc[1]),
+        to_lat: Number(destLoc[0]),
+        to_lng: Number(destLoc[1]),
+
+        // optional: agar keyin addresslarga bo‘lib ishlatsangiz
+        from_address: pickupText,
+        to_address: dropText,
+      };
+
       const { data, error } = await supabase
         .from('orders')
-        .insert([{
-          pickup_location: `Lat: ${userLoc[0].toFixed(5)}, Lng: ${userLoc[1].toFixed(5)}`,
-          dropoff_location: pinAddress || centerAddress,
-          price: selectedTariff.basePrice,
-          status: 'pending',
-          service_type: selectedTariff.id, // tarif saqlanadi
-          client_id: user.id
-        }])
+        .insert([insertPayload])
         .select()
         .single();
 
@@ -411,10 +433,8 @@ export default function ClientOrderCreate({ onBack }) {
           <TileLayer url={getMapStyle()} attribution="&copy; OpenStreetMap contributors &copy; CARTO" />
           <MapFlyTo center={userLoc} trigger={flyTrigger} />
 
-          {/* Center picker (enabled only when selecting destination) */}
           <CenterPicker enabled={selectingDest} onCenterChanged={(pos) => setCenterPos(pos)} />
 
-          {/* user marker */}
           <Marker
             position={userLoc}
             icon={L.divIcon({
@@ -423,12 +443,10 @@ export default function ClientOrderCreate({ onBack }) {
             })}
           />
 
-          {/* route preview only in main mode and dest selected */}
           {mode === 'main' && destLoc && (
             <RoutingMachine from={userLoc} to={destLoc} color="#FFD400" />
           )}
 
-          {/* driver marker when ride in progress */}
           {['coming', 'arrived', 'in_progress'].includes(mode) && (
             <Marker
               position={driverLoc || [userLoc[0] + 0.003, userLoc[1] + 0.003]}
@@ -437,7 +455,6 @@ export default function ClientOrderCreate({ onBack }) {
           )}
         </MapContainer>
 
-        {/* Center pin overlay (Yandex style) */}
         {selectingDest && (
           <div
             style={{
@@ -455,7 +472,6 @@ export default function ClientOrderCreate({ onBack }) {
           </div>
         )}
 
-        {/* Chat button */}
         {['coming', 'arrived', 'in_progress'].includes(mode) && (
           <Badge dot={false} style={{ position: 'absolute', bottom: 320, right: 20, zIndex: 1000 }}>
             <Button
@@ -468,7 +484,6 @@ export default function ClientOrderCreate({ onBack }) {
           </Badge>
         )}
 
-        {/* back */}
         <Button
           icon={<ArrowLeftOutlined />}
           shape="circle"
@@ -483,8 +498,6 @@ export default function ClientOrderCreate({ onBack }) {
         <div className="yandex-sheet">
           <div className="sheet-handle" />
           <div className="sheet-content">
-
-            {/* WHERE */}
             <div className="where-row" onClick={() => setSelectingDest(true)}>
               <div className="where-icon">📍</div>
               <div className="where-text">
@@ -498,7 +511,6 @@ export default function ClientOrderCreate({ onBack }) {
               <div className="where-action">{selectingDest ? "Tanlash" : ">"}</div>
             </div>
 
-            {/* FROM */}
             <div className="from-row">
               <div className="from-dot" />
               <div className="from-text">
@@ -507,7 +519,6 @@ export default function ClientOrderCreate({ onBack }) {
               </div>
             </div>
 
-            {/* If selecting destination: confirm button */}
             {selectingDest && (
               <>
                 <button
@@ -528,7 +539,6 @@ export default function ClientOrderCreate({ onBack }) {
               </>
             )}
 
-            {/* Tariffs (only when not selecting) */}
             {!selectingDest && (
               <>
                 <div className="tariffs">
@@ -557,12 +567,11 @@ export default function ClientOrderCreate({ onBack }) {
                 </button>
               </>
             )}
-
           </div>
         </div>
       )}
 
-      {/* SEARCHING / COMING / ARRIVED / IN_PROGRESS SHEET */}
+      {/* SEARCHING / COMING / ARRIVED / IN_PROGRESS */}
       {mode !== 'main' && mode !== 'completed' && (
         <Card style={{ borderRadius: '24px 24px 0 0', border: 'none', boxShadow: '0 -10px 40px rgba(0,0,0,0.1)' }}>
           {mode === 'searching' && (
@@ -581,15 +590,27 @@ export default function ClientOrderCreate({ onBack }) {
             <div style={{ display: 'flex', gap: 15, alignItems: 'center' }}>
               <Avatar size={60} src={realDriver?.avatar_url} icon={<UserOutlined />} style={{ border: '3px solid #FFD700' }} />
               <div>
-                <div style={{ fontWeight: '900' }}>{realDriver?.first_name || 'Haydovchi'}</div>
-                <Text type="secondary">{realDriver?.car_model} • {realDriver?.plate_number}</Text>
+                <div style={{ fontWeight: '900' }}>
+                  {realDriver?.first_name || 'Haydovchi'} {realDriver?.last_name || ''}
+                </div>
+                <Text type="secondary">
+                  {realDriver?.car_model || realDriver?.car_year || 'Avto'} • {realDriver?.plate_number || realDriver?.car_number || ''}
+                </Text>
                 {mode === 'arrived' && (
                   <div style={{ marginTop: 6, fontWeight: 800 }}>
                     Kutish: {waitTime}s
                   </div>
                 )}
               </div>
-              <Button icon={<PhoneOutlined />} shape="circle" style={{ marginLeft: 'auto' }} />
+              <Button
+                icon={<PhoneOutlined />}
+                shape="circle"
+                style={{ marginLeft: 'auto' }}
+                onClick={() => {
+                  const phone = realDriver?.phone;
+                  if (phone) window.open(`tel:${phone}`);
+                }}
+              />
             </div>
           )}
         </Card>
@@ -603,7 +624,21 @@ export default function ClientOrderCreate({ onBack }) {
             title="Safar yakunlandi!"
             subTitle={`To'lov: ${finalPrice.toLocaleString()} so'm`}
             extra={[
-              <Button type="primary" key="close" onClick={() => setMode('main')}>Yopish</Button>
+              <Button
+                type="primary"
+                key="close"
+                onClick={() => {
+                  setMode('main');
+                  setCurrentOrderId(null);
+                  setRealDriver(null);
+                  setDriverLoc(null);
+                  setDestLoc(null);
+                  setSelectingDest(false);
+                  localStorage.removeItem('activeOrderId');
+                }}
+              >
+                Yopish
+              </Button>
             ]}
           />
         </div>
