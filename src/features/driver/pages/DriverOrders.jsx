@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Card, Typography, Tag } from "antd";
-import { supabase } from "@lib/supabase";
+import { supabase } from "@lib/supabase"; // Yoki to'g'ri modelingizdagi yo'l
 
 const { Title, Text } = Typography;
 
@@ -25,6 +25,7 @@ export default function DriverOrders() {
           .from("orders")
           .select("*")
           .eq("driver_id", uid)
+          .neq("status", "cancelled") // ✅ MANA SHU QATOR QO'SHILDI (Bekor qilinganlarni olib tashlaydi)
           .order("created_at", { ascending: false })
           .limit(100);
 
@@ -68,16 +69,29 @@ export default function DriverOrders() {
           <Card key={o.id} style={{ borderRadius: 16 }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
               <Text strong>{o.service_type || "service"}</Text>
-              <Tag>{o.status || "?"}</Tag>
+              <Tag color={o.status === "completed" ? "green" : "blue"}>
+                {o.status || "?"}
+              </Tag>
             </div>
 
-            <Text type="secondary">{o.pickup_location || ""}</Text>
-            <br />
+            <div style={{ marginTop: 8 }}>
+              <Text type="secondary" style={{ display: "block" }}>
+                {o.pickup_location || "Manzil noma'lum"}
+              </Text>
+              
+              {/* Agar dropoff_location mavjud bo'lsa ko'rsatish */}
+              {o.dropoff_location && (
+                <Text type="secondary" style={{ display: "block", marginTop: 4 }}>
+                   → {o.dropoff_location}
+                </Text>
+              )}
 
-            <Text type="secondary">{o.dropoff_location || ""}</Text>
-            <br />
-
-            <Text strong>{o.price ? `${o.price} UZS` : ""}</Text>
+              {o.price && (
+                <Text strong style={{ display: "block", marginTop: 8, fontSize: 16 }}>
+                  {parseInt(o.price).toLocaleString()} so'm
+                </Text>
+              )}
+            </div>
           </Card>
         ))}
       </div>

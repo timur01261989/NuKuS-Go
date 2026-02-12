@@ -11,6 +11,7 @@ import {
   Switch,
   Tag,
   message,
+  Spin
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -24,6 +25,8 @@ import {
   WalletOutlined,
   ToolOutlined,
   SearchOutlined,
+  StopOutlined,
+  CheckCircleOutlined
 } from "@ant-design/icons";
 
 import DriverTaxi from "./services/DriverTaxi";
@@ -34,7 +37,7 @@ import DriverDelivery from "./services/DriverDelivery";
 
 import DriverProfile from "./DriverProfile";
 
-import { supabase } from "@lib/supabase";
+import { supabase } from "../../../lib/supabase"; // To'g'ri import yo'lini tekshiring
 import { startTracking } from "./services/locationService";
 
 const { Title, Text } = Typography;
@@ -49,6 +52,7 @@ export default function DriverHome({ onLogout }) {
     localStorage.getItem("driverActiveService") || null
   );
   const [profileOpen, setProfileOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   // Online flag (persist)
   const [isOnline, setIsOnline] = useState(() => {
@@ -107,7 +111,10 @@ export default function DriverHome({ onLogout }) {
   const sendDriverState = async (driver_user_id, nextOnline) => {
     const state = nextOnline ? "online" : "offline";
     try {
-      await postJson("/api/driver-state", { driver_user_id, state });
+      // Agar backend API bo'lmasa, bu qism xato berishi mumkin, shuning uchun try/catch
+      if (API_BASE) {
+         await postJson("/api/driver-state", { driver_user_id, state });
+      }
     } catch {
       // ignore
     }
@@ -116,19 +123,21 @@ export default function DriverHome({ onLogout }) {
   const sendHeartbeat = async (driver_user_id, nextOnline) => {
     const { lat, lng, bearing } = lastGeoRef.current || {};
     try {
-      await postJson("/api/driver-heartbeat", {
-        driver_user_id,
-        is_online: !!nextOnline,
-        lat: lat ?? undefined,
-        lng: lng ?? undefined,
-        bearing: bearing ?? undefined,
-      });
+      if (API_BASE) {
+          await postJson("/api/driver-heartbeat", {
+            driver_user_id,
+            is_online: !!nextOnline,
+            lat: lat ?? undefined,
+            lng: lng ?? undefined,
+            bearing: bearing ?? undefined,
+          });
+      }
     } catch {
       // ignore
     }
   };
 
-  const stopTracking = () => {
+  const stopTrackingFunc = () => {
     // stop geolocation watch
     if (watchIdRef.current !== null && watchIdRef.current !== undefined) {
       try {
@@ -156,6 +165,16 @@ export default function DriverHome({ onLogout }) {
         bearing: pos?.heading ?? null,
         speed: pos?.speed ?? null,
       };
+      
+      // Qo'shimcha: Supabasega ham joylashuvni yozish (ixtiyoriy, agar backend bo'lmasa)
+      /*
+      supabase.from('driver_locations').upsert({
+         driver_id: userId,
+         lat: pos.lat,
+         lng: pos.lng,
+         updated_at: new Date()
+      }).then();
+      */
     });
 
     watchIdRef.current = watchId ?? null;
@@ -170,37 +189,46 @@ export default function DriverHome({ onLogout }) {
   };
 
   const toggleOnline = async (next) => {
-    setIsOnline(next);
-    localStorage.setItem("driverOnline", next ? "1" : "0");
-
+    setLoading(true);
     try {
       const { data: u, error: uErr } = await supabase.auth.getUser();
       if (uErr) throw uErr;
       const user = u?.user;
-      if (!user) return;
+      
+      if (!user) {
+          setLoading(false);
+          return;
+      }
 
       userIdRef.current = user.id;
 
-      // try update drivers table (optional)
-      try {
-        await supabase
+      // try update drivers table
+      const { error } = await supabase
           .from("drivers")
           .update({
             is_online: next,
-            online: next,
-            status: next ? "online" : "offline",
+            // Ba'zi bazalarda 'status' ustuni ham ishlatiladi
+            status: next ? "online" : "offline", 
             last_seen_at: new Date().toISOString(),
           })
           .eq("id", user.id);
-      } catch {
-        // ignore
-      }
 
+      if (error) throw error;
+
+      setIsOnline(next);
+      localStorage.setItem("driverOnline", next ? "1" : "0");
+      
+      // Backendga xabar berish
       await sendDriverState(user.id, next);
 
-      message.success(next ? "Online" : "Offline");
-    } catch {
-      // ignore
+      message.success(next ? "Siz Online rejimdasiz" : "Siz Offline rejimdasiz");
+    } catch (err) {
+      console.error("Status update error:", err);
+      message.error("Statusni o'zgartirishda xatolik!");
+      // Xato bo'lsa holatni qaytarish kerak bo'lishi mumkin, 
+      // lekin hozircha foydalanuvchi qayta urinib ko'rishi uchun qoldiramiz.
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -219,14 +247,14 @@ export default function DriverHome({ onLogout }) {
 
         if (!isOnline) {
           await sendDriverState(user.id, false);
-          stopTracking();
+          stopTrackingFunc();
           return;
         }
 
-        stopTracking();
+        stopTrackingFunc();
         await startOnlineLoop(user.id);
 
-        if (cancelled) stopTracking();
+        if (cancelled) stopTrackingFunc();
       } catch {
         // ignore
       }
@@ -234,7 +262,7 @@ export default function DriverHome({ onLogout }) {
 
     return () => {
       cancelled = true;
-      stopTracking();
+      stopTrackingFunc();
     };
   }, [isOnline]);
 
@@ -431,35 +459,24 @@ export default function DriverHome({ onLogout }) {
             }}
             {...btnTouchProps}
           >
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                background: isOnline ? "#52c41a" : "#8c8c8c",
-                boxShadow: isOnline ? "0 0 0 3px rgba(82,196,26,0.20)" : "none",
-              }}
-            />
-            <span style={{ fontSize: 12, fontWeight: 800 }}>
-              {isOnline ? "Online" : "Offline"}
-            </span>
+            {loading ? <Spin size="small" /> : (
+            <>
+                <span
+                style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    background: isOnline ? "#52c41a" : "#8c8c8c",
+                    boxShadow: isOnline ? "0 0 0 3px rgba(82,196,26,0.20)" : "none",
+                }}
+                />
+                <span style={{ fontSize: 12, fontWeight: 800 }}>
+                {isOnline ? "Online" : "Offline"}
+                </span>
+            </>
+            )}
           </div>
 
-          <Button
-            icon={<NotificationOutlined />}
-            shape="circle"
-            size="large"
-            style={{
-              background: "var(--field-bg)",
-              border: "1px solid var(--field-border)",
-              boxShadow: "var(--shadow-soft)",
-              transition: "transform 0.1s",
-              color: "var(--card-text)",
-            }}
-            {...btnTouchProps}
-          />
-
-          {/* PROFIL */}
           <Button
             icon={<UserOutlined />}
             shape="circle"
@@ -477,249 +494,297 @@ export default function DriverHome({ onLogout }) {
         </div>
       </div>
 
-      {/* MENYU KARTOCHKALARI */}
-      <Row gutter={[15, 15]}>
-        <Col span={24}>
-          <Card
-            hoverable
-            onClick={() => selectService("taxi")}
-            style={{
-              borderRadius: 24,
-              textAlign: "center",
-              cursor: "pointer",
-              transition: "transform 0.1s",
-              border:
-                selectedService === "taxi"
-                  ? "1px solid rgba(82,196,26,0.45)"
-                  : "1px solid var(--card-border)",
-              background: "var(--card-bg)",
-              boxShadow:
-                selectedService === "taxi"
-                  ? "0 12px 26px rgba(0,0,0,0.18)"
-                  : "var(--shadow-soft)",
-              position: "relative",
-              overflow: "hidden",
-            }}
-            {...btnTouchProps}
-          >
-            {selectedService === "taxi" && (
-              <div style={{ position: "absolute", top: 12, right: 12 }}>
-                <Tag color="green" style={{ borderRadius: 999, fontWeight: 800, padding: "2px 10px" }}>
-                  Active
-                </Tag>
-              </div>
-            )}
-
-            <div
-              style={{
-                background: "var(--brand)",
-                width: 60,
-                height: 60,
-                borderRadius: "50%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                margin: "0 auto 15px",
-                boxShadow: "0 4px 10px rgba(255, 215, 0, 0.35)",
-              }}
-            >
-              <CarOutlined style={{ fontSize: 30, color: "#000" }} />
-            </div>
-            <Title level={4} style={{ margin: 0 }}>
-              Shahar ichida Taksi
+      {/* ===================================
+          ASOSIY MENYU QISMI (OVERLAY BILAN)
+          ===================================
+      */}
+      <div style={{ position: "relative" }}>
+        
+        {/* 🔥 1. BLOKLASH QAVATI (OVERLAY) */}
+        {!isOnline && (
+          <div style={{
+            position: "absolute",
+            top: -10, left: -10, right: -10, bottom: -10,
+            background: "rgba(245, 245, 245, 0.6)", // Orqa fonni xira qiladi
+            zIndex: 50,
+            backdropFilter: "blur(3px)", // Xiralashtirish effekti
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 12
+          }}>
+            <StopOutlined style={{ fontSize: 48, color: "#ff4d4f", marginBottom: 16 }} />
+            <Title level={4} style={{ color: "#595959", textAlign: "center", margin: 0 }}>
+              Xizmatlar bloklangan
             </Title>
-            <Text type="secondary">Buyurtmalarni qabul qilish</Text>
-          </Card>
-        </Col>
+            <Text type="secondary" style={{ marginBottom: 20 }}>
+              Ishni boshlash uchun "Online" tugmasini yoqing
+            </Text>
+            <Button 
+              type="primary" 
+              size="large" 
+              onClick={() => toggleOnline(true)}
+              loading={loading}
+              icon={<CheckCircleOutlined />}
+              style={{ borderRadius: 12, height: 45, paddingLeft: 24, paddingRight: 24 }}
+            >
+              Online bo'lish
+            </Button>
+          </div>
+        )}
 
-        <Col span={12}>
-          <Card
-            hoverable
-            onClick={() => selectService("interProv")}
-            style={{
-              borderRadius: 20,
-              textAlign: "center",
-              height: "100%",
-              cursor: "pointer",
-              transition: "transform 0.1s",
-              border:
-                selectedService === "interProv"
-                  ? "1px solid rgba(82,196,26,0.45)"
-                  : "1px solid var(--card-border)",
-              background: "var(--card-bg)",
-              boxShadow:
-                selectedService === "interProv"
-                  ? "0 12px 26px rgba(0,0,0,0.18)"
-                  : "var(--shadow-soft)",
-              position: "relative",
-              overflow: "hidden",
-            }}
-            {...btnTouchProps}
-          >
-            {selectedService === "interProv" && (
-              <div style={{ position: "absolute", top: 10, right: 10 }}>
-                <Tag color="green" style={{ borderRadius: 999, fontWeight: 800, padding: "2px 10px" }}>
-                  Active
-                </Tag>
-              </div>
-            )}
-            <GlobalOutlined style={{ fontSize: 30, color: "#1890ff", marginBottom: 15 }} />
-            <div style={{ fontWeight: "bold", fontSize: 15 }}>Viloyatlar aro</div>
-          </Card>
-        </Col>
+        {/* 2. MENYU KARTOCHKALARI (Offline bo'lsa xira bo'ladi) */}
+        <div style={{ 
+            opacity: isOnline ? 1 : 0.4, 
+            pointerEvents: isOnline ? "auto" : "none",
+            transition: "opacity 0.3s ease" 
+        }}>
+            <Row gutter={[15, 15]}>
+                <Col span={24}>
+                <Card
+                    hoverable
+                    onClick={() => selectService("taxi")}
+                    style={{
+                    borderRadius: 24,
+                    textAlign: "center",
+                    cursor: "pointer",
+                    transition: "transform 0.1s",
+                    border:
+                        selectedService === "taxi"
+                        ? "1px solid rgba(82,196,26,0.45)"
+                        : "1px solid var(--card-border)",
+                    background: "var(--card-bg)",
+                    boxShadow:
+                        selectedService === "taxi"
+                        ? "0 12px 26px rgba(0,0,0,0.18)"
+                        : "var(--shadow-soft)",
+                    position: "relative",
+                    overflow: "hidden",
+                    }}
+                    {...btnTouchProps}
+                >
+                    {selectedService === "taxi" && (
+                    <div style={{ position: "absolute", top: 12, right: 12 }}>
+                        <Tag color="green" style={{ borderRadius: 999, fontWeight: 800, padding: "2px 10px" }}>
+                        Active
+                        </Tag>
+                    </div>
+                    )}
 
-        <Col span={12}>
-          <Card
-            hoverable
-            onClick={() => selectService("interDist")}
-            style={{
-              borderRadius: 20,
-              textAlign: "center",
-              height: "100%",
-              cursor: "pointer",
-              transition: "transform 0.1s",
-              border:
-                selectedService === "interDist"
-                  ? "1px solid rgba(82,196,26,0.45)"
-                  : "1px solid var(--card-border)",
-              background: "var(--card-bg)",
-              boxShadow:
-                selectedService === "interDist"
-                  ? "0 12px 26px rgba(0,0,0,0.18)"
-                  : "var(--shadow-soft)",
-              position: "relative",
-              overflow: "hidden",
-            }}
-            {...btnTouchProps}
-          >
-            {selectedService === "interDist" && (
-              <div style={{ position: "absolute", top: 10, right: 10 }}>
-                <Tag color="green" style={{ borderRadius: 999, fontWeight: 800, padding: "2px 10px" }}>
-                  Active
-                </Tag>
-              </div>
-            )}
-            <EnvironmentOutlined style={{ fontSize: 30, color: "#52c41a", marginBottom: 15 }} />
-            <div style={{ fontWeight: "bold", fontSize: 15 }}>Tumanlar aro</div>
-          </Card>
-        </Col>
+                    <div
+                    style={{
+                        background: "var(--brand)",
+                        width: 60,
+                        height: 60,
+                        borderRadius: "50%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        margin: "0 auto 15px",
+                        boxShadow: "0 4px 10px rgba(255, 215, 0, 0.35)",
+                    }}
+                    >
+                    <CarOutlined style={{ fontSize: 30, color: "#000" }} />
+                    </div>
+                    <Title level={4} style={{ margin: 0 }}>
+                    Shahar ichida Taksi
+                    </Title>
+                    <Text type="secondary">Buyurtmalarni qabul qilish</Text>
+                </Card>
+                </Col>
 
-        <Col span={12}>
-          <Card
-            hoverable
-            onClick={() => selectService("freight")}
-            style={{
-              borderRadius: 20,
-              textAlign: "center",
-              height: "100%",
-              cursor: "pointer",
-              transition: "transform 0.1s",
-              border:
-                selectedService === "freight"
-                  ? "1px solid rgba(82,196,26,0.45)"
-                  : "1px solid var(--card-border)",
-              background: "var(--card-bg)",
-              boxShadow:
-                selectedService === "freight"
-                  ? "0 12px 26px rgba(0,0,0,0.18)"
-                  : "var(--shadow-soft)",
-              position: "relative",
-              overflow: "hidden",
-            }}
-            {...btnTouchProps}
-          >
-            {selectedService === "freight" && (
-              <div style={{ position: "absolute", top: 10, right: 10 }}>
-                <Tag color="green" style={{ borderRadius: 999, fontWeight: 800, padding: "2px 10px" }}>
-                  Active
-                </Tag>
-              </div>
-            )}
-            <ShopOutlined style={{ fontSize: 30, color: "#faad14", marginBottom: 15 }} />
-            <div style={{ fontWeight: "bold", fontSize: 15 }}>Yuk tashish</div>
-          </Card>
-        </Col>
+                <Col span={12}>
+                <Card
+                    hoverable
+                    onClick={() => selectService("interProv")}
+                    style={{
+                    borderRadius: 20,
+                    textAlign: "center",
+                    height: "100%",
+                    cursor: "pointer",
+                    transition: "transform 0.1s",
+                    border:
+                        selectedService === "interProv"
+                        ? "1px solid rgba(82,196,26,0.45)"
+                        : "1px solid var(--card-border)",
+                    background: "var(--card-bg)",
+                    boxShadow:
+                        selectedService === "interProv"
+                        ? "0 12px 26px rgba(0,0,0,0.18)"
+                        : "var(--shadow-soft)",
+                    position: "relative",
+                    overflow: "hidden",
+                    }}
+                    {...btnTouchProps}
+                >
+                    {selectedService === "interProv" && (
+                    <div style={{ position: "absolute", top: 10, right: 10 }}>
+                        <Tag color="green" style={{ borderRadius: 999, fontWeight: 800, padding: "2px 10px" }}>
+                        Active
+                        </Tag>
+                    </div>
+                    )}
+                    <GlobalOutlined style={{ fontSize: 30, color: "#1890ff", marginBottom: 15 }} />
+                    <div style={{ fontWeight: "bold", fontSize: 15 }}>Viloyatlar aro</div>
+                </Card>
+                </Col>
 
-        <Col span={12}>
-          <Card
-            hoverable
-            onClick={() => selectService("delivery")}
-            style={{
-              borderRadius: 20,
-              textAlign: "center",
-              height: "100%",
-              cursor: "pointer",
-              transition: "transform 0.1s",
-              border:
-                selectedService === "delivery"
-                  ? "1px solid rgba(82,196,26,0.45)"
-                  : "1px solid var(--card-border)",
-              background: "var(--card-bg)",
-              boxShadow:
-                selectedService === "delivery"
-                  ? "0 12px 26px rgba(0,0,0,0.18)"
-                  : "var(--shadow-soft)",
-              position: "relative",
-              overflow: "hidden",
-            }}
-            {...btnTouchProps}
-          >
-            {selectedService === "delivery" && (
-              <div style={{ position: "absolute", top: 10, right: 10 }}>
-                <Tag color="green" style={{ borderRadius: 999, fontWeight: 800, padding: "2px 10px" }}>
-                  Active
-                </Tag>
-              </div>
-            )}
-            <RocketOutlined style={{ fontSize: 30, color: "#eb2f96", marginBottom: 15 }} />
-            <div style={{ fontWeight: "bold", fontSize: 15 }}>Eltish xizmati</div>
-          </Card>
-        </Col>
-      </Row>
+                <Col span={12}>
+                <Card
+                    hoverable
+                    onClick={() => selectService("interDist")}
+                    style={{
+                    borderRadius: 20,
+                    textAlign: "center",
+                    height: "100%",
+                    cursor: "pointer",
+                    transition: "transform 0.1s",
+                    border:
+                        selectedService === "interDist"
+                        ? "1px solid rgba(82,196,26,0.45)"
+                        : "1px solid var(--card-border)",
+                    background: "var(--card-bg)",
+                    boxShadow:
+                        selectedService === "interDist"
+                        ? "0 12px 26px rgba(0,0,0,0.18)"
+                        : "var(--shadow-soft)",
+                    position: "relative",
+                    overflow: "hidden",
+                    }}
+                    {...btnTouchProps}
+                >
+                    {selectedService === "interDist" && (
+                    <div style={{ position: "absolute", top: 10, right: 10 }}>
+                        <Tag color="green" style={{ borderRadius: 999, fontWeight: 800, padding: "2px 10px" }}>
+                        Active
+                        </Tag>
+                    </div>
+                    )}
+                    <EnvironmentOutlined style={{ fontSize: 30, color: "#52c41a", marginBottom: 15 }} />
+                    <div style={{ fontWeight: "bold", fontSize: 15 }}>Tumanlar aro</div>
+                </Card>
+                </Col>
 
-      {/* SUPER PRO */}
-      <div style={{ marginTop: 18 }}>
-        <Card
-          style={{
-            borderRadius: 24,
-            border: "1px solid var(--card-border)",
-            background: "var(--card-bg)",
-            boxShadow: "var(--shadow-soft)",
-          }}
-        >
-          <Title level={5} style={{ marginTop: 0 }}>
-            Super Pro
-          </Title>
+                <Col span={12}>
+                <Card
+                    hoverable
+                    onClick={() => selectService("freight")}
+                    style={{
+                    borderRadius: 20,
+                    textAlign: "center",
+                    height: "100%",
+                    cursor: "pointer",
+                    transition: "transform 0.1s",
+                    border:
+                        selectedService === "freight"
+                        ? "1px solid rgba(82,196,26,0.45)"
+                        : "1px solid var(--card-border)",
+                    background: "var(--card-bg)",
+                    boxShadow:
+                        selectedService === "freight"
+                        ? "0 12px 26px rgba(0,0,0,0.18)"
+                        : "var(--shadow-soft)",
+                    position: "relative",
+                    overflow: "hidden",
+                    }}
+                    {...btnTouchProps}
+                >
+                    {selectedService === "freight" && (
+                    <div style={{ position: "absolute", top: 10, right: 10 }}>
+                        <Tag color="green" style={{ borderRadius: 999, fontWeight: 800, padding: "2px 10px" }}>
+                        Active
+                        </Tag>
+                    </div>
+                    )}
+                    <ShopOutlined style={{ fontSize: 30, color: "#faad14", marginBottom: 15 }} />
+                    <div style={{ fontWeight: "bold", fontSize: 15 }}>Yuk tashish</div>
+                </Card>
+                </Col>
 
-          <Row gutter={[12, 12]}>
-            {appConfig.features.garage && (
-              <Col span={8}>
-                <Button block icon={<ToolOutlined />} onClick={() => navigate("/garage")} style={{ transition: "transform 0.1s" }} {...btnTouchProps}>
-                  Garage
-                </Button>
-              </Col>
-            )}
-            {appConfig.features.payments && (
-              <Col span={8}>
-                <Button block icon={<WalletOutlined />} onClick={() => navigate("/payments")} style={{ transition: "transform 0.1s" }} {...btnTouchProps}>
-                  To‘lov
-                </Button>
-              </Col>
-            )}
-            {appConfig.features.searchOnRoute && (
-              <Col span={8}>
-                <Button block icon={<SearchOutlined />} onClick={() => navigate("/search-route")} style={{ transition: "transform 0.1s" }} {...btnTouchProps}>
-                  Yo‘lda
-                </Button>
-              </Col>
-            )}
-          </Row>
+                <Col span={12}>
+                <Card
+                    hoverable
+                    onClick={() => selectService("delivery")}
+                    style={{
+                    borderRadius: 20,
+                    textAlign: "center",
+                    height: "100%",
+                    cursor: "pointer",
+                    transition: "transform 0.1s",
+                    border:
+                        selectedService === "delivery"
+                        ? "1px solid rgba(82,196,26,0.45)"
+                        : "1px solid var(--card-border)",
+                    background: "var(--card-bg)",
+                    boxShadow:
+                        selectedService === "delivery"
+                        ? "0 12px 26px rgba(0,0,0,0.18)"
+                        : "var(--shadow-soft)",
+                    position: "relative",
+                    overflow: "hidden",
+                    }}
+                    {...btnTouchProps}
+                >
+                    {selectedService === "delivery" && (
+                    <div style={{ position: "absolute", top: 10, right: 10 }}>
+                        <Tag color="green" style={{ borderRadius: 999, fontWeight: 800, padding: "2px 10px" }}>
+                        Active
+                        </Tag>
+                    </div>
+                    )}
+                    <RocketOutlined style={{ fontSize: 30, color: "#eb2f96", marginBottom: 15 }} />
+                    <div style={{ fontWeight: "bold", fontSize: 15 }}>Eltish xizmati</div>
+                </Card>
+                </Col>
+            </Row>
 
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            Eslatma: bu bo‘limlar scaffold. Keyin backend va POI manba bilan ulaysiz.
-          </Text>
-        </Card>
+            {/* SUPER PRO */}
+            <div style={{ marginTop: 18 }}>
+                <Card
+                style={{
+                    borderRadius: 24,
+                    border: "1px solid var(--card-border)",
+                    background: "var(--card-bg)",
+                    boxShadow: "var(--shadow-soft)",
+                }}
+                >
+                <Title level={5} style={{ marginTop: 0 }}>
+                    Super Pro
+                </Title>
+
+                <Row gutter={[12, 12]}>
+                    {appConfig.features.garage && (
+                    <Col span={8}>
+                        <Button block icon={<ToolOutlined />} onClick={() => navigate("/garage")} style={{ transition: "transform 0.1s" }} {...btnTouchProps}>
+                        Garage
+                        </Button>
+                    </Col>
+                    )}
+                    {appConfig.features.payments && (
+                    <Col span={8}>
+                        <Button block icon={<WalletOutlined />} onClick={() => navigate("/payments")} style={{ transition: "transform 0.1s" }} {...btnTouchProps}>
+                        To‘lov
+                        </Button>
+                    </Col>
+                    )}
+                    {appConfig.features.searchOnRoute && (
+                    <Col span={8}>
+                        <Button block icon={<SearchOutlined />} onClick={() => navigate("/search-route")} style={{ transition: "transform 0.1s" }} {...btnTouchProps}>
+                        Yo‘lda
+                        </Button>
+                    </Col>
+                    )}
+                </Row>
+
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                    Eslatma: bu bo‘limlar scaffold. Keyin backend va POI manba bilan ulaysiz.
+                </Text>
+                </Card>
+            </div>
+        </div>
       </div>
+
 
       {/* PROFIL DRAWER (RIGHT) */}
       <Drawer
@@ -752,7 +817,7 @@ export default function DriverHome({ onLogout }) {
             <div style={{ fontWeight: 900 }}>Profil</div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div style={{ fontSize: 12, opacity: 0.9 }}>{isOnline ? "Online" : "Offline"}</div>
-              <Switch size="small" checked={isOnline} onChange={toggleOnline} />
+              <Switch size="small" checked={isOnline} onChange={toggleOnline} loading={loading} />
             </div>
           </div>
 
