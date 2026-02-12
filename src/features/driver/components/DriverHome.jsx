@@ -203,14 +203,38 @@ export default function DriverHome({ onLogout }) {
       userIdRef.current = user.id;
 
       // try update drivers table
-      const { error } = await supabase
+      const { error } = const toggleOnline = async (next) => {
+    setIsOnline(next);
+    localStorage.setItem("driverOnline", next ? "1" : "0");
+
+    try {
+      const { data: u, error: uErr } = await supabase.auth.getUser();
+      if (uErr) throw uErr;
+      const user = u?.user;
+      if (!user) return;
+
+      userIdRef.current = user.id;
+
+      // Faqat is_online ni o'zgartiramiz, status (active) ga tegmaymiz!
+      try {
+        await supabase
           .from("drivers")
           .update({
             is_online: next,
-            // Ba'zi bazalarda 'status' ustuni ham ishlatiladi
-            status: next ? "online" : "offline", 
             last_seen_at: new Date().toISOString(),
           })
+          .eq("id", user.id);
+      } catch {
+        // ignore
+      }
+
+      await sendDriverState(user.id, next);
+      message.success(next ? "Siz Online rejimdasiz" : "Siz Offline rejimdasiz");
+    } catch {
+      // ignore
+    }
+    setLoading(false);
+  };
           .eq("id", user.id);
 
       if (error) throw error;
