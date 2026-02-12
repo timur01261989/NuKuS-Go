@@ -2,7 +2,7 @@
 @font-face {
   font-family: 'YangoHeadline';
   /* Fayl yo'li to'g'ri ekanligini tekshiring */
-  src: url('./assets/fonts/yango-headline-multi.woff') format('woff');
+  src: url('/assets/fonts/yango-headline-multi.woff') format('woff');
   font-weight: bold;
   font-style: normal;
   font-display: swap;
