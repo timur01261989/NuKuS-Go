@@ -65,6 +65,17 @@ function RoutingMachine({ from, to, color = '#1890ff' }) {
   return null;
 }
 
+function MapClickHandler({ enabled, onPick }) {
+  useMapEvents({
+    click(e) {
+      if (!enabled) return;
+      onPick([e.latlng.lat, e.latlng.lng]);
+    },
+  });
+  return null;
+}
+
+
 function MapFlyTo({ center, trigger }) {
     const map = useMap();
     useEffect(() => { if (center && trigger) map.flyTo(center, 16, { animate: true, duration: 1.5 }); }, [trigger, center, map]);
@@ -85,6 +96,7 @@ export default function ClientOrderCreate({ onBack }) {
   const [mode, setMode] = useState('main'); 
   const [userLoc, setUserLoc] = useState([42.4619, 59.6166]); 
   const [destLoc, setDestLoc] = useState(null);
+  const [selectingDest, setSelectingDest] = useState(false);
   const [driverLoc, setDriverLoc] = useState(null);
   const [realDriver, setRealDriver] = useState(null);
   const [pinAddress, setPinAddress] = useState("Manzilni tanlang");
@@ -213,6 +225,13 @@ export default function ClientOrderCreate({ onBack }) {
                 <TileLayer url={getMapStyle()} />
                 <MapFlyTo center={userLoc} trigger={flyTrigger} />
                 <Marker position={userLoc} icon={L.divIcon({ className: 'user-pulse-marker', html: `<div style="width: 18px; height: 18px; background: #1890ff; border-radius: 50%; border: 3px solid white;"></div>` })} />
+                <MapClickHandler enabled={selectingDest} onPick={(pos) => { 
+                  setDestLoc(pos); 
+                  setPinAddress(`Lat: ${pos[0].toFixed(5)}, Lng: ${pos[1].toFixed(5)}`); 
+                  setSelectingDest(false); 
+                }} />
+                {mode === 'main' && destLoc && (<RoutingMachine from={userLoc} to={destLoc} color="#FFD400" />)}
+
                 {(mode === 'coming' || mode === 'arrived' || mode === 'in_progress') && (
                     <Marker position={driverLoc || [userLoc[0]+0.003, userLoc[1]+0.003]} icon={carIcon} />
                 )}
@@ -232,13 +251,58 @@ export default function ClientOrderCreate({ onBack }) {
         </div>
 
         {mode === 'main' && (
-            <Card style={{ borderRadius: '24px 24px 0 0', border: 'none' }}>
-                <div onClick={() => { setDestLoc([userLoc[0] + 0.008, userLoc[1] + 0.008]); setPinAddress("Nukus, Berdaq"); }} style={{ background: '#f5f5f5', padding: 15, borderRadius: 16, marginBottom: 20 }}>
-                    <SearchOutlined style={{ marginRight: 10 }} />
-                    <Text strong>{destLoc ? pinAddress : "Qayerga boramiz?"}</Text>
+            <div className="yandex-sheet">
+                <div className="sheet-handle" />
+                <div className="sheet-content">
+                    <div className="where-row" onClick={() => setSelectingDest(true)}>
+                        <div className="where-icon">📍</div>
+                        <div className="where-text">
+                            <div className="where-title">{destLoc ? "Borish manzili" : "Qayerga boramiz?"}</div>
+                            <div className="where-sub">{destLoc ? pinAddress : (selectingDest ? "Xaritadan tanlang..." : "Manzilni yozing yoki xaritadan tanlang")}</div>
+                        </div>
+                        <div className="where-action">{selectingDest ? "Tanlash" : ">"}</div>
+                    </div>
+
+                    <div className="from-row">
+                        <div className="from-dot" />
+                        <div className="from-text">
+                            <div className="from-title">Qayerdan</div>
+                            <div className="from-sub">{`Lat: ${userLoc[0].toFixed(5)}, Lng: ${userLoc[1].toFixed(5)}`}</div>
+                        </div>
+                    </div>
+
+                    <div className="tariffs">
+                        {TARIFFS.map(t => {
+                          const active = selectedTariff?.id === t.id;
+                          return (
+                            <div
+                              key={t.id}
+                              className={"tariff-card" + (active ? " active" : "")}
+                              onClick={() => setSelectedTariff(t)}
+                            >
+                              <div className="tariff-name">{t.name}</div>
+                              <div className="tariff-sub">{t.time}</div>
+                              <div className="tariff-price">{t.basePrice} so'm</div>
+                            </div>
+                          );
+                        })}
+                    </div>
+
+                    <button
+                      className={"cta-btn" + (!destLoc ? " disabled" : "")}
+                      onClick={() => destLoc ? startOrder() : message.info("Avval borish manzilini tanlang")}
+                      disabled={!destLoc || loading}
+                    >
+                      {loading ? "Yuklanmoqda..." : `Buyurtma berish • ${selectedTariff?.basePrice || 0} so'm`}
+                    </button>
+
+                    {selectingDest && (
+                      <div className="pick-hint">
+                        Xarita ustiga bosing — borish manzili tanlanadi
+                      </div>
+                    )}
                 </div>
-                <Button type="primary" block size="large" onClick={startOrder} {...btnTouchProps} style={{ height: 60, borderRadius: 20, background: '#FFD700', color: '#000', fontWeight: '900' }}> BUYURTMA BERISH </Button>
-            </Card>
+            </div>
         )}
 
         {['coming', 'arrived', 'in_progress'].includes(mode) && (
@@ -281,6 +345,87 @@ export default function ClientOrderCreate({ onBack }) {
           .leaflet-marker-icon { transition: transform 1.5s linear !important; }
           .user-pulse-marker { animation: pulse 2s infinite; }
           @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(24,144,255,0.4); } 70% { box-shadow: 0 0 0 20px rgba(24,144,255,0); } 100% { box-shadow: 0 0 0 0 rgba(24,144,255,0); } }
+        `}</style>
+
+        <style>{`
+          .yandex-sheet{
+            position: relative;
+            background: #fff;
+            border-radius: 22px 22px 0 0;
+            box-shadow: 0 -12px 30px rgba(0,0,0,0.12);
+            padding: 10px 14px 14px;
+          }
+          .sheet-handle{
+            width: 42px; height: 5px; border-radius: 999px;
+            background: rgba(0,0,0,0.18);
+            margin: 0 auto 10px;
+          }
+          .sheet-content{ display:flex; flex-direction:column; gap:10px; }
+          .where-row{
+            display:flex; gap:10px; align-items:center;
+            background:#f5f5f5; border-radius:16px; padding:12px 12px;
+            cursor:pointer;
+          }
+          .where-icon{ font-size:18px; }
+          .where-text{ flex:1; min-width:0; }
+          .where-title{ font-weight:800; }
+          .where-sub{ color:rgba(0,0,0,0.55); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+          .where-action{ color:rgba(0,0,0,0.45); font-weight:700; }
+          .from-row{
+            display:flex; gap:10px; align-items:center;
+            padding:6px 4px 2px;
+          }
+          .from-dot{
+            width:10px; height:10px; border-radius:999px;
+            background:#1890ff;
+            box-shadow: 0 0 0 4px rgba(24,144,255,0.15);
+          }
+          .from-title{ font-weight:800; font-size:12px; }
+          .from-sub{ color:rgba(0,0,0,0.55); font-size:12px; }
+          .tariffs{
+            display:flex; gap:10px; overflow:auto; padding:6px 2px 2px;
+          }
+          .tariff-card{
+            min-width: 130px;
+            background:#fff;
+            border:1px solid rgba(0,0,0,0.08);
+            border-radius:16px;
+            padding:10px 12px;
+            cursor:pointer;
+            box-shadow: 0 6px 14px rgba(0,0,0,0.06);
+          }
+          .tariff-card.active{
+            border-color:#FFD400;
+            box-shadow: 0 8px 18px rgba(255,212,0,0.25);
+          }
+          .tariff-name{ font-weight:900; }
+          .tariff-sub{ font-size:12px; color:rgba(0,0,0,0.55); margin-top:2px; }
+          .tariff-price{ font-weight:900; margin-top:8px; }
+          .cta-btn{
+            height:56px;
+            border:none;
+            border-radius:18px;
+            background:#FFD400;
+            color:#000;
+            font-weight:900;
+            font-size:16px;
+            cursor:pointer;
+          }
+          .cta-btn.disabled{
+            opacity:0.55;
+            cursor:not-allowed;
+          }
+          .pick-hint{
+            position:absolute;
+            left:14px; right:14px;
+            bottom:90px;
+            background: rgba(0,0,0,0.75);
+            color:#fff;
+            padding:10px 12px;
+            border-radius:14px;
+            text-align:center;
+            font-weight:700;
+          }
         `}</style>
     </div>
   );
