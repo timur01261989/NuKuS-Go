@@ -26,11 +26,11 @@ const getMapStyle = () => {
   if (isNight) {
     // HDR Night Style (Stadia Maps / Alidade Smooth Dark)
     // Bu uslub yo'llarni neon rangda, bino va xaritalarni chuqur HDR qora rangda ko'rsatadi
-    return "https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png";
+    return "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
   }
 
   // Kunduzgi professional uslub
-  return "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+  return "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
 };
 // --- ICONS ---
 const carIcon = L.divIcon({ 
@@ -222,7 +222,7 @@ export default function ClientOrderCreate({ onBack }) {
         <div style={{ flex: 1, position: 'relative' }}>
             <MapContainer center={userLoc} zoom={16} zoomControl={false} style={{ height: '100%', width: '100%' }}>
                 {/* TUNGI REJIM INTEGRATSIYASI */}
-                <TileLayer url={getMapStyle()} />
+                <TileLayer url={getMapStyle()} attribution="&copy; OpenStreetMap contributors &copy; CARTO" />
                 <MapFlyTo center={userLoc} trigger={flyTrigger} />
                 <Marker position={userLoc} icon={L.divIcon({ className: 'user-pulse-marker', html: `<div style="width: 18px; height: 18px; background: #1890ff; border-radius: 50%; border: 3px solid white;"></div>` })} />
                 <MapClickHandler enabled={selectingDest} onPick={(pos) => { 
