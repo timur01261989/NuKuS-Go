@@ -1,10 +1,9 @@
 // Yandex Go Baseline Profile mantiqi simulyatsiyasi
 export const prioritizeAssets = () => {
   const essentialAssets = [
-    '/assets/fonts/yango-headline-multi.woff',
-    '/src/pages/MainPage.jsx',
-    '/src/pages/Auth.jsx'
-  ];
+  '/assets/fonts/yango-headline-multi.woff',
+];
+
 
   essentialAssets.forEach(asset => {
     const link = document.createElement('link');
