@@ -37,7 +37,7 @@ import DriverDelivery from "./services/DriverDelivery";
 
 import DriverProfile from "./DriverProfile";
 
-import { supabase } from "../../../lib/supabase"; // To'g'ri import yo'lini tekshiring
+import { supabase } from "../../../lib/supabase"; 
 import { startTracking } from "./services/locationService";
 
 const { Title, Text } = Typography;
@@ -111,7 +111,6 @@ export default function DriverHome({ onLogout }) {
   const sendDriverState = async (driver_user_id, nextOnline) => {
     const state = nextOnline ? "online" : "offline";
     try {
-      // Agar backend API bo'lmasa, bu qism xato berishi mumkin, shuning uchun try/catch
       if (API_BASE) {
          await postJson("/api/driver-state", { driver_user_id, state });
       }
@@ -165,16 +164,6 @@ export default function DriverHome({ onLogout }) {
         bearing: pos?.heading ?? null,
         speed: pos?.speed ?? null,
       };
-      
-      // Qo'shimcha: Supabasega ham joylashuvni yozish (ixtiyoriy, agar backend bo'lmasa)
-      /*
-      supabase.from('driver_locations').upsert({
-         driver_id: userId,
-         lat: pos.lat,
-         lng: pos.lng,
-         updated_at: new Date()
-      }).then();
-      */
     });
 
     watchIdRef.current = watchId ?? null;
@@ -188,6 +177,7 @@ export default function DriverHome({ onLogout }) {
     }, 15000);
   };
 
+  // ✅ TUZATILGAN TOGGLE FUNCTION
   const toggleOnline = async (next) => {
     setLoading(true);
     try {
@@ -202,55 +192,30 @@ export default function DriverHome({ onLogout }) {
 
       userIdRef.current = user.id;
 
-      // try update drivers table
-      const { error } = const toggleOnline = async (next) => {
-    setIsOnline(next);
-    localStorage.setItem("driverOnline", next ? "1" : "0");
-
-    try {
-      const { data: u, error: uErr } = await supabase.auth.getUser();
-      if (uErr) throw uErr;
-      const user = u?.user;
-      if (!user) return;
-
-      userIdRef.current = user.id;
-
-      // Faqat is_online ni o'zgartiramiz, status (active) ga tegmaymiz!
-      try {
-        await supabase
+      // 1. Supabase Update (Faqat is_online ni o'zgartiramiz, statusga tegmaymiz!)
+      const { error } = await supabase
           .from("drivers")
           .update({
             is_online: next,
             last_seen_at: new Date().toISOString(),
           })
           .eq("id", user.id);
-      } catch {
-        // ignore
-      }
-
-      await sendDriverState(user.id, next);
-      message.success(next ? "Siz Online rejimdasiz" : "Siz Offline rejimdasiz");
-    } catch {
-      // ignore
-    }
-    setLoading(false);
-  };
-          .eq("id", user.id);
 
       if (error) throw error;
 
+      // 2. State yangilash
       setIsOnline(next);
       localStorage.setItem("driverOnline", next ? "1" : "0");
       
-      // Backendga xabar berish
+      // 3. Backendga xabar
       await sendDriverState(user.id, next);
 
       message.success(next ? "Siz Online rejimdasiz" : "Siz Offline rejimdasiz");
     } catch (err) {
       console.error("Status update error:", err);
+      // Agar xato bo'lsa, UI ni eski holatga qaytarish mumkin, 
+      // lekin hozircha xabarni o'zi yetarli.
       message.error("Statusni o'zgartirishda xatolik!");
-      // Xato bo'lsa holatni qaytarish kerak bo'lishi mumkin, 
-      // lekin hozircha foydalanuvchi qayta urinib ko'rishi uchun qoldiramiz.
     } finally {
       setLoading(false);
     }

@@ -26,9 +26,9 @@ import {
   StopOutlined
 } from "@ant-design/icons";
 import { useLocation, useNavigate } from "react-router-dom";
-import { supabase } from "../../../lib/supabase"; // Supabase manzilini to'g'rilab oling
-import { useLanguage } from "../../../shared/i18n/useLanguage"; // Agar i18n ishlatayotgan bo'lsangiz
-import { startTracking } from "../components/services/locationService"; // Lokatsiya xizmati
+import { supabase } from "../../../lib/supabase"; 
+import { useLanguage } from "../../../shared/i18n/useLanguage"; 
+import { startTracking } from "../components/services/locationService";
 
 const { Title, Text } = Typography;
 
@@ -43,16 +43,16 @@ function initials(name) {
 export default function DriverDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { t } = useLanguage(); // Til sozlamalari
+  const { t } = useLanguage(); 
 
   // =========================
   // STATE (HOZIRGI HOLATLAR)
   // =========================
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profile, setProfile] = useState({ fullName: "", avatarUrl: "", phone: "" });
-  const [loading, setLoading] = useState(false); // Tugma bosilganda kutilish holati
+  const [loading, setLoading] = useState(false); 
   
-  // Boshlanishida localStorage'dan o'qiydi, keyin bazadan yangilaydi
+  // Boshlanishida localStorage'dan o'qiydi
   const [isOnline, setIsOnline] = useState(() => {
     const v = localStorage.getItem("driverOnline");
     return v === "1";
@@ -90,7 +90,7 @@ export default function DriverDashboard() {
           setProfile({
             fullName: `${driverData.first_name || ""} ${driverData.last_name || ""}`.trim(),
             phone: driverData.phone,
-            avatarUrl: "", // Agar rasm URL bo'lsa shu yerga qo'shasiz
+            avatarUrl: "",
           });
 
           // Bazadagi haqiqiy statusni olish
@@ -116,21 +116,22 @@ export default function DriverDashboard() {
   }, [navigate]);
 
   // =========================
-  // 2. ONLINE / OFFLINE TUGMASI BOSILGANDA
+  // 2. ONLINE / OFFLINE TUGMASI (TUZATILGAN)
   // =========================
   const toggleOnline = async (checked) => {
-    setLoading(true); // Yuklanishni boshlash
+    setLoading(true);
     try {
       // 1. User ID ni olish
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Foydalanuvchi topilmadi");
 
-      // 2. Supabase'ni yangilash (ENG MUHIM QISM)
+      // 2. Supabase'ni yangilash
+      // DIQQAT: Bu yerda 'status' maydoniga tegmaymiz! Faqat 'is_online'.
       const { error } = await supabase
         .from("drivers")
         .update({ 
           is_online: checked,
-          last_location_updated: new Date() // Vaqtni ham yangilab qo'yamiz
+          last_seen_at: new Date().toISOString() // Vaqtni yangilaymiz
         })
         .eq("id", user.id);
 
@@ -153,7 +154,7 @@ export default function DriverDashboard() {
       // Xato bo'lsa, tugmani eski holiga qaytarish
       setIsOnline(!checked);
     } finally {
-      setLoading(false); // Yuklanishni to'xtatish
+      setLoading(false); 
     }
   };
 
@@ -262,7 +263,7 @@ export default function DriverDashboard() {
               checkedChildren="ON"
               unCheckedChildren="OFF"
               checked={isOnline}
-              loading={loading} // Bosilganda aylanib turadi
+              loading={loading}
               onChange={toggleOnline}
               style={{ transform: "scale(1.2)" }} 
             />
