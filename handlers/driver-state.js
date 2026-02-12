@@ -1,6 +1,11 @@
 import { json, badRequest, serverError, nowIso, hit } from './_lib.js';
 import { getSupabaseAdmin } from './_supabase.js';
-function hasSupabaseEnv(){ return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY); }
+function hasSupabaseEnv() {
+  return !!(
+    process.env.SUPABASE_URL &&
+    (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY)
+  );
+}
 const ALLOWED = new Set(['offline','online','busy','on_trip','pause']);
 
 export default async function handler(req, res) {
@@ -15,7 +20,8 @@ export default async function handler(req, res) {
 
     if (!hasSupabaseEnv()) return json(res, 200, { ok:true, demo:true, state });
 
-    const sb = getSupabaseAdmin();
+    const serviceKey =
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
     const is_online = (state !== 'offline');
     const { data, error } = await sb.from('driver_presence').upsert([{ driver_user_id, is_online, updated_at: nowIso() }], { onConflict:'driver_user_id' }).select('*').single();
     if (error) throw error;
