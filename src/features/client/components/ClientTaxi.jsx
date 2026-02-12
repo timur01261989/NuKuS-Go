@@ -1,8 +1,11 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 // Bu biz oldin to'g'irlagan Asosiy Xarita va Buyurtma berish komponenti
 import ClientOrderCreate from "./ClientOrderCreate"; 
 
 export default function ClientTaxi({ onBack }) {
+  const navigate = useNavigate();
+  const handleBack = onBack || (() => navigate('/client'));
   // Bu komponent shunchaki "Shahar taksi" bo'limini ochadi.
   // Barcha mantiq (Xarita, Narx, Supabase) ClientOrderCreate ichida yozilgan.
 
@@ -15,7 +18,7 @@ export default function ClientTaxi({ onBack }) {
     }}>
 
       {/* Asosiy ishchi komponent shu yerda chaqiriladi */}
-      <ClientOrderCreate onBack={onBack} />
+      <ClientOrderCreate onBack={handleBack} />
 
       {/* Animatsiya uslubi */}
       <style>{`

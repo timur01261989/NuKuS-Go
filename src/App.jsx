@@ -27,6 +27,7 @@ import MyAddresses from "./pages/MyAddresses";
 import Settings from "@features/settings/pages/Settings";
 import AutoMarketPage from "@features/market/pages/AutoMarketPage";
 import ClientHome from "@features/client/pages/ClientHome";
+import ClientTaxi from "@features/client/components/ClientTaxi";
 
 // --- MIJOZ KOMPONENTLARI ---
 import ClientFreight from "./features/client/components/ClientFreight";
@@ -133,7 +134,7 @@ export default function App() {
               path="/client/taxi"
               element={
                 <RoleGate allow={{ client: true, driver: true }}>
-                  <MainPage />
+                  <ClientTaxi />
                 </RoleGate>
               }
             />
