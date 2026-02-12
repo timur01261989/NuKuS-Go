@@ -15,6 +15,27 @@ export default function DriverAuth({ onBack }) {
   const [status, setStatus] = useState("loading");
   const [loading, setLoading] = useState(false); // Tugma uchun loading
 
+
+  const normalizeDriverStatus = (raw) => {
+    // DB'dagi turli qiymatlarni UI statuslariga moslaymiz
+    if (!raw) return "none";
+    const v = typeof raw === "string" ? raw.trim().toLowerCase() : raw;
+
+    // aniq moslar
+    if (v === "loading" || v === "none" || v === "pending" || v === "active" || v === "blocked") return v;
+
+    // boolean/number holatlar
+    if (v === true || v === 1) return "active";
+    if (v === false || v === 0) return "pending";
+
+    // keng tarqalgan sinonimlar
+    if (["approved", "verified", "enabled", "ok"].includes(v)) return "active";
+    if (["inactive", "disabled", "banned", "ban", "blocked_by_admin"].includes(v)) return "blocked";
+    if (["review", "checking", "awaiting", "waiting", "new"].includes(v)) return "pending";
+
+    return "pending";
+  };
+
   // --- 1. HAYDOVCHI STATUSINI TEKSHIRISH (LOGIKA) ---
   const checkDriverStatus = useCallback(async () => {
     try {
@@ -46,7 +67,7 @@ export default function DriverAuth({ onBack }) {
       if (!data) {
         setStatus("none"); // Bazada yo'q -> Ro'yxatdan o'tishga
       } else {
-        setStatus(data.status); // 'pending', 'active' yoki 'blocked'
+        setStatus(normalizeDriverStatus(data.status)); // 'pending' | 'active' | 'blocked' (normalizatsiya)
       }
     } catch (err) {
       console.error("Tarmoq xatosi:", err);
@@ -271,5 +292,24 @@ export default function DriverAuth({ onBack }) {
     );
   }
 
-  return null;
+  // Fallback: hech qaysi statusga tushmasa, qora ekran bo'lib qolmasin
+  return (
+    <div style={{ padding: 16, maxWidth: 520, margin: "0 auto" }}>
+      <Card bordered={false} style={{ borderRadius: 20 }}>
+        <Result
+          status="warning"
+          title="Haydovchi statusi noma'lum"
+          subTitle="Profil status qiymati kutilgan formatda emas. Iltimos, sahifani yangilang yoki admin bilan tekshiring."
+          extra={[
+            <Button key="reload" type="primary" icon={<ReloadOutlined />} onClick={checkDriverStatus}>
+              Qayta tekshirish
+            </Button>,
+            <Button key="back" onClick={goBackMain}>
+              Orqaga
+            </Button>,
+          ]}
+        />
+      </Card>
+    </div>
+  );
 }
