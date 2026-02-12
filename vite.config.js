@@ -4,6 +4,8 @@ import { fileURLToPath, URL } from "node:url";
 
 export default defineConfig({
   plugins: [react()],
+  base: "/", // MUHIM! Vercel uchun
+
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
@@ -16,19 +18,14 @@ export default defineConfig({
       "@shared": fileURLToPath(new URL("./src/shared", import.meta.url)),
     },
   },
+
   server: {
     host: "0.0.0.0",
     allowedHosts: true,
     port: 5173,
   },
+
   optimizeDeps: {
     force: true,
   },
 });
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-
-export default defineConfig({
-  plugins: [react()],
-  base: '/',   // MUHIM!
-})
