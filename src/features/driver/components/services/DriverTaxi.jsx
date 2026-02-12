@@ -513,17 +513,23 @@ export default function DriverTaxi({ onBack }) {
 
   useEffect(() => {
     const initDriver = async () => {
+      // supabase.auth.getSession() async va session qaytaradi
       const {
-        data: { user },
+        data: { session },
         error,
-      } = supabase.auth.getSession();
+      } = await supabase.auth.getSession();
 
       if (error) console.error(error);
 
-      if (user) {
+      const user = session?.user;
+
+      if (user?.id) {
         setDriverId(user.id);
         fetchDailyStats(user.id);
         fetchActivityPoints(user.id);
+      } else {
+        // session bo'lmasa - login kerak (UI ichida toast chiqadi accept bosilganda ham)
+        setDriverId(null);
       }
     };
     initDriver();
