@@ -208,9 +208,6 @@ function HdrOverlay({
   );
 }
 
-/* =========================
-   MAP STYLE (Night/Day)
-========================= */
 const getMapStyle = () => {
   const hour = new Date().getHours();
   const isNightHour = hour >= 20 || hour < 6;
@@ -222,10 +219,10 @@ const getMapStyle = () => {
   const isNight = isNightHour || isNightClass;
 
   if (isNight) {
-    return "https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png";
+    return "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
   }
 
-  return "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+  return "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
 };
 
 /* =========================
@@ -886,7 +883,10 @@ export default function DriverTaxi({ onBack }) {
           style={{ height: "100%", width: "100%" }}
           zoomControl={false}
         >
-          <TileLayer url={getMapStyle()} />
+          <TileLayer
+  url={getMapStyle()}
+  attribution='&copy; OpenStreetMap contributors &copy; CARTO'
+/>
 
           <Marker position={driverLocation} icon={carIcon} />
           {tripStep === 1 && <Marker position={pickupCoords} icon={clientIcon} />}
