@@ -219,11 +219,12 @@ const getMapStyle = () => {
   const isNight = isNightHour || isNightClass;
 
   if (isNight) {
-    return "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+    return `https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png?api_key=${import.meta.env.VITE_STADIA_KEY}`;
   }
 
-  return "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+  return "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
 };
+
 
 /* =========================
    ICONS
