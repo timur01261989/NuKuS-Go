@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Card, List, Button, Tag, Typography, message, Empty, Spin, Skeleton } from "antd";
 import { 
   CheckOutlined, ClockCircleOutlined, CarOutlined, 
@@ -8,9 +8,8 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-import { translations } from '@i18n/translations';
+import { translations } from '@i18n/translations'; // Yo'l to'g'riligini tekshiring
 import { supabase } from "../../../lib/supabase";
-
 
 // --- MAP ICON FIX ---
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -21,6 +20,14 @@ let DefaultIcon = L.icon({
     iconSize: [25, 41], iconAnchor: [12, 41]
 });
 L.Marker.prototype.options.icon = DefaultIcon;
+
+// Maxsus mashina ikonchasi
+const carIcon = L.divIcon({
+  html: '<div style="font-size: 24px;">🚖</div>',
+  className: 'car-marker',
+  iconSize: [30, 30],
+  iconAnchor: [15, 15]
+});
 
 const { Text, Title } = Typography;
 
@@ -33,49 +40,65 @@ function RecenterMap({ lat, lng }) {
   return null;
 }
 
+// Marker harakati uchun komponent
+function SmoothDriverMarker({ position }) {
+  const markerRef = useRef(null);
+
+  useEffect(() => {
+    if (markerRef.current) {
+      const element = markerRef.current.getElement();
+      if (element) element.style.transition = "transform 2s linear";
+    }
+  }, [position]);
+
+  return (
+    <Marker 
+      ref={markerRef} 
+      position={position} 
+      icon={carIcon} 
+    />
+  );
+}
+
 export default function DriverOrderFeed() {
   const [orders, setOrders] = useState([]);
-  const [activeOrder, setActiveOrder] = useState(null); // Hozirgi bajarilayotgan buyurtma
-  const [loading, setLoading] = useState(true); // Skeleton uchun
+  const [activeOrder, setActiveOrder] = useState(null); 
+  const [loading, setLoading] = useState(true); 
 
-  // Haydovchi joylashuvi (Simulyatsiya - Nukus markazi)
+  // Haydovchi joylashuvi (Simulyatsiya)
   const [driverLoc, setDriverLoc] = useState([42.4619, 59.6166]);
 
   const savedLang = localStorage.getItem("appLang") || "uz_lotin";
   const t = translations[savedLang] || translations["uz_lotin"];
 
-    // Smooth Marker komponenti
-    function SmoothDriverMarker({ position }) {
-      const markerRef = useRef(null);
-
-      useEffect(() => {
-        if (markerRef.current) {
-          // Markerning pozitsiyasi o'zgarganda CSS transition ishga tushadi
-          const element = markerRef.current.getElement();
-          element.style.transition = "transform 2s linear";
-        }
-      }, [position]);
-
-      return (
-        <Marker 
-          ref={markerRef} 
-          position={position} 
-          icon={carIcon} 
-        />
-      );
-    }
   // Dastur ochilganda
   useEffect(() => {
     checkActiveOrder();
     fetchOrders();
 
-    // Realtime buyurtmalar
+    // Realtime buyurtmalar kuzatuvi
     const channel = supabase
       .channel('public:orders')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
-        if (payload.new.status === 'pending' && payload.new.type === 'taxi') {
-            setOrders(prev => [payload.new, ...prev]);
-            message.info("Yangi buyurtma!");
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+        
+        // 1. Yangi buyurtma tushsa (INSERT)
+        if (payload.eventType === 'INSERT') {
+           const isNew = ['pending', 'searching'].includes(payload.new.status);
+           // Agar service_type bo'lmasa yoki taxi bo'lsa
+           const isTaxi = !payload.new.service_type || payload.new.service_type === 'taxi';
+           
+           if (isNew && isTaxi) {
+              setOrders(prev => [payload.new, ...prev]);
+              message.info("Yangi buyurtma!");
+           }
+        }
+
+        // 2. Buyurtma o'zgarsa (UPDATE) - masalan birov olsa
+        if (payload.eventType === 'UPDATE') {
+           const isTaken = !['pending', 'searching'].includes(payload.new.status);
+           if (isTaken) {
+              setOrders(prev => prev.filter(o => o.id !== payload.new.id));
+           }
         }
       })
       .subscribe();
@@ -85,9 +108,13 @@ export default function DriverOrderFeed() {
 
   // Aktiv buyurtmani tekshirish
   const checkActiveOrder = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
       const { data } = await supabase
         .from('orders')
         .select('*')
+        .eq('driver_id', user.id) // Faqat o'zimnikini tekshirish
         .in('status', ['accepted', 'arrived', 'in_progress'])
         .limit(1);
 
@@ -98,30 +125,60 @@ export default function DriverOrderFeed() {
 
   const fetchOrders = async () => {
     setLoading(true);
-    const { data } = await supabase
+    // 1. Faqat 'pending' va 'searching' buyurtmalarni olamiz
+    // 2. Faqat 'taxi' turidagi buyurtmalarni olamiz (yoki type null bo'lsa)
+    const { data, error } = await supabase
       .from('orders')
       .select('*')
-      .eq('status', 'pending')
-      .eq('type', 'taxi')
+      .in('status', ['pending', 'searching']) 
+      .or('service_type.eq.taxi,service_type.is.null') // Type 'taxi' yoki bo'sh bo'lsa
       .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error("Fetch xato:", error);
+    }
+    
     setOrders(data || []);
-    // Biroz sun'iy kechikish (chiroyli yuklanish effekti uchun)
-    setTimeout(() => setLoading(false), 800);
+    setTimeout(() => setLoading(false), 500);
   };
 
   // --- ACTIONS ---
 
   const acceptOrder = async (order) => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+          message.error("Tizimga kiring!");
+          return;
+      }
+
+      // Optimistik tekshiruv va yangilash
       const { error } = await supabase
         .from('orders')
-        .update({ status: 'accepted', driver_phone: '+998901234567' })
-        .eq('id', order.id);
+        .update({ 
+            status: 'accepted', 
+            driver_id: user.id, // <--- MUHIM: O'z IDingizni yozish
+            driver_phone: '+998901234567' // Buni keyinchalik user profilidan olish kerak
+        })
+        .eq('id', order.id)
+        .in('status', ['pending', 'searching']); // Faqat bo'sh bo'lsa o'zgartirish
 
       if (error) throw error;
-      message.success("Buyurtma qabul qilindi! Mijozga boramiz.");
-      setActiveOrder({ ...order, status: 'accepted' }); // Aktiv rejimga o'tish
+
+      // Qayta tekshiramiz, rostan bizga o'tdimi
+      const { data: check } = await supabase.from('orders').select('driver_id').eq('id', order.id).single();
+      
+      if (check && check.driver_id === user.id) {
+          message.success("Buyurtma qabul qilindi! Mijozga boramiz.");
+          setActiveOrder({ ...order, status: 'accepted', driver_id: user.id });
+          setOrders(prev => prev.filter(o => o.id !== order.id));
+      } else {
+          message.warning("Kechirasiz, bu buyurtmani boshqa haydovchi oldi.");
+          fetchOrders();
+      }
+
     } catch (error) {
+      console.error(error);
       message.error("Xatolik: " + error.message);
     }
   };
@@ -146,18 +203,15 @@ export default function DriverOrderFeed() {
       }
   };
 
-  // Koordinatalarni parsing qilish (Matndan raqamga o'tkazish)
+  // Koordinatalarni parsing qilish
   const parseLocation = (locString) => {
       if (!locString) return null;
-      // "Lat: 42.123, Lng: 59.123" formatidan ajratib olish
-      const match = locString.match(/Lat: ([0-9.]+), Lng: ([0-9.]+)/);
-      if (match) {
-          return [parseFloat(match[1]), parseFloat(match[2])];
-      }
+      const match = locString.match(/Lat:\s*([0-9.]+),\s*Lng:\s*([0-9.]+)/);
+      if (match) return [parseFloat(match[1]), parseFloat(match[2])];
+      // Agar format boshqacha bo'lsa (masalan shunchaki manzil nomi) null qaytadi
       return null; 
   };
 
-  // Tugma bosilganda kichrayish effekti (Taktil)
   const btnTouchProps = {
     onMouseDown: (e) => e.currentTarget.style.transform = "scale(0.96)",
     onMouseUp: (e) => e.currentTarget.style.transform = "scale(1)",
@@ -183,7 +237,10 @@ export default function DriverOrderFeed() {
                         <Popup>Yo'lovchi shu yerda</Popup>
                     </Marker>
 
-                    {/* Agar manzil aniq bo'lsa, uni ham ko'rsatamiz */}
+                    {/* Haydovchi (Siz) */}
+                    <SmoothDriverMarker position={driverLoc} />
+
+                    {/* Borish manzili (agar bo'lsa) */}
                     {destPos && <Marker position={destPos}><Popup>Borish manzili</Popup></Marker>}
 
                     <RecenterMap lat={clientPos[0]} lng={clientPos[1]} />
@@ -193,16 +250,18 @@ export default function DriverOrderFeed() {
             {/* PASTKI BOSHQARUV PANELI */}
             <div style={{ padding: 25, background: '#fff', boxShadow: '0 -10px 40px rgba(0,0,0,0.15)', borderRadius: '30px 30px 0 0', position: 'relative', zIndex: 1000 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20, alignItems: 'center' }}>
-                    <div>
+                    <div style={{ maxWidth: '80%' }}>
                         <Title level={4} style={{ margin: 0, fontWeight: 800 }}>Mijoz kutyapti</Title>
                         <div style={{ display: 'flex', alignItems: 'center', marginTop: 5 }}>
-                           <EnvironmentOutlined style={{ color: '#52c41a', marginRight: 5 }} />
-                           <Text type="secondary" style={{ fontSize: 13 }}>{activeOrder.pickup_location.substring(0, 35)}...</Text>
+                           <EnvironmentOutlined style={{ color: '#52c41a', marginRight: 5, flexShrink: 0 }} />
+                           <Text type="secondary" style={{ fontSize: 13 }} ellipsis={{tooltip: activeOrder.pickup_location}}>
+                               {activeOrder.pickup_location}
+                           </Text>
                         </div>
                     </div>
                     <Button 
-                       shape="circle" size="large" icon={<PhoneOutlined />} type="primary" 
-                       style={{ background: '#52c41a', border: 'none', width: 50, height: 50, boxShadow: '0 4px 10px rgba(82, 196, 26, 0.4)' }} 
+                        shape="circle" size="large" icon={<PhoneOutlined />} type="primary" 
+                        style={{ background: '#52c41a', border: 'none', width: 50, height: 50, boxShadow: '0 4px 10px rgba(82, 196, 26, 0.4)' }} 
                     />
                 </div>
 
@@ -250,7 +309,7 @@ export default function DriverOrderFeed() {
   // --- AGAR BUYURTMA BO'LMASA -> RO'YXAT REJIMI ---
   return (
     <div style={{ padding: "15px", paddingBottom: "100px", minHeight: "100vh", background: "#f8f9fa" }}>
-      <Title level={4} style={{ marginBottom: 20, fontWeight: 800, paddingLeft: 5 }}>{t.nearOrders || "Shahar ichidagi buyurtmalar"}</Title>
+      <Title level={4} style={{ marginBottom: 20, fontWeight: 800, paddingLeft: 5 }}>{t?.nearOrders || "Buyurtmalar"}</Title>
 
       {/* SKELETON LOADING (Yuklanayotganda) */}
       {loading ? (
@@ -266,14 +325,16 @@ export default function DriverOrderFeed() {
           renderItem={item => (
             <Card key={item.id} hoverable style={{ marginBottom: 15, borderRadius: 24, border: "none", boxShadow: "0 8px 20px rgba(0,0,0,0.04)", overflow: 'hidden' }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 15, paddingBottom: 10, borderBottom: '1px solid #f0f0f0' }}>
-                <Tag icon={<CarOutlined />} color="blue" style={{ borderRadius: 12, padding: '2px 10px' }}>TAKSI</Tag>
-                <Title level={4} style={{ margin: 0, color: "#52c41a", fontWeight: 800 }}>{parseInt(item.price).toLocaleString()} {t.som}</Title>
+                <Tag icon={<CarOutlined />} color="blue" style={{ borderRadius: 12, padding: '2px 10px' }}>
+                    {(item.service_type === 'taxi' || !item.service_type) ? 'TAKSI' : item.service_type.toUpperCase()}
+                </Tag>
+                <Title level={4} style={{ margin: 0, color: "#52c41a", fontWeight: 800 }}>{parseInt(item.price).toLocaleString()} so'm</Title>
               </div>
 
               <div style={{ marginBottom: 20, paddingLeft: 5 }}>
                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 10 }}>
                      <div style={{ minWidth: 20, textAlign: 'center' }}><EnvironmentOutlined style={{ color: "#52c41a", fontSize: 18 }} /></div>
-                     <Text strong style={{ fontSize: 15, lineHeight: 1.3 }}>{item.pickup_location.substring(0, 40)}...</Text>
+                     <Text strong style={{ fontSize: 15, lineHeight: 1.3 }}>{item.pickup_location}</Text>
                  </div>
                  <div style={{ borderLeft: "2px dashed #e0e0e0", height: 15, marginLeft: 9, margin: "0 0 5px 0" }}></div>
                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
