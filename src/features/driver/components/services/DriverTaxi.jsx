@@ -515,7 +515,7 @@ export default function DriverTaxi({ onBack }) {
       const {
         data: { user },
         error,
-      } = await supabase.auth.getUser();
+      } = supabase.auth.getSession();
 
       if (error) console.error(error);
 
