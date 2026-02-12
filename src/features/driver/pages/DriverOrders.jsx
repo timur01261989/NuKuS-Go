@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { Card, List, Button, Tag, Typography, message, Empty, Spin, Skeleton } from "antd";
+import { Card, List, Button, Tag, Typography, message, Empty, Skeleton } from "antd";
 import { 
-  CheckOutlined, CarOutlined, 
-  EnvironmentOutlined, PhoneOutlined 
+  CheckOutlined, EnvironmentOutlined, PhoneOutlined 
 } from "@ant-design/icons";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-import { supabase } from "../../../lib/supabase"; // Importni to'g'rilang
+import { supabase } from "../../../lib/supabase"; 
 
 // --- MAP ICON FIX ---
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -44,13 +43,13 @@ export default function DriverOrderFeed() {
     const channel = supabase
       .channel('public:orders')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
-        // Agar yangi buyurtma tushsa
-        if (payload.eventType === 'INSERT' && payload.new.status === 'pending') {
+        // 1. Yangi buyurtma tushsa (pending YOKI searching)
+        if (payload.eventType === 'INSERT' && ['pending', 'searching'].includes(payload.new.status)) {
             setOrders(prev => [payload.new, ...prev]);
             message.info("Yangi buyurtma tushdi!");
         }
-        // Agar buyurtma o'zgarsa (masalan, kimdir olib qo'ysa)
-        if (payload.eventType === 'UPDATE' && payload.new.status !== 'pending') {
+        // 2. Buyurtma o'zgarsa (birov olsa yoki bekor bo'lsa)
+        if (payload.eventType === 'UPDATE' && !['pending', 'searching'].includes(payload.new.status)) {
             setOrders(prev => prev.filter(o => o.id !== payload.new.id));
         }
       })
@@ -67,7 +66,7 @@ export default function DriverOrderFeed() {
       const { data } = await supabase
         .from('orders')
         .select('*')
-        .eq('driver_id', user.id) // Faqat o'zimniki
+        .eq('driver_id', user.id)
         .in('status', ['accepted', 'arrived', 'in_progress'])
         .limit(1);
 
@@ -78,12 +77,11 @@ export default function DriverOrderFeed() {
 
   const fetchOrders = async () => {
     setLoading(true);
-    // DIQQAT: Bu yerda filtrlarni to'g'irladim
+    // ✅ TUZATILDI: Endi 'pending' VA 'searching' ikkalasini ham oladi
     const { data, error } = await supabase
       .from('orders')
       .select('*')
-      .eq('status', 'pending') // Faqat bo'sh buyurtmalar
-      // .eq('service_type', 'taxi') // Agar kerak bo'lsa yoqing, hozircha hamma buyurtmani ko'rsatsin
+      .in('status', ['pending', 'searching']) 
       .order('created_at', { ascending: false });
 
     if (error) console.error("Error fetching orders:", error);
@@ -101,6 +99,7 @@ export default function DriverOrderFeed() {
           return;
       }
 
+      // Optimistik yangilanish (UI tezroq ishlashi uchun)
       const { error } = await supabase
         .from('orders')
         .update({ 
@@ -108,13 +107,14 @@ export default function DriverOrderFeed() {
             driver_id: user.id 
         })
         .eq('id', order.id)
-        .eq('status', 'pending'); // Birov olib qo'ymaganligini tekshirish
+        .in('status', ['pending', 'searching']); // Faqat bo'shlarini olish
 
       if (error) throw error;
       
       // Tekshiramiz, rostan ham bizga o'tdimi
       const { data: check } = await supabase.from('orders').select('driver_id').eq('id', order.id).single();
-      if (check.driver_id !== user.id) {
+      
+      if (!check || check.driver_id !== user.id) {
           message.warning("Ulgurmadingiz, buyurtmani boshqa haydovchi oldi.");
           fetchOrders();
           return;
@@ -153,21 +153,15 @@ export default function DriverOrderFeed() {
   // Koordinatalarni parsing qilish
   const parseLocation = (locString) => {
       if (!locString) return null;
-      const match = locString.match(/Lat: ([0-9.]+), Lng: ([0-9.]+)/);
+      // Format: "Lat: 42.46..., Lng: 59.61..."
+      const match = locString.match(/Lat:\s*([0-9.]+),\s*Lng:\s*([0-9.]+)/);
       if (match) return [parseFloat(match[1]), parseFloat(match[2])];
       return null; 
   };
 
-  const btnTouchProps = {
-    onMouseDown: (e) => e.currentTarget.style.transform = "scale(0.96)",
-    onMouseUp: (e) => e.currentTarget.style.transform = "scale(1)",
-    onTouchStart: (e) => e.currentTarget.style.transform = "scale(0.96)",
-    onTouchEnd: (e) => e.currentTarget.style.transform = "scale(1)",
-    style: { transition: "transform 0.1s" }
-  };
-
   // --- AGAR AKTIV BUYURTMA BO'LSA -> XARITA REJIMI ---
   if (activeOrder) {
+      // Agar location text bo'lsa (Lat: ..., Lng: ...) parse qilamiz, bo'lmasa default Nukus
       const clientPos = parseLocation(activeOrder.pickup_location) || [42.4619, 59.6166];
       const destPos = parseLocation(activeOrder.dropoff_location);
 
@@ -226,19 +220,25 @@ export default function DriverOrderFeed() {
           renderItem={item => (
             <Card key={item.id} style={{ marginBottom: 15, borderRadius: 16, border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <Tag color="blue">{item.service_type || 'Taksi'}</Tag>
+                {/* Agar service_type bo'lmasa 'Taksi' deb chiqaradi */}
+                <Tag color="blue">{item.service_type === 'taxi' || !item.service_type ? 'Taksi' : item.service_type}</Tag>
                 <Title level={4} style={{ margin: 0, color: "#52c41a" }}>{parseInt(item.price).toLocaleString()} so'm</Title>
               </div>
 
               <div style={{ marginBottom: 15 }}>
                  <div style={{ display: "flex", gap: 8, marginBottom: 5 }}>
                      <EnvironmentOutlined style={{ color: "#52c41a", marginTop: 4 }} />
-                     <Text>{item.pickup_location}</Text>
+                     {/* Text uzun bo'lsa qirqib tashlash */}
+                     <Text style={{width: '90%'}} ellipsis={{tooltip: item.pickup_location}}>
+                        {item.pickup_location}
+                     </Text>
                  </div>
                  {item.dropoff_location && (
                     <div style={{ display: "flex", gap: 8 }}>
                         <EnvironmentOutlined style={{ color: "#ff4d4f", marginTop: 4 }} />
-                        <Text>{item.dropoff_location}</Text>
+                        <Text style={{width: '90%'}} ellipsis={{tooltip: item.dropoff_location}}>
+                            {item.dropoff_location}
+                        </Text>
                     </div>
                  )}
               </div>
