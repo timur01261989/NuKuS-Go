@@ -32,7 +32,6 @@ import { startTracking } from "../components/services/locationService";
 
 const { Title, Text } = Typography;
 
-// Ismning bosh harflarini oluvchi yordamchi funksiya
 function initials(name) {
   const s = String(name || "").trim();
   if (!s) return "D";
@@ -46,13 +45,12 @@ export default function DriverDashboard() {
   const { t } = useLanguage(); 
 
   // =========================
-  // STATE (HOZIRGI HOLATLAR)
+  // STATE
   // =========================
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profile, setProfile] = useState({ fullName: "", avatarUrl: "", phone: "" });
   const [loading, setLoading] = useState(false); 
   
-  // Boshlanishida localStorage'dan o'qiydi
   const [isOnline, setIsOnline] = useState(() => {
     const v = localStorage.getItem("driverOnline");
     return v === "1";
@@ -66,14 +64,12 @@ export default function DriverDashboard() {
 
     const fetchProfile = async () => {
       try {
-        // 1. Hozirgi foydalanuvchini olish
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           navigate("/login");
           return;
         }
 
-        // 2. Drivers jadvalidan ma'lumot olish
         const { data: driverData, error } = await supabase
           .from("drivers")
           .select("first_name, last_name, phone, is_online, status")
@@ -86,19 +82,16 @@ export default function DriverDashboard() {
         }
 
         if (mounted && driverData) {
-          // Profil ma'lumotlarini o'rnatish
           setProfile({
             fullName: `${driverData.first_name || ""} ${driverData.last_name || ""}`.trim(),
             phone: driverData.phone,
             avatarUrl: "",
           });
 
-          // Bazadagi haqiqiy statusni olish
           const onlineStatus = driverData.is_online === true;
           setIsOnline(onlineStatus);
           localStorage.setItem("driverOnline", onlineStatus ? "1" : "0");
 
-          // Agar online bo'lsa, GPS kuzatuvni boshlash
           if (onlineStatus) {
             startTracking();
           }
@@ -116,57 +109,53 @@ export default function DriverDashboard() {
   }, [navigate]);
 
   // =========================
-  // 2. ONLINE / OFFLINE TUGMASI (TUZATILGAN)
+  // 2. ONLINE / OFFLINE TUGMASI (TUZATILDI)
   // =========================
   const toggleOnline = async (checked) => {
     setLoading(true);
     try {
-      // 1. User ID ni olish
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Foydalanuvchi topilmadi");
 
-      // 2. Supabase'ni yangilash
-      // DIQQAT: Bu yerda 'status' maydoniga tegmaymiz! Faqat 'is_online'.
+      // DIQQAT: Faqat 'is_online' va 'last_seen_at' o'zgaradi.
+      // 'status' ustuniga tegmaymiz (u 'active' bo'lib qolishi shart).
       const { error } = await supabase
         .from("drivers")
         .update({ 
           is_online: checked,
-          last_seen_at: new Date().toISOString() // Vaqtni yangilaymiz
+          last_seen_at: new Date().toISOString() 
         })
         .eq("id", user.id);
 
       if (error) throw error;
 
-      // 3. Muvaffaqiyatli bo'lsa state va localStorageni yangilash
       setIsOnline(checked);
       localStorage.setItem("driverOnline", checked ? "1" : "0");
       
       if (checked) {
-        message.success("Siz Online bo'ldingiz. Buyurtmalar kutilmoqda!");
-        startTracking(); // GPS ni yoqish
+        message.success("Siz Online bo'ldingiz.");
+        startTracking(); 
       } else {
-        message.warning("Siz Offline bo'ldingiz. Buyurtmalar kelmaydi.");
+        message.warning("Siz Offline bo'ldingiz.");
       }
 
     } catch (err) {
-      console.error("Status o'zgartirishda xato:", err);
-      message.error("Internet bilan aloqa yo'q yoki xatolik yuz berdi!");
-      // Xato bo'lsa, tugmani eski holiga qaytarish
-      setIsOnline(!checked);
+      console.error("Xatolik:", err);
+      message.error("Statusni o'zgartirishda xatolik!");
+      setIsOnline(!checked); // Xato bo'lsa qaytarib qo'yamiz
     } finally {
       setLoading(false); 
     }
   };
 
   // =========================
-  // 3. SAHIFA OTISH FUNKSIYALARI
+  // 3. SAHIFA OTISH
   // =========================
   const go = (path) => {
     setDrawerOpen(false);
     navigate(path);
   };
 
-  // Logout funksiyasi
   const handleLogout = async () => {
     await supabase.auth.signOut();
     localStorage.clear();
@@ -174,11 +163,11 @@ export default function DriverDashboard() {
   };
 
   // =========================
-  // 4. RENDER (KORINISHI)
+  // 4. RENDER
   // =========================
   return (
     <div style={{ background: "#f5f5f5", minHeight: "100vh", paddingBottom: 80 }}>
-      {/* TEPADAGI HEADER QISMI */}
+      {/* HEADER */}
       <div
         style={{
           background: "#fff",
@@ -218,7 +207,7 @@ export default function DriverDashboard() {
         />
       </div>
 
-      {/* STATUS KARTASI (ONLINE/OFFLINE) */}
+      {/* STATUS KARTASI */}
       <div style={{ padding: 16 }}>
         <Card
           style={{
@@ -258,7 +247,6 @@ export default function DriverDashboard() {
               </div>
             </div>
 
-            {/* ASOSIY SWITCH TUGMASI */}
             <Switch
               checkedChildren="ON"
               unCheckedChildren="OFF"
@@ -347,7 +335,7 @@ export default function DriverDashboard() {
         </Button>
       </div>
 
-      {/* YON TOMONDAN CHIQADIGAN MENU (DRAWER) */}
+      {/* DRAWER */}
       <Drawer
         title="Menu"
         placement="left"
