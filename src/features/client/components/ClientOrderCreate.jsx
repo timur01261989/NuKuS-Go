@@ -369,7 +369,7 @@ export default function ClientOrderCreate({ onBack }) {
       const insertPayload = {
         // sizning orders schema:
         client_id: user.id,
-        status: 'pending', // driver tomoni qabul qilganda accepted qiladi
+        status: 'searching', // driver tomoni qabul qilganda accepted qiladi
         price: selectedTariff.basePrice,
         service_type: selectedTariff.id,
 
