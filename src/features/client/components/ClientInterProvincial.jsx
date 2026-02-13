@@ -723,7 +723,7 @@ export default function ClientInterProvincial({ onBack }) {
                               {order.meet_address ? <Tag>Ketish: {order.meet_address}</Tag> : null}
                               {order.dest_address ? <Tag>Manzil: {order.dest_address}</Tag> : null}
                               {order.meet_lat != null && order.meet_lng != null ? (
-                                <Button size="small" onClick={() => openGoogleMaps(order.meet_lat, order.meet_lng)}>Ketish xarita</Button>
+                                <Button size="small" onClick={() => openMapEmbed({ title: "Xarita", lat: order.meet_lat, lng: order.meet_lng, mode: "pin" })}>Ketish xarita</Button>
                               ) : null}
                             </Space>
                           </Space>
@@ -776,7 +776,7 @@ export default function ClientInterProvincial({ onBack }) {
                           </Button>
                         ) : null,
                         b.status === "accepted" && o.meet_lat != null && o.meet_lng != null ? (
-                          <Button key="meet" onClick={() => openGoogleDirectionsTo(o.meet_lat, o.meet_lng)}>Ketish joyiga yo‘l</Button>
+                          <Button key="meet" onClick={() => openMapEmbed({ title: "Yo‘l", lat: o.meet_lat, lng: o.meet_lng, sLat: null, sLng: null, mode: "route" })}>Ketish joyiga yo‘l</Button>
                         ) : null,
                       ].filter(Boolean)}
                     >
@@ -890,8 +890,8 @@ export default function ClientInterProvincial({ onBack }) {
 
                   {pickupLat != null && pickupLng != null ? (
                     <>
-                      <Button onClick={() => openGoogleMaps(pickupLat, pickupLng)}>Xarita</Button>
-                      <Button type="primary" onClick={() => openGoogleDirectionsTo(pickupLat, pickupLng)}>Yo‘l</Button>
+                      <Button onClick={() => openMapEmbed({ title: "Xarita", lat: pickupLat, lng: pickupLng, mode: "pin" })}>Xarita</Button>
+                      <Button type="primary" onClick={() => openMapEmbed({ title: "Yo‘l", lat: pickupLat, lng: pickupLng, sLat: null, sLng: null, mode: "route" })}>Yo‘l</Button>
                     </>
                   ) : null}
                 </Space>

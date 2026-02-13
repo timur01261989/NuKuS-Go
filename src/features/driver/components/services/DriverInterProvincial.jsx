@@ -223,6 +223,31 @@ export default function DriverInterProvincial({ onBack }) {
   const [destLng, setDestLng] = useState(null);
   const [destAddress, setDestAddress] = useState("");
 
+  // Swap direction to quickly create a "return" ride draft
+  const prepareReturnDraft = () => {
+    // swap regions/districts
+    setFormData((p) => ({
+      ...p,
+      fromRegion: p.toRegion,
+      fromDistrict: p.toDistrict,
+      toRegion: p.fromRegion,
+      toDistrict: p.fromDistrict,
+    }));
+
+    // swap meet/destination pins
+    setMeetLat(destLat);
+    setMeetLng(destLng);
+    setMeetAddress(destAddress || "");
+
+    setDestLat(meetLat);
+    setDestLng(meetLng);
+    setDestAddress(meetAddress || "");
+
+    setEditMode(true);
+    message.success("Qaytish yo‘nalishi uchun draft tayyorlandi");
+  };
+
+
   const [formData, setFormData] = useState(() => {
     const saved = localStorage.getItem("driverInterProvDraft_v5");
     if (saved) {
@@ -1000,8 +1025,8 @@ export default function DriverInterProvincial({ onBack }) {
                       </Button>
                       {meetLat != null && meetLng != null ? (
                         <>
-                          <Button onClick={() => openGoogleMaps(meetLat, meetLng)}>Xarita</Button>
-                          <Button onClick={() => openGoogleDirectionsTo(meetLat, meetLng)}>Yo‘l</Button>
+                          <Button onClick={() => openMapEmbed({ title: "Xarita", lat: meetLat, lng: meetLng, mode: "pin" })}>Xarita</Button>
+                          <Button onClick={() => openMapEmbed({ title: "Yo‘l", lat: meetLat, lng: meetLng, sLat: meetLat, sLng: meetLng, mode: "route" })}>Yo‘l</Button>
                         </>
                       ) : null}
                     </Space>
@@ -1032,8 +1057,8 @@ export default function DriverInterProvincial({ onBack }) {
                       </Button>
                       {destLat != null && destLng != null ? (
                         <>
-                          <Button onClick={() => openGoogleMaps(destLat, destLng)}>Xarita</Button>
-                          <Button onClick={() => openGoogleDirectionsTo(destLat, destLng)}>Yo‘l</Button>
+                          <Button onClick={() => openMapEmbed({ title: "Xarita", lat: destLat, lng: destLng, mode: "pin" })}>Xarita</Button>
+                          <Button onClick={() => openMapEmbed({ title: "Yo‘l", lat: destLat, lng: destLng, sLat: meetLat, sLng: meetLng, mode: "route" })}>Yo‘l</Button>
                         </>
                       ) : null}
                     </Space>
@@ -1117,10 +1142,10 @@ export default function DriverInterProvincial({ onBack }) {
                             <List.Item
                               actions={[
                                 b.pickup_lat != null && b.pickup_lng != null ? (
-                                  <Button key="map" onClick={() => openGoogleMaps(b.pickup_lat, b.pickup_lng)}>Xarita</Button>
+                                  <Button key="map" onClick={() => openMapEmbed({ title: "Xarita", lat: b.pickup_lat, lng: b.pickup_lng, mode: "pin" })}>Xarita</Button>
                                 ) : null,
                                 b.pickup_lat != null && b.pickup_lng != null ? (
-                                  <Button key="route" type="primary" onClick={() => openGoogleDirectionsTo(b.pickup_lat, b.pickup_lng)}>Yo‘l</Button>
+                                  <Button key="route" type="primary" onClick={() => openMapEmbed({ title: "Yo‘l", lat: b.pickup_lat, lng: b.pickup_lng, sLat: meetLat, sLng: meetLng, mode: "route" })}>Yo‘l</Button>
                                 ) : null,
                               ].filter(Boolean)}
                             >
@@ -1295,8 +1320,8 @@ export default function DriverInterProvincial({ onBack }) {
                   </Button>
                   {destLat != null && destLng != null ? (
                     <>
-                      <Button onClick={() => openGoogleMaps(destLat, destLng)}>Xarita</Button>
-                      <Button onClick={() => openGoogleDirectionsTo(destLat, destLng)}>Yo‘l</Button>
+                      <Button onClick={() => openMapEmbed({ title: "Xarita", lat: destLat, lng: destLng, mode: "pin" })}>Xarita</Button>
+                      <Button onClick={() => openMapEmbed({ title: "Yo‘l", lat: destLat, lng: destLng, sLat: meetLat, sLng: meetLng, mode: "route" })}>Yo‘l</Button>
                     </>
                   ) : null}
                 </Space>
