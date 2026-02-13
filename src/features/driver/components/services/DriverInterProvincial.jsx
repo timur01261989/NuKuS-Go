@@ -533,64 +533,80 @@ export default function DriverInterProvincial({ onBack }) {
   };
 
   const loadDriverData = async () => {
-    const { data: authData } = await supabase.auth.getUser();
-    const user = authData?.user;
-    if (!user) {
-      setActiveAd(null);
-      setRequests([]);
-      setAccepted([]);
-      setNotifications([]);
-      setDriverBalance(null);
-      return;
-    }
+try {
+  setLoading(true);
 
-    const bal = await loadDriverBalance(user.id);
-    setDriverBalance(bal);
+  const {
+    data: { user },
+    error: userErr,
+  } = await supabase.auth.getUser();
+  if (userErr) throw userErr;
 
-    const { data: ad, error: adErr } = await supabase
-      .from("orders")
-      .select("*")
-      .eq("driver_id", user.id)
-      .eq("service_type", "inter_prov")
-      .in("status", ["pending", "booked"])
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+  if (!user) {
+    setActiveAd(null);
+    setRequests([]);
+    setAccepted([]);
+    return;
+  }
 
-    if (adErr) {
-      // no active ad
-      setActiveAd(null);
-      setRequests([]);
-      setAccepted([]);
-    } else {
-      setActiveAd(ad);
-      fillFormFromActive(ad);
+  // 1) Active ride
+  const { data: ride, error: rideErr } = await supabase
+    .from("inter_prov_rides")
+    .select("*")
+    .eq("driver_id", user.id)
+    .in("status", ["open", "active"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-      const { data: reqs } = await supabase
-        .from("trip_booking_requests")
-        .select("*")
-        .eq("driver_id", user.id)
-        .eq("order_id", ad.id)
-        .eq("status", "requested")
-        .order("created_at", { ascending: false });
+  if (rideErr) throw rideErr;
 
-      const { data: accs } = await supabase
-        .from("trip_booking_requests")
-        .select("*")
-        .eq("driver_id", user.id)
-        .eq("order_id", ad.id)
-        .eq("status", "accepted")
-        .order("updated_at", { ascending: false });
+  if (!ride) {
+    setActiveAd(null);
+    setRequests([]);
+    setAccepted([]);
+    return;
+  }
 
-      setRequests(reqs || []);
-      setAccepted(accs || []);
-    }
+  // 2) Fetch bookings for this ride
+  const { data: bookings, error: bErr } = await supabase
+    .from("inter_prov_bookings")
+    .select("*")
+    .eq("ride_id", ride.id)
+    .order("created_at", { ascending: false });
 
-    try {
-      const nots = await loadNotifications(user.id);
-      setNotifications(nots);
-    } catch (e) {}
-  };
+  if (bErr) throw bErr;
+
+  const req = (bookings || []).filter((b) => b.status === "requested" || b.status === "pending");
+  const acc = (bookings || []).filter((b) => b.status === "accepted");
+
+  const acceptedSeats = acc.reduce((sum, b) => sum + Number(b.seats || 0), 0);
+  const seats_total = Number(ride.seats || 0);
+  const seats_available = Math.max(0, seats_total - acceptedSeats);
+
+  const scheduled_at = ride.ride_date && ride.ride_time ? `${ride.ride_date}T${ride.ride_time}` : null;
+
+  // Keep UI compatibility with previous fields
+  setActiveAd({
+    ...ride,
+    seats_total,
+    seats_available,
+    scheduled_at,
+    service_type: "inter_prov",
+    delivery_service: false,
+  });
+
+  setRequests(req);
+  setAccepted(acc);
+} catch (e) {
+  console.error("loadDriverData error:", e);
+  setActiveAd(null);
+  setRequests([]);
+  setAccepted([]);
+} finally {
+  setLoading(false);
+}
+};
 
   useEffect(() => {
     let isMounted = true;
@@ -608,12 +624,12 @@ export default function DriverInterProvincial({ onBack }) {
         if (user && isMounted) {
           channel = supabase
             .channel("driver-interprov-live")
-            .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, (payload) => {
+            .on("postgres_changes", { event: "*", schema: "public", table: "inter_prov_rides" }, (payload) => {
               const row = payload?.new || payload?.old;
               if (!row) return;
               if (row.driver_id === user.id) loadDriverData();
             })
-            .on("postgres_changes", { event: "*", schema: "public", table: "trip_booking_requests" }, (payload) => {
+            .on("postgres_changes", { event: "*", schema: "public", table: "inter_prov_bookings" }, (payload) => {
               const row = payload?.new || payload?.old;
               if (!row) return;
               if (row.driver_id === user.id) loadDriverData();
@@ -647,187 +663,201 @@ export default function DriverInterProvincial({ onBack }) {
   }, [formData]);
 
   const createAd = async () => {
-    if (!validate()) return;
+try {
+  setCreating(true);
 
-    setSubmitting(true);
-    try {
-      const { data: authData, error: authErr } = await supabase.auth.getUser();
-      if (authErr) throw authErr;
-      const user = authData?.user;
-      if (!user) return message.error("Avval login qiling");
+  const {
+    data: { user },
+    error: userErr,
+  } = await supabase.auth.getUser();
+  if (userErr) throw userErr;
+  if (!user) {
+    alert("Avval tizimga kiring (login).");
+    return;
+  }
 
-      if (ACCEPT_FEE_SUM > 0) {
-        const bal = Number(driverBalance ?? 0);
-        if (!Number.isFinite(bal) || bal < ACCEPT_FEE_SUM) {
-          return message.error(`Balans yetarli emas. Qabul qilish narxi: ${ACCEPT_FEE_SUM} so‘m`);
-        }
-      }
+  const seatsTotal = Number(formData.seatsTotal || 0);
+  if (!Number.isFinite(seatsTotal) || seatsTotal <= 0) {
+    alert("O'rinlar soni noto‘g‘ri.");
+    return;
+  }
 
-      const scheduledAtObj = dayjs(`${formData.date} ${formData.time}`, "YYYY-MM-DD HH:mm");
+  const priceNum = Number(formData.price || 0);
+  if (!Number.isFinite(priceNum) || priceNum < 0) {
+    alert("Narx noto‘g‘ri.");
+    return;
+  }
 
-      if (scheduledAtObj.isBefore(dayjs(), 'day') || scheduledAtObj.isBefore(dayjs(), 'minute')) {
-        message.error("Ketish vaqti o'tgan bo'lishi mumkin emas!");
-        setSubmitting(false);
-        return;
-      }
-
-      const scheduledAt = scheduledAtObj.toISOString();
-
-      const payload = {
-        driver_id: user.id,
-        client_id: null,
-        service_type: "inter_prov",
-        status: "pending",
-
-        from_region: formData.fromRegion,
-        from_district: (formData.fromDistrict || "").trim(),
-        to_region: formData.toRegion,
-        to_district: (formData.toDistrict || "").trim(),
-
-        scheduled_at: scheduledAt,
-        seats_total: formData.seatsTotal,
-        seats_available: formData.seatsTotal,
-
-        pickup_location: `${formData.fromRegion}, ${districtLabel(formData.fromDistrict)}`,
-        dropoff_location: `${formData.toRegion}, ${districtLabel(formData.toDistrict)}`,
-        price: formData.price,
-        gender_pref: normalizeGender(formData.genderPref),
-
-        pickup_mode: pickupMode,
-        meet_lat: meetLat,
-        meet_lng: meetLng,
-        meet_address: meetAddress || null,
-        dest_lat: null,
-        dest_lng: null,
-        dest_address: null,
-        delivery_service: !!deliveryService,
-      };
-
-      const { data, error } = await supabase.from("orders").insert(payload).select("*").maybeSingle();
-      if (error) throw error;
-
-      setActiveAd(data);
-      setRequests([]);
-      setAccepted([]);
-      setEditMode(false);
-      message.success("E’lon yaratildi!");
-    } catch (e) {
-      console.error(e);
-      message.error(e?.message || "Xatolik!");
-    } finally {
-      setSubmitting(false);
-    }
+  // Map to inter_prov_rides schema
+  const payload = {
+    driver_id: user.id,
+    from_region: formData.fromRegion || null,
+    from_district: formData.fromDistrict || null,
+    to_region: formData.toRegion || null,
+    to_district: formData.toDistrict || null,
+    pickup_location: formData.pickupLocation || null,
+    dropoff_location: formData.dropoffLocation || null,
+    pickup_mode: formData.pickupMode || "meet_point",
+    meet_lat: formData.meetLat ?? null,
+    meet_lng: formData.meetLng ?? null,
+    meet_address: formData.meetAddress || null,
+    dest_lat: formData.destLat ?? null,
+    dest_lng: formData.destLng ?? null,
+    dest_address: formData.destAddress || null,
+    seats: seatsTotal,
+    price: Math.trunc(priceNum),
+    ride_date: formData.date || null,
+    ride_time: formData.time || null,
+    status: "open",
   };
+
+  const { data: ins, error } = await supabase.from("inter_prov_rides").insert(payload).select("*").single();
+  if (error) throw error;
+
+  // Compute UI fields to keep the rest of component unchanged
+  const scheduled_at =
+    payload.ride_date && payload.ride_time ? `${payload.ride_date}T${payload.ride_time}` : null;
+
+  const uiAd = {
+    ...ins,
+    seats_total: payload.seats,
+    seats_available: payload.seats, // will be recalculated on refresh
+    scheduled_at,
+    service_type: "inter_prov",
+    delivery_service: false,
+  };
+
+  setActiveAd(uiAd);
+  setEditMode(true);
+  setShowCreate(false);
+
+  await loadDriverData();
+} catch (e) {
+  console.error("createAd error:", e);
+  alert(e?.message || "E'lon yaratishda xatolik.");
+} finally {
+  setCreating(false);
+}
+};
 
   const saveEdits = async () => {
-    if (!activeAd) return;
-    if (!validate()) return;
+try {
+  if (!activeAd?.id) return;
 
-    setSubmitting(true);
-    try {
-      const scheduledAtObj = dayjs(`${formData.date} ${formData.time}`, "YYYY-MM-DD HH:mm");
+  setSaving(true);
 
-      if (scheduledAtObj.isBefore(dayjs(), 'day') || scheduledAtObj.isBefore(dayjs(), 'minute')) {
-        message.error("Ketish vaqti o'tgan bo'lishi mumkin emas!");
-        setSubmitting(false);
-        return;
-      }
+  const seatsTotal = Number(editForm.seatsTotal || 0);
+  if (!Number.isFinite(seatsTotal) || seatsTotal <= 0) {
+    alert("O'rinlar soni noto‘g‘ri.");
+    return;
+  }
 
-      const scheduledAt = scheduledAtObj.toISOString();
+  const priceNum = Number(editForm.price || 0);
+  if (!Number.isFinite(priceNum) || priceNum < 0) {
+    alert("Narx noto‘g‘ri.");
+    return;
+  }
 
-      const hasRequestsOrAccepted = requests.length + accepted.length > 0;
-      const seatsPatch = hasRequestsOrAccepted ? {} : { seats_total: formData.seatsTotal, seats_available: formData.seatsTotal };
-
-      const patch = {
-        from_region: formData.fromRegion,
-        from_district: (formData.fromDistrict || "").trim(),
-        to_region: formData.toRegion,
-        to_district: (formData.toDistrict || "").trim(),
-        scheduled_at: scheduledAt,
-        price: formData.price,
-        gender_pref: normalizeGender(formData.genderPref),
-        pickup_mode: pickupMode,
-        meet_lat: meetLat,
-        meet_lng: meetLng,
-        meet_address: meetAddress || null,
-        dest_lat: null,
-        dest_lng: null,
-        dest_address: null,
-        delivery_service: !!deliveryService,
-        pickup_location: `${formData.fromRegion}, ${districtLabel(formData.fromDistrict)}`,
-        dropoff_location: `${formData.toRegion}, ${districtLabel(formData.toDistrict)}`,
-        ...seatsPatch,
-      };
-
-      const { data, error } = await supabase.from("orders").update(patch).eq("id", activeAd.id).select("*").maybeSingle();
-      if (error) throw error;
-
-      setActiveAd(data);
-      setEditMode(false);
-
-      // optional notify
-      try {
-        await supabase.from("notifications").insert({
-          user_id: data.driver_id,
-          type: "order_updated",
-          title: "E’lon yangilandi",
-          body: `Yangilandi: ${routeText(data)}`,
-          order_id: data.id,
-        });
-      } catch (e) {}
-
-      message.success("Saqlangan!");
-    } catch (e) {
-      console.error(e);
-      message.error(e?.message || "Saqlashda xatolik!");
-    } finally {
-      setSubmitting(false);
-    }
+  const payload = {
+    from_region: editForm.fromRegion || null,
+    from_district: editForm.fromDistrict || null,
+    to_region: editForm.toRegion || null,
+    to_district: editForm.toDistrict || null,
+    pickup_location: editForm.pickupLocation || null,
+    dropoff_location: editForm.dropoffLocation || null,
+    pickup_mode: editForm.pickupMode || "meet_point",
+    meet_lat: editForm.meetLat ?? null,
+    meet_lng: editForm.meetLng ?? null,
+    meet_address: editForm.meetAddress || null,
+    dest_lat: editForm.destLat ?? null,
+    dest_lng: editForm.destLng ?? null,
+    dest_address: editForm.destAddress || null,
+    seats: seatsTotal,
+    price: Math.trunc(priceNum),
+    ride_date: editForm.date || null,
+    ride_time: editForm.time || null,
+    status: activeAd.status || "open",
   };
+
+  const { data: upd, error } = await supabase
+    .from("inter_prov_rides")
+    .update(payload)
+    .eq("id", activeAd.id)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+
+  const scheduled_at = payload.ride_date && payload.ride_time ? `${payload.ride_date}T${payload.ride_time}` : null;
+
+  setActiveAd((prev) => ({
+    ...prev,
+    ...upd,
+    seats_total: payload.seats,
+    scheduled_at,
+  }));
+
+  await loadDriverData();
+  setEditMode(false);
+} catch (e) {
+  console.error("saveEdits error:", e);
+  alert(e?.message || "Saqlashda xatolik.");
+} finally {
+  setSaving(false);
+}
+};
 
   const cancelAd = async () => {
-    if (!activeAd) return;
-    setSubmitting(true);
-    try {
-      const { error } = await supabase.from("orders").update({ status: "cancelled" }).eq("id", activeAd.id);
-      if (error) throw error;
+try {
+  if (!activeAd?.id) return;
 
-      setActiveAd(null);
-      setRequests([]);
-      setAccepted([]);
-      setEditMode(false);
-      message.success("E’lon bekor qilindi.");
-    } catch (e) {
-      console.error(e);
-      message.error(e?.message || "Xatolik!");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  if (!confirm("E'lonni yopmoqchimisiz?")) return;
+
+  setCancelling(true);
+
+  // Prefer RPC if exists, else update status directly
+  const { error: rpcErr } = await supabase.rpc("cancel_booking", { p_ride_id: activeAd.id });
+
+  if (rpcErr) {
+    const { error } = await supabase.from("inter_prov_rides").update({ status: "cancelled" }).eq("id", activeAd.id);
+    if (error) throw error;
+
+    // Also cancel pending bookings
+    await supabase.from("inter_prov_bookings").update({ status: "cancelled" }).eq("ride_id", activeAd.id);
+  }
+
+  setActiveAd(null);
+  setRequests([]);
+  setAccepted([]);
+} catch (e) {
+  console.error("cancelAd error:", e);
+  alert(e?.message || "Bekor qilishda xatolik.");
+} finally {
+  setCancelling(false);
+}
+};
 
   const finishTrip = async () => {
-    if (!activeAd) return;
-    setSubmitting(true);
-    try {
-      const { error } = await supabase
-        .from("orders")
-        .update({ status: "completed", completed_at: new Date().toISOString() })
-        .eq("id", activeAd.id);
-      if (error) throw error;
+try {
+  if (!activeAd?.id) return;
 
-      message.success("Safar yakunlandi (manzilga yetib keldik). Yangi buyurtma berishingiz mumkin.");
-      // keep draft for quick re-create
-      setActiveAd(null);
-      setRequests([]);
-      setAccepted([]);
-      setEditMode(false);
-    } catch (e) {
-      console.error(e);
-      message.error(e?.message || "Safarni yakunlashda xatolik!");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  if (!confirm("Safarni yakunlash (yopish)ni xohlaysizmi?")) return;
+
+  setFinishing(true);
+
+  const { error } = await supabase.from("inter_prov_rides").update({ status: "closed" }).eq("id", activeAd.id);
+  if (error) throw error;
+
+  setActiveAd(null);
+  setRequests([]);
+  setAccepted([]);
+} catch (e) {
+  console.error("finishTrip error:", e);
+  alert(e?.message || "Yakunlashda xatolik.");
+} finally {
+  setFinishing(false);
+}
+};
 
   const openNotifications = async () => {
     setNotifOpen(true);
@@ -844,68 +874,68 @@ export default function DriverInterProvincial({ onBack }) {
   };
 
   const acceptRequest = async (bookingId) => {
-    if (!activeAd) return;
-    setSubmitting(true);
-    try {
-      const { data: authData, error: authErr } = await supabase.auth.getUser();
-      if (authErr) throw authErr;
-      const user = authData?.user;
-      if (!user) return message.error("Avval login qiling");
+try {
+  if (!req?.id) return;
 
-      if (ACCEPT_FEE_SUM > 0) {
-        const bal = Number(driverBalance ?? 0);
-        if (!Number.isFinite(bal) || bal < ACCEPT_FEE_SUM) {
-          return message.error(`Balans yetarli emas. Qabul qilish narxi: ${ACCEPT_FEE_SUM} so‘m`);
-        }
-      }
+  setActionLoading((prev) => ({ ...prev, [req.id]: true }));
 
-      const { error } = await supabase.rpc("accept_inter_prov_booking", {
-        p_booking_id: bookingId,
-        p_driver_id: user.id,
-      });
-      if (error) throw error;
+  // Try RPC first (recommended to enforce seat checks)
+  let rpcOk = false;
 
-      message.success("So‘rov qabul qilindi. Telefon endi ko‘rinadi.");
-      await loadDriverData();
-    } catch (e) {
-      console.error(e);
-      message.error(e?.message || "Qabul qilishda xatolik!");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const { error: rpcErr1 } = await supabase.rpc("accept_inter_prov_booking", { p_booking_id: req.id });
+  if (!rpcErr1) rpcOk = true;
+
+  if (!rpcOk) {
+    const { error: rpcErr2 } = await supabase.rpc("accept_booking_request_v2", { p_booking_id: req.id });
+    if (!rpcErr2) rpcOk = true;
+  }
+
+  if (!rpcOk) {
+    const { error } = await supabase
+      .from("inter_prov_bookings")
+      .update({ status: "accepted", accepted_at: new Date().toISOString() })
+      .eq("id", req.id);
+    if (error) throw error;
+  }
+
+  await loadDriverData();
+} catch (e) {
+  console.error("acceptRequest error:", e);
+  alert(e?.message || "Qabul qilishda xatolik.");
+} finally {
+  setActionLoading((prev) => ({ ...prev, [req?.id]: false }));
+}
+};
 
   const rejectRequest = async (bookingId) => {
-    if (!activeAd) return;
-    setSubmitting(true);
-    try {
-      const { data: authData, error: authErr } = await supabase.auth.getUser();
-      if (authErr) throw authErr;
-      const user = authData?.user;
-      if (!user) return message.error("Avval login qiling");
+try {
+  if (!req?.id) return;
 
-      if (ACCEPT_FEE_SUM > 0) {
-        const bal = Number(driverBalance ?? 0);
-        if (!Number.isFinite(bal) || bal < ACCEPT_FEE_SUM) {
-          return message.error(`Balans yetarli emas. Qabul qilish narxi: ${ACCEPT_FEE_SUM} so‘m`);
-        }
-      }
+  setActionLoading((prev) => ({ ...prev, [req.id]: true }));
 
-      const { error } = await supabase.rpc("reject_inter_prov_booking", {
-        p_booking_id: bookingId,
-        p_driver_id: user.id,
-      });
-      if (error) throw error;
+  let rpcOk = false;
 
-      message.success("So‘rov rad etildi. Joy qaytarildi.");
-      await loadDriverData();
-    } catch (e) {
-      console.error(e);
-      message.error(e?.message || "Rad etishda xatolik!");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const { error: rpcErr1 } = await supabase.rpc("reject_inter_prov_booking", { p_booking_id: req.id });
+  if (!rpcErr1) rpcOk = true;
+
+  if (!rpcOk) {
+    const { error: rpcErr2 } = await supabase.rpc("reject_booking_request", { p_booking_id: req.id });
+    if (!rpcErr2) rpcOk = true;
+  }
+
+  if (!rpcOk) {
+    const { error } = await supabase.from("inter_prov_bookings").update({ status: "rejected" }).eq("id", req.id);
+    if (error) throw error;
+  }
+
+  await loadDriverData();
+} catch (e) {
+  console.error("rejectRequest error:", e);
+  alert(e?.message || "Rad etishda xatolik.");
+} finally {
+  setActionLoading((prev) => ({ ...prev, [req?.id]: false }));
+}
+};
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 

@@ -414,127 +414,73 @@ export default function ClientInterProvincial({ onBack }) {
   }, [form]);
 
   const loadMyBookings = async () => {
-    setMyLoading(true);
-    try {
-      const { data: authData } = await supabase.auth.getUser();
-      const user = authData?.user;
-      if (!user) {
-        setMyBookings([]);
-        return;
-      }
+try {
+  setMyBookingsLoading(true);
+  const {
+    data: { user },
+    error: userErr,
+  } = await supabase.auth.getUser();
+  if (userErr) throw userErr;
+  if (!user) {
+    setMyBookings([]);
+    return;
+  }
 
-      // auto-fill from meta if local storage empty
-      const metaName = user?.user_metadata?.full_name || user?.user_metadata?.name || "";
-      const metaPhone = user?.user_metadata?.phone || user?.phone || "";
-      if (!localStorage.getItem("passenger_name") && metaName) localStorage.setItem("passenger_name", metaName);
-      if (!localStorage.getItem("passenger_phone") && metaPhone) localStorage.setItem("passenger_phone", metaPhone);
+  // inter_prov_bookings -> inter_prov_rides (aliased as "order" to keep UI intact)
+  const { data, error } = await supabase
+    .from("inter_prov_bookings")
+    .select("*, order:inter_prov_rides(*)")
+    .eq("passenger_id", user.id)
+    .order("created_at", { ascending: false });
 
-      const { data, error } = await supabase
-        .from("trip_booking_requests")
-        .select("*, orders(*)")
-        .eq("passenger_id", user.id)
-        .order("created_at", { ascending: false });
+  if (error) throw error;
 
-      if (error) throw error;
-      setMyBookings(data || []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setMyLoading(false);
-    }
-  };
+  setMyBookings(Array.isArray(data) ? data : []);
+} catch (e) {
+  console.error("loadMyBookings error:", e);
+  setMyBookings([]);
+} finally {
+  setMyBookingsLoading(false);
+}
+};
 
   const doSearch = async (silent = false) => {
-    setSearching(true);
-    setErrorText("");
+try {
+  setSearching(true);
 
-    try {
-      const fromDistrictFilter = (form.fromDistrict || "").trim();
-      const toDistrictFilter = (form.toDistrict || "").trim();
+  // Build query on inter_prov_rides (we keep variable name "orders" in state for UI compatibility)
+  let q = supabase.from("inter_prov_rides").select("*").order("created_at", { ascending: false }).limit(60);
 
-      let q = supabase
-        .from("orders")
-        .select("*")
-        .eq("service_type", "inter_prov")
-        .eq("delivery_service", listMode === "delivery")
-        .in("status", ["pending", "booked"])
-        .gt("seats_available", 0)
-        .eq("from_region", form.fromRegion)
-        .eq("to_region", form.toRegion)
-        .order("scheduled_at", { ascending: true });
+  // status filter: show only open/active rides
+  q = q.in("status", ["open", "active"]);
 
-      // gender filter (optional column gender_pref)
-      if (form.gender && form.gender !== "all") {
-        // show orders that allow everyone OR matching gender
-        q = q.in("gender_pref", ["all", form.gender]);
-      }
+  if (fromRegion) q = q.eq("from_region", fromRegion);
+  if (fromDistrict) q = q.eq("from_district", fromDistrict);
+  if (toRegion) q = q.eq("to_region", toRegion);
+  if (toDistrict) q = q.eq("to_district", toDistrict);
 
-      // pickup mode filter
-      if (form.pickupMode && form.pickupMode !== "all") {
-        q = q.eq("pickup_mode", form.pickupMode);
-      }
+  // Date filter
+  if (rideDate) q = q.eq("ride_date", rideDate);
 
-      // wildcard rules:
-      // If passenger chose district, match exact OR driver wildcard (empty string)
-      if (!isTashkentCity(form.fromRegion) || fromDistrictFilter) {
-        q = q.or(`from_district.eq.${fromDistrictFilter},from_district.eq.`);
-      }
-      if (!isTashkentCity(form.toRegion) || toDistrictFilter) {
-        q = q.or(`to_district.eq.${toDistrictFilter},to_district.eq.`);
-      }
+  // Pickup mode: listMode = "ride" or "delivery"
+  // deliveryType typically = "meet_point" | "home_pickup" (or similar)
+  if (listMode === "delivery") {
+    q = q.eq("pickup_mode", "delivery");
+  } else if (deliveryType) {
+    q = q.eq("pickup_mode", deliveryType);
+  }
 
-      if (form.date) {
-        const start = dayjs(form.date).startOf("day").toISOString();
-        const end = dayjs(form.date).endOf("day").toISOString();
-        q = q.gte("scheduled_at", start).lte("scheduled_at", end);
-      }
+  const { data, error } = await q;
+  if (error) throw error;
 
-      let data, error;
-      ({ data, error } = await q);
-      if (error) {
-        const msg = String(error.message || "");
-        if (msg.toLowerCase().includes("gender") || msg.toLowerCase().includes("gender_pref") || msg.toLowerCase().includes("column")) {
-          // fallback: column not migrated yet
-          const fromDistrictFilter2 = (form.fromDistrict || "").trim();
-          const toDistrictFilter2 = (form.toDistrict || "").trim();
-          let q2 = supabase
-            .from("orders")
-            .select("*")
-            .eq("service_type", "inter_prov")
-            .in("status", ["pending", "booked"])
-            .gt("seats_available", 0)
-            .eq("from_region", form.fromRegion)
-            .eq("to_region", form.toRegion)
-            .order("scheduled_at", { ascending: true });
-          if (!isTashkentCity(form.fromRegion) || fromDistrictFilter2) {
-            q2 = q2.or(`from_district.eq.${fromDistrictFilter2},from_district.eq.`);
-          }
-          if (!isTashkentCity(form.toRegion) || toDistrictFilter2) {
-            q2 = q2.or(`to_district.eq.${toDistrictFilter2},to_district.eq.`);
-          }
-          if (form.date) {
-            const start = dayjs(form.date).startOf("day").toISOString();
-            const end = dayjs(form.date).endOf("day").toISOString();
-            q2 = q2.gte("scheduled_at", start).lte("scheduled_at", end);
-          }
-          ({ data, error } = await q2);
-        }
-      }
-      if (error) throw error;
-
-      const filtered = (data || []).filter((o) => Number(o.seats_available || 0) >= Number(form.minSeats || 1));
-      setResults(filtered);
-
-      if (!silent) message.success(`Topildi: ${filtered.length} ta e’lon`);
-    } catch (e) {
-      console.error(e);
-      setResults([]);
-      setErrorText(e?.message || "Qidiruvda xatolik!");
-      if (!silent) message.error(e?.message || "Qidiruvda xatolik!");
-    } finally {
-      setSearching(false);
-    }
-  };
+  setOrders(Array.isArray(data) ? data : []);
+} catch (e) {
+  console.error("doSearch error:", e);
+  setOrders([]);
+} finally {
+  setSearching(false);
+}
+};
 
   useEffect(() => {
     let isMounted = true;
@@ -552,11 +498,11 @@ export default function ClientInterProvincial({ onBack }) {
         if (user && isMounted) {
           channel = supabase
             .channel("client-interprov-live")
-            .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => doSearch(true))
-            .on("postgres_changes", { event: "*", schema: "public", table: "trip_booking_requests" }, (payload) => {
+            .on("postgres_changes", { event: "*", schema: "public", table: "inter_prov_rides" }, () => doSearch(true))
+            .on("postgres_changes", { event: "*", schema: "public", table: "inter_prov_bookings" }, (payload) => {
               const row = payload?.new || payload?.old;
               if (!row) return;
-              if (row.passenger_id === user.id || row.driver_id === user.id) loadMyBookings();
+              if (row.passenger_id === user.id) loadMyBookings();
               doSearch(true);
             })
             .subscribe();
@@ -579,85 +525,140 @@ export default function ClientInterProvincial({ onBack }) {
   }, []);
 
   const openBooking = async (order) => {
-    setSelectedOrder(order);
-    setBookingSeats(1);
+try {
+  const rideId = order?.id;
+  if (!rideId) return;
 
-    // fill from localStorage
-    const savedName = localStorage.getItem("passenger_name") || "";
-    const savedPhone = localStorage.getItem("passenger_phone") || "";
-    const savedGender = localStorage.getItem("passenger_gender") || "all";
-    setPassengerName(savedName);
-    setPassengerPhone(savedPhone);
-    setPassengerGender(normalizeGender(savedGender));
+  // Ensure we have the latest ride row
+  const { data: ride, error } = await supabase.from("inter_prov_rides").select("*").eq("id", rideId).maybeSingle();
+  if (error) throw error;
 
-    // default deliveryType from order if exists
-    setDeliveryType(order.pickup_mode || "meet_point");
-    setPickupLat(null);
-    setPickupLng(null);
-    setPickupAddress("");
+  if (!ride) {
+    alert("E'lon topilmadi.");
+    return;
+  }
 
-    setBookingModalOpen(true);
-  };
+  setSelectedOrder(ride);
+  setIsRequestModalOpen(true);
+
+  // Default pickup mode selection for request modal
+  if (ride.pickup_mode) {
+    setDeliveryType(ride.pickup_mode);
+    setListMode(ride.pickup_mode === "delivery" ? "delivery" : "ride");
+  }
+} catch (e) {
+  console.error("openBooking error:", e);
+  alert(e?.message || "Ochishda xatolik.");
+}
+};
 
   const confirmBookingRequest = async () => {
-    try {
-      if (!selectedOrder) return;
+try {
+  if (!selectedOrder?.id) return;
 
-      const seatsReq = Number(bookingSeats || 1);
-      if (seatsReq < 1) return message.error("Joylar soni kamida 1 bo‘lsin!");
-      if (!passengerPhone.trim()) return message.error("Telefon raqamingizni kiriting!");
+  const {
+    data: { user },
+    error: userErr,
+  } = await supabase.auth.getUser();
+  if (userErr) throw userErr;
+  if (!user) {
+    alert("Avval tizimga kiring (login).");
+    return;
+  }
 
-      if (deliveryType === "home_pickup") {
-        if (pickupLat == null || pickupLng == null) return message.error("Uydan olib ketish uchun lokatsiya yuboring!");
-      }
+  if (!passengerPhone?.trim()) {
+    alert("Telefon raqamingizni kiriting.");
+    return;
+  }
 
-      const { data: authData, error: authErr } = await supabase.auth.getUser();
-      if (authErr) throw authErr;
-      const user = authData?.user;
-      if (!user) return message.error("So‘rov yuborish uchun avval tizimga kiring!");
+  const seatsNum = Number(seatsToBook || 0);
+  if (!Number.isFinite(seatsNum) || seatsNum <= 0) {
+    alert("O'rinlar soni noto‘g‘ri.");
+    return;
+  }
 
-      // save passenger info (auto next time)
-      localStorage.setItem("passenger_name", passengerName);
-      localStorage.setItem("passenger_phone", passengerPhone);
-      localStorage.setItem("passenger_gender", passengerGender);
+  // Normalization (UI may pass different labels)
+  const pickupModeWanted = listMode === "delivery" ? "delivery" : (deliveryType || selectedOrder.pickup_mode || "meet_point");
 
-      // Prefer v2, fallback to v1
-      let rpcErr = null;
-      const v2 = await supabase.rpc("request_inter_prov_booking", {
-        p_order_id: selectedOrder.id,
-        p_passenger_id: user.id,
-        p_passenger_name: passengerName || "",
-        p_passenger_phone: passengerPhone,
-        p_passenger_gender: normalizeGender(passengerGender),
-        p_seats: seatsReq,
-        p_pickup_lat: pickupLat,
-        p_pickup_lng: pickupLng,
-        p_pickup_address: pickupAddress,
+  // Try RPC v2 first, then fallback to v1, then direct insert.
+  let rpcError = null;
+
+  // v2 parameters (most flexible)
+  const rpcArgsV2 = {
+    p_ride_id: selectedOrder.id,
+    p_passenger_id: user.id,
+    p_passenger_phone: passengerPhone.trim(),
+    p_passenger_gender: passengerGender || null,
+    p_seats: seatsNum,
+    p_pickup_mode: pickupModeWanted,
+    p_pickup_lat: pickupLat ?? null,
+    p_pickup_lng: pickupLng ?? null,
+    p_pickup_address: pickupAddress || null,
+  };
+
+  const { data: rpcDataV2, error: rpcErrV2 } = await supabase.rpc("request_inter_prov_booking_v2", rpcArgsV2);
+
+  if (rpcErrV2) {
+    rpcError = rpcErrV2;
+
+    // v1 fallback (some projects used p_order_id instead of p_ride_id)
+    const rpcArgsV1 = {
+      p_order_id: selectedOrder.id,
+      p_passenger_id: user.id,
+      p_passenger_phone: passengerPhone.trim(),
+      p_passenger_gender: passengerGender || null,
+      p_seats: seatsNum,
+      p_pickup_mode: pickupModeWanted,
+      p_pickup_lat: pickupLat ?? null,
+      p_pickup_lng: pickupLng ?? null,
+      p_pickup_address: pickupAddress || null,
+    };
+
+    const { error: rpcErrV1 } = await supabase.rpc("request_inter_prov_booking", rpcArgsV1);
+
+    if (rpcErrV1) {
+      rpcError = rpcErrV1;
+
+      // Direct insert fallback
+      const { error: insErr } = await supabase.from("inter_prov_bookings").insert({
+        ride_id: selectedOrder.id,
+        passenger_id: user.id,
+        passenger_phone: passengerPhone.trim(),
+        passenger_gender: passengerGender || null,
+        seats: seatsNum,
+        pickup_lat: pickupLat ?? null,
+        pickup_lng: pickupLng ?? null,
+        pickup_address: pickupAddress || null,
+        status: "requested",
       });
 
-      if (v2?.error) {
-        rpcErr = v2.error;
-        const v1 = await supabase.rpc("request_inter_prov_booking", {
-          p_order_id: selectedOrder.id,
-          p_passenger_id: user.id,
-          p_passenger_name: passengerName || "",
-          p_passenger_phone: passengerPhone,
-          p_seats: seatsReq,
-        });
-        if (v1?.error) throw v1.error;
-      }
-
-      message.success("So‘rov yuborildi! Haydovchi qabul qilsa telefon ko‘rinadi.");
-      setBookingModalOpen(false);
-      setSelectedOrder(null);
-
-      await doSearch(true);
-      await loadMyBookings();
-    } catch (e) {
-      console.error(e);
-      message.error(e?.message || "So‘rov yuborishda xatolik!");
+      if (insErr) throw insErr;
     }
-  };
+  }
+
+  // Refresh bookings + search list
+  await loadMyBookings();
+  await doSearch();
+
+  // Close modal
+  setIsRequestModalOpen(false);
+  setEditBookingModal(false);
+  setSelectedBooking(null);
+
+  // Clear pickup info for next time
+  setPickupLat(null);
+  setPickupLng(null);
+  setPickupAddress("");
+
+  if (rpcError) {
+    // If we fell back successfully, keep quiet; but log for debugging.
+    console.warn("request booking RPC fallback used:", rpcError);
+  }
+} catch (e) {
+  console.error("confirmBookingRequest error:", e);
+  alert(e?.message || "So'rov yuborishda xatolik.");
+}
+};
 
   const openEditBooking = (b) => {
     setEditBooking(b);
@@ -672,98 +673,89 @@ export default function ClientInterProvincial({ onBack }) {
   };
 
   const saveEditBookingSeats = async () => {
-    try {
-      if (!editBooking) return;
+try {
+  if (!selectedBooking?.id) return;
 
-      const newSeats = Number(editSeats || 1);
-      if (newSeats < 1) return message.error("Joy kamida 1 bo‘lsin!");
+  const seatsNum = Number(editSeats || 0);
+  if (!Number.isFinite(seatsNum) || seatsNum <= 0) {
+    alert("O'rinlar soni noto‘g‘ri.");
+    return;
+  }
 
-      const { data: authData } = await supabase.auth.getUser();
-      const user = authData?.user;
-      if (!user) return message.error("Avval tizimga kiring!");
+  // Prefer RPC v2, then v1, then direct update
+  let rpcErr = null;
 
-      const canEditAll = editBooking.status === "requested";
-      const v2Args = {
-        p_request_id: editBooking.id,
-        p_passenger_id: user.id,
-        p_new_seats: newSeats,
-        p_pickup_lat: pickupLat,
-        p_pickup_lng: pickupLng,
-        p_pickup_address: pickupAddress,
-      };
-      if (canEditAll) {
-        v2Args.p_passenger_name = editName || "";
-        v2Args.p_passenger_phone = editPhone || "";
-        v2Args.p_passenger_gender = normalizeGender(editGender);
-      }
+  const { error: rpcErrV2 } = await supabase.rpc("edit_booking_request_v2", {
+    p_booking_id: selectedBooking.id,
+    p_seats: seatsNum,
+  });
 
-      // prefer v2 edit
-      const v2 = await supabase.rpc("edit_booking_request", v2Args);
+  if (rpcErrV2) {
+    rpcErr = rpcErrV2;
+    const { error: rpcErrV1 } = await supabase.rpc("edit_booking_request", {
+      p_booking_id: selectedBooking.id,
+      p_seats: seatsNum,
+    });
 
-      if (v2?.error) {
-        // fallback old seats-only rpc
-        const v1 = await supabase.rpc("update_inter_prov_booking_seats", {
-          p_booking_id: editBooking.id,
-          p_passenger_id: user.id,
-          p_new_seats: newSeats,
-        });
-        if (v1?.error) throw v1.error;
-      }
+    if (rpcErrV1) {
+      rpcErr = rpcErrV1;
 
-      message.success("So‘rov yangilandi!");
-      setEditModalOpen(false);
-      setEditBooking(null);
+      const { error } = await supabase
+        .from("inter_prov_bookings")
+        .update({ seats: seatsNum })
+        .eq("id", selectedBooking.id);
 
-      await doSearch(true);
-      await loadMyBookings();
-    } catch (e) {
-      console.error(e);
-      message.error(e?.message || "Tahrirlashda xatolik!");
+      if (error) throw error;
     }
-  };
+  }
+
+  await loadMyBookings();
+  await doSearch();
+
+  setEditBookingModal(false);
+  setSelectedBooking(null);
+
+  if (rpcErr) console.warn("edit booking RPC fallback used:", rpcErr);
+} catch (e) {
+  console.error("saveEditBookingSeats error:", e);
+  alert(e?.message || "Tahrirlashda xatolik.");
+}
+};
 
   const cancelBooking = async (b) => {
-    try {
-      const { data: authData } = await supabase.auth.getUser();
-      const user = authData?.user;
-      if (!user) return message.error("Avval tizimga kiring!");
+try {
+  if (!booking?.id) return;
 
-      // If already accepted: send cancel request to driver (driver should confirm to refund fee)
-      if (b.status === "accepted") {
-        const v3 = await supabase.rpc("request_cancel_after_accept", {
-          p_request_id: b.id,
-          p_passenger_id: user.id,
-        });
-        if (v3?.error) {
-          // fallback: mark status if column exists
-          try {
-            await supabase.from("trip_booking_requests").update({ status: "cancel_requested" }).eq("id", b.id).eq("passenger_id", user.id);
-          } catch (e) {}
-        }
-        message.success("Bekor qilish so‘rovi haydovchiga yuborildi. Haydovchi tasdiqlasa to‘lov qaytariladi.");
-      } else {
-        // requested -> immediate cancel
-        const v2 = await supabase.rpc("cancel_booking_request", {
-          p_request_id: b.id,
-          p_passenger_id: user.id,
-        });
+  const {
+    data: { user },
+    error: userErr,
+  } = await supabase.auth.getUser();
+  if (userErr) throw userErr;
 
-        if (v2?.error) {
-          const v1 = await supabase.rpc("cancel_booking_request", {
-            p_booking_id: b.id,
-            p_passenger_id: user.id,
-          });
-          if (v1?.error) throw v1.error;
-        }
-        message.success("So‘rov bekor qilindi. Joylar qaytarildi.");
-      }
-      await doSearch(true);
-      await loadMyBookings();
-    } catch (e) {
-      console.error(e);
-      message.error(e?.message || "Bekor qilishda xatolik!");
-    }
-  };
+  // Prefer RPC if exists
+  let rpcWorked = false;
+  const { error: rpcErr } = await supabase.rpc("cancel_booking_request", { p_booking_id: booking.id });
+
+  if (!rpcErr) rpcWorked = true;
+
+  if (!rpcWorked) {
+    // Fallback to status update
+    const { error } = await supabase
+      .from("inter_prov_bookings")
+      .update({ status: "cancelled" })
+      .eq("id", booking.id)
+      .eq("passenger_id", user?.id);
+
+    if (error) throw error;
+  }
+
+  await loadMyBookings();
+  await doSearch();
+} catch (e) {
+  console.error("cancelBooking error:", e);
+  alert(e?.message || "Bekor qilishda xatolik.");
+}
+};
 
   if (loading) {
     return (
