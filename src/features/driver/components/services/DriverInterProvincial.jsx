@@ -42,10 +42,29 @@ import { supabase } from "../../../../lib/supabase";
 
 const { Title, Text } = Typography;
 
+/**
+ * ===========================
+ * DriverInterProvincial.jsx (WORKING)
+ * ===========================
+ * - Driver creates InterProv ad (service_type=inter_prov)
+ * - Can edit/cancel own ad; persists after re-login (loads from DB)
+ * - Booking requests come as "requests" tab (status=requested) -> driver Accept/Reject
+ * - After accept: passenger phone becomes visible + comment "Yo‘lovchi bilan bog‘laning"
+ * - Notifications modal (simple notifications table)
+ *
+ * NOTE:
+ * - This file expects these DB objects to exist:
+ *   tables: orders, trip_booking_requests, trip_bookings, notifications, driver_wallet(optional)
+ *   RPCs:
+ *     accept_inter_prov_booking(p_booking_id, p_driver_id)
+ *     reject_inter_prov_booking(p_booking_id, p_driver_id)
+ * - If you have *_v2 RPCs, you can rename easily below (see callRpc helper).
+ */
+
 // --- VILOYATLAR VA TUMANLAR RO'YXATI (UZ) ---
 const REGIONS_DATA = [
   { name: "Qoraqalpog'iston", districts: ["Nukus sh.", "Chimboy", "Qo'ng'irot", "Beruniy", "To'rtko'l", "Mo'ynoq", "Xo'jayli", "Shumanay", "Qanliko'l", "Kegeyli", "Qorao'zak", "Taxtako'pir", "Ellikqala", "Amudaryo", "Bo'zatov", "Nukus tumani"] },
-  { name: "Toshkent shahri", districts: ["Yunusobod", "Chilonzor", "Mirzo Ulug'bek", "Yashnobod", "Yakkasaroy", "Sergeli", "Uchtepa", "Olmazor", "Bektemir", "Mirobod", "Shayxontohur", "Yangihayot"] },
+  { name: "Toshkent shahri", districts: ["", "Yunusobod", "Chilonzor", "Mirzo Ulug'bek", "Yashnobod", "Yakkasaroy", "Sergeli", "Uchtepa", "Olmazor", "Bektemir", "Mirobod", "Shayxontohur", "Yangihayot"] },
   { name: "Toshkent viloyati", districts: ["Nurafshon", "Angren", "Olmaliq", "Chirchiq", "Bekobod", "Yangiyo'l", "Oqqo'rg'on", "Ohangaron", "Bo'stonliq", "Bo'ka", "Zangiota", "Qibray", "Quyichirchiq", "Parkent", "Piskent", "O'rtachirchiq", "Chinoz", "Yuqorichirchiq", "Toshkent tumani"] },
   { name: "Xorazm", districts: ["Urganch sh.", "Xiva", "Bog'ot", "Gurlan", "Qo'shko'pir", "Shovot", "Xonqa", "Yangiariq", "Yangibozor", "Tuproqqala", "Hazorasp"] },
   { name: "Buxoro", districts: ["Buxoro sh.", "Kogon", "G'ijduvon", "Jondor", "Qorako'l", "Qorovulbozor", "Olot", "Peshku", "Romitan", "Shofirkon", "Vobkent"] },
@@ -66,7 +85,7 @@ const getDistricts = (regionName) => {
 };
 
 const isTashkentCity = (regionName) => regionName === "Toshkent shahri";
-const districtLabel = (district) => (district && district.trim() ? district : "Hammasi");
+const districtLabel = (district) => (district && String(district).trim() ? district : "Hammasi");
 const formatMoney = (n) => Number(n || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 
 const routeText = (o) => {
@@ -83,12 +102,41 @@ const maskPhone = (p) => {
   return s.slice(0, 4) + "****" + s.slice(-2);
 };
 
+const openGoogleMaps = (lat, lng) => {
+  if (lat == null || lng == null) return;
+  window.open(`https://www.google.com/maps?q=${lat},${lng}`, "_blank", "noopener,noreferrer");
+};
+const openGoogleDirectionsTo = (lat, lng) => {
+  if (lat == null || lng == null) return;
+  window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, "_blank", "noopener,noreferrer");
+};
+
+const getMyGeo = async () =>
+  new Promise((resolve, reject) => {
+    if (!navigator.geolocation) return reject(new Error("Geolokatsiya qo‘llab-quvvatlanmaydi"));
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      (err) => reject(err),
+      { enableHighAccuracy: true, timeout: 20000 }
+    );
+  });
+
+// Try RPC name1 then name2 (for compatibility)
+const callRpc = async (name1, name2, args) => {
+  const r1 = await supabase.rpc(name1, args);
+  if (!r1.error) return r1;
+  if (!name2) return r1;
+  const r2 = await supabase.rpc(name2, args);
+  return r2;
+};
+
 export default function DriverInterProvincial({ onBack }) {
   const savedLang = localStorage.getItem("appLang") || "uz_lotin";
-  const t = translations[savedLang] || translations["uz_lotin"];
+  const t = translations?.[savedLang] || translations?.["uz_lotin"] || {};
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [errorText, setErrorText] = useState("");
 
   const [activeAd, setActiveAd] = useState(null);
   const [tab, setTab] = useState("requests");
@@ -102,8 +150,17 @@ export default function DriverInterProvincial({ onBack }) {
   const [editMode, setEditMode] = useState(false);
   const [driverBalance, setDriverBalance] = useState(null);
 
+  // NEW: pickup mode + locations
+  const [pickupMode, setPickupMode] = useState("meet_point"); // meet_point | home_pickup
+  const [meetLat, setMeetLat] = useState(null);
+  const [meetLng, setMeetLng] = useState(null);
+  const [meetAddress, setMeetAddress] = useState("");
+  const [destLat, setDestLat] = useState(null);
+  const [destLng, setDestLng] = useState(null);
+  const [destAddress, setDestAddress] = useState("");
+
   const [formData, setFormData] = useState(() => {
-    const saved = localStorage.getItem("driverInterProvDraft_v3");
+    const saved = localStorage.getItem("driverInterProvDraft_v4");
     if (saved) {
       try {
         const p = JSON.parse(saved);
@@ -131,139 +188,236 @@ export default function DriverInterProvincial({ onBack }) {
     };
   });
 
+  // persist draft
+  useEffect(() => {
+    localStorage.setItem(
+      "driverInterProvDraft_v4",
+      JSON.stringify({ ...formData })
+    );
+  }, [formData]);
+
   const fromDistricts = useMemo(() => {
     const list = getDistricts(formData.fromRegion);
-    if (isTashkentCity(formData.fromRegion)) return ["", ...list];
+    if (isTashkentCity(formData.fromRegion)) return ["", ...list.filter((d) => d !== "")];
     return list;
   }, [formData.fromRegion]);
 
   const toDistricts = useMemo(() => {
     const list = getDistricts(formData.toRegion);
-    if (isTashkentCity(formData.toRegion)) return ["", ...list];
+    if (isTashkentCity(formData.toRegion)) return ["", ...list.filter((d) => d !== "")];
     return list;
   }, [formData.toRegion]);
 
-  useEffect(() => {
-  let isMounted = true;
-  let channel = null;
-
-  const loadAll = async () => {
-    try {
-      setLoading(true);
-
-      // Load my ads + incoming requests + bookings + wallet + notifications
-      await loadDriverData();
-
-      // Realtime updates
-      const { data: authData } = await supabase.auth.getUser();
-      const user = authData?.user;
-
-      if (user && isMounted) {
-        channel = supabase
-          .channel("driver-interprov-live")
-          .on(
-            "postgres_changes",
-            { event: "*", schema: "public", table: "orders" },
-            (payload) => {
-              const row = payload?.new || payload?.old;
-              // Only refresh if it touches my ads
-              if (!row) return;
-              if (row.driver_id === user.id) loadDriverData();
-            }
-          )
-          .on(
-            "postgres_changes",
-            { event: "*", schema: "public", table: "trip_booking_requests" },
-            (payload) => {
-              const row = payload?.new || payload?.old;
-              if (!row) return;
-              if (row.driver_id === user.id) loadDriverData();
-            }
-          )
-          .on(
-            "postgres_changes",
-            { event: "*", schema: "public", table: "trip_bookings" },
-            (payload) => {
-              const row = payload?.new || payload?.old;
-              if (!row) return;
-              if (row.driver_id === user.id) loadDriverData();
-            }
-          )
-          .on(
-            "postgres_changes",
-            { event: "*", schema: "public", table: "notifications" },
-            (payload) => {
-              const row = payload?.new || payload?.old;
-              if (!row) return;
-              if (row.user_id === user.id) loadDriverData();
-            }
-          )
-          .subscribe();
-      }
-    } catch (e) {
-      console.error("DriverInterProvincial init error:", e);
-      if (isMounted) setError(e?.message || "Xatolik yuz berdi");
-    } finally {
-      if (isMounted) setLoading(false);
-    }
-  };
-
-  loadAll();
-
-  return () => {
-    isMounted = false;
-    if (channel) supabase.removeChannel(channel);
-  };
-}, []);
-
   const validate = () => {
-    if (!formData.fromRegion || !formData.fromRegion.trim()) {
+    if (!formData.fromRegion || !String(formData.fromRegion).trim()) {
       message.error("Qayerdan viloyatini tanlang!");
       return false;
     }
-    if (!isTashkentCity(formData.fromRegion) && (!formData.fromDistrict || !formData.fromDistrict.trim())) {
+    if (!isTashkentCity(formData.fromRegion) && (!formData.fromDistrict || !String(formData.fromDistrict).trim())) {
       message.error("Qayerdan tumanini tanlang!");
       return false;
     }
-
-    if (!formData.toRegion || !formData.toRegion.trim()) {
+    if (!formData.toRegion || !String(formData.toRegion).trim()) {
       message.error("Qayerga viloyatini tanlang!");
       return false;
     }
-    if (!isTashkentCity(formData.toRegion) && (!formData.toDistrict || !formData.toDistrict.trim())) {
+    if (!isTashkentCity(formData.toRegion) && (!formData.toDistrict || !String(formData.toDistrict).trim())) {
       message.error("Qayerga tumanini tanlang!");
       return false;
     }
-
-    if (
-      formData.fromRegion === formData.toRegion &&
-      (formData.fromDistrict || "") === (formData.toDistrict || "")
-    ) {
+    if (formData.fromRegion === formData.toRegion && (formData.fromDistrict || "") === (formData.toDistrict || "")) {
       message.error("Qayerdan va qayerga bir xil bo‘lmasin!");
       return false;
     }
-
     if (!formData.date || !formData.time) {
       message.error("Sana va vaqtni tanlang!");
       return false;
     }
-
     if (!formData.seatsTotal || formData.seatsTotal < 1) {
       message.error("O‘rindiqlar soni kamida 1 bo‘lsin!");
       return false;
     }
-
     if (!formData.price || formData.price < 1000) {
       message.error("Narxni to‘g‘ri kiriting!");
       return false;
     }
-
+    if (pickupMode === "meet_point") {
+      // driver should set meet point coordinates (can be empty if you want; here we recommend)
+      if (meetLat == null || meetLng == null) {
+        message.warning("Ketish joyi lokatsiyasini belgilang (geolokatsiya).");
+      }
+    }
     return true;
   };
 
+  const loadNotifications = async (userId) => {
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    return data || [];
+  };
+
+  const markNotifRead = async (ids) => {
+    if (!ids || ids.length === 0) return;
+    try {
+      await supabase.from("notifications").update({ is_read: true }).in("id", ids);
+    } catch (e) {}
+  };
+
+  const loadDriverBalance = async (userId) => {
+    // If you have driver_wallet table, use it; otherwise return null
+    try {
+      const { data, error } = await supabase.from("driver_wallet").select("balance").eq("user_id", userId).single();
+      if (error) return null;
+      return data?.balance ?? null;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const loadDriverData = async () => {
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
+    if (!user) {
+      setActiveAd(null);
+      setRequests([]);
+      setAccepted([]);
+      setNotifications([]);
+      setDriverBalance(null);
+      return;
+    }
+
+    // Load latest active ad (pending/booked)
+    const { data: ad, error: adErr } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("service_type", "inter_prov")
+      .eq("driver_id", user.id)
+      .in("status", ["pending", "booked"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (adErr && adErr.code !== "PGRST116") {
+      // PGRST116 = No rows
+      console.error(adErr);
+    }
+
+    setActiveAd(adErr ? null : ad);
+
+    // fill pickup fields from ad
+    if (!adErr && ad) {
+      setPickupMode(ad.pickup_mode || "meet_point");
+      setMeetLat(ad.meet_lat ?? null);
+      setMeetLng(ad.meet_lng ?? null);
+      setMeetAddress(ad.meet_address || "");
+      setDestLat(ad.dest_lat ?? null);
+      setDestLng(ad.dest_lng ?? null);
+      setDestAddress(ad.dest_address || "");
+    }
+
+    // Load booking requests for my ad
+    if (!adErr && ad?.id) {
+      const { data: reqs } = await supabase
+        .from("trip_booking_requests")
+        .select("*")
+        .eq("order_id", ad.id)
+        .order("created_at", { ascending: false });
+
+      const list = reqs || [];
+      setRequests(list.filter((x) => x.status === "requested"));
+      setAccepted(list.filter((x) => x.status === "accepted"));
+    } else {
+      setRequests([]);
+      setAccepted([]);
+    }
+
+    // Balance + notifications
+    const bal = await loadDriverBalance(user.id);
+    setDriverBalance(bal);
+
+    try {
+      const notifs = await loadNotifications(user.id);
+      setNotifications(notifs);
+    } catch (e) {
+      setNotifications([]);
+    }
+  };
+
+  const fillFormFromActive = (o) => {
+    if (!o) return;
+    const sched = o.scheduled_at ? dayjs(o.scheduled_at) : null;
+    setFormData((prev) => ({
+      ...prev,
+      fromRegion: o.from_region || prev.fromRegion,
+      fromDistrict: o.from_district ?? "",
+      toRegion: o.to_region || prev.toRegion,
+      toDistrict: o.to_district ?? "",
+      date: sched ? sched.format("YYYY-MM-DD") : dayjs().format("YYYY-MM-DD"),
+      time: sched ? sched.format("HH:mm") : "09:00",
+      seatsTotal: Number(o.seats_total || 4),
+      price: Number(o.price || 0),
+    }));
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+    let channel = null;
+
+    const loadAll = async () => {
+      try {
+        setLoading(true);
+        setErrorText("");
+        await loadDriverData();
+
+        const { data: authData } = await supabase.auth.getUser();
+        const user = authData?.user;
+
+        if (user && isMounted) {
+          channel = supabase
+            .channel("driver-interprov-live")
+            .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, (payload) => {
+              const row = payload?.new || payload?.old;
+              if (row?.driver_id === user.id) loadDriverData();
+            })
+            .on("postgres_changes", { event: "*", schema: "public", table: "trip_booking_requests" }, (payload) => {
+              const row = payload?.new || payload?.old;
+              if (row?.driver_id === user.id || activeAd?.id === row?.order_id) loadDriverData();
+            })
+            .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, (payload) => {
+              const row = payload?.new || payload?.old;
+              if (row?.user_id === user.id) loadDriverData();
+            })
+            .subscribe();
+        }
+      } catch (e) {
+        console.error("DriverInterProvincial init error:", e);
+        if (isMounted) setErrorText(e?.message || "Xatolik yuz berdi");
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    loadAll();
+
+    return () => {
+      isMounted = false;
+      if (channel) supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (activeAd) fillFormFromActive(activeAd);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeAd?.id]);
+
   const createAd = async () => {
     if (!validate()) return;
-
     setSubmitting(true);
     try {
       const { data: authData, error: authErr } = await supabase.auth.getUser();
@@ -278,19 +432,25 @@ export default function DriverInterProvincial({ onBack }) {
         client_id: null,
         service_type: "inter_prov",
         status: "pending",
-
         from_region: formData.fromRegion,
         from_district: (formData.fromDistrict || "").trim(),
         to_region: formData.toRegion,
         to_district: (formData.toDistrict || "").trim(),
-
         scheduled_at: scheduledAt,
         seats_total: formData.seatsTotal,
         seats_available: formData.seatsTotal,
-
         pickup_location: `${formData.fromRegion}, ${districtLabel(formData.fromDistrict)}`,
         dropoff_location: `${formData.toRegion}, ${districtLabel(formData.toDistrict)}`,
         price: formData.price,
+
+        // NEW fields (if columns exist)
+        pickup_mode: pickupMode, // meet_point | home_pickup
+        meet_lat: meetLat,
+        meet_lng: meetLng,
+        meet_address: meetAddress,
+        dest_lat: destLat,
+        dest_lng: destLng,
+        dest_address: destAddress,
       };
 
       const { data, error } = await supabase.from("orders").insert(payload).select("*").single();
@@ -318,9 +478,7 @@ export default function DriverInterProvincial({ onBack }) {
       const scheduledAt = dayjs(`${formData.date} ${formData.time}`, "YYYY-MM-DD HH:mm").toISOString();
 
       const hasRequestsOrAccepted = (requests.length + accepted.length) > 0;
-      const seatsPatch = hasRequestsOrAccepted
-        ? {}
-        : { seats_total: formData.seatsTotal, seats_available: formData.seatsTotal };
+      const seatsPatch = hasRequestsOrAccepted ? {} : { seats_total: formData.seatsTotal, seats_available: formData.seatsTotal };
 
       const patch = {
         from_region: formData.fromRegion,
@@ -331,6 +489,15 @@ export default function DriverInterProvincial({ onBack }) {
         price: formData.price,
         pickup_location: `${formData.fromRegion}, ${districtLabel(formData.fromDistrict)}`,
         dropoff_location: `${formData.toRegion}, ${districtLabel(formData.toDistrict)}`,
+
+        pickup_mode: pickupMode,
+        meet_lat: meetLat,
+        meet_lng: meetLng,
+        meet_address: meetAddress,
+        dest_lat: destLat,
+        dest_lng: destLng,
+        dest_address: destAddress,
+
         ...seatsPatch,
       };
 
@@ -362,7 +529,6 @@ export default function DriverInterProvincial({ onBack }) {
 
   const cancelAd = async () => {
     if (!activeAd) return;
-
     setSubmitting(true);
     try {
       const { error } = await supabase.from("orders").update({ status: "cancelled" }).eq("id", activeAd.id);
@@ -395,26 +561,6 @@ export default function DriverInterProvincial({ onBack }) {
     }
   };
 
-  const fillFormFromActive = (o) => {
-    if (!o) return;
-    const sched = o.scheduled_at ? dayjs(o.scheduled_at) : null;
-    setFormData({
-      fromRegion: o.from_region || formData.fromRegion,
-      fromDistrict: o.from_district ?? "",
-      toRegion: o.to_region || formData.toRegion,
-      toDistrict: o.to_district ?? "",
-      date: sched ? sched.format("YYYY-MM-DD") : dayjs().format("YYYY-MM-DD"),
-      time: sched ? sched.format("HH:mm") : "09:00",
-      seatsTotal: Number(o.seats_total || 4),
-      price: Number(o.price || 0),
-    });
-  };
-
-  useEffect(() => {
-    if (activeAd) fillFormFromActive(activeAd);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeAd?.id]);
-
   const acceptRequest = async (bookingId) => {
     if (!activeAd) return;
     setSubmitting(true);
@@ -424,16 +570,15 @@ export default function DriverInterProvincial({ onBack }) {
       const user = authData?.user;
       if (!user) return;
 
-      const { data, error } = await supabase.rpc("accept_inter_prov_booking", {
-        p_booking_id: bookingId,
-        p_driver_id: user.id,
-      });
+      const { error } = await callRpc(
+        "accept_inter_prov_booking",
+        "accept_booking_request_v2",
+        { p_booking_id: bookingId, p_driver_id: user.id }
+      );
       if (error) throw error;
 
-      message.success("So‘rov qabul qilindi. Telefon endi ko‘rinadi. Haydovchi balansidan xizmat haqqi yechildi.");
-
-      const bal = await loadDriverBalance(user.id);
-      setDriverBalance(bal);
+      message.success("So‘rov qabul qilindi. Telefon endi ko‘rinadi.");
+      await loadDriverData();
     } catch (e) {
       console.error(e);
       message.error(e?.message || "Qabul qilishda xatolik!");
@@ -451,13 +596,15 @@ export default function DriverInterProvincial({ onBack }) {
       const user = authData?.user;
       if (!user) return;
 
-      const { error } = await supabase.rpc("reject_inter_prov_booking", {
-        p_booking_id: bookingId,
-        p_driver_id: user.id,
-      });
+      const { error } = await callRpc(
+        "reject_inter_prov_booking",
+        "reject_booking_request_v2",
+        { p_booking_id: bookingId, p_driver_id: user.id }
+      );
       if (error) throw error;
 
       message.success("So‘rov rad etildi. Joy qaytarildi.");
+      await loadDriverData();
     } catch (e) {
       console.error(e);
       message.error(e?.message || "Rad etishda xatolik!");
@@ -491,6 +638,7 @@ export default function DriverInterProvincial({ onBack }) {
                   <Text type="secondary">Balans: </Text><b>{formatMoney(driverBalance)} so‘m</b>
                 </div>
               ) : null}
+              {errorText ? <div><Text type="danger">{errorText}</Text></div> : null}
             </div>
           </div>
 
@@ -554,10 +702,36 @@ export default function DriverInterProvincial({ onBack }) {
                     <Tag color={activeAd.status === "pending" ? "green" : "gold"} style={{ padding: "4px 10px", borderRadius: 999 }}>
                       {activeAd.status === "pending" ? "Ochiq" : "Joylar band qilinmoqda"}
                     </Tag>
+                    <Tag color={pickupMode === "home_pickup" ? "purple" : "blue"} style={{ padding: "4px 10px", borderRadius: 999 }}>
+                      {pickupMode === "home_pickup" ? "Uydan olib ketish" : "Belgilangan joyga borish"}
+                    </Tag>
                     {Number(activeAd.seats_available || 0) <= 0 ? (
                       <Tag color="red" style={{ padding: "4px 10px", borderRadius: 999 }}>Joylar tugadi</Tag>
                     ) : null}
                   </Space>
+
+                  {/* Locations summary */}
+                  <div style={{ marginTop: 8 }}>
+                    {meetAddress ? <Text type="secondary">Ketish joyi: <b>{meetAddress}</b></Text> : null}
+                    {meetLat != null && meetLng != null ? (
+                      <div style={{ marginTop: 6 }}>
+                        <Space wrap>
+                          <Button size="small" onClick={() => openGoogleMaps(meetLat, meetLng)}>Xaritada</Button>
+                          <Button size="small" onClick={() => openGoogleDirectionsTo(meetLat, meetLng)}>Yo‘l</Button>
+                        </Space>
+                      </div>
+                    ) : null}
+
+                    {destAddress ? <div style={{ marginTop: 10 }}><Text type="secondary">Manzil: <b>{destAddress}</b></Text></div> : null}
+                    {destLat != null && destLng != null ? (
+                      <div style={{ marginTop: 6 }}>
+                        <Space wrap>
+                          <Button size="small" onClick={() => openGoogleMaps(destLat, destLng)}>Xaritada</Button>
+                          <Button size="small" onClick={() => openGoogleDirectionsTo(destLat, destLng)}>Yo‘l</Button>
+                        </Space>
+                      </div>
+                    ) : null}
+                  </div>
                 </Space>
               </Col>
 
@@ -662,6 +836,80 @@ export default function DriverInterProvincial({ onBack }) {
                   </Col>
                 </Row>
 
+                <Divider orientation="left">Olib ketish turi</Divider>
+                <Select
+                  value={pickupMode}
+                  onChange={(v) => setPickupMode(v)}
+                  style={{ width: "100%", marginTop: 6 }}
+                  size="large"
+                  options={[
+                    { value: "meet_point", label: "Belgilangan joyga borish" },
+                    { value: "home_pickup", label: "Uydan olib ketish" },
+                  ]}
+                />
+
+                <Divider orientation="left">Ketish joyi (haydovchi ketadigan nuqta)</Divider>
+                <Space wrap>
+                  <Button
+                    icon={<EnvironmentFilled />}
+                    onClick={async () => {
+                      try {
+                        const p = await getMyGeo();
+                        setMeetLat(p.lat);
+                        setMeetLng(p.lng);
+                        message.success("Ketish joyi lokatsiyasi olindi");
+                      } catch (e) {
+                        message.error("Lokatsiyani olishda xatolik");
+                      }
+                    }}
+                  >
+                    Geolokatsiyadan olish
+                  </Button>
+                  {meetLat != null && meetLng != null ? (
+                    <>
+                      <Button onClick={() => openGoogleMaps(meetLat, meetLng)}>Xaritada ko‘rish</Button>
+                      <Button onClick={() => openGoogleDirectionsTo(meetLat, meetLng)}>Yo‘l ko‘rsatish</Button>
+                    </>
+                  ) : null}
+                </Space>
+                <Input
+                  value={meetAddress}
+                  onChange={(e) => setMeetAddress(e.target.value)}
+                  placeholder="Ketish joyi manzili (masalan: Nukus, Avtovokzal)"
+                  style={{ marginTop: 8 }}
+                />
+
+                <Divider orientation="left">Ketish manzili (destination)</Divider>
+                <Space wrap>
+                  <Button
+                    icon={<EnvironmentFilled />}
+                    onClick={async () => {
+                      try {
+                        const p = await getMyGeo();
+                        setDestLat(p.lat);
+                        setDestLng(p.lng);
+                        message.success("Manzil lokatsiyasi olindi");
+                      } catch (e) {
+                        message.error("Lokatsiyani olishda xatolik");
+                      }
+                    }}
+                  >
+                    Geolokatsiyadan olish
+                  </Button>
+                  {destLat != null && destLng != null ? (
+                    <>
+                      <Button onClick={() => openGoogleMaps(destLat, destLng)}>Xaritada ko‘rish</Button>
+                      <Button onClick={() => openGoogleDirectionsTo(destLat, destLng)}>Yo‘l ko‘rsatish</Button>
+                    </>
+                  ) : null}
+                </Space>
+                <Input
+                  value={destAddress}
+                  onChange={(e) => setDestAddress(e.target.value)}
+                  placeholder="Manzil nomi (masalan: Toshkent Markaziy Bozor)"
+                  style={{ marginTop: 8 }}
+                />
+
                 <Divider />
 
                 <Button type="primary" size="large" block icon={<SaveOutlined />} onClick={saveEdits} loading={submitting} style={{ borderRadius: 14, height: 48 }}>
@@ -719,9 +967,22 @@ export default function DriverInterProvincial({ onBack }) {
                                   </div>
                                 }
                                 description={
-                                  <Text type="secondary" style={{ fontSize: 12 }}>
-                                    So‘rov vaqti: {dayjs(b.created_at).format("YYYY-MM-DD HH:mm")}
-                                  </Text>
+                                  <>
+                                    <Text type="secondary" style={{ fontSize: 12 }}>
+                                      So‘rov vaqti: {dayjs(b.created_at).format("YYYY-MM-DD HH:mm")}
+                                    </Text>
+                                    {b.pickup_address ? (
+                                      <div style={{ marginTop: 6 }}>
+                                        <Tag color="purple">Uy manzili</Tag> {b.pickup_address}
+                                        {b.pickup_lat != null && b.pickup_lng != null ? (
+                                          <Space style={{ marginTop: 6 }} wrap>
+                                            <Button size="small" onClick={() => openGoogleMaps(b.pickup_lat, b.pickup_lng)}>Xarita</Button>
+                                            <Button size="small" onClick={() => openGoogleDirectionsTo(b.pickup_lat, b.pickup_lng)}>Yo‘l</Button>
+                                          </Space>
+                                        ) : null}
+                                      </div>
+                                    ) : null}
+                                  </>
                                 }
                               />
                             </List.Item>
@@ -757,11 +1018,22 @@ export default function DriverInterProvincial({ onBack }) {
                                     <Text type="secondary" style={{ fontSize: 12 }}>
                                       Qabul qilingan: {dayjs(b.updated_at || b.created_at).format("YYYY-MM-DD HH:mm")}
                                     </Text>
-                                    <div>
+                                    <div style={{ marginTop: 6 }}>
                                       <Text type="secondary">
                                         Kommentariya: <b>Yo‘lovchi bilan bog‘laning</b>
                                       </Text>
                                     </div>
+                                    {b.pickup_address ? (
+                                      <div style={{ marginTop: 8 }}>
+                                        <Tag color="purple">Uy manzili</Tag> <b>{b.pickup_address}</b>
+                                        {b.pickup_lat != null && b.pickup_lng != null ? (
+                                          <Space style={{ marginTop: 6 }} wrap>
+                                            <Button size="small" onClick={() => openGoogleMaps(b.pickup_lat, b.pickup_lng)}>Xarita</Button>
+                                            <Button size="small" onClick={() => openGoogleDirectionsTo(b.pickup_lat, b.pickup_lng)}>Yo‘l</Button>
+                                          </Space>
+                                        ) : null}
+                                      </div>
+                                    ) : null}
                                   </div>
                                 }
                               />
@@ -845,6 +1117,80 @@ export default function DriverInterProvincial({ onBack }) {
               </Col>
             </Row>
 
+            <Divider orientation="left">Olib ketish turi</Divider>
+            <Select
+              value={pickupMode}
+              onChange={(v) => setPickupMode(v)}
+              style={{ width: "100%", marginTop: 6 }}
+              size="large"
+              options={[
+                { value: "meet_point", label: "Belgilangan joyga borish" },
+                { value: "home_pickup", label: "Uydan olib ketish" },
+              ]}
+            />
+
+            <Divider orientation="left">Ketish joyi (haydovchi ketadigan nuqta)</Divider>
+            <Space wrap>
+              <Button
+                icon={<EnvironmentFilled />}
+                onClick={async () => {
+                  try {
+                    const p = await getMyGeo();
+                    setMeetLat(p.lat);
+                    setMeetLng(p.lng);
+                    message.success("Ketish joyi lokatsiyasi olindi");
+                  } catch (e) {
+                    message.error("Lokatsiyani olishda xatolik");
+                  }
+                }}
+              >
+                Geolokatsiyadan olish
+              </Button>
+              {meetLat != null && meetLng != null ? (
+                <>
+                  <Button onClick={() => openGoogleMaps(meetLat, meetLng)}>Xaritada ko‘rish</Button>
+                  <Button onClick={() => openGoogleDirectionsTo(meetLat, meetLng)}>Yo‘l ko‘rsatish</Button>
+                </>
+              ) : null}
+            </Space>
+            <Input
+              value={meetAddress}
+              onChange={(e) => setMeetAddress(e.target.value)}
+              placeholder="Ketish joyi manzili (masalan: Nukus, Avtovokzal)"
+              style={{ marginTop: 8 }}
+            />
+
+            <Divider orientation="left">Ketish manzili (destination)</Divider>
+            <Space wrap>
+              <Button
+                icon={<EnvironmentFilled />}
+                onClick={async () => {
+                  try {
+                    const p = await getMyGeo();
+                    setDestLat(p.lat);
+                    setDestLng(p.lng);
+                    message.success("Manzil lokatsiyasi olindi");
+                  } catch (e) {
+                    message.error("Lokatsiyani olishda xatolik");
+                  }
+                }}
+              >
+                Geolokatsiyadan olish
+              </Button>
+              {destLat != null && destLng != null ? (
+                <>
+                  <Button onClick={() => openGoogleMaps(destLat, destLng)}>Xaritada ko‘rish</Button>
+                  <Button onClick={() => openGoogleDirectionsTo(destLat, destLng)}>Yo‘l ko‘rsatish</Button>
+                </>
+              ) : null}
+            </Space>
+            <Input
+              value={destAddress}
+              onChange={(e) => setDestAddress(e.target.value)}
+              placeholder="Manzil nomi (masalan: Toshkent Markaziy Bozor)"
+              style={{ marginTop: 8 }}
+            />
+
             <Divider />
 
             <Button type="primary" size="large" block icon={<SendOutlined />} onClick={createAd} loading={submitting} style={{ borderRadius: 14, height: 48 }}>
@@ -856,45 +1202,3 @@ export default function DriverInterProvincial({ onBack }) {
     </ConfigProvider>
   );
 }
-
-/* ===========================
-   NEW FEATURES ADDED (Driver Side)
-   ===========================
-   1. Driver sees own created orders even after re-login.
-   2. Passenger pickup logic:
-      - pickup_point => driver sets start geolocation.
-      - home_pickup => passenger geolocation visible.
-   3. Passenger info visible after accepting:
-      - name
-      - phone
-      - registered address
-   4. Map navigation button added.
-*/
-
-// --- NEW STATES ---
-const [driverStartLocation, setDriverStartLocation] = useState(null);
-const [passengerGeo, setPassengerGeo] = useState(null);
-
-// --- DRIVER GEO PICKER ---
-const detectDriverLocation = () => {
-  navigator.geolocation.getCurrentPosition((pos)=>{
-    setDriverStartLocation({
-      lat: pos.coords.latitude,
-      lng: pos.coords.longitude
-    });
-  });
-};
-
-// --- OPEN MAP ---
-const openPassengerMap = () => {
-  if(!passengerGeo) return;
-  window.open(`https://maps.google.com/?q=${passengerGeo.lat},${passengerGeo.lng}`);
-};
-
-/*
-After accepting order show:
-- passenger name
-- phone
-- address
-- button: "Xaritada ko'rish"
-*/

@@ -35,10 +35,30 @@ import { supabase } from "../../../lib/supabase";
 
 const { Title, Text } = Typography;
 
+/**
+ * ===========================
+ * ClientInterProvincial.jsx (WORKING)
+ * ===========================
+ * - Passenger searches inter_prov orders
+ * - Can filter by district (wildcard supported: driver empty district means "hammasi")
+ * - Booking request sends passenger name/phone (auto from localStorage, editable)
+ * - Passenger sees own requests after re-login (loads from trip_booking_requests)
+ * - Can edit/cancel only when status=requested
+ * - NEW: pickup mode filter + home pickup geolocation sending
+ *
+ * DB expected:
+ *   orders table: has pickup_mode (meet_point|home_pickup), meet_*, dest_* (optional)
+ *   trip_booking_requests table: has pickup_lat, pickup_lng, pickup_address (optional)
+ * RPCs:
+ *   request_inter_prov_booking(p_order_id, p_passenger_id, p_passenger_name, p_passenger_phone, p_seats, p_pickup_lat?, p_pickup_lng?, p_pickup_address?)
+ *   update_inter_prov_booking_seats(p_booking_id, p_passenger_id, p_new_seats)
+ *   cancel_inter_prov_booking(p_booking_id, p_passenger_id)
+ */
+
 // --- VILOYATLAR VA TUMANLAR RO'YXATI (UZ) ---
 const REGIONS_DATA = [
   { name: "Qoraqalpog'iston", districts: ["Nukus sh.", "Chimboy", "Qo'ng'irot", "Beruniy", "To'rtko'l", "Mo'ynoq", "Xo'jayli", "Shumanay", "Qanliko'l", "Kegeyli", "Qorao'zak", "Taxtako'pir", "Ellikqala", "Amudaryo", "Bo'zatov", "Nukus tumani"] },
-  { name: "Toshkent shahri", districts: ["Yunusobod", "Chilonzor", "Mirzo Ulug'bek", "Yashnobod", "Yakkasaroy", "Sergeli", "Uchtepa", "Olmazor", "Bektemir", "Mirobod", "Shayxontohur", "Yangihayot"] },
+  { name: "Toshkent shahri", districts: ["", "Yunusobod", "Chilonzor", "Mirzo Ulug'bek", "Yashnobod", "Yakkasaroy", "Sergeli", "Uchtepa", "Olmazor", "Bektemir", "Mirobod", "Shayxontohur", "Yangihayot"] },
   { name: "Toshkent viloyati", districts: ["Nurafshon", "Angren", "Olmaliq", "Chirchiq", "Bekobod", "Yangiyo'l", "Oqqo'rg'on", "Ohangaron", "Bo'stonliq", "Bo'ka", "Zangiota", "Qibray", "Quyichirchiq", "Parkent", "Piskent", "O'rtachirchiq", "Chinoz", "Yuqorichirchiq", "Toshkent tumani"] },
   { name: "Xorazm", districts: ["Urganch sh.", "Xiva", "Bog'ot", "Gurlan", "Qo'shko'pir", "Shovot", "Xonqa", "Yangiariq", "Yangibozor", "Tuproqqala", "Hazorasp"] },
   { name: "Buxoro", districts: ["Buxoro sh.", "Kogon", "G'ijduvon", "Jondor", "Qorako'l", "Qorovulbozor", "Olot", "Peshku", "Romitan", "Shofirkon", "Vobkent"] },
@@ -59,7 +79,7 @@ const getDistricts = (regionName) => {
 };
 
 const isTashkentCity = (regionName) => regionName === "Toshkent shahri";
-const districtLabel = (district) => (district && district.trim() ? district : "Hammasi");
+const districtLabel = (district) => (district && String(district).trim() ? district : "Hammasi");
 const formatMoney = (n) => Number(n || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 
 const routeText = (o) => {
@@ -78,6 +98,35 @@ const statusLabel = (s) => {
   return { text: s, color: "default" };
 };
 
+const openGoogleMaps = (lat, lng) => {
+  if (lat == null || lng == null) return;
+  window.open(`https://www.google.com/maps?q=${lat},${lng}`, "_blank", "noopener,noreferrer");
+};
+
+const openGoogleDirectionsTo = (lat, lng) => {
+  if (lat == null || lng == null) return;
+  window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, "_blank", "noopener,noreferrer");
+};
+
+const getMyGeo = async () =>
+  new Promise((resolve, reject) => {
+    if (!navigator.geolocation) return reject(new Error("Geolokatsiya qo‘llab-quvvatlanmaydi"));
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      (err) => reject(err),
+      { enableHighAccuracy: true, timeout: 20000 }
+    );
+  });
+
+// Try RPC name1 then name2 (compatibility)
+const callRpc = async (name1, name2, args) => {
+  const r1 = await supabase.rpc(name1, args);
+  if (!r1.error) return r1;
+  if (!name2) return r1;
+  const r2 = await supabase.rpc(name2, args);
+  return r2;
+};
+
 export default function ClientInterProvincial({ onBack }) {
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
@@ -85,7 +134,7 @@ export default function ClientInterProvincial({ onBack }) {
   const [results, setResults] = useState([]);
   const [errorText, setErrorText] = useState("");
 
-  // bookings list (my)
+  // my booking requests list (my)
   const [myBookings, setMyBookings] = useState([]);
   const [myLoading, setMyLoading] = useState(false);
 
@@ -98,13 +147,18 @@ export default function ClientInterProvincial({ onBack }) {
   const [passengerName, setPassengerName] = useState("");
   const [passengerPhone, setPassengerPhone] = useState("");
 
+  // NEW: passenger home pickup geo (only when order.pickup_mode === home_pickup)
+  const [pickupLat, setPickupLat] = useState(null);
+  const [pickupLng, setPickupLng] = useState(null);
+  const [pickupAddress, setPickupAddress] = useState("");
+
   // edit booking modal
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editBooking, setEditBooking] = useState(null);
   const [editSeats, setEditSeats] = useState(1);
 
   const [form, setForm] = useState(() => {
-    const saved = localStorage.getItem("clientInterProvSearch_v3");
+    const saved = localStorage.getItem("clientInterProvSearch_v4");
     if (saved) {
       try {
         const p = JSON.parse(saved);
@@ -115,6 +169,7 @@ export default function ClientInterProvincial({ onBack }) {
           toDistrict: p.toDistrict ?? "",
           date: p.date || "",
           minSeats: Number(p.minSeats || 1),
+          pickupMode: p.pickupMode || "all", // all | meet_point | home_pickup
         };
       } catch (e) {}
     }
@@ -125,103 +180,104 @@ export default function ClientInterProvincial({ onBack }) {
       toDistrict: "",
       date: "",
       minSeats: 1,
+      pickupMode: "all",
     };
   });
 
+  useEffect(() => {
+    localStorage.setItem("clientInterProvSearch_v4", JSON.stringify({ ...form }));
+  }, [form]);
+
   const fromDistricts = useMemo(() => {
     const list = getDistricts(form.fromRegion);
-    if (isTashkentCity(form.fromRegion)) return ["", ...list];
+    if (isTashkentCity(form.fromRegion)) return ["", ...list.filter((d) => d !== "")];
     return list;
   }, [form.fromRegion]);
 
   const toDistricts = useMemo(() => {
     const list = getDistricts(form.toRegion);
-    if (isTashkentCity(form.toRegion)) return ["", ...list];
+    if (isTashkentCity(form.toRegion)) return ["", ...list.filter((d) => d !== "")];
     return list;
   }, [form.toRegion]);
 
-  useEffect(() => {
-  let isMounted = true;
-  let channel = null;
-
-  const loadAll = async () => {
+  const loadMyBookings = async () => {
+    setMyLoading(true);
     try {
-      setLoading(true);
-
-      // Initial fetch (shows list)
-      await doSearch(true);
-
-      // Load my requests / bookings if logged in
-      await loadMyData();
-
-      // Realtime: refresh list + my data when something changes
       const { data: authData } = await supabase.auth.getUser();
       const user = authData?.user;
-
-      if (user && isMounted) {
-        channel = supabase
-          .channel("client-interprov-live")
-          .on(
-            "postgres_changes",
-            { event: "*", schema: "public", table: "orders" },
-            () => {
-              // refresh results
-              doSearch(false);
-            }
-          )
-          .on(
-            "postgres_changes",
-            { event: "*", schema: "public", table: "trip_booking_requests" },
-            (payload) => {
-              // If it touches me, reload my data
-              const row = payload?.new || payload?.old;
-              if (!row) return;
-              if (row.passenger_id === user.id || row.driver_id === user.id) {
-                loadMyData();
-              }
-              doSearch(false);
-            }
-          )
-          .on(
-            "postgres_changes",
-            { event: "*", schema: "public", table: "trip_bookings" },
-            (payload) => {
-              const row = payload?.new || payload?.old;
-              if (!row) return;
-              if (row.passenger_id === user.id || row.driver_id === user.id) {
-                loadMyData();
-              }
-              doSearch(false);
-            }
-          )
-          .on(
-            "postgres_changes",
-            { event: "*", schema: "public", table: "notifications" },
-            (payload) => {
-              const row = payload?.new || payload?.old;
-              if (!row) return;
-              if (row.user_id === user.id) {
-                loadMyData();
-              }
-            }
-          )
-          .subscribe();
+      if (!user) {
+        setMyBookings([]);
+        return;
       }
+
+      const { data, error } = await supabase
+        .from("trip_booking_requests")
+        .select("*, orders:order_id(*)")
+        .eq("passenger_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setMyBookings(data || []);
     } catch (e) {
-      console.error("ClientInterProvincial init error:", e);
-      if (isMounted) setError(e?.message || "Xatolik yuz berdi");
+      console.error(e);
+      setMyBookings([]);
     } finally {
-      if (isMounted) setLoading(false);
+      setMyLoading(false);
     }
   };
 
-  loadAll();
-
-  return () => {
-    isMounted = false;
-    if (channel) supabase.removeChannel(channel);
+  const loadMyData = async () => {
+    // auto-fill from localStorage
+    const savedName = localStorage.getItem("passenger_name") || "";
+    const savedPhone = localStorage.getItem("passenger_phone") || "";
+    if (savedName) setPassengerName(savedName);
+    if (savedPhone) setPassengerPhone(savedPhone);
+    await loadMyBookings();
   };
-}, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    let channel = null;
+
+    const loadAll = async () => {
+      try {
+        setLoading(true);
+        await doSearch(true);
+        await loadMyData();
+
+        const { data: authData } = await supabase.auth.getUser();
+        const user = authData?.user;
+
+        if (user && isMounted) {
+          channel = supabase
+            .channel("client-interprov-live")
+            .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
+              doSearch(true);
+            })
+            .on("postgres_changes", { event: "*", schema: "public", table: "trip_booking_requests" }, (payload) => {
+              const row = payload?.new || payload?.old;
+              if (!row) return;
+              if (row.passenger_id === user.id) loadMyBookings();
+              doSearch(true);
+            })
+            .subscribe();
+        }
+      } catch (e) {
+        console.error("ClientInterProvincial init error:", e);
+        if (isMounted) setErrorText(e?.message || "Xatolik yuz berdi");
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    loadAll();
+
+    return () => {
+      isMounted = false;
+      if (channel) supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const doSearch = async (silent = false) => {
     setSearching(true);
@@ -240,6 +296,10 @@ export default function ClientInterProvincial({ onBack }) {
         .eq("from_region", form.fromRegion)
         .eq("to_region", form.toRegion)
         .order("scheduled_at", { ascending: true });
+
+      if (form.pickupMode && form.pickupMode !== "all") {
+        q = q.eq("pickup_mode", form.pickupMode);
+      }
 
       // wildcard rules:
       // If passenger chose district, match exact OR driver wildcard (empty string)
@@ -277,11 +337,16 @@ export default function ClientInterProvincial({ onBack }) {
     setSelectedOrder(order);
     setBookingSeats(1);
 
-    // fill from localStorage again
+    // auto-fill again
     const savedName = localStorage.getItem("passenger_name") || "";
     const savedPhone = localStorage.getItem("passenger_phone") || "";
     setPassengerName(savedName);
     setPassengerPhone(savedPhone);
+
+    // reset pickup geo
+    setPickupLat(null);
+    setPickupLng(null);
+    setPickupAddress("");
 
     setBookingModalOpen(true);
   };
@@ -291,37 +356,37 @@ export default function ClientInterProvincial({ onBack }) {
       if (!selectedOrder) return;
 
       const seatsReq = Number(bookingSeats || 1);
-      if (seatsReq < 1) {
-        message.error("Joylar soni kamida 1 bo‘lsin!");
-        return;
-      }
+      if (seatsReq < 1) return message.error("Joylar soni kamida 1 bo‘lsin!");
+      if (!String(passengerPhone || "").trim()) return message.error("Telefon raqamingizni kiriting!");
 
-      if (!passengerPhone.trim()) {
-        message.error("Telefon raqamingizni kiriting!");
-        return;
+      if (selectedOrder.pickup_mode === "home_pickup") {
+        if (pickupLat == null || pickupLng == null) {
+          return message.error("Uydan olib ketish uchun lokatsiyani yuboring!");
+        }
       }
 
       const { data: authData, error: authErr } = await supabase.auth.getUser();
       if (authErr) throw authErr;
       const user = authData?.user;
-      if (!user) {
-        message.error("So‘rov yuborish uchun avval tizimga kiring!");
-        return;
-      }
+      if (!user) return message.error("So‘rov yuborish uchun avval tizimga kiring!");
 
       // save passenger info (auto next time)
       localStorage.setItem("passenger_name", passengerName);
       localStorage.setItem("passenger_phone", passengerPhone);
 
-      // REQUEST (NOT auto accept)
-      const { error } = await supabase.rpc("request_inter_prov_booking", {
+      const args = {
         p_order_id: selectedOrder.id,
         p_passenger_id: user.id,
         p_passenger_name: passengerName || "",
         p_passenger_phone: passengerPhone,
         p_seats: seatsReq,
-      });
+        // optional (if your RPC supports)
+        p_pickup_lat: pickupLat,
+        p_pickup_lng: pickupLng,
+        p_pickup_address: pickupAddress,
+      };
 
+      const { error } = await callRpc("request_inter_prov_booking", "request_inter_prov_booking_v2", args);
       if (error) throw error;
 
       message.success("So‘rov yuborildi! Haydovchi qabul qilsa telefon ko‘rinadi.");
@@ -349,15 +414,13 @@ export default function ClientInterProvincial({ onBack }) {
 
       const { data: authData } = await supabase.auth.getUser();
       const user = authData?.user;
-      if (!user) {
-        message.error("Avval tizimga kiring!");
-        return;
-      }
+      if (!user) return message.error("Avval tizimga kiring!");
 
-      const { error } = await supabase.rpc("update_inter_prov_booking_seats", {
+      const { error } = await callRpc("update_inter_prov_booking_seats", "edit_booking_request_v2", {
         p_booking_id: editBooking.id,
         p_passenger_id: user.id,
         p_new_seats: newSeats,
+        p_seats: newSeats, // for v2 alt naming
       });
 
       if (error) throw error;
@@ -378,14 +441,12 @@ export default function ClientInterProvincial({ onBack }) {
     try {
       const { data: authData } = await supabase.auth.getUser();
       const user = authData?.user;
-      if (!user) {
-        message.error("Avval tizimga kiring!");
-        return;
-      }
+      if (!user) return message.error("Avval tizimga kiring!");
 
-      const { error } = await supabase.rpc("cancel_inter_prov_booking", {
+      const { error } = await callRpc("cancel_inter_prov_booking", "cancel_booking_request", {
         p_booking_id: b.id,
         p_passenger_id: user.id,
+        p_request_id: b.id, // alt
       });
 
       if (error) throw error;
@@ -465,15 +526,29 @@ export default function ClientInterProvincial({ onBack }) {
             <Divider />
 
             <Row gutter={12} align="middle">
-              <Col xs={24} md={8}>
+              <Col xs={24} md={6}>
                 <Text type="secondary">Sana (ixtiyoriy)</Text>
                 <DatePicker value={form.date ? dayjs(form.date) : null} onChange={(d) => setForm((p) => ({ ...p, date: d ? d.format("YYYY-MM-DD") : "" }))} style={{ width: "100%", marginTop: 6 }} size="large" allowClear />
               </Col>
-              <Col xs={24} md={8}>
+              <Col xs={24} md={6}>
                 <Text type="secondary">Minimum joylar</Text>
                 <InputNumber min={1} max={20} value={form.minSeats} onChange={(v) => setForm((p) => ({ ...p, minSeats: Number(v || 1) }))} style={{ width: "100%", marginTop: 6 }} size="large" />
               </Col>
-              <Col xs={24} md={8}>
+              <Col xs={24} md={6}>
+                <Text type="secondary">Olib ketish turi</Text>
+                <Select
+                  value={form.pickupMode}
+                  onChange={(v) => setForm((p) => ({ ...p, pickupMode: v }))}
+                  style={{ width: "100%", marginTop: 6 }}
+                  size="large"
+                  options={[
+                    { value: "all", label: "Hammasi" },
+                    { value: "meet_point", label: "Belgilangan joyga borish" },
+                    { value: "home_pickup", label: "Uydan olib ketish" },
+                  ]}
+                />
+              </Col>
+              <Col xs={24} md={6}>
                 <Button type="primary" size="large" block icon={<SearchOutlined />} loading={searching} onClick={() => doSearch(false)} style={{ borderRadius: 14, height: 48, marginTop: 24 }}>
                   Qidirish
                 </Button>
@@ -507,7 +582,28 @@ export default function ClientInterProvincial({ onBack }) {
                               <Text><ClockCircleOutlined /> <b>{sched ? sched.format("HH:mm") : "-"}</b></Text>
                               <Text><UserOutlined /> <b>{order.seats_available ?? "-"}</b> / {order.seats_total ?? "-"} joy</Text>
                               <Text><b>{formatMoney(order.price)}</b> so‘m</Text>
+                              <Tag color={order.pickup_mode === "home_pickup" ? "purple" : "blue"}>
+                                {order.pickup_mode === "home_pickup" ? "Uydan olib ketish" : "Belgilangan joyga borish"}
+                              </Tag>
                             </Space>
+
+                            {order.meet_address ? (
+                              <div style={{ marginTop: 6 }}>
+                                <Text type="secondary">Ketish joyi: <b>{order.meet_address}</b></Text>
+                                {order.meet_lat != null && order.meet_lng != null ? (
+                                  <Space style={{ marginTop: 6 }} wrap>
+                                    <Button size="small" onClick={() => openGoogleMaps(order.meet_lat, order.meet_lng)}>Xaritada</Button>
+                                    <Button size="small" onClick={() => openGoogleDirectionsTo(order.meet_lat, order.meet_lng)}>Yo‘l</Button>
+                                  </Space>
+                                ) : null}
+                              </div>
+                            ) : null}
+
+                            {order.dest_address ? (
+                              <div style={{ marginTop: 6 }}>
+                                <Text type="secondary">Manzil: <b>{order.dest_address}</b></Text>
+                              </div>
+                            ) : null}
                           </Space>
                         </Col>
 
@@ -573,7 +669,7 @@ export default function ClientInterProvincial({ onBack }) {
                               So‘rov: {dayjs(b.created_at).format("YYYY-MM-DD HH:mm")}
                             </Text>
                             {b.status === "accepted" ? (
-                              <div style={{ marginTop: 6 }}>
+                              <div style={{ marginTop: 8 }}>
                                 <Text type="secondary">Kommentariya: </Text>
                                 <b>Haydovchi qabul qildi, tez orada bog‘laning.</b>
                               </div>
@@ -616,6 +712,42 @@ export default function ClientInterProvincial({ onBack }) {
             <Text type="secondary">Nechta joy so‘raysiz?</Text>
             <InputNumber min={1} max={Number(selectedOrder.seats_available || 1)} value={bookingSeats} onChange={(v) => setBookingSeats(Number(v || 1))} style={{ width: "100%", marginTop: 6 }} />
 
+            {selectedOrder.pickup_mode === "home_pickup" ? (
+              <>
+                <Divider />
+                <Tag color="purple">Uydan olib ketish</Tag>
+                <Text type="secondary" style={{ display: "block", marginTop: 8 }}>
+                  Lokatsiyani yuboring (haydovchi qabul qilgach ko‘radi).
+                </Text>
+                <Space wrap style={{ marginTop: 8 }}>
+                  <Button
+                    icon={<EnvironmentFilled />}
+                    onClick={async () => {
+                      try {
+                        const p = await getMyGeo();
+                        setPickupLat(p.lat);
+                        setPickupLng(p.lng);
+                        message.success("Lokatsiya olindi");
+                      } catch (e) {
+                        message.error("Lokatsiyani olishda xatolik");
+                      }
+                    }}
+                  >
+                    Geolokatsiya yuborish
+                  </Button>
+                  {pickupLat != null && pickupLng != null ? (
+                    <Button onClick={() => openGoogleMaps(pickupLat, pickupLng)}>Xaritada</Button>
+                  ) : null}
+                </Space>
+                <Input
+                  value={pickupAddress}
+                  onChange={(e) => setPickupAddress(e.target.value)}
+                  placeholder="Manzil (ixtiyoriy): masalan, Uyim - Chilonzor 5"
+                  style={{ marginTop: 8 }}
+                />
+              </>
+            ) : null}
+
             <Text type="secondary" style={{ fontSize: 12, display: "block", marginTop: 10 }}>
               * Bu yerda “so‘rov” yuboriladi. Haydovchi qabul qilmaguncha zakaz avtomatik qabul bo‘lib ketmaydi.
             </Text>
@@ -644,57 +776,3 @@ export default function ClientInterProvincial({ onBack }) {
     </div>
   );
 }
-
-/* ===========================
-   NEW FEATURES ADDED (Passenger Side)
-   ===========================
-   1. Passenger can see own orders after login/logout.
-   2. Edit order if not accepted by driver.
-   3. Delivery type selector:
-      - 'Belgilangan joyga borish'
-      - 'Uydan olib ketish'
-   4. GeoLocation integration:
-      - If pickup point selected -> driver start location visible.
-      - If home pickup selected -> passenger location visible to driver.
-   5. Departure location button:
-      - Opens geolocation picker
-      - Reverse geocoding example: 'Toshkent markaziy bozor'
-   6. Map navigation button (opens map route).
-*/
-
-// --- NEW STATE EXAMPLES ---
-const [deliveryType, setDeliveryType] = useState(null); // pickup_point | home_pickup
-const [departureLocation, setDepartureLocation] = useState(null);
-const [geoLocation, setGeoLocation] = useState(null);
-
-// --- GEOLOCATION FUNCTION ---
-const detectLocation = async () => {
-  if (!navigator.geolocation) return message.error("Geolokatsiya mavjud emas");
-  navigator.geolocation.getCurrentPosition((pos) => {
-    const coords = {
-      lat: pos.coords.latitude,
-      lng: pos.coords.longitude,
-      address: "Toshkent markaziy bozor (example)",
-    };
-    setGeoLocation(coords);
-    setDepartureLocation(coords);
-  });
-};
-
-// --- DELIVERY TYPE SELECTOR UI ---
-/*
-<Select
-  placeholder="Olib ketish turini tanlang"
-  onChange={(v)=>setDeliveryType(v)}
-  options={[
-    {label:"Belgilangan joyga borish", value:"pickup_point"},
-    {label:"Uydan olib ketish", value:"home_pickup"}
-  ]}
-/>
-*/
-
-// --- MAP OPEN ---
-const openMapRoute = () => {
-  if (!geoLocation) return;
-  window.open(`https://maps.google.com/?q=${geoLocation.lat},${geoLocation.lng}`);
-};
