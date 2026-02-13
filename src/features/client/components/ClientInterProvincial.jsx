@@ -16,6 +16,8 @@ import {
   Divider,
   Modal,
   Input,
+  List,
+  Popconfirm,
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -26,6 +28,8 @@ import {
   UserOutlined,
   CarOutlined,
   CheckCircleOutlined,
+  EditOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { supabase } from "../../../lib/supabase";
@@ -67,6 +71,20 @@ const routeText = (o) => {
   return `${fromR} / ${fromD}  →  ${toR} / ${toD}`;
 };
 
+// Prefill from auth user metadata/phone/localStorage
+const buildPrefill = (user) => {
+  const lsName = localStorage.getItem("passenger_name") || "";
+  const lsPhone = localStorage.getItem("passenger_phone") || "";
+
+  const metaName = user?.user_metadata?.full_name || user?.user_metadata?.name || "";
+  const authPhone = user?.phone || "";
+
+  return {
+    name: lsName || metaName || "",
+    phone: lsPhone || authPhone || "",
+  };
+};
+
 export default function ClientInterProvincial({ onBack }) {
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
@@ -74,15 +92,25 @@ export default function ClientInterProvincial({ onBack }) {
   const [results, setResults] = useState([]);
   const [errorText, setErrorText] = useState("");
 
-  // booking modal
-  const [bookingModalOpen, setBookingModalOpen] = useState(false);
+  // booking request modal
+  const [modalOpen, setModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
-  const [bookingSeats, setBookingSeats] = useState(1);
+
+  const [reqSeats, setReqSeats] = useState(1);
   const [passengerName, setPassengerName] = useState("");
   const [passengerPhone, setPassengerPhone] = useState("");
+  const [note, setNote] = useState("");
+
+  // My requests & bookings
+  const [myRequests, setMyRequests] = useState([]);
+  const [myBookings, setMyBookings] = useState([]);
+
+  // edit request modal
+  const [editReqOpen, setEditReqOpen] = useState(false);
+  const [editingReq, setEditingReq] = useState(null);
 
   const [form, setForm] = useState(() => {
-    const saved = localStorage.getItem("clientInterProvSearch_v2");
+    const saved = localStorage.getItem("clientInterProvSearch_v3");
     if (saved) {
       try {
         const p = JSON.parse(saved);
@@ -90,8 +118,8 @@ export default function ClientInterProvincial({ onBack }) {
           fromRegion: p.fromRegion || "Qoraqalpog'iston",
           fromDistrict: p.fromDistrict ?? "Nukus sh.",
           toRegion: p.toRegion || "Toshkent shahri",
-          toDistrict: p.toDistrict ?? "", // yo‘lovchi ham Toshkent shahri bo‘lsa tumanni tanlamasa bo‘ladi
-          date: p.date || "", // ixtiyoriy
+          toDistrict: p.toDistrict ?? "",
+          date: p.date || "",
           minSeats: Number(p.minSeats || 1),
         };
       } catch (e) {}
@@ -133,13 +161,54 @@ export default function ClientInterProvincial({ onBack }) {
   }, [form.toRegion]);
 
   useEffect(() => {
-    localStorage.setItem("clientInterProvSearch_v2", JSON.stringify(form));
+    localStorage.setItem("clientInterProvSearch_v3", JSON.stringify(form));
   }, [form]);
+
+  const loadMyData = async () => {
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
+    if (!user) return;
+
+    const { data: reqs } = await supabase
+      .from("trip_booking_requests")
+      .select("*")
+      .eq("passenger_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    const { data: bookings } = await supabase
+      .from("trip_bookings")
+      .select("*")
+      .eq("passenger_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    setMyRequests(reqs || []);
+    setMyBookings(bookings || []);
+  };
 
   useEffect(() => {
     const init = async () => {
       setLoading(true);
       await doSearch(true);
+      await loadMyData();
+
+      // realtime for my requests/bookings
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData?.user;
+      if (user) {
+        const ch = supabase
+          .channel("rt_passenger_interprov")
+          .on("postgres_changes", { event: "*", schema: "public", table: "trip_booking_requests", filter: `passenger_id=eq.${user.id}` }, async () => {
+            await loadMyData();
+          })
+          .on("postgres_changes", { event: "*", schema: "public", table: "trip_bookings", filter: `passenger_id=eq.${user.id}` }, async () => {
+            await loadMyData();
+          })
+          .subscribe();
+
+        return () => supabase.removeChannel(ch);
+      }
       setLoading(false);
     };
     init();
@@ -151,9 +220,6 @@ export default function ClientInterProvincial({ onBack }) {
     setErrorText("");
 
     try {
-      // Wildcard logika:
-      // - Driver Toshkent shahri va district "" bo‘lsa: yo‘lovchi Toshkent shahri ichidagi istalgan district bilan qidirsa ham mos keladi.
-      // - Yo‘lovchi Toshkent shahri va district "" bo‘lsa: hammasiga mos bo‘ladi (district shartini qo‘ymaymiz).
       const fromDistrictFilter = (form.fromDistrict || "").trim();
       const toDistrictFilter = (form.toDistrict || "").trim();
 
@@ -161,28 +227,18 @@ export default function ClientInterProvincial({ onBack }) {
         .from("orders")
         .select("*")
         .eq("service_type", "inter_prov")
-        .in("status", ["pending", "booked"]) // booked ham bo‘lishi mumkin, seats_available > 0 bo‘lsa ko‘rsatamiz
+        .in("status", ["pending", "booked"])
         .gt("seats_available", 0)
         .eq("from_region", form.fromRegion)
         .eq("to_region", form.toRegion)
         .order("scheduled_at", { ascending: true });
 
-      // district shartlari:
-      // Agar yo‘lovchi district tanlagan bo‘lsa:
-      //  - order.from_district = tanlangan district OR order.from_district = '' (wildcard)
-      if (!isTashkentCity(form.fromRegion) || fromDistrictFilter) {
-        q = q.or(`from_district.eq.${fromDistrictFilter},from_district.eq.`); // '' ham mos
-      } else {
-        // yo‘lovchi ham Toshkent shahri va district bo‘sh: hech qanday district shart qo‘ymaymiz
-      }
+      // Wildcard:
+      // If passenger picked district => (order district == picked) OR (order district == '')
+      // If passenger district empty AND region == Toshkent shahri => no district filter
+      if (!isTashkentCity(form.fromRegion) || fromDistrictFilter) q = q.or(`from_district.eq.${fromDistrictFilter},from_district.eq.`);
+      if (!isTashkentCity(form.toRegion) || toDistrictFilter) q = q.or(`to_district.eq.${toDistrictFilter},to_district.eq.`);
 
-      if (!isTashkentCity(form.toRegion) || toDistrictFilter) {
-        q = q.or(`to_district.eq.${toDistrictFilter},to_district.eq.`);
-      } else {
-        // Toshkent shahri va bo‘sh: shart yo‘q
-      }
-
-      // Sana ixtiyoriy
       if (form.date) {
         const start = dayjs(form.date).startOf("day").toISOString();
         const end = dayjs(form.date).endOf("day").toISOString();
@@ -206,66 +262,141 @@ export default function ClientInterProvincial({ onBack }) {
     }
   };
 
-  const openBooking = async (order) => {
+  const openRequestModal = async (order) => {
     setSelectedOrder(order);
-    setBookingSeats(1);
+    setReqSeats(1);
+    setNote("");
 
-    // passenger info (localStorage)
-    const savedName = localStorage.getItem("passenger_name") || "";
-    const savedPhone = localStorage.getItem("passenger_phone") || "";
-    setPassengerName(savedName);
-    setPassengerPhone(savedPhone);
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
 
-    setBookingModalOpen(true);
+    const pre = buildPrefill(user);
+    setPassengerName(pre.name);
+    setPassengerPhone(pre.phone);
+
+    setModalOpen(true);
   };
 
-  const confirmBooking = async () => {
+  const sendRequest = async () => {
     try {
       if (!selectedOrder) return;
 
-      const seatsReq = Number(bookingSeats || 1);
-      if (seatsReq < 1) {
-        message.error("Joylar soni kamida 1 bo‘lsin!");
-        return;
-      }
-
-      if (!passengerPhone.trim()) {
-        message.error("Telefon raqamingizni kiriting!");
-        return;
-      }
+      const seatsReq = Number(reqSeats || 1);
+      if (seatsReq < 1) return message.error("Joy kamida 1 bo‘lsin!");
+      if (!passengerPhone.trim()) return message.error("Telefon raqamingizni kiriting!");
 
       const { data: authData, error: authErr } = await supabase.auth.getUser();
       if (authErr) throw authErr;
       const user = authData?.user;
-      if (!user) {
-        message.error("Band qilish uchun avval tizimga kiring!");
-        return;
-      }
+      if (!user) return message.error("So‘rov yuborish uchun avval tizimga kiring!");
 
-      // passenger info saqlab qo‘yamiz
+      // save local
       localStorage.setItem("passenger_name", passengerName);
       localStorage.setItem("passenger_phone", passengerPhone);
 
-      // ATOMIK bron:
-      // RPC: book_inter_prov(order_id, passenger_id, name, phone, seats)
-      const { data, error } = await supabase.rpc("book_inter_prov", {
+      // RPC: request_inter_prov_booking
+      const { error } = await supabase.rpc("request_inter_prov_booking", {
         p_order_id: selectedOrder.id,
         p_passenger_id: user.id,
         p_passenger_name: passengerName || "",
         p_passenger_phone: passengerPhone,
         p_seats: seatsReq,
+        p_note: note || null,
       });
-
       if (error) throw error;
 
-      message.success("Band qilindi! Haydovchiga bildirishnoma yuborildi.");
-      setBookingModalOpen(false);
+      message.success("So‘rov yuborildi! Haydovchi qabul qilsa sizga xabar keladi.");
+      setModalOpen(false);
       setSelectedOrder(null);
 
+      await loadMyData();
+    } catch (e) {
+      console.error(e);
+      message.error(e?.message || "So‘rov yuborishda xatolik!");
+    }
+  };
+
+  const openEditRequest = (req) => {
+    setEditingReq(req);
+    setReqSeats(req.seats);
+    setPassengerName(req.passenger_name || passengerName);
+    setPassengerPhone(req.passenger_phone || passengerPhone);
+    setNote(req.note || "");
+    setEditReqOpen(true);
+  };
+
+  const saveRequestEdits = async () => {
+    try {
+      if (!editingReq) return;
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData?.user;
+      if (!user) return message.error("Avval tizimga kiring!");
+
+      const seatsReq = Number(reqSeats || 1);
+      if (seatsReq < 1) return message.error("Joy kamida 1 bo‘lsin!");
+      if (!passengerPhone.trim()) return message.error("Telefon raqamingizni kiriting!");
+
+      localStorage.setItem("passenger_name", passengerName);
+      localStorage.setItem("passenger_phone", passengerPhone);
+
+      const { error } = await supabase.rpc("edit_booking_request", {
+        p_request_id: editingReq.id,
+        p_passenger_id: user.id,
+        p_seats: seatsReq,
+        p_passenger_name: passengerName || "",
+        p_passenger_phone: passengerPhone,
+        p_note: note || null,
+      });
+      if (error) throw error;
+
+      message.success("So‘rov yangilandi!");
+      setEditReqOpen(false);
+      setEditingReq(null);
+      await loadMyData();
+    } catch (e) {
+      console.error(e);
+      message.error(e?.message || "Tahrirlashda xatolik!");
+    }
+  };
+
+  const cancelRequest = async (req) => {
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData?.user;
+      if (!user) return message.error("Avval tizimga kiring!");
+
+      const { error } = await supabase.rpc("cancel_booking_request", {
+        p_request_id: req.id,
+        p_passenger_id: user.id,
+      });
+      if (error) throw error;
+
+      message.success("So‘rov bekor qilindi!");
+      await loadMyData();
+    } catch (e) {
+      console.error(e);
+      message.error(e?.message || "Bekor qilishda xatolik!");
+    }
+  };
+
+  const cancelBooking = async (booking) => {
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData?.user;
+      if (!user) return message.error("Avval tizimga kiring!");
+
+      const { error } = await supabase.rpc("cancel_booking", {
+        p_booking_id: booking.id,
+        p_passenger_id: user.id,
+      });
+      if (error) throw error;
+
+      message.success("Bron bekor qilindi!");
+      await loadMyData();
       await doSearch(true);
     } catch (e) {
       console.error(e);
-      message.error(e?.message || "Band qilishda xatolik!");
+      message.error(e?.message || "Bron bekor qilishda xatolik!");
     }
   };
 
@@ -287,6 +418,98 @@ export default function ClientInterProvincial({ onBack }) {
         <Tag color="purple">inter_prov</Tag>
       </div>
 
+      {/* My Requests/Bookings */}
+      <Card style={{ borderRadius: 18, border: "none", boxShadow: "0 6px 20px rgba(0,0,0,0.06)", marginBottom: 12 }}>
+        <Title level={5} style={{ marginTop: 0 }}>
+          Mening so‘rovlarim va bronlarim
+        </Title>
+
+        <Divider orientation="left">So‘rovlar</Divider>
+        {myRequests.length === 0 ? (
+          <Text type="secondary">So‘rov yo‘q.</Text>
+        ) : (
+          <List
+            dataSource={myRequests}
+            renderItem={(r) => (
+              <List.Item
+                actions={[
+                  r.status === "requested" ? (
+                    <Button key="edit" icon={<EditOutlined />} onClick={() => openEditRequest(r)}>
+                      Tahrirlash
+                    </Button>
+                  ) : null,
+                  r.status === "requested" ? (
+                    <Popconfirm key="del" title="So‘rovni bekor qilasizmi?" onConfirm={() => cancelRequest(r)}>
+                      <Button danger icon={<DeleteOutlined />}>
+                        Bekor qilish
+                      </Button>
+                    </Popconfirm>
+                  ) : null,
+                ]}
+              >
+                <List.Item.Meta
+                  title={
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <Tag color={r.status === "requested" ? "blue" : r.status === "accepted" ? "green" : "default"}>{r.status}</Tag>
+                      <span style={{ fontWeight: 600 }}>{r.seats} ta joy</span>
+                    </div>
+                  }
+                  description={
+                    <div>
+                      <Text type="secondary">Order:</Text> {r.order_id}
+                      <br />
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {dayjs(r.created_at).format("YYYY-MM-DD HH:mm")}
+                      </Text>
+                    </div>
+                  }
+                />
+              </List.Item>
+            )}
+          />
+        )}
+
+        <Divider orientation="left">Bronlar (qabul qilingan)</Divider>
+        {myBookings.length === 0 ? (
+          <Text type="secondary">Bron yo‘q.</Text>
+        ) : (
+          <List
+            dataSource={myBookings}
+            renderItem={(b) => (
+              <List.Item
+                actions={[
+                  b.status === "active" ? (
+                    <Popconfirm key="c" title="Bronni bekor qilasizmi?" onConfirm={() => cancelBooking(b)}>
+                      <Button danger>Bronni bekor qilish</Button>
+                    </Popconfirm>
+                  ) : null,
+                ]}
+              >
+                <List.Item.Meta
+                  title={
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <Tag color={b.status === "active" ? "green" : "default"}>{b.status}</Tag>
+                      <span style={{ fontWeight: 600 }}>{b.seats} ta joy</span>
+                    </div>
+                  }
+                  description={
+                    <div>
+                      <Text type="secondary">Haydovchi bilan bog‘lanish:</Text>{" "}
+                      <b>{b.status === "active" ? (b.passenger_phone ? "✅ (Sizning telefoningiz haydovchiga ko‘rindi)" : "") : "-"}</b>
+                      <br />
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {dayjs(b.created_at).format("YYYY-MM-DD HH:mm")}
+                      </Text>
+                    </div>
+                  }
+                />
+              </List.Item>
+            )}
+          />
+        )}
+      </Card>
+
+      {/* Search Filters */}
       <Card style={{ borderRadius: 18, border: "none", boxShadow: "0 6px 20px rgba(0,0,0,0.06)" }}>
         <Title level={5} style={{ marginTop: 0 }}>
           Qidiruv filtrlari
@@ -296,12 +519,7 @@ export default function ClientInterProvincial({ onBack }) {
         <Row gutter={12}>
           <Col xs={24} md={12}>
             <Text type="secondary">Viloyat</Text>
-            <Select
-              value={form.fromRegion}
-              onChange={(v) => setForm((p) => ({ ...p, fromRegion: v }))}
-              style={{ width: "100%", marginTop: 6 }}
-              size="large"
-            >
+            <Select value={form.fromRegion} onChange={(v) => setForm((p) => ({ ...p, fromRegion: v }))} style={{ width: "100%", marginTop: 6 }} size="large">
               {REGIONS_DATA.map((r) => (
                 <Select.Option key={r.name} value={r.name}>
                   {r.name}
@@ -312,12 +530,7 @@ export default function ClientInterProvincial({ onBack }) {
 
           <Col xs={24} md={12}>
             <Text type="secondary">Tuman/Shahar</Text>
-            <Select
-              value={form.fromDistrict}
-              onChange={(v) => setForm((p) => ({ ...p, fromDistrict: v }))}
-              style={{ width: "100%", marginTop: 6 }}
-              size="large"
-            >
+            <Select value={form.fromDistrict} onChange={(v) => setForm((p) => ({ ...p, fromDistrict: v }))} style={{ width: "100%", marginTop: 6 }} size="large">
               {fromDistricts.map((d) => (
                 <Select.Option key={`${d}`} value={d}>
                   {districtLabel(d)}
@@ -336,12 +549,7 @@ export default function ClientInterProvincial({ onBack }) {
         <Row gutter={12}>
           <Col xs={24} md={12}>
             <Text type="secondary">Viloyat</Text>
-            <Select
-              value={form.toRegion}
-              onChange={(v) => setForm((p) => ({ ...p, toRegion: v }))}
-              style={{ width: "100%", marginTop: 6 }}
-              size="large"
-            >
+            <Select value={form.toRegion} onChange={(v) => setForm((p) => ({ ...p, toRegion: v }))} style={{ width: "100%", marginTop: 6 }} size="large">
               {REGIONS_DATA.map((r) => (
                 <Select.Option key={r.name} value={r.name}>
                   {r.name}
@@ -352,12 +560,7 @@ export default function ClientInterProvincial({ onBack }) {
 
           <Col xs={24} md={12}>
             <Text type="secondary">Tuman/Shahar</Text>
-            <Select
-              value={form.toDistrict}
-              onChange={(v) => setForm((p) => ({ ...p, toDistrict: v }))}
-              style={{ width: "100%", marginTop: 6 }}
-              size="large"
-            >
+            <Select value={form.toDistrict} onChange={(v) => setForm((p) => ({ ...p, toDistrict: v }))} style={{ width: "100%", marginTop: 6 }} size="large">
               {toDistricts.map((d) => (
                 <Select.Option key={`${d}`} value={d}>
                   {districtLabel(d)}
@@ -377,37 +580,16 @@ export default function ClientInterProvincial({ onBack }) {
         <Row gutter={12} align="middle">
           <Col xs={24} md={8}>
             <Text type="secondary">Sana (ixtiyoriy)</Text>
-            <DatePicker
-              value={form.date ? dayjs(form.date) : null}
-              onChange={(d) => setForm((p) => ({ ...p, date: d ? d.format("YYYY-MM-DD") : "" }))}
-              style={{ width: "100%", marginTop: 6 }}
-              size="large"
-              allowClear
-            />
+            <DatePicker value={form.date ? dayjs(form.date) : null} onChange={(d) => setForm((p) => ({ ...p, date: d ? d.format("YYYY-MM-DD") : "" }))} style={{ width: "100%", marginTop: 6 }} size="large" allowClear />
           </Col>
 
           <Col xs={24} md={8}>
             <Text type="secondary">Minimum joylar</Text>
-            <InputNumber
-              min={1}
-              max={20}
-              value={form.minSeats}
-              onChange={(v) => setForm((p) => ({ ...p, minSeats: Number(v || 1) }))}
-              style={{ width: "100%", marginTop: 6 }}
-              size="large"
-            />
+            <InputNumber min={1} max={20} value={form.minSeats} onChange={(v) => setForm((p) => ({ ...p, minSeats: Number(v || 1) }))} style={{ width: "100%", marginTop: 6 }} size="large" />
           </Col>
 
           <Col xs={24} md={8}>
-            <Button
-              type="primary"
-              size="large"
-              block
-              icon={<SearchOutlined />}
-              loading={searching}
-              onClick={() => doSearch(false)}
-              style={{ borderRadius: 14, height: 48, marginTop: 24 }}
-            >
+            <Button type="primary" size="large" block icon={<SearchOutlined />} loading={searching} onClick={() => doSearch(false)} style={{ borderRadius: 14, height: 48, marginTop: 24 }}>
               Qidirish
             </Button>
           </Col>
@@ -416,6 +598,7 @@ export default function ClientInterProvincial({ onBack }) {
 
       <div style={{ height: 14 }} />
 
+      {/* Results */}
       <Card style={{ borderRadius: 18, border: "none", boxShadow: "0 6px 20px rgba(0,0,0,0.06)" }}>
         <Title level={5} style={{ marginTop: 0 }}>
           Topilgan e’lonlar
@@ -424,11 +607,7 @@ export default function ClientInterProvincial({ onBack }) {
         {errorText ? (
           <Result status="error" title="Xatolik" subTitle={errorText} />
         ) : results.length === 0 ? (
-          <Result
-            icon={<CarOutlined />}
-            title="Hozircha mos e’lon topilmadi"
-            subTitle="Filtrlarni o‘zgartirib ko‘ring yoki keyinroq qayta qidiring."
-          />
+          <Result icon={<CarOutlined />} title="Hozircha mos e’lon topilmadi" subTitle="Filtrlarni o‘zgartirib ko‘ring yoki keyinroq qayta qidiring." />
         ) : (
           <Space direction="vertical" style={{ width: "100%" }} size={12}>
             {results.map((order) => {
@@ -460,21 +639,14 @@ export default function ClientInterProvincial({ onBack }) {
                         </Space>
 
                         <Text type="secondary" style={{ fontSize: 12 }}>
-                          Haydovchi ID: {order.driver_id}
+                          * “Band qilish” bosilganda haydovchiga so‘rov boradi. Haydovchi qabul qilgandan keyin sizga tasdiq keladi.
                         </Text>
                       </Space>
                     </Col>
 
                     <Col xs={24} md={8}>
-                      <Button
-                        type="primary"
-                        block
-                        size="large"
-                        icon={<CheckCircleOutlined />}
-                        onClick={() => openBooking(order)}
-                        style={{ borderRadius: 14, height: 44 }}
-                      >
-                        Band qilish
+                      <Button type="primary" block size="large" icon={<CheckCircleOutlined />} onClick={() => openRequestModal(order)} style={{ borderRadius: 14, height: 44 }}>
+                        Band qilish (so‘rov yuborish)
                       </Button>
                     </Col>
                   </Row>
@@ -485,14 +657,8 @@ export default function ClientInterProvincial({ onBack }) {
         )}
       </Card>
 
-      {/* Booking modal */}
-      <Modal
-        title="Band qilish"
-        open={bookingModalOpen}
-        onCancel={() => setBookingModalOpen(false)}
-        onOk={confirmBooking}
-        okText="Band qilish"
-      >
+      {/* Create request modal */}
+      <Modal title="Band qilish (haydovchiga so‘rov yuboriladi)" open={modalOpen} onCancel={() => setModalOpen(false)} onOk={sendRequest} okText="So‘rov yuborish">
         {!selectedOrder ? null : (
           <div>
             <Tag color="purple" style={{ marginBottom: 8 }}>
@@ -500,40 +666,40 @@ export default function ClientInterProvincial({ onBack }) {
             </Tag>
 
             <div style={{ marginBottom: 10 }}>
-              <Text type="secondary">Qolgan joy:</Text>{" "}
-              <b>{selectedOrder.seats_available ?? "-"}</b>
+              <Text type="secondary">Qolgan joy:</Text> <b>{selectedOrder.seats_available ?? "-"}</b>
             </div>
 
             <Divider />
 
-            <Text type="secondary">Ismingiz (ixtiyoriy)</Text>
-            <Input
-              value={passengerName}
-              onChange={(e) => setPassengerName(e.target.value)}
-              placeholder="Masalan: Abdiev Timur"
-              style={{ marginTop: 6, marginBottom: 12 }}
-            />
+            <Text type="secondary">Ism Familiya (ro‘yxatdan o‘tganingizdan avtomat keladi, o‘zgartirsa bo‘ladi)</Text>
+            <Input value={passengerName} onChange={(e) => setPassengerName(e.target.value)} placeholder="Masalan: Abdiev Timur" style={{ marginTop: 6, marginBottom: 12 }} />
 
-            <Text type="secondary">Telefon raqamingiz</Text>
-            <Input
-              value={passengerPhone}
-              onChange={(e) => setPassengerPhone(e.target.value)}
-              placeholder="+998 ..."
-              style={{ marginTop: 6, marginBottom: 12 }}
-            />
+            <Text type="secondary">Telefon raqam (avtomat keladi, o‘zgartirsa bo‘ladi)</Text>
+            <Input value={passengerPhone} onChange={(e) => setPassengerPhone(e.target.value)} placeholder="+998 ..." style={{ marginTop: 6, marginBottom: 12 }} />
 
-            <Text type="secondary">Nechta joy band qilasiz?</Text>
-            <InputNumber
-              min={1}
-              max={Number(selectedOrder.seats_available || 1)}
-              value={bookingSeats}
-              onChange={(v) => setBookingSeats(Number(v || 1))}
-              style={{ width: "100%", marginTop: 6 }}
-            />
+            <Text type="secondary">Nechta joy so‘raysiz?</Text>
+            <InputNumber min={1} max={Number(selectedOrder.seats_available || 1)} value={reqSeats} onChange={(v) => setReqSeats(Number(v || 1))} style={{ width: "100%", marginTop: 6, marginBottom: 12 }} />
 
-            <Text type="secondary" style={{ fontSize: 12, display: "block", marginTop: 10 }}>
-              * “Band qilish” bosilganda haydovchiga bildirishnoma boradi va joylar avtomatik kamayadi.
-            </Text>
+            <Text type="secondary">Izoh (ixtiyoriy)</Text>
+            <Input.TextArea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder="Masalan: 2 ta joy, ertaroq bo‘lsa yaxshi..." style={{ marginTop: 6 }} />
+          </div>
+        )}
+      </Modal>
+
+      {/* Edit request modal */}
+      <Modal title="So‘rovni tahrirlash" open={editReqOpen} onCancel={() => setEditReqOpen(false)} onOk={saveRequestEdits} okText="Saqlash">
+        {!editingReq ? null : (
+          <div>
+            <Tag color="blue">{editingReq.status}</Tag>
+            <Divider />
+            <Text type="secondary">Ism Familiya</Text>
+            <Input value={passengerName} onChange={(e) => setPassengerName(e.target.value)} style={{ marginTop: 6, marginBottom: 12 }} />
+            <Text type="secondary">Telefon</Text>
+            <Input value={passengerPhone} onChange={(e) => setPassengerPhone(e.target.value)} style={{ marginTop: 6, marginBottom: 12 }} />
+            <Text type="secondary">Joylar</Text>
+            <InputNumber min={1} value={reqSeats} onChange={(v) => setReqSeats(Number(v || 1))} style={{ width: "100%", marginTop: 6, marginBottom: 12 }} />
+            <Text type="secondary">Izoh</Text>
+            <Input.TextArea value={note} onChange={(e) => setNote(e.target.value)} rows={3} style={{ marginTop: 6 }} />
           </div>
         )}
       </Modal>
