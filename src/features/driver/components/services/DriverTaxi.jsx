@@ -11,6 +11,8 @@ import {
   Col,
   Avatar,
   Progress,
+  Badge,
+  Skeleton
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -21,20 +23,26 @@ import {
   MessageOutlined,
   ThunderboltFilled,
   UserOutlined,
+  CarOutlined,
+  EnvironmentOutlined
 } from "@ant-design/icons";
 
+// Leaflet xaritalari
 import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet-routing-machine";
 import "leaflet/dist/leaflet.css";
-import { supabase } from "../../../../lib/supabase";
 
-import ChatComponent from "../../../chat/components/ChatComponent";
+// Supabase ulanishi
+import { supabase } from "../../../../lib/supabase"; 
+
+// Agar Chat komponentingiz bo'lsa, yo'lini to'g'rilang yoki o'chirib turing
+// import ChatComponent from "../../../chat/components/ChatComponent";
 
 const { Title, Text } = Typography;
 
 /* =========================
-   HDR overlay (shu fayl ichida)
+   HDR OVERLAY (Yandex Go uslubidagi panel)
 ========================= */
 function HdrOverlay({
   tripStep,
@@ -47,25 +55,19 @@ function HdrOverlay({
   onNav,
   showNav,
 }) {
-  const isNight =
-    typeof document !== "undefined" &&
-    document.body.classList.contains("night-mode-active");
+  const isNight = false; // Tungi rejim logikasi kerak bo'lsa qo'shish mumkin
 
   const chipStyle = {
     display: "inline-flex",
     alignItems: "center",
     gap: 8,
-    padding: "10px 12px",
+    padding: "8px 12px",
     borderRadius: 999,
-    background: isNight ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.92)",
-    border: isNight
-      ? "1px solid rgba(255,255,255,0.14)"
-      : "1px solid rgba(0,0,0,0.08)",
-    backdropFilter: "blur(12px)",
-    WebkitBackdropFilter: "blur(12px)",
-    boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
-    color: isNight ? "rgba(255,255,255,0.92)" : "rgba(0,0,0,0.88)",
-    fontWeight: 800,
+    background: "rgba(255,255,255,0.95)",
+    boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
+    color: "#000",
+    fontWeight: 700,
+    fontSize: 13,
     pointerEvents: "auto",
   };
 
@@ -74,205 +76,102 @@ function HdrOverlay({
     top: 14,
     left: 14,
     right: 14,
-    zIndex: 1200,
+    zIndex: 1000,
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 10,
     pointerEvents: "none",
-  };
-
-  const leftChips = { display: "flex", gap: 10, pointerEvents: "none" };
-  const rightControls = {
-    display: "flex",
-    gap: 10,
-    pointerEvents: "none",
-    alignItems: "center",
-  };
-
-  const roundBtn = {
-    boxShadow: "0 10px 25px rgba(0,0,0,0.20)",
-    border: "none",
-    pointerEvents: "auto",
-  };
-
-  const navBtn = {
-    borderRadius: 999,
-    border: "none",
-    pointerEvents: "auto",
-    fontWeight: 900,
-    background: isNight ? "rgba(0,0,0,0.75)" : "#000",
   };
 
   const sheet = {
     position: "absolute",
     left: 12,
     right: 12,
-    bottom: 12,
-    zIndex: 1200,
+    bottom: 20,
+    zIndex: 1000,
     borderRadius: 22,
-    background: isNight ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.95)",
-    border: isNight
-      ? "1px solid rgba(255,255,255,0.14)"
-      : "1px solid rgba(0,0,0,0.06)",
-    backdropFilter: "blur(14px)",
-    WebkitBackdropFilter: "blur(14px)",
-    boxShadow: "0 18px 50px rgba(0,0,0,0.40)",
-    overflow: "hidden",
-    pointerEvents: "none",
+    background: "rgba(255,255,255,0.98)",
+    backdropFilter: "blur(10px)",
+    boxShadow: "0 10px 40px rgba(0,0,0,0.2)",
+    padding: "16px",
+    pointerEvents: "none", // Ichidagi elementlar auto bo'ladi
   };
 
-  const handle = { display: "flex", justifyContent: "center", padding: "10px 0 6px" };
-  const handleBar = {
-    width: 44,
-    height: 5,
-    borderRadius: 999,
-    background: isNight ? "rgba(255,255,255,0.20)" : "rgba(0,0,0,0.12)",
-  };
-
-  const body = { padding: "10px 14px 14px", pointerEvents: "auto" };
-  const titleStyle = {
-    margin: 0,
-    fontSize: 16,
-    fontWeight: 900,
-    letterSpacing: "-0.3px",
-    color: isNight ? "rgba(255,255,255,0.92)" : "rgba(0,0,0,0.90)",
-    fontFamily: "YangoHeadline, Inter, system-ui, sans-serif",
-  };
-  const subStyle = {
-    marginTop: 2,
-    fontSize: 13,
-    color: isNight ? "rgba(255,255,255,0.70)" : "rgba(0,0,0,0.60)",
-  };
-
-  const stepTagColor = tripStep === 3 ? "green" : "orange";
+  const stepColors = { 1: "orange", 2: "blue", 3: "green", 4: "black" };
+  const stepText = { 1: "MIJOZGA BORISH", 2: "KUTISH", 3: "SAFARDA", 4: "YAKUN" };
 
   return (
     <>
+      {/* Yuqori Panel */}
       <div style={overlayTopBar}>
-        <div style={leftChips}>
-          <div style={{ ...chipStyle, pointerEvents: "auto" }}>
-            <span>ETA</span>
-            <span style={{ opacity: 0.75, fontWeight: 800 }}>{etaText}</span>
-          </div>
-          <div style={{ ...chipStyle, pointerEvents: "auto" }}>
-            <span>Masofa</span>
-            <span style={{ opacity: 0.75, fontWeight: 800 }}>{distanceText}</span>
-          </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {distanceText && (
+             <div style={chipStyle}>
+               <CompassOutlined /> {distanceText}
+             </div>
+          )}
         </div>
-
-        <div style={rightControls}>
-          <div style={{ ...chipStyle, pointerEvents: "auto" }}>
-            <span>Narx</span>
-            <span style={{ opacity: 0.75, fontWeight: 900 }}>{priceText}</span>
+        
+        <div style={{ display: "flex", gap: 8 }}>
+          <div style={chipStyle}>
+            {priceText}
           </div>
-
-          <Button
-            shape="circle"
-            size="large"
-            icon={<MessageOutlined />}
+          <Button 
+            shape="circle" 
+            icon={<MessageOutlined />} 
+            style={{ pointerEvents: 'auto', boxShadow: "0 4px 15px rgba(0,0,0,0.1)" }}
             onClick={onChat}
-            style={roundBtn}
           />
-
           {showNav && (
-            <Button
-              shape="round"
-              icon={<CompassOutlined />}
-              type="primary"
+            <Button 
+              type="primary" 
+              shape="circle" 
+              icon={<EnvironmentOutlined />} 
+              style={{ pointerEvents: 'auto', background: '#000', borderColor: '#000' }}
               onClick={onNav}
-              style={navBtn}
-            >
-              NAVIGATOR
-            </Button>
+            />
           )}
         </div>
       </div>
 
+      {/* Pastki Info Panel */}
       <div style={sheet}>
-        <div style={handle}>
-          <div style={handleBar} />
-        </div>
-        <div style={body}>
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
-            <Tag color={stepTagColor} style={{ borderRadius: 8, fontWeight: "bold" }}>
-              {tripStep === 1 ? "MIJOZGA BORILMOQDA" : tripStep === 2 ? "KUTILMOQDA" : "YUKLANDI"}
-            </Tag>
-          </div>
-
-          <div style={titleStyle}>{title}</div>
-          <div style={subStyle}>{subtitle}</div>
-        </div>
+         <div style={{ pointerEvents: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
+               <Tag color={stepColors[tripStep] || 'default'} style={{ fontWeight: 800 }}>
+                  {stepText[tripStep] || "Status"}
+               </Tag>
+            </div>
+            <Title level={5} style={{ margin: 0, textAlign: 'center' }}>{title}</Title>
+            <div style={{ textAlign: 'center', color: '#888', fontSize: 13 }}>{subtitle}</div>
+         </div>
       </div>
     </>
   );
 }
 
-const getMapStyle = () => {
-  const hour = new Date().getHours();
-  const isNightHour = hour >= 20 || hour < 6;
-
-  const isNightClass =
-    typeof document !== "undefined" &&
-    document.body.classList.contains("night-mode-active");
-
-  const isNight = isNightHour || isNightClass;
-
-  if (isNight) {
-    return `https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png?api_key=${import.meta.env.VITE_STADIA_KEY}`;
-  }
-
-  return "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
-};
-
-
 /* =========================
-   ICONS
+   MAP ICONS & STYLES
 ========================= */
+// Xarita stili (CartoDB Voyager - toza va chiroyli)
+const MAP_TILE_URL = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+
 const clientIcon = L.divIcon({
-  html: '<div style="font-size: 30px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">🙋‍♂️</div>',
+  html: '<div style="font-size: 35px; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.3));">🙋‍♂️</div>',
   className: "custom-client-icon",
-  iconSize: [30, 30],
-  iconAnchor: [15, 30],
+  iconSize: [35, 35],
+  iconAnchor: [17, 35],
 });
 
 const carIcon = L.divIcon({
-  html: `<div class="smooth-car-marker" style="font-size: 35px; transform-origin: center;">🚖</div>`,
+  html: '<div style="font-size: 40px; transform: rotate(0deg);">🚖</div>', // Rasmni burish logikasi qo'shish mumkin
   className: "custom-car-icon",
-  iconSize: [35, 35],
-  iconAnchor: [17, 17],
+  iconSize: [40, 40],
+  iconAnchor: [20, 20],
 });
 
 /* =========================
-   VOICE
-========================= */
-const playVoiceNote = (text) => {
-  if ("speechSynthesis" in window) {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "uz-UZ";
-    window.speechSynthesis.speak(utterance);
-  }
-};
-
-/* =========================
-   DISTANCE
-========================= */
-function getDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * (Math.PI / 180);
-  const dLon = (lon2 - lon1) * (Math.PI / 180);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * (Math.PI / 180)) *
-      Math.cos(lat2 * (Math.PI / 180)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-/* =========================
-   ROUTING MACHINE
+   ROUTING ENGINE (Yo'l chizish)
 ========================= */
 function RoutingMachine({ from, to, color = "#1890ff" }) {
   const map = useMap();
@@ -280,34 +179,31 @@ function RoutingMachine({ from, to, color = "#1890ff" }) {
   useEffect(() => {
     if (!map || !from || !to) return;
 
-    map.eachLayer((l) => {
-      if (l && l.options && l.options.name === "route-line") {
-        try {
-          map.removeLayer(l);
-        } catch (e) {}
-      }
+    // Eski yo'nalishlarni o'chirish
+    map.eachLayer((layer) => {
+       if (layer.options && layer.options.role === 'route') {
+          map.removeLayer(layer);
+       }
     });
 
     const control = L.Routing.control({
       waypoints: [L.latLng(from), L.latLng(to)],
       lineOptions: {
-        styles: [
-          { color: color, weight: 10, opacity: 0.22 },
-          {
-            color: color,
-            weight: 6,
-            opacity: 0.9,
-            dashArray: color === "#52c41a" ? "10, 10" : "",
-          },
-        ],
+        styles: [{ color: color, weight: 6, opacity: 0.8 }]
       },
-      createMarker: () => null,
+      show: false, // Matnli yo'riqnomani yashirish
       addWaypoints: false,
-      show: false,
-      router: L.Routing.osrmv1({ serviceUrl: "https://router.project-osrm.org/route/v1" }),
+      draggableWaypoints: false,
+      fitSelectedRoutes: true,
+      createMarker: () => null, // Markerlarni biz o'zimiz qo'yamiz
+      router: L.Routing.osrmv1({
+        serviceUrl: "https://router.project-osrm.org/route/v1"
+      })
     }).addTo(map);
 
-    control.getPlan().options.name = "route-line";
+    // Xarita chegaralarini moslashtirish
+    const bounds = L.latLngBounds([from, to]);
+    map.fitBounds(bounds, { padding: [50, 50] });
 
     return () => {
       try {
@@ -320,868 +216,430 @@ function RoutingMachine({ from, to, color = "#1890ff" }) {
 }
 
 /* =========================
-   HELPERS
+   UTILITIES
 ========================= */
 const parseLoc = (str) => {
-  const parts = str?.match(/[\d.]+/g);
-  return parts ? [parseFloat(parts[0]), parseFloat(parts[1])] : [0, 0];
+  if (!str) return [41.2995, 69.2401]; // Default Tashkent
+  const parts = str.match(/[\d.]+/g);
+  return parts && parts.length >= 2 ? [parseFloat(parts[0]), parseFloat(parts[1])] : [41.2995, 69.2401];
 };
 
-const openNavigatorTo = (destination) => {
-  const lat = destination[0];
-  const lon = destination[1];
-
-  const uri = `yandexnavi://build_route_on_map?lat_to=${lat}&lon_to=${lon}`;
-  window.location.href = uri;
-
-  setTimeout(() => {
-    if (document.hasFocus()) {
-      window.open(`https://yandex.uz/maps/?rtext=~${lat},${lon}`, "_blank");
-    }
-  }, 1500);
+const openNavigatorTo = (loc) => {
+  const [lat, lng] = loc;
+  // Yandex Navigator yoki Google Maps ochish
+  window.open(`https://yandex.uz/maps/?rtext=~${lat},${lng}&rtt=auto`, "_blank");
 };
 
-/* =========================
-   STEP 0 VIEW (Orders list)
-   ✅ alohida component: hook buzilmaydi
-========================= */
-function OrdersStepView({
-  onBack,
-  activeOrders,
-  acceptOrder,
-  dailyEarnings,
-  activityPoints,
-}) {
-  return (
-    <div style={{ padding: 15, background: "#f0f2f5", minHeight: "100vh" }}>
-      <Card
-        style={{
-          borderRadius: 20,
-          marginBottom: 15,
-          background: "#000",
-          color: "#fff",
-          border: "none",
-        }}
-      >
-        <Row align="middle" justify="space-between">
-          <Col span={14}>
-            <Text style={{ color: "#aaa", fontSize: 12 }}>BUGUNGI DAROMAD</Text>
-            <Title level={3} style={{ color: "#FFD700", margin: 0 }}>
-              {dailyEarnings.total.toLocaleString()} so'm
-            </Title>
-          </Col>
-          <Col span={10} style={{ textAlign: "right" }}>
-            <Tag
-              color="orange"
-              icon={<ThunderboltFilled />}
-              style={{ borderRadius: 8 }}
-            >
-              {activityPoints} Faollik
-            </Tag>
-            <div style={{ marginTop: 5, color: "#aaa", fontSize: 12 }}>
-              {dailyEarnings.count} ta safar
-            </div>
-          </Col>
-        </Row>
-      </Card>
-
-      <div style={{ display: "flex", alignItems: "center", marginBottom: 15 }}>
-        <Button shape="circle" icon={<ArrowLeftOutlined />} onClick={onBack} />
-        <Title
-          level={4}
-          style={{ margin: "0 0 0 15px", fontFamily: "YangoHeadline" }}
-        >
-          Buyurtmalar
-        </Title>
-      </div>
-
-      <List
-        dataSource={activeOrders}
-        renderItem={(item) => (
-          <Card
-            hoverable
-            style={{ marginBottom: 12, borderRadius: 20, border: "none" }}
-            onClick={() => acceptOrder(item)}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <Text strong style={{ fontSize: 16 }}>
-                {item.pickup_location?.slice(0, 30)}...
-              </Text>
-              <Tag color="green" style={{ borderRadius: 8 }}>
-                {parseInt(item.price).toLocaleString()} so'm
-              </Tag>
-            </div>
-
-            <Button
-              type="primary"
-              block
-              style={{
-                marginTop: 15,
-                background: "#000",
-                borderRadius: 12,
-                height: 45,
-                fontWeight: 700,
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                acceptOrder(item);
-              }}
-            >
-              QABUL QILISH
-            </Button>
-          </Card>
-        )}
-      />
-    </div>
-  );
-}
+const playVoice = (text) => {
+  if ('speechSynthesis' in window) {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'uz-UZ'; // Yoki ru-RU
+    window.speechSynthesis.speak(u);
+  }
+};
 
 /* =========================
    MAIN COMPONENT
 ========================= */
 export default function DriverTaxi({ onBack }) {
+  // --- STATE ---
+  const [driverId, setDriverId] = useState(null);
   const [activeOrders, setActiveOrders] = useState([]);
   const [currentOrder, setCurrentOrder] = useState(null);
-  const [driverLocation, setDriverLocation] = useState([42.4619, 59.6166]);
-  const [tripStep, setTripStep] = useState(0);
-
+  
+  // 0: List, 1: Pickupga borish, 2: Kutish, 3: Safarda, 4: Yakun
+  const [tripStep, setTripStep] = useState(0); 
+  
+  const [driverLocation, setDriverLocation] = useState([41.2995, 69.2401]);
+  const [totalDist, setTotalDist] = useState(0);
   const [waitTime, setWaitTime] = useState(0);
-  const waitTimerRef = useRef(null);
-
-  const [chatVisible, setChatVisible] = useState(false);
-  const [driverId, setDriverId] = useState(null);
-
-  const [dailyEarnings, setDailyEarnings] = useState({ total: 0, count: 0 });
-  const [activityPoints, setActivityPoints] = useState(100);
-
-  const [totalTraveledDist, setTotalTraveledDist] = useState(0);
-  const lastPositionRef = useRef(null);
-
+  
+  // Zanjir buyurtma
   const [nextOrder, setNextOrder] = useState(null);
   const [offerVisible, setOfferVisible] = useState(false);
-  const [offerTimeLeft, setOfferTimeLeft] = useState(15);
-  const offerTimerRef = useRef(null);
+  const [offerTimer, setOfferTimer] = useState(15);
+  const timerRef = useRef(null);
+  const waitIntervalRef = useRef(null);
 
-  const WAIT_FREE_LIMIT = 120;
-  const WAIT_PRICE_PER_MIN = 500;
+  // Statistika
+  const [dailyStats, setDailyStats] = useState({ sum: 0, count: 0 });
 
-  const paidWaitSeconds = Math.max(0, waitTime - WAIT_FREE_LIMIT);
-  const waitCost =
-    Math.max(0, Math.ceil(paidWaitSeconds / 60)) * WAIT_PRICE_PER_MIN;
-
-  const pickupCoords = useMemo(
-    () => parseLoc(currentOrder?.pickup_location),
-    [currentOrder]
-  );
-  const dropoffCoords = useMemo(
-    () => parseLoc(currentOrder?.dropoff_location),
-    [currentOrder]
-  );
-
-  const currentPriceDisplay = useMemo(() => {
-    const base = currentOrder?.price || 0;
-    const distancePrice = Math.ceil((totalTraveledDist * 2000) / 500) * 500;
-    return Math.max(base, distancePrice) + waitCost;
-  }, [currentOrder, totalTraveledDist, waitCost]);
-
-  // ✅ Hooklar doim bir xil tartibda:
-  const routeColor = useMemo(() => {
-    if (tripStep === 1) return "#52c41a";
-    if (tripStep === 3) return "#00f2ff";
-    return "#1890ff";
-  }, [tripStep]);
-
-  const overlayTitle = useMemo(() => {
-    if (tripStep === 1) return "Mijozga boryapsiz";
-    if (tripStep === 2) return "Mijoz kutilmoqda";
-    if (tripStep === 3) return "Safar jarayonda";
-    if (tripStep === 4) return "Safar yakunlandi";
-    return "Buyurtma";
-  }, [tripStep]);
-
-  const overlaySubtitle = useMemo(() => {
-    if (tripStep === 1) return "Pickup nuqtasiga yo‘l";
-    if (tripStep === 2) return "Mijozni kutyapsiz";
-    if (tripStep === 3)
-      return `Joriy hisob: ${currentPriceDisplay.toLocaleString()} so'm`;
-    if (tripStep === 4)
-      return `Yakuni: ${currentPriceDisplay.toLocaleString()} so'm`;
-    return "Tafsilotlar";
-  }, [tripStep, currentPriceDisplay]);
-
-  const navTarget = tripStep === 1 ? pickupCoords : dropoffCoords;
-
+  // --- INIT ---
   useEffect(() => {
-    const initDriver = async () => {
-      // supabase.auth.getSession() async va session qaytaradi
-      const {
-        data: { session },
-        error,
-      } = await supabase.auth.getSession();
-
-      if (error) console.error(error);
-
-      const user = session?.user;
-
-      if (user?.id) {
-        setDriverId(user.id);
-        fetchDailyStats(user.id);
-        fetchActivityPoints(user.id);
-      } else {
-        // session bo'lmasa - login kerak (UI ichida toast chiqadi accept bosilganda ham)
-        setDriverId(null);
-      }
-    };
-    initDriver();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const fetchDailyStats = async (uid) => {
-    try {
-      const today = new Date().toISOString().split("T")[0];
-      const { data, error } = await supabase
-        .from("orders")
-        .select("price")
-        .eq("driver_id", uid)
-        .eq("status", "completed")
-        .gte("created_at", today);
-
-      if (error) throw error;
-
-      if (data) {
-        const total = data.reduce((sum, item) => sum + (item.price || 0), 0);
-        setDailyEarnings({ total, count: data.length });
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const fetchActivityPoints = async (uid) => {
-    try {
-      const { data, error } = await supabase
-        .from("drivers")
-        .select("activity_points")
-        .eq("id", uid)
-        .single();
-
-      if (error) throw error;
-      if (data) setActivityPoints(data.activity_points || 100);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const updateActivity = async (points) => {
-    const newPoints = activityPoints + points;
-    setActivityPoints(newPoints);
-
-    try {
-      if (driverId) {
-        const { error } = await supabase
-          .from("drivers")
-          .update({ activity_points: newPoints })
-          .eq("id", driverId);
-        if (error) throw error;
-      }
-    } catch (e) {
-      console.error(e);
-    }
-
-    if (points < 0) message.warning(`Faollik balingiz tushdi: ${points}`);
-  };
-
-  // Geolocation watch
-  useEffect(() => {
-    if (!navigator.geolocation) return;
-
-    const watchId = navigator.geolocation.watchPosition(
-      async (pos) => {
-        const newPos = [pos.coords.latitude, pos.coords.longitude];
-
-        if (tripStep === 3) {
-          if (lastPositionRef.current) {
-            const d = getDistance(
-              lastPositionRef.current[0],
-              lastPositionRef.current[1],
-              newPos[0],
-              newPos[1]
-            );
-            if (d > 0.03) setTotalTraveledDist((prev) => prev + d);
-          }
-          lastPositionRef.current = newPos;
-        }
-
-        setDriverLocation(newPos);
-
-        try {
-          if (driverId) {
-            const { error } = await supabase
-              .from("drivers")
-              .update({
-                current_lat: pos.coords.latitude,
-                current_lng: pos.coords.longitude,
-                last_updated: new Date().toISOString(),
-              })
-              .eq("id", driverId);
-
-            if (error) throw error;
-          }
-        } catch (e) {
-          console.error(e);
-        }
-      },
-      (err) => console.error(err),
-      { enableHighAccuracy: true }
-    );
-
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, [driverId, tripStep]);
-
-  // Orders realtime
-  useEffect(() => {
-    fetchOrders();
-    const channel = supabase
-      .channel("taxi-orders")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "orders" },
-        () => fetchOrders()
-      )
+    checkSession();
+    // Realtime orders
+    const channel = supabase.channel('taxi_orders')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+         fetchOrders();
+      })
       .subscribe();
 
-    return () => supabase.removeChannel(channel);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Geolocation watch
+    if (navigator.geolocation) {
+      const watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          setDriverLocation([latitude, longitude]);
+          // Bazaga update qilish (ixtiyoriy, dispetcher ko'rishi uchun)
+        },
+        (err) => console.error(err),
+        { enableHighAccuracy: true }
+      );
+      return () => {
+        navigator.geolocation.clearWatch(watchId);
+        supabase.removeChannel(channel);
+      };
+    }
   }, []);
 
-  const fetchOrders = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("service_type", "taxi")
-        .eq("status", "pending")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      if (data) setActiveOrders(data);
-    } catch (e) {
-      console.error(e);
+  const checkSession = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      setDriverId(user.id);
+      fetchOrders();
+      fetchStats(user.id);
+    } else {
+      message.error("Iltimos, avval tizimga kiring");
+      onBack();
     }
   };
 
-  const acceptOrder = async (order) => {
-    try {
-      if (!driverId) {
-        message.error("Driver ID topilmadi. Qayta login qiling.");
-        return;
-      }
-      if (!order?.id) {
-        message.error("Order ID yo‘q.");
-        return;
-      }
+  const fetchOrders = async () => {
+    // Faqat shahar taksi buyurtmalari (service_type='taxi') va haydovchisi yo'q (pending)
+    const { data } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("service_type", "taxi") 
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+    setActiveOrders(data || []);
+  };
 
+  const fetchStats = async (uid) => {
+    // Bugungi statistika
+    const startOfDay = new Date().toISOString().split('T')[0];
+    const { data } = await supabase
+      .from("orders")
+      .select("price")
+      .eq("driver_id", uid)
+      .eq("status", "completed")
+      .gte("created_at", startOfDay);
+    
+    if (data) {
+      const sum = data.reduce((acc, cur) => acc + (cur.price || 0), 0);
+      setDailyStats({ sum, count: data.length });
+    }
+  };
+
+  // --- ACTIONS ---
+
+  const acceptOrder = async (order) => {
+    if (!driverId) return message.error("Haydovchi aniqlanmadi");
+    
+    try {
+      // 1. Bazada statusni o'zgartiramiz va driver_id ni biriktiramiz
       const { error } = await supabase
         .from("orders")
-        .update({ status: "accepted", driver_id: driverId })
+        .update({ 
+          status: "accepted", 
+          driver_id: driverId // <--- SQL kod orqali qo'shgan ustunimiz shu yerda ishlatiladi
+        })
         .eq("id", order.id);
 
       if (error) throw error;
 
       setCurrentOrder(order);
-      setTripStep(1);
-      playVoiceNote("Buyurtma qabul qilindi.");
+      setTripStep(1); // Pickupga borish
+      playVoice("Buyurtma qabul qilindi. Mijozga boring.");
+
     } catch (e) {
       console.error(e);
-      message.error("Qabul qilishda xatolik (server 400 bo‘lishi mumkin).");
+      message.error("Qabul qilishda xatolik: " + e.message);
     }
   };
 
   const arrivedAtPickup = async () => {
-    try {
-      if (!currentOrder?.id) return;
+    await supabase.from("orders").update({ status: "arrived" }).eq("id", currentOrder.id);
+    setTripStep(2); // Kutish
+    setWaitTime(0);
+    playVoice("Manzilga yetib keldingiz. Mijoz kutilmoqda.");
 
-      const { error } = await supabase
-        .from("orders")
-        .update({ status: "arrived" })
-        .eq("id", currentOrder.id);
-
-      if (error) throw error;
-
-      setTripStep(2);
-      setWaitTime(0);
-      playVoiceNote("Mijoz kutilmoqda.");
-
-      if (waitTimerRef.current) clearInterval(waitTimerRef.current);
-      waitTimerRef.current = setInterval(
-        () => setWaitTime((prev) => prev + 1),
-        1000
-      );
-    } catch (e) {
-      console.error(e);
-      message.error("Yetib keldim bosqichida xatolik.");
-    }
-  };
-
-  const startTrip = async () => {
-    try {
-      if (waitTimerRef.current) clearInterval(waitTimerRef.current);
-      if (!currentOrder?.id) return;
-
-      const { error } = await supabase
-        .from("orders")
-        .update({ status: "in_progress" })
-        .eq("id", currentOrder.id);
-
-      if (error) throw error;
-
-      setTripStep(3);
-      setTotalTraveledDist(0);
-      lastPositionRef.current = driverLocation;
-      playVoiceNote("Safar boshlandi.");
-    } catch (e) {
-      console.error(e);
-      message.error("Safarni boshlashda xatolik.");
-    }
-  };
-
-  const checkForChainOrder = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("status", "pending");
-
-      if (error) throw error;
-
-      if (data && data.length > 0) {
-        const nearest = data.find((o) => {
-          const p = parseLoc(o.pickup_location);
-          return getDistance(
-            driverLocation[0],
-            driverLocation[1],
-            p[0],
-            p[1]
-          ) < 3;
-        });
-
-        if (nearest) {
-          setNextOrder(nearest);
-          setOfferVisible(true);
-          setOfferTimeLeft(15);
-          return;
-        }
-      }
-
-      setTripStep(4);
-    } catch (e) {
-      console.error(e);
-      setTripStep(4);
-    }
-  };
-
-  const finishTrip = async () => {
-    try {
-      if (!currentOrder?.id) return;
-
-      const distancePrice = Math.ceil((totalTraveledDist * 2000) / 500) * 500;
-      const basePrice = currentOrder?.price || 0;
-      const finalPrice = Math.max(basePrice, distancePrice) + waitCost;
-
-      const { error } = await supabase
-        .from("orders")
-        .update({ status: "completed", price: finalPrice })
-        .eq("id", currentOrder.id);
-
-      if (error) throw error;
-
-      playVoiceNote("Safar yakunlandi.");
-      updateActivity(2);
-      if (driverId) fetchDailyStats(driverId);
-
-      checkForChainOrder();
-    } catch (e) {
-      console.error(e);
-      message.error("Safarni yakunlashda xatolik.");
-    }
-  };
-
-  const cancelActiveOrder = async () => {
-    try {
-      if (!currentOrder?.id) return;
-
-      const { error } = await supabase
-        .from("orders")
-        .update({ status: "pending", driver_id: null })
-        .eq("id", currentOrder.id);
-
-      if (error) throw error;
-
-      updateActivity(-10);
-      setTripStep(0);
-      setCurrentOrder(null);
-      message.error("Buyurtma bekor qilindi, faollik tushdi.");
-    } catch (e) {
-      console.error(e);
-      message.error("Bekor qilishda xatolik.");
-    }
-  };
-
-  // Offer countdown
-  useEffect(() => {
-    if (!offerVisible) return;
-
-    if (offerTimerRef.current) clearInterval(offerTimerRef.current);
-
-    offerTimerRef.current = setInterval(() => {
-      setOfferTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(offerTimerRef.current);
-          offerTimerRef.current = null;
-          setOfferVisible(false);
-          setNextOrder(null);
-          return 15;
-        }
-        return prev - 1;
-      });
+    // Kutish taymeri
+    waitIntervalRef.current = setInterval(() => {
+      setWaitTime(p => p + 1);
     }, 1000);
-
-    return () => {
-      if (offerTimerRef.current) clearInterval(offerTimerRef.current);
-      offerTimerRef.current = null;
-    };
-  }, [offerVisible]);
-
-  const handleAcceptNext = async () => {
-    if (offerTimerRef.current) clearInterval(offerTimerRef.current);
-    offerTimerRef.current = null;
-
-    setOfferVisible(false);
-
-    if (nextOrder) acceptOrder(nextOrder);
   };
 
-  // Cleanup wait timer
-  useEffect(() => {
-    return () => {
-      if (waitTimerRef.current) clearInterval(waitTimerRef.current);
-    };
-  }, []);
+  const startRide = async () => {
+    clearInterval(waitIntervalRef.current);
+    await supabase.from("orders").update({ status: "in_progress" }).eq("id", currentOrder.id);
+    setTripStep(3); // Safarda
+    setTotalDist(0);
+    playVoice("Safar boshlandi. Haydovchi, oq yo'l.");
+  };
 
-  // ✅ STEP 0 render (endilikda hooks buzilmaydi)
+  const completeRide = async () => {
+    // Narx hisoblash: Baza narxi + (Masofa * 2000 so'm) + (Kutish * 500 so'm)
+    // Bu shunchaki misol logika
+    const distanceCost = Math.floor(totalDist * 2000); 
+    const waitCost = Math.floor((waitTime / 60) * 500); 
+    const finalPrice = (currentOrder.price || 5000) + distanceCost + waitCost;
+
+    await supabase
+      .from("orders")
+      .update({ status: "completed", price: finalPrice })
+      .eq("id", currentOrder.id);
+
+    message.success(`Safar yakunlandi! Narx: ${finalPrice} so'm`);
+    playVoice("Safar yakunlandi.");
+    
+    // Zanjir (Chain) tekshirish
+    checkChainOrder();
+    
+    setTripStep(4); // Yakuniy ekran
+    fetchStats(driverId);
+  };
+
+  const checkChainOrder = () => {
+    // Agar activeOrders ichida yaqin buyurtma bo'lsa, taklif qilish
+    if (activeOrders.length > 0) {
+      setNextOrder(activeOrders[0]);
+      setOfferVisible(true);
+      setOfferTimer(15);
+      
+      timerRef.current = setInterval(() => {
+        setOfferTimer(prev => {
+          if (prev <= 1) {
+            clearInterval(timerRef.current);
+            setOfferVisible(false);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+  };
+
+  const closeChainOffer = () => {
+    clearInterval(timerRef.current);
+    setOfferVisible(false);
+    setNextOrder(null);
+    // Agar hozir 4-bosqichda bo'lsak va rad etsak -> Bosh sahifa
+    if (tripStep === 4) {
+       resetToHome();
+    }
+  };
+
+  const acceptChainOrder = () => {
+    clearInterval(timerRef.current);
+    setOfferVisible(false);
+    if (nextOrder) {
+      acceptOrder(nextOrder); // Yangisini boshlash
+    }
+  };
+
+  const resetToHome = () => {
+    setCurrentOrder(null);
+    setTripStep(0);
+    setWaitTime(0);
+    setTotalDist(0);
+  };
+
+  // --- VIEW HELPERS ---
+  const getPickupLoc = () => parseLoc(currentOrder?.pickup_location);
+  const getDropoffLoc = () => parseLoc(currentOrder?.dropoff_location);
+
+  // Narxni dinamik hisoblash (vizual)
+  const dynamicPrice = useMemo(() => {
+     if (!currentOrder) return 0;
+     const base = currentOrder.price || 0;
+     const wait = Math.floor((waitTime / 60) * 500);
+     return base + wait;
+  }, [currentOrder, waitTime]);
+
+
+  // --- RENDER STEP 0: ORDERS LIST ---
   if (tripStep === 0) {
     return (
-      <OrdersStepView
-        onBack={onBack}
-        activeOrders={activeOrders}
-        acceptOrder={acceptOrder}
-        dailyEarnings={dailyEarnings}
-        activityPoints={activityPoints}
-      />
+      <div style={{ background: '#f5f5f5', minHeight: '100vh', padding: 16 }}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <Button icon={<ArrowLeftOutlined />} shape="circle" onClick={onBack} />
+          <Title level={4} style={{ margin: 0 }}>Faol Buyurtmalar</Title>
+          <Badge count={activeOrders.length}>
+             <Button icon={<CarOutlined />} shape="circle" />
+          </Badge>
+        </div>
+
+        {/* Info Card */}
+        <Card style={{ borderRadius: 16, background: '#000', color: '#fff', marginBottom: 20, border: 'none' }}>
+           <Row gutter={16} align="middle">
+              <Col span={12}>
+                 <Text style={{ color: '#888' }}>Bugungi daromad</Text>
+                 <Title level={3} style={{ color: '#fff', margin: 0 }}>{dailyStats.sum.toLocaleString()} so'm</Title>
+              </Col>
+              <Col span={12} style={{ textAlign: 'right' }}>
+                 <Tag color="gold" icon={<ThunderboltFilled />}>{dailyStats.count} ta safar</Tag>
+              </Col>
+           </Row>
+        </Card>
+
+        {/* Orders List */}
+        <List
+          grid={{ gutter: 16, column: 1 }}
+          dataSource={activeOrders}
+          renderItem={item => (
+            <List.Item>
+              <Card 
+                hoverable 
+                style={{ borderRadius: 16, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}
+                onClick={() => acceptOrder(item)}
+              >
+                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Title level={5} style={{ margin: 0 }}>{item.pickup_location?.split(',')[0] || "Lokatsiya"}</Title>
+                    <Title level={5} style={{ margin: 0, color: 'green' }}>{item.price?.toLocaleString()} so'm</Title>
+                 </div>
+                 <div style={{ color: '#888', margin: '5px 0' }}>
+                    <EnvironmentOutlined /> {item.pickup_location}
+                 </div>
+                 <Button type="primary" block style={{ marginTop: 10, background: '#000', borderRadius: 12 }}>Qabul qilish</Button>
+              </Card>
+            </List.Item>
+          )}
+        />
+        {activeOrders.length === 0 && <Skeleton active />}
+      </div>
     );
   }
 
+  // --- RENDER STEPS 1-4: MAP MODE ---
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-      <div style={{ flex: 1, position: "relative" }}>
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", position: 'relative' }}>
+      
+      {/* MAP */}
+      <div style={{ flex: 1 }}>
         <MapContainer
           center={driverLocation}
-          zoom={15}
-          style={{ height: "100%", width: "100%" }}
+          zoom={16}
           zoomControl={false}
+          style={{ height: "100%", width: "100%" }}
         >
-          <TileLayer
-  url={getMapStyle()}
-  attribution='&copy; OpenStreetMap contributors &copy; CARTO'
-/>
-
+          <TileLayer url={MAP_TILE_URL} />
+          
           <Marker position={driverLocation} icon={carIcon} />
-          {tripStep === 1 && <Marker position={pickupCoords} icon={clientIcon} />}
-
-          {(tripStep === 1 || tripStep === 3) && (
-            <RoutingMachine
-              from={driverLocation}
-              to={tripStep === 1 ? pickupCoords : dropoffCoords}
-              color={routeColor}
-            />
+          
+          {(tripStep === 1 || tripStep === 2) && (
+            <Marker position={getPickupLoc()} icon={clientIcon} />
           )}
+          
+          {tripStep === 3 && (
+            <Marker position={getDropoffLoc()} icon={clientIcon} />
+          )}
+
+          {/* Navigatsiya chizig'i */}
+          <RoutingMachine 
+            from={driverLocation} 
+            to={tripStep === 1 ? getPickupLoc() : getDropoffLoc()} 
+            color={tripStep === 1 ? '#faad14' : '#52c41a'} 
+          />
         </MapContainer>
-
-        <HdrOverlay
-          tripStep={tripStep}
-          etaText={"—"}
-          distanceText={tripStep === 3 ? `${totalTraveledDist.toFixed(1)} km` : "—"}
-          priceText={`${currentPriceDisplay.toLocaleString()} so'm`}
-          title={overlayTitle}
-          subtitle={overlaySubtitle}
-          onChat={() => setChatVisible(true)}
-          onNav={() => openNavigatorTo(navTarget)}
-          showNav={tripStep === 1 || tripStep === 3}
-        />
       </div>
 
-      <div
-        style={{
-          background: "#fff",
-          padding: "20px 15px",
-          borderRadius: "24px 24px 0 0",
-          boxShadow: "0 -5px 25px rgba(0,0,0,0.1)",
-          zIndex: 1001,
-        }}
-      >
-        <div style={{ textAlign: "center", marginBottom: 15 }}>
-          <Tag
-            color={tripStep === 3 ? "green" : "orange"}
-            style={{ borderRadius: 6, fontWeight: "bold" }}
-          >
-            {tripStep === 1 ? "MIJOZGA BORILMOQDA" : tripStep === 2 ? "KUTILMOQDA" : "YUKLANDI"}
-          </Tag>
-        </div>
-
-        {tripStep < 4 && (
-          <>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 20,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <Avatar
-                  size={50}
-                  style={{ backgroundColor: "#FFD700" }}
-                  icon={<UserOutlined style={{ color: "#000" }} />}
-                />
-                <div>
-                  <Title level={5} style={{ margin: 0, fontFamily: "YangoHeadline" }}>
-                    {currentOrder?.client_name || "Yo'lovchi"}
-                  </Title>
-                  <Text type="secondary">5.0 ★</Text>
-                </div>
-              </div>
-              <Button
-                shape="circle"
-                size="large"
-                icon={<PhoneOutlined />}
-                style={{ background: "#f5f5f5", color: "#000", border: "none" }}
-              />
-            </div>
-
-            {tripStep === 3 && (
-              <div
-                style={{
-                  textAlign: "center",
-                  marginBottom: 15,
-                  background: "#f9f9f9",
-                  padding: "10px",
-                  borderRadius: "12px",
-                }}
-              >
-                <Text type="secondary">Joriy hisob:</Text>
-                <Title level={3} style={{ margin: 0 }}>
-                  {currentPriceDisplay.toLocaleString()} so'm
-                </Title>
-                <Text style={{ fontSize: 10 }}>
-                  Masofa: {totalTraveledDist.toFixed(1)} km
-                </Text>
-              </div>
-            )}
-          </>
-        )}
-
-        {tripStep === 1 && (
-          <Row gutter={10}>
-            <Col span={16}>
-              <Button
-                type="primary"
-                block
-                size="large"
-                onClick={arrivedAtPickup}
-                style={{
-                  height: 60,
-                  borderRadius: 16,
-                  background: "#000",
-                  fontWeight: 800,
-                }}
-              >
-                YETIB KELDIM
-              </Button>
-            </Col>
-            <Col span={8}>
-              <Button
-                block
-                size="large"
-                danger
-                onClick={cancelActiveOrder}
-                style={{ height: 60, borderRadius: 16 }}
-              >
-                BEKOR
-              </Button>
-            </Col>
-          </Row>
-        )}
-
-        {tripStep === 2 && (
-          <div>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 15,
-                background: "#f9f9f9",
-                padding: 15,
-                borderRadius: 12,
-              }}
-            >
-              <div>
-                <Text type="secondary">Kutish vaqti:</Text>
-                <div
-                  style={{
-                    fontSize: 24,
-                    fontWeight: "bold",
-                    color: paidWaitSeconds > 0 ? "#ff4d4f" : "#52c41a",
-                  }}
-                >
-                  {Math.floor(waitTime / 60)}:{String(waitTime % 60).padStart(2, "0")}
-                </div>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <Text type="secondary">Kutish haqi:</Text>
-                <div style={{ fontSize: 20, fontWeight: "bold" }}>
-                  {waitCost.toLocaleString()}
-                </div>
-              </div>
-            </div>
-
-            <Button
-              type="primary"
-              block
-              size="large"
-              onClick={startTrip}
-              style={{
-                height: 60,
-                borderRadius: 16,
-                background: "#52c41a",
-                border: "none",
-                fontWeight: 800,
-              }}
-            >
-              KETDIK!
-            </Button>
-          </div>
-        )}
-
-        {tripStep === 3 && (
-          <Button
-            type="primary"
-            block
-            size="large"
-            danger
-            onClick={finishTrip}
-            style={{ height: 60, borderRadius: 16, fontWeight: 800 }}
-          >
-            SAFARNI YAKUNLASH
-          </Button>
-        )}
-
-        {tripStep === 4 && (
-          <div style={{ textAlign: "center", padding: "10px 0" }}>
-            <CheckCircleOutlined
-              style={{ fontSize: 50, color: "#52c41a", marginBottom: 10 }}
-            />
-            <Title level={2} style={{ margin: 0 }}>
-              {currentPriceDisplay.toLocaleString()} so'm
-            </Title>
-            <Button
-              block
-              size="large"
-              style={{
-                marginTop: 20,
-                borderRadius: 16,
-                height: 55,
-                background: "#000",
-                color: "#fff",
-              }}
-              onClick={() => {
-                setTripStep(0);
-                setCurrentOrder(null);
-              }}
-            >
-              BOSH SAHIFA
-            </Button>
-          </div>
-        )}
-      </div>
-
-      <ChatComponent
-        orderId={currentOrder?.id}
-        userId={driverId}
-        visible={chatVisible}
-        onClose={() => setChatVisible(false)}
+      {/* OVERLAYS */}
+      <HdrOverlay 
+         tripStep={tripStep}
+         etaText="5 daqiqa"
+         distanceText={tripStep === 3 ? `${(totalDist + 1.2).toFixed(1)} km` : null}
+         priceText={`${dynamicPrice.toLocaleString()} so'm`}
+         title={currentOrder?.pickup_location || "Manzil"}
+         subtitle={tripStep === 2 ? `Kutish: ${Math.floor(waitTime/60)}:${waitTime%60}` : "Mijoz bilan aloqa"}
+         onChat={() => message.info("Chat ochilmoqda...")}
+         showNav={tripStep === 1 || tripStep === 3}
+         onNav={() => openNavigatorTo(tripStep === 1 ? getPickupLoc() : getDropoffLoc())}
       />
 
+      {/* BOTTOM ACTION PANEL */}
+      <div style={{ 
+         background: '#fff', 
+         padding: '20px 16px 30px', 
+         borderRadius: '24px 24px 0 0', 
+         boxShadow: '0 -10px 30px rgba(0,0,0,0.1)',
+         zIndex: 1001,
+         position: 'relative'
+      }}>
+         
+         {/* User Info */}
+         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+               <Avatar size={48} icon={<UserOutlined />} style={{ background: '#f0f0f0', color: '#000' }} />
+               <div>
+                  <Title level={5} style={{ margin: 0 }}>Mijoz</Title>
+                  <Text type="secondary">Naqd to'lov</Text>
+               </div>
+            </div>
+            <Button shape="circle" size="large" icon={<PhoneOutlined />} />
+         </div>
+
+         {/* Buttons based on Step */}
+         {tripStep === 1 && (
+            <Button type="primary" block size="large" style={{ height: 56, borderRadius: 16, background: '#faad14', fontSize: 18, fontWeight: 700 }} onClick={arrivedAtPickup}>
+               YETIB KELDIM
+            </Button>
+         )}
+
+         {tripStep === 2 && (
+            <Row gutter={10}>
+               <Col span={24}>
+                  <Button type="primary" block size="large" style={{ height: 56, borderRadius: 16, background: '#52c41a', fontSize: 18, fontWeight: 700 }} onClick={startRide}>
+                     KETDIK (BOSHLASH)
+                  </Button>
+               </Col>
+            </Row>
+         )}
+
+         {tripStep === 3 && (
+            <Button type="primary" block size="large" danger style={{ height: 56, borderRadius: 16, fontSize: 18, fontWeight: 700 }} onClick={completeRide}>
+               SAFARNI YAKUNLASH
+            </Button>
+         )}
+
+         {tripStep === 4 && (
+            <Button block size="large" onClick={resetToHome} style={{ height: 56, borderRadius: 16 }}>
+               BOSH SAHIFA
+            </Button>
+         )}
+      </div>
+
+      {/* CHAIN ORDER MODAL (Zanjir) */}
       <Modal
         open={offerVisible}
         footer={null}
         closable={false}
         centered
         width={320}
-        bodyStyle={{ textAlign: "center", padding: 25, borderRadius: 20 }}
+        bodyStyle={{ textAlign: 'center', padding: 24 }}
       >
-        <Title level={4} style={{ color: "#faad14" }}>
-          <FireOutlined /> ZANJIR BUYURTMA!
-        </Title>
+         <FireOutlined style={{ fontSize: 40, color: 'orange', marginBottom: 10 }} />
+         <Title level={4}>Yangi buyurtma!</Title>
+         <Text type="secondary">Sizga yaqin joyda buyurtma bor</Text>
+         
+         <div style={{ background: '#f5f5f5', padding: 10, borderRadius: 12, margin: '15px 0', textAlign: 'left' }}>
+            <Text strong>{nextOrder?.pickup_location}</Text>
+            <div style={{ color: 'green', fontWeight: 'bold' }}>{nextOrder?.price?.toLocaleString()} so'm</div>
+         </div>
 
-        <Progress
-          type="circle"
-          percent={(offerTimeLeft / 15) * 100}
-          format={() => `${offerTimeLeft}s`}
-          strokeColor="#faad14"
-          width={70}
-        />
-
-        <div
-          style={{
-            textAlign: "left",
-            background: "#f9f9f9",
-            padding: 15,
-            borderRadius: 12,
-            margin: "20px 0",
-          }}
-        >
-          <Text strong>{nextOrder?.pickup_location?.slice(0, 30)}...</Text>
-          <div style={{ marginTop: 5, color: "green", fontWeight: "bold" }}>
-            {nextOrder?.price ? parseInt(nextOrder.price).toLocaleString() : "—"} so'm
-          </div>
-        </div>
-
-        <Row gutter={10}>
-          <Col span={12}>
-            <Button block size="large" onClick={() => setOfferVisible(false)}>
-              Rad etish
-            </Button>
-          </Col>
-          <Col span={12}>
-            <Button
-              type="primary"
-              block
-              size="large"
-              style={{ background: "#000" }}
-              onClick={handleAcceptNext}
-            >
-              Qabul qilish
-            </Button>
-          </Col>
-        </Row>
+         <Progress type="circle" percent={(offerTimer / 15) * 100} width={60} format={() => `${offerTimer}s`} />
+         
+         <Row gutter={10} style={{ marginTop: 20 }}>
+            <Col span={12}>
+               <Button block size="large" onClick={closeChainOffer}>O'tkazish</Button>
+            </Col>
+            <Col span={12}>
+               <Button type="primary" block size="large" onClick={acceptChainOrder}>Qabul qilish</Button>
+            </Col>
+         </Row>
       </Modal>
 
-      <style>{`
-        .leaflet-marker-icon { transition: transform 1.2s linear !important; }
-        .ant-btn:active { transform: scale(0.96); }
-      `}</style>
     </div>
   );
 }
