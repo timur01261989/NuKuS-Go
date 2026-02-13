@@ -2,8 +2,10 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Card, List, Button, Tag, Typography, message, Empty, Skeleton } from "antd";
 import {
   CheckOutlined,
+  ClockCircleOutlined,
   CarOutlined,
   EnvironmentOutlined,
+  SendOutlined,
   PhoneOutlined,
 } from "@ant-design/icons";
 
@@ -36,6 +38,9 @@ const carIcon = L.divIcon({
 
 const { Text, Title } = Typography;
 
+// ✅ SHAHAR ICHIDAGI TARIFLAR (Viloyat buyurtmalarini ajratish uchun)
+const CITY_TARIFFS = ['start', 'comfort', 'taxi', 'econom'];
+
 // Xaritani markazlashtirish komponenti
 function RecenterMap({ lat, lng }) {
   const map = useMap();
@@ -61,7 +66,7 @@ function SmoothDriverMarker({ position }) {
   return <Marker ref={markerRef} position={position} icon={carIcon} />;
 }
 
-// Koordinatalarni parsing qilish (Lat: xx, Lng: yy format)
+// Koordinatalarni parsing qilish
 const parseLatLng = (locString) => {
   if (!locString || typeof locString !== "string") return null;
   const match = locString.match(/Lat:\s*([0-9.]+),\s*Lng:\s*([0-9.]+)/i);
@@ -77,21 +82,22 @@ export default function DriverOrderFeed() {
   const [activeOrder, setActiveOrder] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Haydovchi joylashuvi (Simulyatsiya)
+  // Haydovchi joylashuvi (Simulyatsiya - Nukus)
   const [driverLoc] = useState([42.4619, 59.6166]);
 
   const savedLang = localStorage.getItem("appLang") || "uz_lotin";
   const t = translations[savedLang] || translations["uz_lotin"];
 
+  // ✅ Shahar ichidagi buyurtmalarni yuklash (Filtrlangan)
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     try {
-      // ✅ faqat bo‘sh buyurtmalar
       const { data, error } = await supabase
         .from("orders")
         .select("*")
         .in("status", ["pending", "searching"])
         .is("driver_id", null)
+        .in("service_type", CITY_TARIFFS) // Faqat shahar tariflari
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -134,7 +140,7 @@ export default function DriverOrderFeed() {
     checkActiveOrder();
     fetchOrders();
 
-    // ✅ REALTIME: orders o‘zgarishini kuzatish
+    // ✅ REALTIME: Shahar ichi buyurtmalarini jonli kuzatish
     const channel = supabase
       .channel("driver-orders-feed")
       .on(
@@ -144,38 +150,39 @@ export default function DriverOrderFeed() {
           const rowNew = payload.new;
           const rowOld = payload.old;
 
-          // INSERT
+          // Yangi buyurtma qo'shilganda (INSERT)
           if (payload.eventType === "INSERT") {
             const isRelevant = ["pending", "searching"].includes(rowNew?.status);
             const isFree = !rowNew?.driver_id;
-            if (isRelevant && isFree) {
+            const isCityService = CITY_TARIFFS.includes(rowNew?.service_type);
+
+            if (isRelevant && isFree && isCityService) {
               setOrders((prev) => [rowNew, ...prev]);
-              message.info("Yangi buyurtma tushdi!");
+              message.info("Yangi shahar ichi buyurtmasi!");
             }
             return;
           }
 
-          // UPDATE
+          // Buyurtma o'zgarganda (UPDATE)
           if (payload.eventType === "UPDATE") {
             const statusOk = ["pending", "searching"].includes(rowNew?.status);
             const isFree = !rowNew?.driver_id;
+            const isCityService = CITY_TARIFFS.includes(rowNew?.service_type);
 
-            // Agar endi mavjud bo‘lmasa -> ro‘yxatdan o‘chiramiz
-            if (!statusOk || !isFree) {
+            // Agar endi mavjud bo'lmasa yoki boshqa turga o'tib ketsa -> o'chirish
+            if (!statusOk || !isFree || !isCityService) {
               setOrders((prev) => prev.filter((o) => o.id !== rowNew?.id));
             } else {
-              // Hali ham mavjud bo‘lsa -> yangilaymiz (yoki qo‘shamiz)
               setOrders((prev) => {
                 const exists = prev.some((o) => o.id === rowNew.id);
                 if (!exists) return [rowNew, ...prev];
                 return prev.map((o) => (o.id === rowNew.id ? rowNew : o));
               });
             }
-
             return;
           }
 
-          // DELETE
+          // Buyurtma o'chirilganda (DELETE)
           if (payload.eventType === "DELETE") {
             setOrders((prev) => prev.filter((o) => o.id !== rowOld?.id));
           }
@@ -199,7 +206,6 @@ export default function DriverOrderFeed() {
         return;
       }
 
-      // ✅ poyga bo‘lmasligi uchun: driver_id bo‘sh bo‘lsa va status pending/searching bo‘lsa update
       const { data, error } = await supabase
         .from("orders")
         .update({
@@ -255,10 +261,18 @@ export default function DriverOrderFeed() {
     }
   };
 
+  const btnTouchProps = {
+    onMouseDown: (e) => (e.currentTarget.style.transform = "scale(0.96)"),
+    onMouseUp: (e) => (e.currentTarget.style.transform = "scale(1)"),
+    onTouchStart: (e) => (e.currentTarget.style.transform = "scale(0.96)"),
+    onTouchEnd: (e) => (e.currentTarget.style.transform = "scale(1)"),
+    style: { transition: "transform 0.1s" },
+  };
+
   // --- AGAR AKTIV BUYURTMA BO'LSA -> XARITA REJIMI ---
   if (activeOrder) {
     const clientPos = parseLatLng(activeOrder.pickup_location) || [42.4619, 59.6166];
-    const destPos = parseLatLng(activeOrder.dropoff_location); // ko‘pincha address bo‘ladi -> null bo‘lishi mumkin
+    const destPos = parseLatLng(activeOrder.dropoff_location);
 
     return (
       <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
@@ -325,12 +339,14 @@ export default function DriverOrderFeed() {
               block
               type="primary"
               size="large"
+              {...btnTouchProps}
               onClick={() => updateStatus("arrived")}
               style={{
                 height: 60,
                 borderRadius: 20,
                 background: "black",
                 fontWeight: 700,
+                ...btnTouchProps.style,
               }}
             >
               YETIB KELDIM 🏁
@@ -342,6 +358,7 @@ export default function DriverOrderFeed() {
               block
               type="primary"
               size="large"
+              {...btnTouchProps}
               onClick={() => updateStatus("in_progress")}
               style={{
                 height: 60,
@@ -349,6 +366,7 @@ export default function DriverOrderFeed() {
                 background: "#faad14",
                 color: "black",
                 fontWeight: 700,
+                ...btnTouchProps.style,
               }}
             >
               KETDIK (SAFARNI BOSHLASH) 🚖
@@ -361,11 +379,13 @@ export default function DriverOrderFeed() {
               type="primary"
               danger
               size="large"
+              {...btnTouchProps}
               onClick={() => updateStatus("completed")}
               style={{
                 height: 60,
                 borderRadius: 20,
                 fontWeight: 700,
+                ...btnTouchProps.style,
               }}
             >
               SAFARNI YAKUNLASH ✅
@@ -417,9 +437,14 @@ export default function DriverOrderFeed() {
                   <EnvironmentOutlined style={{ color: "#52c41a", fontSize: 18 }} />
                   <Text strong>{item.pickup_location}</Text>
                 </div>
+                <div style={{ borderLeft: "2px dashed #e0e0e0", height: 15, marginLeft: 9, margin: "0 0 5px 0" }}></div>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                   <EnvironmentOutlined style={{ color: "#ff4d4f", fontSize: 18 }} />
-                  <Text strong>{item.dropoff_location || "Manzil noma'lum"}</Text>
+                  <Text strong>
+                    {item.dropoff_location && item.dropoff_location.includes("Lat:") 
+                      ? "Xaritada belgilangan joy" 
+                      : (item.dropoff_location || "Noma'lum")}
+                  </Text>
                 </div>
               </div>
 
@@ -428,12 +453,15 @@ export default function DriverOrderFeed() {
                 block
                 size="large"
                 icon={<CheckOutlined />}
+                {...btnTouchProps}
                 style={{
                   background: "black",
                   height: 55,
                   borderRadius: 18,
                   fontWeight: 700,
                   border: "none",
+                  boxShadow: "0 4px 15px rgba(0,0,0,0.2)",
+                  ...btnTouchProps.style,
                 }}
                 onClick={() => acceptOrder(item)}
               >
