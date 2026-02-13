@@ -252,7 +252,7 @@ export default function ClientOrderCreate({ onBack }) {
             
             <div className="payment-row">
               <Space><WalletOutlined /> <span>Naqd</span></Space>
-              <span>Kommentariya ></span>
+              <span>Kommentariya &gt;</span>
             </div>
           </div>
         )}
