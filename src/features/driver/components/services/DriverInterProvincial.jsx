@@ -1,15 +1,17 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   Card,
   Button,
   Typography,
   Row,
   Col,
-  DatePicker,
   TimePicker,
+  DatePicker,
   InputNumber,
+  Switch,
   Space,
   message,
+  ConfigProvider,
   Divider,
   Select,
   Tag,
@@ -17,50 +19,54 @@ import {
   List,
   Modal,
   Input,
-  Tabs,
   Badge,
-  Popconfirm,
-  Switch,
+  Tabs,
 } from "antd";
 import {
+  ArrowLeftOutlined,
   EnvironmentFilled,
-  CalendarOutlined,
   ClockCircleOutlined,
+  CalendarOutlined,
   UserOutlined,
+  DeleteOutlined,
+  SendOutlined,
+  EditOutlined,
+  BellOutlined,
+  SaveOutlined,
   CheckOutlined,
   CloseOutlined,
-  PlusOutlined,
+  EyeInvisibleOutlined,
   AimOutlined,
-  EditOutlined,
-  StopOutlined,
-  CheckCircleOutlined,
-  ReloadOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import { translations } from "@i18n/translations";
 import { supabase } from "../../../../lib/supabase";
 
 const { Title, Text } = Typography;
 
 /**
- * ✅ DB TABLES
+ * DriverInterProvincial.jsx (v5 - fixed & working)
+ * - Driver creates inter_prov ad (order)
+ * - Driver sees own active ad after re-login
+ * - Passenger booking requests come as "requested"
+ * - Driver must Accept/Reject
+ * - After accept: passenger phone visible + "Yo‘lovchi bilan bog‘laning" comment
+ * - Optional pickup mode:
+ *    - meet_point: passenger comes to driver's meet point
+ *    - home_pickup: passenger sends pickup geolocation; driver sees it after accept
+ * - Driver can set:
+ *    - meet point (start) via geolocation + address text
+ *    - destination (label + optional geo) via geolocation + address text
+ *
+ * NOTE:
+ * - This file expects DB tables:
+ *   orders, trip_booking_requests, trip_bookings, notifications
+ * - RPCs used (expected to exist):
+ *   accept_inter_prov_booking, reject_inter_prov_booking
+ * - Wallet/balance is optional; if table not present it will just show nothing.
  */
-const RIDES_TABLE = "inter_prov_rides";
-const BOOKINGS_TABLE = "inter_prov_bookings";
 
-/**
- * ✅ RPCs
- */
-const ACCEPT_RPC = "accept_inter_prov_booking";
-const REJECT_RPC = "reject_inter_prov_booking";
-
-/**
- * ✅ Accept fee for now
- */
-const ACCEPT_FEE_SUM = 0;
-
-/**
- * --- REGIONS (minimal demo, replace with your full list) ---
- */
+// --- REGIONS + DISTRICTS (UZ) ---
 const REGIONS_DATA = [
   { name: "Qoraqalpog'iston", districts: ["Nukus sh.", "Chimboy", "Qo'ng'irot", "Beruniy", "To'rtko'l", "Mo'ynoq", "Xo'jayli", "Shumanay", "Qanliko'l", "Kegeyli", "Qorao'zak", "Taxtako'pir", "Ellikqala", "Amudaryo", "Bo'zatov", "Nukus tumani"] },
   { name: "Toshkent shahri", districts: ["", "Yunusobod", "Chilonzor", "Mirzo Ulug'bek", "Yashnobod", "Yakkasaroy", "Sergeli", "Uchtepa", "Olmazor", "Bektemir", "Mirobod", "Shayxontohur", "Yangihayot"] },
@@ -78,905 +84,1265 @@ const REGIONS_DATA = [
   { name: "Namangan", districts: ["Namangan sh.", "Chortoq", "Chust", "Kosonsoy", "Mingbuloq", "Norin", "Pop", "To'raqo'rg'on", "Uchqo'rg'on", "Uychi", "Yangiqo'rg'on"] },
 ];
 
-const regionOptions = REGIONS_DATA.map((r) => ({ label: r.name, value: r.name }));
-const districtsByRegion = (regionName) =>
-  REGIONS_DATA.find((r) => r.name === regionName)?.districts?.map((d) => ({ label: d, value: d })) || [];
+const getDistricts = (regionName) => (REGIONS_DATA.find((r) => r.name === regionName)?.districts || []);
+const isTashkentCity = (regionName) => regionName === "Toshkent shahri";
+const districtLabel = (district) => (district && district.trim() ? district : "Hammasi");
+const formatMoney = (n) => Number(n || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 
-const fmtMoney = (n) => {
-  const v = Number(n || 0);
-  return v.toLocaleString("uz-UZ");
+const GENDER_OPTIONS = [
+  { label: "Hamma", value: "all" },
+  { label: "Erkak", value: "male" },
+  { label: "Ayol", value: "female" },
+];
+
+const PICKUP_MODES = [
+  { label: "Belgilangan joyga kelish", value: "meet_point" },
+  { label: "Uydan olib ketish", value: "home_pickup" },
+];
+
+const normalizeGender = (v) => (v === "male" || v === "female" || v === "all" ? v : "all");
+
+const routeText = (o) => {
+  const fromR = o.from_region || "-";
+  const fromD = districtLabel(o.from_district);
+  const toR = o.to_region || "-";
+  const toD = districtLabel(o.to_district);
+  return `${fromR} / ${fromD}  →  ${toR} / ${toD}`;
 };
 
-const safeMapUrl = ({ lat, lng, mode, sLat, sLng }) => {
-  if (!lat || !lng) return "";
-  if (mode === "route" && sLat && sLng) {
-    return `https://www.google.com/maps?saddr=${sLat},${sLng}&daddr=${lat},${lng}&output=embed`;
-  }
-  return `https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`;
+const maskPhone = (p) => {
+  const s = String(p || "");
+  if (s.length < 6) return "********";
+  return s.slice(0, 4) + "****" + s.slice(-2);
 };
 
-const AcceptButtonWithNote = ({ onAccept, disabled }) => {
-  return (
-    <div style={{ minWidth: 180 }}>
-      <Button block type="primary" icon={<CheckOutlined />} disabled={disabled} onClick={onAccept}>
-        Qabul qilish
-      </Button>
-      <div style={{ marginTop: 6, lineHeight: 1.2 }}>
-        <Text type="secondary" style={{ fontSize: 12 }}>
-          Qabul qilish tugmasini bossangiz hisobingizdan pul yechiladi.
-        </Text>
-        <br />
-        <Text type="secondary" style={{ fontSize: 12 }}>
-          (Hozircha: {fmtMoney(ACCEPT_FEE_SUM)} so‘m)
-        </Text>
-      </div>
-    </div>
-  );
+const openGoogleMaps = (lat, lng, title = "Xarita") => {
+  if (lat == null || lng == null) return;
+  openMapEmbed({ title, lat, lng, mode: "pin" });
+};
+const openGoogleDirectionsTo = (lat, lng, sLat, sLng, title = "Yo‘l") => {
+  if (lat == null || lng == null) return;
+  openMapEmbed({ title, lat, lng, sLat, sLng, mode: "route" });
+};
+const getMyGeo = async () => {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) return reject(new Error("Geolokatsiya qo‘llab-quvvatlanmaydi"));
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      (err) => reject(err),
+      { enableHighAccuracy: true, timeout: 20000 }
+    );
+  });
 };
 
-export default function DriverInterProvincial() {
-  const formRef = useRef(null);
+async function loadNotifications(userId) {
+  const { data, error } = await supabase
+    .from("notifications")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) throw error;
+  return data || [];
+}
+
+async function markNotifRead(ids) {
+  if (!ids || ids.length === 0) return;
+  await supabase.from("notifications").update({ is_read: true }).in("id", ids);
+}
+
+async function loadDriverBalance(driverId) {
+  // optional table. If absent - ignore.
+  try {
+    const { data, error } = await supabase
+      .from("driver_wallets")
+      .select("balance")
+      .eq("driver_id", driverId)
+      .maybeSingle();
+    if (!error && data) return Number(data.balance || 0);
+  } catch (e) {}
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("balance")
+      .eq("id", driverId)
+      .maybeSingle();
+    if (!error && data) return Number(data.balance || 0);
+  } catch (e) {}
+  return null;
+}
+
+export default function DriverInterProvincial({ onBack }) {
+  const savedLang = localStorage.getItem("appLang") || "uz_lotin";
+  const t = translations?.[savedLang] || translations?.["uz_lotin"] || {};
+
+
+  // In-app map modal (no new tab)
+  const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita" });
+  const openMapEmbed = ({ title = "Xarita", lat, lng, sLat, sLng, mode = "pin" }) => {
+    const safe = (v) => String(v ?? "").trim();
+    const qLat = safe(lat), qLng = safe(lng);
+    const aLat = safe(sLat), aLng = safe(sLng);
+
+    let url = "";
+    if (mode === "route" && aLat && aLng && qLat && qLng) {
+      url = `https://www.google.com/maps?saddr=${aLat},${aLng}&daddr=${qLat},${qLng}&output=embed`;
+    } else if (qLat && qLng) {
+      url = `https://www.google.com/maps?q=${qLat},${qLng}&output=embed`;
+    } else {
+      message.error("Lokatsiya topilmadi");
+      return;
+    }
+    setMapModal({ open: true, url, title });
+  };
 
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorText, setErrorText] = useState("");
 
-  // Auth
-  const [session, setSession] = useState(null);
+  const [activeAd, setActiveAd] = useState(null);
+  const [tab, setTab] = useState("requests");
 
-  // Driver balance (optional)
+  const [requests, setRequests] = useState([]); // status=requested
+  const [accepted, setAccepted] = useState([]); // status=accepted
+
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+
+  const [editMode, setEditMode] = useState(false);
   const [driverBalance, setDriverBalance] = useState(null);
 
-  // Rides list
-  const [rides, setRides] = useState([]);
-  const [selectedRideId, setSelectedRideId] = useState(null);
+  // Accept fee (UZS). For now 0 so'm => everyone can accept.
+  const ACCEPT_FEE_SUM = 0;
 
-  // Bookings for selected ride
-  const [bookings, setBookings] = useState([]);
+  // pickup/destination extra
+  const [pickupMode, setPickupMode] = useState("meet_point"); // meet_point | home_pickup
+  const [meetLat, setMeetLat] = useState(null);
+  const [meetLng, setMeetLng] = useState(null);
+  const [meetAddress, setMeetAddress] = useState("");
+  const [destLat, setDestLat] = useState(null);
+  const [destLng, setDestLng] = useState(null);
+  const [destAddress, setDestAddress] = useState("");
 
-  const pendingBookings = useMemo(() => bookings.filter((b) => b.status === "pending"), [bookings]);
-  const acceptedBookings = useMemo(() => bookings.filter((b) => b.status === "accepted"), [bookings]);
+  const [deliveryService, setDeliveryService] = useState(false);
 
-  const selectedRide = useMemo(() => rides.find((r) => r.id === selectedRideId) || null, [rides, selectedRideId]);
-  const rideIsCompleted = selectedRide?.status === "completed";
-  const rideIsCancelled = selectedRide?.status === "cancelled";
-
-  // Create ride form
-  const [form, setForm] = useState({
-    fromRegion: null,
-    fromDistrict: null,
-    toRegion: null,
-    toDistrict: null,
-    rideDate: null,
-    rideTime: null,
-    seats: 1,
-    price: 0,
-    pickup_mode: "meet_point",
-
-    // ✅ New: delivery service
-    delivery_service: false,
-
-    // ✅ only ONE required "ketish" point:
-    meet_lat: null,
-    meet_lng: null,
-    meet_address: "",
-
-    // optional dest
-    dest_lat: null,
-    dest_lng: null,
-    dest_address: "",
-  });
-
-  // Map modal
-  const [mapModal, setMapModal] = useState({ open: false, title: "", url: "" });
-
-  // Safe: won't crash if referenced
+  // Swap direction to quickly create a "return" ride draft
   const prepareReturnDraft = () => {
-    message.info("Qaytish yo‘nalishi: yo‘nalishlar almashtirildi");
-    setForm((p) => ({
+    // swap regions/districts
+    setFormData((p) => ({
       ...p,
       fromRegion: p.toRegion,
       fromDistrict: p.toDistrict,
       toRegion: p.fromRegion,
       toDistrict: p.fromDistrict,
-      meet_lat: p.dest_lat,
-      meet_lng: p.dest_lng,
-      meet_address: p.dest_address,
-      dest_lat: p.meet_lat,
-      dest_lng: p.meet_lng,
-      dest_address: p.meet_address,
     }));
-    setTimeout(() => formRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" }), 150);
+
+    // swap meet/destination pins
+    setMeetLat(destLat);
+    setMeetLng(destLng);
+    setMeetAddress(destAddress || "");
+
+    setDestLat(meetLat);
+    setDestLng(meetLng);
+    setDestAddress(meetAddress || "");
+
+    setEditMode(true);
+    message.success("Qaytish yo‘nalishi uchun draft tayyorlandi");
   };
 
-  const openMapEmbed = ({ title, lat, lng, mode = "pin", sLat = null, sLng = null }) => {
-    const url = safeMapUrl({ lat, lng, mode, sLat, sLng });
-    if (!url) return message.warning("Lokatsiya topilmadi");
-    setMapModal({ open: true, title, url });
-  };
 
-  const getMyLocation = async () => {
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      message.error("Geolokatsiya qo‘llab-quvvatlanmaydi");
-      return null;
+  const [formData, setFormData] = useState(() => {
+    const saved = localStorage.getItem("driverInterProvDraft_v5");
+    if (saved) {
+      try {
+        const p = JSON.parse(saved);
+        return {
+          fromRegion: p.fromRegion || "Qoraqalpog'iston",
+          fromDistrict: p.fromDistrict ?? "Nukus sh.",
+          toRegion: p.toRegion || "Toshkent shahri",
+          toDistrict: p.toDistrict ?? "",
+          date: p.date || dayjs().format("YYYY-MM-DD"),
+          time: p.time || "09:00",
+          seatsTotal: Number(p.seatsTotal || 4),
+          price: Number(p.price || 150000),
+          genderPref: normalizeGender(p.genderPref || p.gender_pref || "all"),
+          pickupMode: p.pickupMode || p.pickup_mode || "meet_point",
+        };
+      } catch (e) {}
     }
-    return await new Promise((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => resolve(null),
-        { enableHighAccuracy: true, timeout: 8000 }
-      );
-    });
-  };
-
-  const refreshSession = async () => {
-    const { data } = await supabase.auth.getSession();
-    setSession(data?.session || null);
-    return data?.session || null;
-  };
-
-  const loadDriverBalance = async (uid) => {
-    try {
-      const { data, error } = await supabase.from("driver_wallets").select("balance").eq("driver_id", uid).maybeSingle();
-      if (error) return;
-      if (data && typeof data.balance !== "undefined") setDriverBalance(data.balance);
-    } catch {
-      // ignore
-    }
-  };
-
-  const loadMyRides = async (uid) => {
-    const { data, error } = await supabase
-      .from(RIDES_TABLE)
-      .select("*")
-      .eq("driver_id", uid)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      message.error(`Ride yuklash xatosi: ${error.message}`);
-      return [];
-    }
-    setRides(data || []);
-    if (!selectedRideId && data?.[0]?.id) setSelectedRideId(data[0].id);
-    return data || [];
-  };
-
-  const loadBookingsForRide = async (rideId) => {
-    if (!rideId) {
-      setBookings([]);
-      return [];
-    }
-
-    // ✅ ketma-ketlik: created_at ascending (old -> new)
-    const { data, error } = await supabase
-      .from(BOOKINGS_TABLE)
-      .select("*")
-      .eq("ride_id", rideId)
-      .order("created_at", { ascending: true });
-
-    if (error) {
-      message.error(`Booking yuklash xatosi: ${error.message}`);
-      return [];
-    }
-    setBookings(data || []);
-    return data || [];
-  };
-
-  const createRide = async () => {
-    const uid = session?.user?.id;
-    if (!uid) return message.error("Login qiling");
-
-    if (!form.fromRegion || !form.toRegion) return message.warning("Viloyatlarni tanlang");
-    if (!form.rideDate) return message.warning("Sanani tanlang");
-    if (!form.rideTime) return message.warning("Vaqtni tanlang");
-
-    if (!form.meet_lat || !form.meet_lng) return message.warning("Ketish lokatsiyasini belgilang (GPS yoki lat/lng)");
-
-    const payload = {
-      driver_id: uid,
-      from_region: form.fromRegion,
-      from_district: form.fromDistrict,
-      to_region: form.toRegion,
-      to_district: form.toDistrict,
-      pickup_location: `${form.fromRegion}${form.fromDistrict ? ", " + form.fromDistrict : ""}`,
-      dropoff_location: `${form.toRegion}${form.toDistrict ? ", " + form.toDistrict : ""}`,
-      pickup_mode: form.pickup_mode,
-      delivery_service: !!form.delivery_service,
-
-      meet_lat: form.meet_lat,
-      meet_lng: form.meet_lng,
-      meet_address: form.meet_address || null,
-
-      dest_lat: form.dest_lat,
-      dest_lng: form.dest_lng,
-      dest_address: form.dest_address || null,
-
-      seats: Number(form.seats || 1),
-      price: Number(form.price || 0),
-
-      ride_date: dayjs(form.rideDate).format("YYYY-MM-DD"),
-      ride_time: dayjs(form.rideTime).format("HH:mm:ss"),
-      status: "active",
+    return {
+      fromRegion: "Qoraqalpog'iston",
+      fromDistrict: "Nukus sh.",
+      toRegion: "Toshkent shahri",
+      toDistrict: "",
+      date: dayjs().format("YYYY-MM-DD"),
+      time: "09:00",
+      seatsTotal: 4,
+      price: 150000,
+      genderPref: "all",
+      pickupMode: "meet_point",
     };
+  });
 
-    const { data, error } = await supabase.from(RIDES_TABLE).insert(payload).select("*").single();
-    if (error) return message.error(`Saqlash xatosi: ${error.message}`);
+  const fromDistricts = useMemo(() => {
+    const list = getDistricts(formData.fromRegion);
+    return isTashkentCity(formData.fromRegion) ? ["", ...list.filter((x) => x !== "")] : list;
+  }, [formData.fromRegion]);
 
-    message.success("E’lon yaratildi");
-    const updated = [data, ...rides];
-    setRides(updated);
-    setSelectedRideId(data.id);
+  const toDistricts = useMemo(() => {
+    const list = getDistricts(formData.toRegion);
+    return isTashkentCity(formData.toRegion) ? ["", ...list.filter((x) => x !== "")] : list;
+  }, [formData.toRegion]);
+
+  const validate = () => {
+    if (!formData.fromRegion || !formData.fromRegion.trim()) return message.error("Qayerdan viloyatini tanlang!"), false;
+    if (!isTashkentCity(formData.fromRegion) && (!formData.fromDistrict || !formData.fromDistrict.trim()))
+      return message.error("Qayerdan tumanini tanlang!"), false;
+
+    if (!formData.toRegion || !formData.toRegion.trim()) return message.error("Qayerga viloyatini tanlang!"), false;
+    if (!isTashkentCity(formData.toRegion) && (!formData.toDistrict || !formData.toDistrict.trim()))
+      return message.error("Qayerga tumanini tanlang!"), false;
+
+    if (formData.fromRegion === formData.toRegion && (formData.fromDistrict || "") === (formData.toDistrict || ""))
+      return message.error("Qayerdan va qayerga bir xil bo‘lmasin!"), false;
+
+    if (!formData.date || !formData.time) return message.error("Sana va vaqtni tanlang!"), false;
+
+    if (!formData.seatsTotal || formData.seatsTotal < 1) return message.error("O‘rindiqlar soni kamida 1 bo‘lsin!"), false;
+
+    if (!formData.price || formData.price < 1000) return message.error("Narxni to‘g‘ri kiriting!"), false;
+
+    if (pickupMode === "meet_point" && meetLat == null && meetAddress.trim() === "") {
+      // allow no geo, but recommend
+      // no hard error
+    }
+    return true;
   };
 
-  const updateRideStatus = async (rideId, status) => {
-    const { error } = await supabase.from(RIDES_TABLE).update({ status }).eq("id", rideId);
-    if (error) return message.error(`Status o‘zgartirish xatosi: ${error.message}`);
-
-    setRides((prev) => prev.map((r) => (r.id === rideId ? { ...r, status } : r)));
-    message.success("Status yangilandi");
+  const persistDraft = () => {
+    localStorage.setItem("driverInterProvDraft_v5", JSON.stringify({ ...formData }));
   };
 
-  const acceptBooking = async (bookingId) => {
-    if (ACCEPT_FEE_SUM > 0) {
-      const bal = Number(driverBalance || 0);
-      if (bal < ACCEPT_FEE_SUM) {
-        return message.error(`Balans yetarli emas. Qabul qilish narxi: ${fmtMoney(ACCEPT_FEE_SUM)} so‘m`);
-      }
+  const fillFormFromActive = (o) => {
+    if (!o) return;
+    const sched = o.scheduled_at ? dayjs(o.scheduled_at) : null;
+    setFormData({
+      fromRegion: o.from_region || "Qoraqalpog'iston",
+      fromDistrict: o.from_district ?? "",
+      toRegion: o.to_region || "Toshkent shahri",
+      toDistrict: o.to_district ?? "",
+      date: sched ? sched.format("YYYY-MM-DD") : dayjs().format("YYYY-MM-DD"),
+      time: sched ? sched.format("HH:mm") : "09:00",
+      seatsTotal: Number(o.seats_total || 4),
+      price: Number(o.price || 150000),
+    });
+
+    setPickupMode(o.pickup_mode || "meet_point");
+    setMeetLat(o.meet_lat ?? null);
+    setMeetLng(o.meet_lng ?? null);
+    setMeetAddress(o.meet_address || "");
+    setDestLat(o.dest_lat ?? null);
+    setDestLng(o.dest_lng ?? null);
+    setDestAddress(o.dest_address || "");
+    setDeliveryService(!!o.delivery_service);
+  };
+
+  const loadDriverData = async () => {
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
+    if (!user) {
+      setActiveAd(null);
+      setRequests([]);
+      setAccepted([]);
+      setNotifications([]);
+      setDriverBalance(null);
+      return;
     }
 
-    const { error } = await supabase.rpc(ACCEPT_RPC, { booking_id: bookingId });
-    if (error) return message.error(`Qabul qilish xatosi: ${error.message}`);
+    const bal = await loadDriverBalance(user.id);
+    setDriverBalance(bal);
 
-    message.success("Qabul qilindi");
-    await loadBookingsForRide(selectedRideId);
-  };
+    const { data: ad, error: adErr } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("driver_id", user.id)
+      .eq("service_type", "inter_prov")
+      .in("status", ["pending", "booked"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  const rejectBooking = async (bookingId) => {
-    const { error } = await supabase.rpc(REJECT_RPC, { booking_id: bookingId });
-    if (error) return message.error(`Rad etish xatosi: ${error.message}`);
+    if (adErr) {
+      // no active ad
+      setActiveAd(null);
+      setRequests([]);
+      setAccepted([]);
+    } else {
+      setActiveAd(ad);
+      fillFormFromActive(ad);
 
-    message.success("Rad etildi");
-    await loadBookingsForRide(selectedRideId);
-  };
+      const { data: reqs } = await supabase
+        .from("trip_booking_requests")
+        .select("*")
+        .eq("driver_id", user.id)
+        .eq("order_id", ad.id)
+        .eq("status", "requested")
+        .order("created_at", { ascending: false });
 
-  const refreshAll = async () => {
-    const uid = session?.user?.id;
-    if (!uid) return;
-    await loadDriverBalance(uid);
-    await loadMyRides(uid);
-    await loadBookingsForRide(selectedRideId);
-    message.success("Yangilandi");
+      const { data: accs } = await supabase
+        .from("trip_booking_requests")
+        .select("*")
+        .eq("driver_id", user.id)
+        .eq("order_id", ad.id)
+        .eq("status", "accepted")
+        .order("updated_at", { ascending: false });
+
+      setRequests(reqs || []);
+      setAccepted(accs || []);
+    }
+
+    try {
+      const nots = await loadNotifications(user.id);
+      setNotifications(nots);
+    } catch (e) {}
   };
 
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      const s = await refreshSession();
-      if (s?.user?.id) {
-        await loadDriverBalance(s.user.id);
-        const r = await loadMyRides(s.user.id);
-        const firstRideId = selectedRideId || r?.[0]?.id || null;
-        if (firstRideId) await loadBookingsForRide(firstRideId);
-      }
-      setLoading(false);
-    })();
+    let isMounted = true;
+    let channel = null;
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async () => {
-      const s = await refreshSession();
-      if (s?.user?.id) {
-        await loadDriverBalance(s.user.id);
-        const r = await loadMyRides(s.user.id);
-        const firstRideId = r?.[0]?.id || null;
-        setSelectedRideId(firstRideId);
-        if (firstRideId) await loadBookingsForRide(firstRideId);
-      } else {
-        setRides([]);
-        setBookings([]);
-      }
-    });
+    const init = async () => {
+      try {
+        setLoading(true);
+        setErrorText("");
+        await loadDriverData();
 
-    return () => sub?.subscription?.unsubscribe?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        const { data: authData } = await supabase.auth.getUser();
+        const user = authData?.user;
+
+        if (user && isMounted) {
+          channel = supabase
+            .channel("driver-interprov-live")
+            .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, (payload) => {
+              const row = payload?.new || payload?.old;
+              if (!row) return;
+              if (row.driver_id === user.id) loadDriverData();
+            })
+            .on("postgres_changes", { event: "*", schema: "public", table: "trip_booking_requests" }, (payload) => {
+              const row = payload?.new || payload?.old;
+              if (!row) return;
+              if (row.driver_id === user.id) loadDriverData();
+            })
+            .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, (payload) => {
+              const row = payload?.new || payload?.old;
+              if (!row) return;
+              if (row.user_id === user.id) loadDriverData();
+            })
+            .subscribe();
+        }
+      } catch (e) {
+        console.error("DriverInterProvincial init error:", e);
+        if (isMounted) setErrorText(e?.message || "Xatolik yuz berdi");
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    init();
+
+    return () => {
+      isMounted = false;
+      if (channel) supabase.removeChannel(channel);
+    };
   }, []);
 
   useEffect(() => {
-    (async () => {
-      if (!session?.user?.id) return;
-      await loadBookingsForRide(selectedRideId);
-    })();
+    persistDraft();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedRideId]);
+  }, [formData]);
 
-  useEffect(() => {
-    if (!selectedRideId) return;
+  const createAd = async () => {
+    if (!validate()) return;
 
-    const channel = supabase
-      .channel(`driver_interprov_bookings_${selectedRideId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: BOOKINGS_TABLE, filter: `ride_id=eq.${selectedRideId}` },
-        async () => {
-          await loadBookingsForRide(selectedRideId);
+    setSubmitting(true);
+    try {
+      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      if (authErr) throw authErr;
+      const user = authData?.user;
+      if (!user) return message.error("Avval login qiling");
+
+      if (ACCEPT_FEE_SUM > 0) {
+        const bal = Number(driverBalance ?? 0);
+        if (!Number.isFinite(bal) || bal < ACCEPT_FEE_SUM) {
+          return message.error(`Balans yetarli emas. Qabul qilish narxi: ${ACCEPT_FEE_SUM} so‘m`);
         }
-      )
-      .subscribe();
+      }
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedRideId]);
+      const scheduledAtObj = dayjs(`${formData.date} ${formData.time}`, "YYYY-MM-DD HH:mm");
+
+      if (scheduledAtObj.isBefore(dayjs(), 'day') || scheduledAtObj.isBefore(dayjs(), 'minute')) {
+        message.error("Ketish vaqti o'tgan bo'lishi mumkin emas!");
+        setSubmitting(false);
+        return;
+      }
+
+      const scheduledAt = scheduledAtObj.toISOString();
+
+      const payload = {
+        driver_id: user.id,
+        client_id: null,
+        service_type: "inter_prov",
+        status: "pending",
+
+        from_region: formData.fromRegion,
+        from_district: (formData.fromDistrict || "").trim(),
+        to_region: formData.toRegion,
+        to_district: (formData.toDistrict || "").trim(),
+
+        scheduled_at: scheduledAt,
+        seats_total: formData.seatsTotal,
+        seats_available: formData.seatsTotal,
+
+        pickup_location: `${formData.fromRegion}, ${districtLabel(formData.fromDistrict)}`,
+        dropoff_location: `${formData.toRegion}, ${districtLabel(formData.toDistrict)}`,
+        price: formData.price,
+        gender_pref: normalizeGender(formData.genderPref),
+
+        pickup_mode: pickupMode,
+        meet_lat: meetLat,
+        meet_lng: meetLng,
+        meet_address: meetAddress || null,
+        dest_lat: null,
+        dest_lng: null,
+        dest_address: null,
+        delivery_service: !!deliveryService,
+      };
+
+      const { data, error } = await supabase.from("orders").insert(payload).select("*").maybeSingle();
+      if (error) throw error;
+
+      setActiveAd(data);
+      setRequests([]);
+      setAccepted([]);
+      setEditMode(false);
+      message.success("E’lon yaratildi!");
+    } catch (e) {
+      console.error(e);
+      message.error(e?.message || "Xatolik!");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const saveEdits = async () => {
+    if (!activeAd) return;
+    if (!validate()) return;
+
+    setSubmitting(true);
+    try {
+      const scheduledAtObj = dayjs(`${formData.date} ${formData.time}`, "YYYY-MM-DD HH:mm");
+
+      if (scheduledAtObj.isBefore(dayjs(), 'day') || scheduledAtObj.isBefore(dayjs(), 'minute')) {
+        message.error("Ketish vaqti o'tgan bo'lishi mumkin emas!");
+        setSubmitting(false);
+        return;
+      }
+
+      const scheduledAt = scheduledAtObj.toISOString();
+
+      const hasRequestsOrAccepted = requests.length + accepted.length > 0;
+      const seatsPatch = hasRequestsOrAccepted ? {} : { seats_total: formData.seatsTotal, seats_available: formData.seatsTotal };
+
+      const patch = {
+        from_region: formData.fromRegion,
+        from_district: (formData.fromDistrict || "").trim(),
+        to_region: formData.toRegion,
+        to_district: (formData.toDistrict || "").trim(),
+        scheduled_at: scheduledAt,
+        price: formData.price,
+        gender_pref: normalizeGender(formData.genderPref),
+        pickup_mode: pickupMode,
+        meet_lat: meetLat,
+        meet_lng: meetLng,
+        meet_address: meetAddress || null,
+        dest_lat: null,
+        dest_lng: null,
+        dest_address: null,
+        delivery_service: !!deliveryService,
+        pickup_location: `${formData.fromRegion}, ${districtLabel(formData.fromDistrict)}`,
+        dropoff_location: `${formData.toRegion}, ${districtLabel(formData.toDistrict)}`,
+        ...seatsPatch,
+      };
+
+      const { data, error } = await supabase.from("orders").update(patch).eq("id", activeAd.id).select("*").maybeSingle();
+      if (error) throw error;
+
+      setActiveAd(data);
+      setEditMode(false);
+
+      // optional notify
+      try {
+        await supabase.from("notifications").insert({
+          user_id: data.driver_id,
+          type: "order_updated",
+          title: "E’lon yangilandi",
+          body: `Yangilandi: ${routeText(data)}`,
+          order_id: data.id,
+        });
+      } catch (e) {}
+
+      message.success("Saqlangan!");
+    } catch (e) {
+      console.error(e);
+      message.error(e?.message || "Saqlashda xatolik!");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const cancelAd = async () => {
+    if (!activeAd) return;
+    setSubmitting(true);
+    try {
+      const { error } = await supabase.from("orders").update({ status: "cancelled" }).eq("id", activeAd.id);
+      if (error) throw error;
+
+      setActiveAd(null);
+      setRequests([]);
+      setAccepted([]);
+      setEditMode(false);
+      message.success("E’lon bekor qilindi.");
+    } catch (e) {
+      console.error(e);
+      message.error(e?.message || "Xatolik!");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const finishTrip = async () => {
+    if (!activeAd) return;
+    setSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from("orders")
+        .update({ status: "completed", completed_at: new Date().toISOString() })
+        .eq("id", activeAd.id);
+      if (error) throw error;
+
+      message.success("Safar yakunlandi (manzilga yetib keldik). Yangi buyurtma berishingiz mumkin.");
+      // keep draft for quick re-create
+      setActiveAd(null);
+      setRequests([]);
+      setAccepted([]);
+      setEditMode(false);
+    } catch (e) {
+      console.error(e);
+      message.error(e?.message || "Safarni yakunlashda xatolik!");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const openNotifications = async () => {
+    setNotifOpen(true);
+    const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id);
+    await markNotifRead(unreadIds);
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData?.user;
+      if (user?.id) {
+        const nots2 = await loadNotifications(user.id);
+        setNotifications(nots2);
+      }
+    } catch (e) {}
+  };
+
+  const acceptRequest = async (bookingId) => {
+    if (!activeAd) return;
+    setSubmitting(true);
+    try {
+      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      if (authErr) throw authErr;
+      const user = authData?.user;
+      if (!user) return message.error("Avval login qiling");
+
+      if (ACCEPT_FEE_SUM > 0) {
+        const bal = Number(driverBalance ?? 0);
+        if (!Number.isFinite(bal) || bal < ACCEPT_FEE_SUM) {
+          return message.error(`Balans yetarli emas. Qabul qilish narxi: ${ACCEPT_FEE_SUM} so‘m`);
+        }
+      }
+
+      const { error } = await supabase.rpc("accept_inter_prov_booking", {
+        p_booking_id: bookingId,
+        p_driver_id: user.id,
+      });
+      if (error) throw error;
+
+      message.success("So‘rov qabul qilindi. Telefon endi ko‘rinadi.");
+      await loadDriverData();
+    } catch (e) {
+      console.error(e);
+      message.error(e?.message || "Qabul qilishda xatolik!");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const rejectRequest = async (bookingId) => {
+    if (!activeAd) return;
+    setSubmitting(true);
+    try {
+      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      if (authErr) throw authErr;
+      const user = authData?.user;
+      if (!user) return message.error("Avval login qiling");
+
+      if (ACCEPT_FEE_SUM > 0) {
+        const bal = Number(driverBalance ?? 0);
+        if (!Number.isFinite(bal) || bal < ACCEPT_FEE_SUM) {
+          return message.error(`Balans yetarli emas. Qabul qilish narxi: ${ACCEPT_FEE_SUM} so‘m`);
+        }
+      }
+
+      const { error } = await supabase.rpc("reject_inter_prov_booking", {
+        p_booking_id: bookingId,
+        p_driver_id: user.id,
+      });
+      if (error) throw error;
+
+      message.success("So‘rov rad etildi. Joy qaytarildi.");
+      await loadDriverData();
+    } catch (e) {
+      console.error(e);
+      message.error(e?.message || "Rad etishda xatolik!");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   if (loading) {
     return (
       <div style={{ padding: 16 }}>
-        <Skeleton active />
-      </div>
-    );
-  }
-
-  if (!session?.user) {
-    return (
-      <div style={{ padding: 16 }}>
-        <Card>
-          <Title level={4}>Haydovchi paneli</Title>
-          <Text type="secondary">Davom etish uchun login qiling.</Text>
-        </Card>
+        <Skeleton active paragraph={{ rows: 12 }} />
       </div>
     );
   }
 
   return (
-    <div style={{ padding: 16, maxWidth: 1100, margin: "0 auto" }}>
-      <Row justify="space-between" align="middle">
-        <Col>
-          <Title level={4} style={{ margin: 0 }}>
-            Tumanlar/Viloyatlararo — Haydovchi
-          </Title>
-          <Text type="secondary">SERVICE_TYPE: INTER_PROV</Text>
-          <br />
-          <Text type="secondary">
-            Tablelar: {RIDES_TABLE} / {BOOKINGS_TABLE}
-          </Text>
-        </Col>
-        <Col>
-          <Space>
-            <Tag color="blue">Balans: {fmtMoney(driverBalance)} so‘m</Tag>
-            <Tag color={ACCEPT_FEE_SUM > 0 ? "orange" : "green"}>Qabul narxi: {fmtMoney(ACCEPT_FEE_SUM)} so‘m</Tag>
-            <Button icon={<ReloadOutlined />} onClick={refreshAll}>
-              Yangilash
-            </Button>
-          </Space>
-        </Col>
-      </Row>
-
-      <Divider />
-
-      <Row gutter={[16, 16]}>
-        <Col xs={24} md={10}>
-          <div ref={formRef} />
-          <Card
-            title={
-              <Space>
-                <PlusOutlined />
-                <span>Yangi e’lon</span>
-              </Space>
-            }
-            extra={
-              <Button onClick={prepareReturnDraft} size="small">
-                Qaytish e’lon
-              </Button>
-            }
-          >
-            <Row gutter={[12, 12]}>
-              <Col span={12}>
-                <Text type="secondary">Qayerdan</Text>
-                <Select
-                  style={{ width: "100%", marginTop: 6 }}
-                  placeholder="Viloyat"
-                  options={regionOptions}
-                  value={form.fromRegion}
-                  onChange={(v) => setForm((p) => ({ ...p, fromRegion: v, fromDistrict: null }))}
-                />
-              </Col>
-              <Col span={12}>
-                <Text type="secondary">Tuman (ixtiyoriy)</Text>
-                <Select
-                  style={{ width: "100%", marginTop: 6 }}
-                  placeholder="Tuman"
-                  options={districtsByRegion(form.fromRegion)}
-                  value={form.fromDistrict}
-                  onChange={(v) => setForm((p) => ({ ...p, fromDistrict: v }))}
-                  allowClear
-                />
-              </Col>
-
-              <Col span={12}>
-                <Text type="secondary">Qayerga</Text>
-                <Select
-                  style={{ width: "100%", marginTop: 6 }}
-                  placeholder="Viloyat"
-                  options={regionOptions}
-                  value={form.toRegion}
-                  onChange={(v) => setForm((p) => ({ ...p, toRegion: v, toDistrict: null }))}
-                />
-              </Col>
-              <Col span={12}>
-                <Text type="secondary">Tuman (ixtiyoriy)</Text>
-                <Select
-                  style={{ width: "100%", marginTop: 6 }}
-                  placeholder="Tuman"
-                  options={districtsByRegion(form.toRegion)}
-                  value={form.toDistrict}
-                  onChange={(v) => setForm((p) => ({ ...p, toDistrict: v }))}
-                  allowClear
-                />
-              </Col>
-
-              <Col span={12}>
-                <Text type="secondary">
-                  <CalendarOutlined /> Sana
-                </Text>
-                <DatePicker
-                  style={{ width: "100%", marginTop: 6 }}
-                  value={form.rideDate ? dayjs(form.rideDate) : null}
-                  onChange={(d) => setForm((p) => ({ ...p, rideDate: d ? d.toDate() : null }))}
-                  disabledDate={(c) => c && c < dayjs().startOf("day")}
-                />
-              </Col>
-              <Col span={12}>
-                <Text type="secondary">
-                  <ClockCircleOutlined /> Vaqt
-                </Text>
-                <TimePicker
-                  style={{ width: "100%", marginTop: 6 }}
-                  value={form.rideTime ? dayjs(form.rideTime) : null}
-                  onChange={(t) => setForm((p) => ({ ...p, rideTime: t ? t.toDate() : null }))}
-                  format="HH:mm"
-                />
-              </Col>
-
-              <Col span={12}>
-                <Text type="secondary">O‘rinlar</Text>
-                <InputNumber
-                  style={{ width: "100%", marginTop: 6 }}
-                  min={1}
-                  max={10}
-                  value={form.seats}
-                  onChange={(v) => setForm((p) => ({ ...p, seats: v || 1 }))}
-                />
-              </Col>
-              <Col span={12}>
-                <Text type="secondary">Narx (so‘m)</Text>
-                <InputNumber
-                  style={{ width: "100%", marginTop: 6 }}
-                  min={0}
-                  step={1000}
-                  value={form.price}
-                  onChange={(v) => setForm((p) => ({ ...p, price: v || 0 }))}
-                />
-              </Col>
-
-
-              <Col span={24}>
-                <Space align="center">
-                  <Text strong>Eltish xizmati</Text>
-                  <Switch checked={!!form.delivery_service} onChange={(checked) => setForm((p) => ({ ...p, delivery_service: checked }))} />
-                </Space>
-                <div style={{ marginTop: 6 }}>
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    Belgilasangiz, bu e’lon yo‘lovchi tarafda “Eltish xizmati” sahifasida ham ko‘rinadi.
-                  </Text>
+    <ConfigProvider theme={{ token: { colorPrimary: "#1890ff", borderRadius: 12 } }}>
+      <div style={{ padding: 16, maxWidth: 980, margin: "0 auto" }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Button icon={<ArrowLeftOutlined />} onClick={onBack} shape="circle" />
+            <div>
+              <Title level={4} style={{ margin: 0 }}>Tumanlar/Viloyatlar aro — Haydovchi</Title>
+              <Text type="secondary">service_type: <b>inter_prov</b></Text>
+              {driverBalance !== null ? (
+                <div>
+                  <Text type="secondary">Balans: </Text><b>{formatMoney(driverBalance)} so‘m</b>
                 </div>
+              ) : null}
+              {errorText ? <div><Text type="danger">{errorText}</Text></div> : null}
+            </div>
+          </div>
+
+          <Badge count={unreadCount} overflowCount={99}>
+            <Button icon={<BellOutlined />} onClick={openNotifications}>Bildirishnomalar</Button>
+          </Badge>
+        </div>
+
+        <Modal title="Bildirishnomalar" open={notifOpen} onCancel={() => setNotifOpen(false)} footer={null}>
+          {notifications.length === 0 ? (
+            <Text type="secondary">Hozircha bildirishnoma yo‘q.</Text>
+          ) : (
+            <List
+              dataSource={notifications}
+              renderItem={(n) => (
+                <List.Item>
+                  <List.Item.Meta
+                    title={
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <Tag color={n.is_read ? "default" : "blue"}>{n.type}</Tag>
+                        <span style={{ fontWeight: 600 }}>{n.title}</span>
+                      </div>
+                    }
+                    description={
+                      <div>
+                        <div>{n.body}</div>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          {dayjs(n.created_at).format("YYYY-MM-DD HH:mm")}
+                        </Text>
+                      </div>
+                    }
+                  />
+                </List.Item>
+              )}
+            />
+          )}
+        </Modal>
+      <Modal
+        title={mapModal.title}
+        open={mapModal.open}
+        onCancel={() => setMapModal({ open: false, url: "", title: "Xarita" })}
+        footer={null}
+        width={900}
+        style={{ top: 24 }}
+      >
+        {mapModal.url ? (
+          <iframe
+            title="map"
+            src={mapModal.url}
+            style={{ width: "100%", height: 520, border: 0, borderRadius: 12 }}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
+        ) : null}
+      </Modal>
+
+
+        {/* Active Ad */}
+        {activeAd ? (
+          <Card style={{ borderRadius: 18, border: "none", boxShadow: "0 6px 20px rgba(0,0,0,0.06)" }}>
+            <Row gutter={12} align="middle">
+              <Col xs={24} md={16}>
+                <Space direction="vertical" size={6} style={{ width: "100%" }}>
+                  <Text type="secondary">Aktiv e’lon</Text>
+                  <Title level={5} style={{ margin: 0 }}>
+                    <EnvironmentFilled style={{ marginRight: 8, color: "#1890ff" }} />
+                    {routeText(activeAd)}
+                  </Title>
+
+                  <Space size={16} wrap>
+                    <Text><CalendarOutlined /> <b>{activeAd.scheduled_at ? dayjs(activeAd.scheduled_at).format("YYYY-MM-DD") : "-"}</b></Text>
+                    <Text><ClockCircleOutlined /> <b>{activeAd.scheduled_at ? dayjs(activeAd.scheduled_at).format("HH:mm") : "-"}</b></Text>
+                    <Text><UserOutlined /> <b>{activeAd.seats_available ?? "-"}</b> / {activeAd.seats_total ?? "-"} joy</Text>
+                    <Text><b>{formatMoney(activeAd.price)}</b> so‘m</Text>
+                  </Space>
+
+                  <Space size={10} wrap style={{ marginTop: 6 }}>
+                    <Tag color={activeAd.status === "pending" ? "green" : "gold"} style={{ padding: "4px 10px", borderRadius: 999 }}>
+                      {activeAd.status === "pending" ? "Ochiq" : "Joylar band qilinmoqda"}
+                    </Tag>
+                    <Tag color={activeAd.pickup_mode === "home_pickup" ? "purple" : "blue"} style={{ padding: "4px 10px", borderRadius: 999 }}>
+                      {activeAd.pickup_mode === "home_pickup" ? "Uydan olib ketish" : "Belgilangan joyga kelish"}
+                    </Tag>
+                    {Number(activeAd.seats_available || 0) <= 0 ? (
+                      <Tag color="red" style={{ padding: "4px 10px", borderRadius: 999 }}>Joylar tugadi</Tag>
+                    ) : null}
+                  </Space>
+
+                  {activeAd.meet_address ? (
+                    <Text type="secondary">Ketish joyi: <b>{activeAd.meet_address}</b></Text>
+                  ) : null}
+                  {activeAd.dest_address ? (
+                    <Text type="secondary">Manzil: <b>{activeAd.dest_address}</b></Text>
+                  ) : null}
+                </Space>
               </Col>
 
-              <Col span={24}>
-                <Divider style={{ margin: "10px 0" }} />
-                <Text strong>
-                  <EnvironmentFilled /> Ketish joyi (bitta, shart)
-                </Text>
-                <Row gutter={[8, 8]} style={{ marginTop: 8 }}>
-                  <Col span={16}>
-                    <Input
-                      placeholder="Ketish address (ixtiyoriy)"
-                      value={form.meet_address}
-                      onChange={(e) => setForm((p) => ({ ...p, meet_address: e.target.value }))}
-                    />
-                  </Col>
-                  <Col span={8}>
-                    <Button
-                      icon={<AimOutlined />}
-                      block
-                      onClick={async () => {
-                        const loc = await getMyLocation();
-                        if (!loc) return message.error("Lokatsiya olinmadi");
-                        setForm((p) => ({ ...p, meet_lat: loc.lat, meet_lng: loc.lng }));
-                        message.success("Ketish lokatsiyasi belgilandi");
-                      }}
-                    >
-                      Meniki
-                    </Button>
-                  </Col>
-                  <Col span={12}>
-                    <Input
-                      placeholder="meet_lat"
-                      value={form.meet_lat ?? ""}
-                      onChange={(e) => setForm((p) => ({ ...p, meet_lat: e.target.value ? Number(e.target.value) : null }))}
-                    />
-                  </Col>
-                  <Col span={12}>
-                    <Input
-                      placeholder="meet_lng"
-                      value={form.meet_lng ?? ""}
-                      onChange={(e) => setForm((p) => ({ ...p, meet_lng: e.target.value ? Number(e.target.value) : null }))}
-                    />
-                  </Col>
+              <Col xs={24} md={8}>
+                <Space direction="vertical" style={{ width: "100%" }} size={10}>
+                  <Button
+                    icon={<EditOutlined />}
+                    block
+                    size="large"
+                    onClick={() => setEditMode((p) => !p)}
+                    style={{ borderRadius: 14, height: 44 }}
+                  >
+                    {editMode ? "Tahrirni yopish" : "E’lonni tahrirlash"}
+                  </Button>
 
-                  <Col span={24}>
-                    <Space>
-                      <Button onClick={() => openMapEmbed({ title: "Ketish joyi", lat: form.meet_lat, lng: form.meet_lng, mode: "pin" })}>
-                        Xarita
-                      </Button>
-                      <Button
-                        type="primary"
-                        onClick={() =>
-                          openMapEmbed({
-                            title: "Yo‘l (ketish joyi)",
-                            lat: form.meet_lat,
-                            lng: form.meet_lng,
-                            mode: "route",
-                          })
-                        }
-                      >
-                        Yo‘l
-                      </Button>
-                    </Space>
+                  <Button
+                    danger
+                    type="primary"
+                    icon={<DeleteOutlined />}
+                    block
+                    size="large"
+                    onClick={cancelAd}
+                    loading={submitting}
+                    style={{ borderRadius: 14, height: 44 }}
+                  >
+                    E’lonni bekor qilish
+                  </Button>
+
+                  {(Number(activeAd.seats_available || 0) <= 0 || activeAd.status === "booked") ? (
+                    <Button
+                      type="primary"
+                      icon={<CheckOutlined />}
+                      block
+                      size="large"
+                      onClick={finishTrip}
+                      loading={submitting}
+                      style={{ borderRadius: 14, height: 44 }}
+                    >
+                      Manzilga yetib keldik
+                    </Button>
+                  ) : null}
+
+                  <Button
+                    block
+                    size="large"
+                    onClick={prepareReturnDraft}
+                    style={{ borderRadius: 14, height: 44 }}
+                  >
+                    Qaytish e’loni uchun yo‘nalishni almashtirish
+                  </Button>
+                </Space>
+              </Col>
+            </Row>
+
+            {editMode ? (
+              <div style={{ marginTop: 16 }}>
+                <Divider orientation="left">Tahrirlash</Divider>
+
+                <Row gutter={12}>
+                  <Col xs={24} md={12}>
+                    <Text type="secondary">Qayerdan viloyat</Text>
+                    <Select value={formData.fromRegion} onChange={(v) => setFormData((p) => ({ ...p, fromRegion: v, fromDistrict: isTashkentCity(v) ? "" : p.fromDistrict }))} style={{ width: "100%", marginTop: 6 }} size="large">
+                      {REGIONS_DATA.map((r) => (
+                        <Select.Option key={r.name} value={r.name}>{r.name}</Select.Option>
+                      ))}
+                    </Select>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Text type="secondary">Qayerdan tuman</Text>
+                    <Select value={formData.fromDistrict} onChange={(v) => setFormData((p) => ({ ...p, fromDistrict: v }))} style={{ width: "100%", marginTop: 6 }} size="large">
+                      {fromDistricts.map((d) => (
+                        <Select.Option key={`${d}`} value={d}>{districtLabel(d)}</Select.Option>
+                      ))}
+                    </Select>
+                    {isTashkentCity(formData.fromRegion) ? <Text type="secondary" style={{ fontSize: 12 }}>* Toshkent shahri uchun tumanni tanlamasa bo‘ladi.</Text> : null}
                   </Col>
                 </Row>
-              </Col>
 
-              <Col span={24}>
-                <Divider style={{ margin: "10px 0" }} />
-                <Text strong>
-                  <EnvironmentFilled /> Borish joyi (ixtiyoriy)
-                </Text>
-                <Row gutter={[8, 8]} style={{ marginTop: 8 }}>
-                  <Col span={16}>
-                    <Input
-                      placeholder="Borish address (ixtiyoriy)"
-                      value={form.dest_address}
-                      onChange={(e) => setForm((p) => ({ ...p, dest_address: e.target.value }))}
-                    />
-                  </Col>
-                  <Col span={8}>
-                    <Button
-                      icon={<AimOutlined />}
-                      block
-                      onClick={async () => {
-                        const loc = await getMyLocation();
-                        if (!loc) return message.error("Lokatsiya olinmadi");
-                        setForm((p) => ({ ...p, dest_lat: loc.lat, dest_lng: loc.lng }));
-                        message.success("Borish lokatsiyasi belgilandi");
-                      }}
-                    >
-                      Meniki
-                    </Button>
-                  </Col>
-                  <Col span={12}>
-                    <Input
-                      placeholder="dest_lat"
-                      value={form.dest_lat ?? ""}
-                      onChange={(e) => setForm((p) => ({ ...p, dest_lat: e.target.value ? Number(e.target.value) : null }))}
-                    />
-                  </Col>
-                  <Col span={12}>
-                    <Input
-                      placeholder="dest_lng"
-                      value={form.dest_lng ?? ""}
-                      onChange={(e) => setForm((p) => ({ ...p, dest_lng: e.target.value ? Number(e.target.value) : null }))}
-                    />
-                  </Col>
+                <Divider />
 
-                  <Col span={24}>
-                    <Space>
-                      <Button onClick={() => openMapEmbed({ title: "Borish joyi", lat: form.dest_lat, lng: form.dest_lng, mode: "pin" })}>
-                        Xarita
-                      </Button>
-                      <Button
-                        type="primary"
-                        onClick={() =>
-                          openMapEmbed({
-                            title: "Yo‘l (borish joyi)",
-                            lat: form.dest_lat,
-                            lng: form.dest_lng,
-                            mode: "route",
-                          })
-                        }
-                      >
-                        Yo‘l
-                      </Button>
-                    </Space>
+                <Row gutter={12}>
+                  <Col xs={24} md={12}>
+                    <Text type="secondary">Qayerga viloyat</Text>
+                    <Select value={formData.toRegion} onChange={(v) => setFormData((p) => ({ ...p, toRegion: v, toDistrict: isTashkentCity(v) ? "" : p.toDistrict }))} style={{ width: "100%", marginTop: 6 }} size="large">
+                      {REGIONS_DATA.map((r) => (
+                        <Select.Option key={r.name} value={r.name}>{r.name}</Select.Option>
+                      ))}
+                    </Select>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Text type="secondary">Qayerga tuman</Text>
+                    <Select value={formData.toDistrict} onChange={(v) => setFormData((p) => ({ ...p, toDistrict: v }))} style={{ width: "100%", marginTop: 6 }} size="large">
+                      {toDistricts.map((d) => (
+                        <Select.Option key={`${d}`} value={d}>{districtLabel(d)}</Select.Option>
+                      ))}
+                    </Select>
+                    {isTashkentCity(formData.toRegion) ? <Text type="secondary" style={{ fontSize: 12 }}>* Toshkent shahri uchun tumanni tanlamasa bo‘ladi.</Text> : null}
                   </Col>
                 </Row>
-              </Col>
 
-              <Col span={24}>
-                <Divider style={{ margin: "10px 0" }} />
-                <Button type="primary" block onClick={createRide}>
-                  E’lonni saqlash
+                <Divider />
+
+                <Row gutter={12}>
+                  <Col xs={24} md={12}>
+                    <Text type="secondary">Sana</Text>
+                    <DatePicker value={formData.date ? dayjs(formData.date) : null} disabledDate={(current) => current && current < dayjs().startOf("day")} onChange={(d) => setFormData((p) => ({ ...p, date: d ? d.format("YYYY-MM-DD") : "" }))} style={{ width: "100%", marginTop: 6 }} size="large" />
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Text type="secondary">Vaqt</Text>
+                    <TimePicker value={dayjs(formData.time, "HH:mm")} disabledTime={() => {
+                      const isToday = formData.date === dayjs().format("YYYY-MM-DD");
+                      if (!isToday) return {};
+                      const now = dayjs();
+                      const disabledHours = () => Array.from({ length: now.hour() }, (_, i) => i);
+                      const disabledMinutes = (selectedHour) => {
+                        if (selectedHour !== now.hour()) return [];
+                        return Array.from({ length: now.minute() }, (_, i) => i);
+                      };
+                      return { disabledHours, disabledMinutes };
+                    }} onChange={(tVal) => setFormData((p) => ({ ...p, time: tVal ? tVal.format("HH:mm") : "" }))} format="HH:mm" style={{ width: "100%", marginTop: 6 }} size="large" />
+                  </Col>
+                </Row>
+
+                <Divider />
+
+                <Row gutter={12}>
+                  <Col xs={24} md={12}>
+                    <Text type="secondary">Narx (so‘m)</Text>
+                    <InputNumber min={1000} step={1000} value={formData.price} onChange={(v) => setFormData((p) => ({ ...p, price: Number(v || 0) }))} style={{ width: "100%", marginTop: 6 }} size="large" />
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Text type="secondary">O‘rindiqlar (so‘rovlar bo‘lsa bloklanadi)</Text>
+                    <InputNumber min={1} max={20} value={formData.seatsTotal} onChange={(v) => setFormData((p) => ({ ...p, seatsTotal: Number(v || 1) }))} style={{ width: "100%", marginTop: 6 }} size="large" disabled={(requests.length + accepted.length) > 0} />
+                    {(requests.length + accepted.length) > 0 ? <Text type="secondary" style={{ fontSize: 12 }}>* So‘rovlar bor: o‘rindiqlar sonini o‘zgartirib bo‘lmaydi.</Text> : null}
+                  </Col>
+                </Row>
+
+                <Divider />
+
+                <Row gutter={12}>
+                  <Col xs={24} md={12}>
+                    <Text type="secondary">Yo‘lovchi jinsi</Text>
+                    <Select
+                      value={formData.genderPref}
+                      onChange={(v) => setFormData((p) => ({ ...p, genderPref: v }))}
+                      style={{ width: "100%", marginTop: 6 }}
+                      size="large"
+                      options={GENDER_OPTIONS}
+                    />
+                    <Text type="secondary" style={{ fontSize: 12 }}>* Kimlar uchun: erkak/ayol/hamma.</Text>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Text type="secondary">Olib ketish turi</Text>
+                    <Select
+                      value={pickupMode}
+                      style={{ width: "100%", marginTop: 6 }}
+                      size="large"
+                      onChange={(v) => setPickupMode(v)}
+                      options={[
+                        { value: "meet_point", label: "Belgilangan joyga kelish" },
+                        { value: "home_pickup", label: "Uydan olib ketish" },
+                      ]}
+                    />
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      {pickupMode === "home_pickup"
+                        ? "* Yo‘lovchi so‘rov yuborganda uy lokatsiyasini yuboradi, siz acceptdan keyin ko‘rasiz."
+                        : "* Yo‘lovchi siz belgilagan ketish joyiga keladi."}
+                    </Text>
+
+                    <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10 }}>
+                      <Switch checked={deliveryService} onChange={(v) => setDeliveryService(v)} />
+                      <Text strong>Eltish xizmati</Text>
+                      <Text type="secondary" style={{ fontSize: 12 }}>* Belgilansa yo‘lovchi tomonda “Eltish xizmati” bo‘limida chiqadi.</Text>
+                    </div>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Text type="secondary">Ketish joyi (meet point)</Text>
+                    <Space style={{ width: "100%", marginTop: 6 }} wrap>
+                      <Button
+                        icon={<AimOutlined />}
+                        onClick={async () => {
+                          try {
+                            const p = await getMyGeo();
+                            setMeetLat(p.lat);
+                            setMeetLng(p.lng);
+                            message.success("Ketish joyi lokatsiyasi olindi");
+                          } catch (e) {
+                            message.error("Lokatsiyani olishda xatolik");
+                          }
+                        }}
+                      >
+                        Geolokatsiya
+                      </Button>
+                      {meetLat != null && meetLng != null ? (
+                        <>
+                          <Button onClick={() => openMapEmbed({ title: "Xarita", lat: meetLat, lng: meetLng, mode: "pin" })}>Xarita</Button>
+                          <Button onClick={() => openMapEmbed({ title: "Yo‘l", lat: meetLat, lng: meetLng, sLat: meetLat, sLng: meetLng, mode: "route" })}>Yo‘l</Button>
+                        </>
+                      ) : null}
+                    </Space>
+                    <Row gutter={8} style={{ marginTop: 8 }}>
+                      <Col xs={12}>
+                        <Input
+                          value={meetLat ?? ""}
+                          onChange={(e) => setMeetLat(e.target.value === "" ? null : Number(e.target.value))}
+                          placeholder="Lat (masalan: 42.46)"
+                        />
+                      </Col>
+                      <Col xs={12}>
+                        <Input
+                          value={meetLng ?? ""}
+                          onChange={(e) => setMeetLng(e.target.value === "" ? null : Number(e.target.value))}
+                          placeholder="Lng (masalan: 59.61)"
+                        />
+                      </Col>
+                    </Row>
+                    <Input value={meetAddress} onChange={(e) => setMeetAddress(e.target.value)} placeholder="Masalan: Nukus avtovokzal" style={{ marginTop: 8 }} />
+                  </Col>
+                </Row>
+
+                <Divider />
+
+                <Row gutter={12}>
+                  <Col xs={24} md={12}>
+                    <Text type="secondary">Borish lokatsiyasi shart emas</Text>
+                    <Text type="secondary" style={{ fontSize: 12, display: "block", marginTop: 6 }}>
+                      * Boradigan joy yuqorida (viloyat/tuman) bilan ma’lum. Lokatsiya belgilash kerak emas.
+                    </Text>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Button type="primary" size="large" block icon={<SaveOutlined />} onClick={saveEdits} loading={submitting} style={{ borderRadius: 14, height: 48, marginTop: 24 }}>
+                      Saqlash
+                    </Button>
+                  </Col>
+                </Row>
+              </div>
+            ) : null}
+
+            <Divider />
+
+            <Tabs
+              activeKey={tab}
+              onChange={setTab}
+              items={[
+                {
+                  key: "requests",
+                  label: `So‘rovlar (${requests.length})`,
+                  children: (
+                    <>
+                      {requests.length === 0 ? (
+                        <Text type="secondary">Hozircha bron so‘rovlari yo‘q.</Text>
+                      ) : (
+                        <List
+                          dataSource={requests}
+                          itemLayout="horizontal"
+                          renderItem={(b) => (
+                            <List.Item
+                              actions={[
+                                <Button key="accept" type="primary" icon={<CheckOutlined />} loading={submitting} onClick={() => acceptRequest(b.id)}>
+                                  Qabul qilish
+                                </Button>,
+                                <Button key="reject" danger icon={<CloseOutlined />} loading={submitting} onClick={() => rejectRequest(b.id)}>
+                                  Rad etish
+                                </Button>,
+                              ]}
+                            >
+                              <List.Item.Meta
+                                title={
+                                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                                    <Tag color="blue">{b.seats} ta joy</Tag>
+                                    <span style={{ fontWeight: 600 }}>{b.passenger_name || "Yo‘lovchi"}</span>
+                                    <Tag icon={<EyeInvisibleOutlined />}>Telefon: {maskPhone(b.passenger_phone)}</Tag>
+                                  </div>
+                                }
+                                description={
+                                  <div>
+                                    <Text type="secondary" style={{ fontSize: 12 }}>
+                                      So‘rov vaqti: {dayjs(b.created_at).format("YYYY-MM-DD HH:mm")}
+                                    </Text>
+
+                                    {/* Home pickup data may already exist, but we keep it hidden until accept.
+                                        If you want to show address as masked before accept, do it here. */}
+                                  </div>
+                                }
+                              />
+                            </List.Item>
+                          )}
+                        />
+                      )}
+                    </>
+                  ),
+                },
+                {
+                  key: "accepted",
+                  label: `Qabul qilinganlar (${accepted.length})`,
+                  children: (
+                    <>
+                      {accepted.length === 0 ? (
+                        <Text type="secondary">Hozircha qabul qilingan bronlar yo‘q.</Text>
+                      ) : (
+                        <List
+                          dataSource={accepted}
+                          itemLayout="horizontal"
+                          renderItem={(b) => (
+                            <List.Item
+                              actions={[
+                                b.pickup_lat != null && b.pickup_lng != null ? (
+                                  <Button key="map" onClick={() => openMapEmbed({ title: "Xarita", lat: b.pickup_lat, lng: b.pickup_lng, mode: "pin" })}>Xarita</Button>
+                                ) : null,
+                                b.pickup_lat != null && b.pickup_lng != null ? (
+                                  <Button key="route" type="primary" onClick={() => openMapEmbed({ title: "Yo‘l", lat: b.pickup_lat, lng: b.pickup_lng, sLat: meetLat, sLng: meetLng, mode: "route" })}>Yo‘l</Button>
+                                ) : null,
+                              ].filter(Boolean)}
+                            >
+                              <List.Item.Meta
+                                title={
+                                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                                    <Tag color="green">{b.seats} ta joy</Tag>
+                                    <span style={{ fontWeight: 600 }}>{b.passenger_name || "Yo‘lovchi"}</span>
+                                    <Tag color="geekblue">Telefon: <b>{b.passenger_phone || "-"}</b></Tag>
+                                  </div>
+                                }
+                                description={
+                                  <div>
+                                    <Text type="secondary" style={{ fontSize: 12 }}>
+                                      Qabul qilingan: {dayjs(b.updated_at || b.created_at).format("YYYY-MM-DD HH:mm")}
+                                    </Text>
+
+                                    {b.pickup_address ? (
+                                      <div style={{ marginTop: 6 }}>
+                                        <Tag color="purple">Uy manzili</Tag> <b>{b.pickup_address}</b>
+                                      </div>
+                                    ) : null}
+
+                                    <div style={{ marginTop: 6 }}>
+                                      <Text type="secondary">Kommentariya: </Text>
+                                      <b>Yo‘lovchi bilan bog‘laning</b>
+                                    </div>
+                                  </div>
+                                }
+                              />
+                            </List.Item>
+                          )}
+                        />
+                      )}
+                    </>
+                  ),
+                },
+              ]}
+            />
+          </Card>
+        ) : (
+          <Card style={{ borderRadius: 18, border: "none", boxShadow: "0 6px 20px rgba(0,0,0,0.06)" }}>
+            <Title level={5} style={{ marginTop: 0 }}>Yangi e’lon yaratish</Title>
+
+            <Divider orientation="left">Qayerdan</Divider>
+            <Row gutter={12}>
+              <Col xs={24} md={12}>
+                <Text type="secondary">Viloyat</Text>
+                <Select value={formData.fromRegion} onChange={(v) => setFormData((p) => ({ ...p, fromRegion: v, fromDistrict: isTashkentCity(v) ? "" : p.fromDistrict }))} style={{ width: "100%", marginTop: 6 }} size="large">
+                  {REGIONS_DATA.map((r) => (
+                    <Select.Option key={r.name} value={r.name}>{r.name}</Select.Option>
+                  ))}
+                </Select>
+              </Col>
+              <Col xs={24} md={12}>
+                <Text type="secondary">Tuman/Shahar</Text>
+                <Select value={formData.fromDistrict} onChange={(v) => setFormData((p) => ({ ...p, fromDistrict: v }))} style={{ width: "100%", marginTop: 6 }} size="large">
+                  {fromDistricts.map((d) => (
+                    <Select.Option key={`${d}`} value={d}>{districtLabel(d)}</Select.Option>
+                  ))}
+                </Select>
+                {isTashkentCity(formData.fromRegion) ? <Text type="secondary" style={{ fontSize: 12 }}>* Toshkent shahri uchun tumanni tanlamasa bo‘ladi.</Text> : null}
+              </Col>
+            </Row>
+
+            <Divider orientation="left">Qayerga</Divider>
+            <Row gutter={12}>
+              <Col xs={24} md={12}>
+                <Text type="secondary">Viloyat</Text>
+                <Select value={formData.toRegion} onChange={(v) => setFormData((p) => ({ ...p, toRegion: v, toDistrict: isTashkentCity(v) ? "" : p.toDistrict }))} style={{ width: "100%", marginTop: 6 }} size="large">
+                  {REGIONS_DATA.map((r) => (
+                    <Select.Option key={r.name} value={r.name}>{r.name}</Select.Option>
+                  ))}
+                </Select>
+              </Col>
+              <Col xs={24} md={12}>
+                <Text type="secondary">Tuman/Shahar</Text>
+                <Select value={formData.toDistrict} onChange={(v) => setFormData((p) => ({ ...p, toDistrict: v }))} style={{ width: "100%", marginTop: 6 }} size="large">
+                  {toDistricts.map((d) => (
+                    <Select.Option key={`${d}`} value={d}>{districtLabel(d)}</Select.Option>
+                  ))}
+                </Select>
+                {isTashkentCity(formData.toRegion) ? <Text type="secondary" style={{ fontSize: 12 }}>* Toshkent shahri uchun tumanni tanlamasa bo‘ladi.</Text> : null}
+              </Col>
+            </Row>
+
+            <Divider />
+
+            <Row gutter={12}>
+              <Col xs={24} md={12}>
+                <Text type="secondary">Sana</Text>
+                <DatePicker value={formData.date ? dayjs(formData.date) : null} disabledDate={(current) => current && current < dayjs().startOf("day")} onChange={(d) => setFormData((p) => ({ ...p, date: d ? d.format("YYYY-MM-DD") : "" }))} style={{ width: "100%", marginTop: 6 }} size="large" />
+              </Col>
+              <Col xs={24} md={12}>
+                <Text type="secondary">Vaqt</Text>
+                <TimePicker value={dayjs(formData.time, "HH:mm")} disabledTime={() => {
+                      const isToday = formData.date === dayjs().format("YYYY-MM-DD");
+                      if (!isToday) return {};
+                      const now = dayjs();
+                      const disabledHours = () => Array.from({ length: now.hour() }, (_, i) => i);
+                      const disabledMinutes = (selectedHour) => {
+                        if (selectedHour !== now.hour()) return [];
+                        return Array.from({ length: now.minute() }, (_, i) => i);
+                      };
+                      return { disabledHours, disabledMinutes };
+                    }} onChange={(tVal) => setFormData((p) => ({ ...p, time: tVal ? tVal.format("HH:mm") : "" }))} format="HH:mm" style={{ width: "100%", marginTop: 6 }} size="large" />
+              </Col>
+            </Row>
+
+            <Divider />
+
+            <Row gutter={12}>
+              <Col xs={24} md={12}>
+                <Text type="secondary">Yo‘lovchi jinsi</Text>
+                <Select
+                  value={formData.genderPref}
+                  onChange={(v) => setFormData((p) => ({ ...p, genderPref: v }))}
+                  style={{ width: "100%", marginTop: 6 }}
+                  size="large"
+                  options={GENDER_OPTIONS}
+                />
+                <Text type="secondary" style={{ fontSize: 12 }}>* Kimlar uchun: erkak/ayol/hamma.</Text>
+              </Col>
+              <Col xs={24} md={12}>
+                <Text type="secondary">Olib ketish turi</Text>
+                <Select
+                  value={pickupMode}
+                  onChange={setPickupMode}
+                  style={{ width: "100%", marginTop: 6 }}
+                  size="large"
+                  options={PICKUP_MODES}
+                />
+              </Col>
+            </Row>
+
+            <Divider />
+
+            <Row gutter={12}>
+              <Col xs={24} md={12}>
+                <Text type="secondary">O‘rindiqlar</Text>
+                <InputNumber min={1} max={20} value={formData.seatsTotal} onChange={(v) => setFormData((p) => ({ ...p, seatsTotal: Number(v || 1) }))} style={{ width: "100%", marginTop: 6 }} size="large" />
+              </Col>
+              <Col xs={24} md={12}>
+                <Text type="secondary">Narx (so‘m)</Text>
+                <InputNumber min={1000} step={1000} value={formData.price} onChange={(v) => setFormData((p) => ({ ...p, price: Number(v || 0) }))} style={{ width: "100%", marginTop: 6 }} size="large" />
+              </Col>
+            </Row>
+
+            <Divider />
+
+            
+<Divider />
+
+            <Row gutter={12}>
+              <Col xs={24} md={12}>
+                <Text type="secondary">Ketish manzili (destination)</Text>
+                <Space style={{ width: "100%", marginTop: 6 }} wrap>
+                  <Button
+                    icon={<AimOutlined />}
+                    onClick={async () => {
+                      try {
+                        const p = await getMyGeo();
+                        setDestLat(p.lat);
+                        setDestLng(p.lng);
+                        message.success("Manzil lokatsiyasi olindi");
+                      } catch (e) {
+                        message.error("Lokatsiyani olishda xatolik");
+                      }
+                    }}
+                  >
+                    Geolokatsiya
+                  </Button>
+                  {destLat != null && destLng != null ? (
+                    <>
+                      <Button onClick={() => openMapEmbed({ title: "Xarita", lat: destLat, lng: destLng, mode: "pin" })}>Xarita</Button>
+                      <Button onClick={() => openMapEmbed({ title: "Yo‘l", lat: destLat, lng: destLng, sLat: meetLat, sLng: meetLng, mode: "route" })}>Yo‘l</Button>
+                    </>
+                  ) : null}
+                </Space>
+                <Input value={destAddress} onChange={(e) => setDestAddress(e.target.value)} placeholder="Masalan: Toshkent Markaziy Bozor" style={{ marginTop: 8 }} />
+              </Col>
+              <Col xs={24} md={12}>
+                <Button type="primary" size="large" block icon={<SendOutlined />} onClick={createAd} loading={submitting} style={{ borderRadius: 14, height: 48, marginTop: 24 }}>
+                  E’lonni yaratish
                 </Button>
               </Col>
             </Row>
           </Card>
-        </Col>
-
-        <Col xs={24} md={14}>
-          <Card
-            title={
-              <Space>
-                <span>Mening e’lonlarim</span>
-                <Badge count={rides.length} showZero />
-              </Space>
-            }
-          >
-            {rides.length === 0 ? (
-              <Text type="secondary">Hozircha e’lon yo‘q.</Text>
-            ) : (
-              <Space direction="vertical" style={{ width: "100%" }}>
-                <Select
-                  style={{ width: "100%" }}
-                  value={selectedRideId}
-                  onChange={setSelectedRideId}
-                  options={rides.map((r) => ({
-                    value: r.id,
-                    label: `${r.from_region || ""} → ${r.to_region || ""}${r.delivery_service ? " • ELTISH" : ""} • ${r.ride_date || ""} ${String(r.ride_time || "").slice(0, 5)} • ${fmtMoney(r.price)} so‘m • ${r.status}`,
-                  }))}
-                />
-
-                {selectedRide ? (
-                  <Card size="small" style={{ background: "rgba(0,0,0,0.02)" }}>
-                    <Row gutter={[10, 10]} align="middle">
-                      <Col flex="auto">
-                        <Space wrap>
-                          <Tag color={rideIsCompleted ? "green" : rideIsCancelled ? "red" : "blue"}>
-                            {rideIsCompleted ? "TUGAGAN" : rideIsCancelled ? "BEKOR QILINGAN" : "AKTIV"}
-                          </Tag>
-                          <Text strong>
-                            {selectedRide.from_region} → {selectedRide.to_region}
-                          </Text>
-                          <Tag>{fmtMoney(selectedRide.price)} so‘m</Tag>
-                          {selectedRide.delivery_service ? <Tag color="purple">ELTISH XIZMATI</Tag> : null}
-                        </Space>
-                      </Col>
-
-                      <Col>
-                        {!rideIsCompleted ? (
-                          <Space wrap>
-                            <Button icon={<EditOutlined />} onClick={() => message.info("Tahrirlash: keyingi versiyada (hozircha)")} >
-                              E’lonni tahrirlash
-                            </Button>
-
-                            <Popconfirm
-                              title="E’lonni bekor qilasizmi?"
-                              okText="Ha"
-                              cancelText="Yo‘q"
-                              onConfirm={() => updateRideStatus(selectedRide.id, "cancelled")}
-                            >
-                              <Button danger icon={<StopOutlined />}>
-                                E’lonni bekor qilish
-                              </Button>
-                            </Popconfirm>
-
-                            <Button
-                              type="primary"
-                              icon={<CheckCircleOutlined />}
-                              onClick={() => updateRideStatus(selectedRide.id, "completed")}
-                            >
-                              Manzilga yetib keldik
-                            </Button>
-                          </Space>
-                        ) : (
-                          <div style={{ width: 360, maxWidth: "100%" }}>
-                            <Button type="primary" size="large" block icon={<CheckCircleOutlined />} disabled>
-                              MANZILGA YETIB KELDIK
-                            </Button>
-                            <Button style={{ marginTop: 10 }} block onClick={prepareReturnDraft}>
-                              Qayta buyurtma yaratish
-                            </Button>
-                          </div>
-                        )}
-                      </Col>
-                    </Row>
-                  </Card>
-                ) : null}
-
-                <Tabs
-                  items={[
-                    {
-                      key: "pending",
-                      label: (
-                        <Space>
-                          <span>So‘rovlar</span>
-                          <Badge count={pendingBookings.length} showZero />
-                        </Space>
-                      ),
-                      children: (
-                        <List
-                          dataSource={pendingBookings}
-                          locale={{ emptyText: "Hozircha bron so‘rovlar yo‘q" }}
-                          renderItem={(b) => (
-                            <List.Item
-                              actions={[
-                                <AcceptButtonWithNote
-                                  key="accept"
-                                  disabled={rideIsCompleted || rideIsCancelled}
-                                  onAccept={() => acceptBooking(b.id)}
-                                />,
-                                <Button
-                                  key="reject"
-                                  danger
-                                  icon={<CloseOutlined />}
-                                  disabled={rideIsCompleted || rideIsCancelled}
-                                  onClick={() => rejectBooking(b.id)}
-                                >
-                                  Rad
-                                </Button>,
-                                <Button
-                                  key="map"
-                                  onClick={() =>
-                                    openMapEmbed({
-                                      title: "Yo‘lovchi lokatsiyasi (pin)",
-                                      lat: b.pickup_lat,
-                                      lng: b.pickup_lng,
-                                      mode: "pin",
-                                    })
-                                  }
-                                >
-                                  Xarita
-                                </Button>,
-                              ]}
-                            >
-                              <List.Item.Meta
-                                avatar={<UserOutlined />}
-                                title={
-                                  <Space wrap>
-                                    <Text strong>{b.passenger_phone || "Yo‘lovchi"}</Text>
-                                    <Tag>{b.passenger_gender || "—"}</Tag>
-                                    <Tag color="blue">{b.seats} o‘rin</Tag>
-                                    <Tag color="gold">{b.status}</Tag>
-                                  </Space>
-                                }
-                                description={
-                                  <div>
-                                    <Text type="secondary">
-                                      Lokatsiya:{" "}
-                                      <Button
-                                        type="link"
-                                        style={{ padding: 0, height: "auto" }}
-                                        onClick={() =>
-                                          openMapEmbed({
-                                            title: "Yo‘lovchiga yo‘l (navigator)",
-                                            lat: b.pickup_lat,
-                                            lng: b.pickup_lng,
-                                            mode: "route",
-                                            sLat: selectedRide?.meet_lat,
-                                            sLng: selectedRide?.meet_lng,
-                                          })
-                                        }
-                                      >
-                                        {b.pickup_address || `${b.pickup_lat || ""}, ${b.pickup_lng || ""}` || "—"}
-                                      </Button>
-                                    </Text>
-                                    <br />
-                                    <Text type="secondary">
-                                      Yuborilgan: {b.created_at ? dayjs(b.created_at).format("YYYY-MM-DD HH:mm") : "—"}
-                                    </Text>
-                                  </div>
-                                }
-                              />
-                            </List.Item>
-                          )}
-                        />
-                      ),
-                    },
-                    {
-                      key: "accepted",
-                      label: (
-                        <Space>
-                          <span>Qabul qilinganlar</span>
-                          <Badge count={acceptedBookings.length} showZero />
-                        </Space>
-                      ),
-                      children: (
-                        <List
-                          dataSource={acceptedBookings}
-                          locale={{ emptyText: "Qabul qilingan yo‘lovchi yo‘q" }}
-                          renderItem={(b) => (
-                            <List.Item
-                              actions={[
-                                <Button
-                                  key="route"
-                                  type="primary"
-                                  onClick={() =>
-                                    openMapEmbed({
-                                      title: "Yo‘lovchiga yo‘l (navigator)",
-                                      lat: b.pickup_lat,
-                                      lng: b.pickup_lng,
-                                      mode: "route",
-                                      sLat: selectedRide?.meet_lat,
-                                      sLng: selectedRide?.meet_lng,
-                                    })
-                                  }
-                                >
-                                  Yo‘l ko‘rsatish
-                                </Button>,
-                                <Button
-                                  key="pin"
-                                  onClick={() =>
-                                    openMapEmbed({
-                                      title: "Yo‘lovchi lokatsiyasi (pin)",
-                                      lat: b.pickup_lat,
-                                      lng: b.pickup_lng,
-                                      mode: "pin",
-                                    })
-                                  }
-                                >
-                                  Xarita
-                                </Button>,
-                              ]}
-                            >
-                              <List.Item.Meta
-                                avatar={<UserOutlined />}
-                                title={
-                                  <Space wrap>
-                                    <Text strong>{b.passenger_phone || "Yo‘lovchi"}</Text>
-                                    <Tag color="green">accepted</Tag>
-                                    <Tag>{b.passenger_gender || "—"}</Tag>
-                                    <Tag color="blue">{b.seats} o‘rin</Tag>
-                                  </Space>
-                                }
-                                description={
-                                  <div>
-                                    <Text type="secondary">
-                                      Lokatsiya:{" "}
-                                      <Button
-                                        type="link"
-                                        style={{ padding: 0, height: "auto" }}
-                                        onClick={() =>
-                                          openMapEmbed({
-                                            title: "Yo‘lovchiga yo‘l (navigator)",
-                                            lat: b.pickup_lat,
-                                            lng: b.pickup_lng,
-                                            mode: "route",
-                                            sLat: selectedRide?.meet_lat,
-                                            sLng: selectedRide?.meet_lng,
-                                          })
-                                        }
-                                      >
-                                        {b.pickup_address || `${b.pickup_lat || ""}, ${b.pickup_lng || ""}` || "—"}
-                                      </Button>
-                                    </Text>
-                                    <br />
-                                    <Text type="secondary">
-                                      Qabul vaqti: {b.accepted_at ? dayjs(b.accepted_at).format("YYYY-MM-DD HH:mm") : "—"}
-                                    </Text>
-                                  </div>
-                                }
-                              />
-                            </List.Item>
-                          )}
-                        />
-                      ),
-                    },
-                  ]}
-                />
-              </Space>
-            )}
-          </Card>
-        </Col>
-      </Row>
-
-      <Modal open={mapModal.open} title={mapModal.title} footer={null} width={900} onCancel={() => setMapModal({ open: false, title: "", url: "" })}>
-        <iframe src={mapModal.url} width="100%" height="520" style={{ border: 0 }} loading="lazy" />
-      </Modal>
-    </div>
+        )}
+      </div>
+    </ConfigProvider>
   );
 }
