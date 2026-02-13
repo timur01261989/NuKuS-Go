@@ -27,7 +27,7 @@ import {
   AimOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-import { supabase } from "../../../../lib/supabase";
+import { supabase } from "../../../lib/supabase";
 
 const { Title, Text } = Typography;
 
