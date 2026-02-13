@@ -17,6 +17,7 @@ import {
   Input,
   List,
   Badge,
+  Tabs,
 } from "antd";
 import {
   EnvironmentFilled,
@@ -27,7 +28,7 @@ import {
   AimOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-import { supabase } from "../../../lib/supabase";
+import { supabase } from "../../../../lib/supabase";
 
 const { Title, Text } = Typography;
 
@@ -35,12 +36,20 @@ const RIDES_TABLE = "inter_prov_rides";
 const BOOKINGS_TABLE = "inter_prov_bookings";
 
 const REGIONS_DATA = [
-  { name: "Qoraqalpog'iston", districts: ["Nukus sh.", "Chimboy", "Qo'ng'irot", "To'rtko'l", "Beruniy", "Amudaryo"] },
-  { name: "Xorazm", districts: ["Urganch sh.", "Xiva", "Hazorasp", "Yangibozor", "Shovot"] },
-  { name: "Buxoro", districts: ["Buxoro sh.", "G'ijduvon", "Kogon", "Vobkent"] },
-  { name: "Samarqand", districts: ["Samarqand sh.", "Jomboy", "Pastdarg'om", "Kattaqo'rg'on"] },
-  { name: "Toshkent vil.", districts: ["Chirchiq", "Angren", "Bekobod", "Olmaliq"] },
-  { name: "Toshkent shahri", districts: ["Yunusobod", "Chilonzor", "Yakkasaroy", "Mirzo Ulug'bek", "Shayxontohur"] },
+  { name: "Qoraqalpog'iston", districts: ["Nukus sh.", "Chimboy", "Qo'ng'irot", "Beruniy", "To'rtko'l", "Mo'ynoq", "Xo'jayli", "Shumanay", "Qanliko'l", "Kegeyli", "Qorao'zak", "Taxtako'pir", "Ellikqala", "Amudaryo", "Bo'zatov", "Nukus tumani"] },
+  { name: "Toshkent shahri", districts: ["", "Yunusobod", "Chilonzor", "Mirzo Ulug'bek", "Yashnobod", "Yakkasaroy", "Sergeli", "Uchtepa", "Olmazor", "Bektemir", "Mirobod", "Shayxontohur", "Yangihayot"] },
+  { name: "Toshkent viloyati", districts: ["Nurafshon", "Angren", "Olmaliq", "Chirchiq", "Bekobod", "Yangiyo'l", "Oqqo'rg'on", "Ohangaron", "Bo'stonliq", "Bo'ka", "Zangiota", "Qibray", "Quyichirchiq", "Parkent", "Piskent", "O'rtachirchiq", "Chinoz", "Yuqorichirchiq", "Toshkent tumani"] },
+  { name: "Xorazm", districts: ["Urganch sh.", "Xiva", "Bog'ot", "Gurlan", "Qo'shko'pir", "Shovot", "Xonqa", "Yangiariq", "Yangibozor", "Tuproqqala", "Hazorasp"] },
+  { name: "Buxoro", districts: ["Buxoro sh.", "Kogon", "G'ijduvon", "Jondor", "Qorako'l", "Qorovulbozor", "Olot", "Peshku", "Romitan", "Shofirkon", "Vobkent"] },
+  { name: "Navoiy", districts: ["Navoiy sh.", "Zarafshon", "Karmana", "Konimex", "Navbahor", "Nurota", "Tomdi", "Uchquduq", "Xatirchi", "Qiziltepa"] },
+  { name: "Samarqand", districts: ["Samarqand sh.", "Kattaqo'rg'on", "Ishtixon", "Jomboy", "Narpay", "Nurobod", "Oqdaryo", "Paxtachi", "Payariq", "Pastdarg'om", "Toyloq", "Bulung'ur", "Urgut"] },
+  { name: "Qashqadaryo", districts: ["Qarshi sh.", "Shahrisabz", "Muborak", "Dehqonobod", "Kasbi", "Kitob", "Koson", "Mirishkor", "Nishon", "Chiroqchi", "Yakkabog'", "Qamashi", "G'uzor"] },
+  { name: "Surxondaryo", districts: ["Termiz sh.", "Angor", "Boysun", "Denov", "Jarqo'rg'on", "Muzrabot", "Oltinsoy", "Sariosiyo", "Sherobod", "Sho'rchi", "Uzun", "Qiziriq", "Qumqo'rg'on"] },
+  { name: "Jizzax", districts: ["Jizzax sh.", "Arnasoy", "Baxmal", "Do'stlik", "Forish", "G'allaorol", "Sharof Rashidov", "Mirzachul", "Paxtakor", "Yangiobod", "Zomin", "Zafarobod"] },
+  { name: "Sirdaryo", districts: ["Guliston sh.", "Shirin", "Yangiyer", "Boyovut", "Mirzaobod", "Oqoltin", "Sayhunobod", "Sardoba", "Xovos"] },
+  { name: "Andijon", districts: ["Andijon sh.", "Asaka", "Xonobod", "Shahrixon", "Oltinkul", "Baliqchi", "Bo'z", "Buloqboshi", "Izboskan", "Jalaquduq", "Marhamat", "Paxtaobod", "Qo'rg'ontepa", "Xo'jaobod"] },
+  { name: "Farg'ona", districts: ["Farg'ona sh.", "Qo'qon", "Marg'ilon", "Quva", "Quvasoy", "Beshariq", "Bog'dod", "Buvayda", "Dang'ara", "Yozyovon", "Oltiariq", "Rishton", "So'x", "Toshloq", "Uchko'prik", "O'zbekiston", "Furqat"] },
+  { name: "Namangan", districts: ["Namangan sh.", "Chortoq", "Chust", "Kosonsoy", "Mingbuloq", "Norin", "Pop", "To'raqo'rg'on", "Uchqo'rg'on", "Uychi", "Yangiqo'rg'on"] },
 ];
 
 const regionOptions = REGIONS_DATA.map((r) => ({ label: r.name, value: r.name }));
@@ -69,6 +78,8 @@ export default function ClientInterProvincial() {
     toDistrict: null,
     date: null,
   });
+
+  const [activeTab, setActiveTab] = useState("rides");
 
   const [rides, setRides] = useState([]);
   const [myBookings, setMyBookings] = useState([]);
@@ -123,7 +134,12 @@ export default function ClientInterProvincial() {
   const searchRides = async () => {
     setLoading(true);
 
-    let q = supabase.from(RIDES_TABLE).select("*").eq("status", "active").order("ride_date", { ascending: true });
+    let q = supabase
+      .from(RIDES_TABLE)
+      .select("*")
+      .eq("status", "active")
+      .eq("delivery_service", activeTab === "delivery")
+      .order("ride_date", { ascending: true });
 
     if (filters.fromRegion) q = q.eq("from_region", filters.fromRegion);
     if (filters.fromDistrict) q = q.eq("from_district", filters.fromDistrict);
@@ -197,6 +213,13 @@ export default function ClientInterProvincial() {
     return () => sub?.subscription?.unsubscribe?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+
+  useEffect(() => {
+    // Tab o‘zgarganda qayta qidiramiz
+    searchRides();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   if (loading) {
     return (
@@ -296,10 +319,30 @@ export default function ClientInterProvincial() {
         <Col xs={24} md={14}>
           <Card
             title={
-              <Space>
-                <span>Topilgan e’lonlar</span>
-                <Badge count={rides.length} showZero />
-              </Space>
+              <Tabs
+                activeKey={activeTab}
+                onChange={setActiveTab}
+                items={[
+                  {
+                    key: "rides",
+                    label: (
+                      <Space>
+                        <span>Yo‘lovchi</span>
+                        <Badge count={activeTab === "rides" ? rides.length : 0} showZero />
+                      </Space>
+                    ),
+                  },
+                  {
+                    key: "delivery",
+                    label: (
+                      <Space>
+                        <span>Eltish xizmati</span>
+                        <Badge count={activeTab === "delivery" ? rides.length : 0} showZero />
+                      </Space>
+                    ),
+                  },
+                ]}
+              />
             }
           >
             <List
@@ -324,6 +367,7 @@ export default function ClientInterProvincial() {
                           {r.from_region || "—"} → {r.to_region || "—"}
                         </Text>
                         <Tag color="blue">{fmtMoney(r.price)} so‘m</Tag>
+                        {r.delivery_service ? <Tag color="purple">ELTISH</Tag> : null}
                         <Tag>{r.seats} o‘rin</Tag>
                       </Space>
                     }

@@ -20,6 +20,7 @@ import {
   Tabs,
   Badge,
   Popconfirm,
+  Switch,
 } from "antd";
 import {
   EnvironmentFilled,
@@ -61,12 +62,20 @@ const ACCEPT_FEE_SUM = 0;
  * --- REGIONS (minimal demo, replace with your full list) ---
  */
 const REGIONS_DATA = [
-  { name: "Qoraqalpog'iston", districts: ["Nukus sh.", "Chimboy", "Qo'ng'irot", "To'rtko'l", "Beruniy", "Amudaryo"] },
-  { name: "Xorazm", districts: ["Urganch sh.", "Xiva", "Hazorasp", "Yangibozor", "Shovot"] },
-  { name: "Buxoro", districts: ["Buxoro sh.", "G'ijduvon", "Kogon", "Vobkent"] },
-  { name: "Samarqand", districts: ["Samarqand sh.", "Jomboy", "Pastdarg'om", "Kattaqo'rg'on"] },
-  { name: "Toshkent vil.", districts: ["Chirchiq", "Angren", "Bekobod", "Olmaliq"] },
-  { name: "Toshkent shahri", districts: ["Yunusobod", "Chilonzor", "Yakkasaroy", "Mirzo Ulug'bek", "Shayxontohur"] },
+  { name: "Qoraqalpog'iston", districts: ["Nukus sh.", "Chimboy", "Qo'ng'irot", "Beruniy", "To'rtko'l", "Mo'ynoq", "Xo'jayli", "Shumanay", "Qanliko'l", "Kegeyli", "Qorao'zak", "Taxtako'pir", "Ellikqala", "Amudaryo", "Bo'zatov", "Nukus tumani"] },
+  { name: "Toshkent shahri", districts: ["", "Yunusobod", "Chilonzor", "Mirzo Ulug'bek", "Yashnobod", "Yakkasaroy", "Sergeli", "Uchtepa", "Olmazor", "Bektemir", "Mirobod", "Shayxontohur", "Yangihayot"] },
+  { name: "Toshkent viloyati", districts: ["Nurafshon", "Angren", "Olmaliq", "Chirchiq", "Bekobod", "Yangiyo'l", "Oqqo'rg'on", "Ohangaron", "Bo'stonliq", "Bo'ka", "Zangiota", "Qibray", "Quyichirchiq", "Parkent", "Piskent", "O'rtachirchiq", "Chinoz", "Yuqorichirchiq", "Toshkent tumani"] },
+  { name: "Xorazm", districts: ["Urganch sh.", "Xiva", "Bog'ot", "Gurlan", "Qo'shko'pir", "Shovot", "Xonqa", "Yangiariq", "Yangibozor", "Tuproqqala", "Hazorasp"] },
+  { name: "Buxoro", districts: ["Buxoro sh.", "Kogon", "G'ijduvon", "Jondor", "Qorako'l", "Qorovulbozor", "Olot", "Peshku", "Romitan", "Shofirkon", "Vobkent"] },
+  { name: "Navoiy", districts: ["Navoiy sh.", "Zarafshon", "Karmana", "Konimex", "Navbahor", "Nurota", "Tomdi", "Uchquduq", "Xatirchi", "Qiziltepa"] },
+  { name: "Samarqand", districts: ["Samarqand sh.", "Kattaqo'rg'on", "Ishtixon", "Jomboy", "Narpay", "Nurobod", "Oqdaryo", "Paxtachi", "Payariq", "Pastdarg'om", "Toyloq", "Bulung'ur", "Urgut"] },
+  { name: "Qashqadaryo", districts: ["Qarshi sh.", "Shahrisabz", "Muborak", "Dehqonobod", "Kasbi", "Kitob", "Koson", "Mirishkor", "Nishon", "Chiroqchi", "Yakkabog'", "Qamashi", "G'uzor"] },
+  { name: "Surxondaryo", districts: ["Termiz sh.", "Angor", "Boysun", "Denov", "Jarqo'rg'on", "Muzrabot", "Oltinsoy", "Sariosiyo", "Sherobod", "Sho'rchi", "Uzun", "Qiziriq", "Qumqo'rg'on"] },
+  { name: "Jizzax", districts: ["Jizzax sh.", "Arnasoy", "Baxmal", "Do'stlik", "Forish", "G'allaorol", "Sharof Rashidov", "Mirzachul", "Paxtakor", "Yangiobod", "Zomin", "Zafarobod"] },
+  { name: "Sirdaryo", districts: ["Guliston sh.", "Shirin", "Yangiyer", "Boyovut", "Mirzaobod", "Oqoltin", "Sayhunobod", "Sardoba", "Xovos"] },
+  { name: "Andijon", districts: ["Andijon sh.", "Asaka", "Xonobod", "Shahrixon", "Oltinkul", "Baliqchi", "Bo'z", "Buloqboshi", "Izboskan", "Jalaquduq", "Marhamat", "Paxtaobod", "Qo'rg'ontepa", "Xo'jaobod"] },
+  { name: "Farg'ona", districts: ["Farg'ona sh.", "Qo'qon", "Marg'ilon", "Quva", "Quvasoy", "Beshariq", "Bog'dod", "Buvayda", "Dang'ara", "Yozyovon", "Oltiariq", "Rishton", "So'x", "Toshloq", "Uchko'prik", "O'zbekiston", "Furqat"] },
+  { name: "Namangan", districts: ["Namangan sh.", "Chortoq", "Chust", "Kosonsoy", "Mingbuloq", "Norin", "Pop", "To'raqo'rg'on", "Uchqo'rg'on", "Uychi", "Yangiqo'rg'on"] },
 ];
 
 const regionOptions = REGIONS_DATA.map((r) => ({ label: r.name, value: r.name }));
@@ -141,6 +150,9 @@ export default function DriverInterProvincial() {
     seats: 1,
     price: 0,
     pickup_mode: "meet_point",
+
+    // ✅ New: delivery service
+    delivery_service: false,
 
     // ✅ only ONE required "ketish" point:
     meet_lat: null,
@@ -267,6 +279,7 @@ export default function DriverInterProvincial() {
       pickup_location: `${form.fromRegion}${form.fromDistrict ? ", " + form.fromDistrict : ""}`,
       dropoff_location: `${form.toRegion}${form.toDistrict ? ", " + form.toDistrict : ""}`,
       pickup_mode: form.pickup_mode,
+      delivery_service: !!form.delivery_service,
 
       meet_lat: form.meet_lat,
       meet_lng: form.meet_lng,
@@ -542,6 +555,19 @@ export default function DriverInterProvincial() {
                 />
               </Col>
 
+
+              <Col span={24}>
+                <Space align="center">
+                  <Text strong>Eltish xizmati</Text>
+                  <Switch checked={!!form.delivery_service} onChange={(checked) => setForm((p) => ({ ...p, delivery_service: checked }))} />
+                </Space>
+                <div style={{ marginTop: 6 }}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    Belgilasangiz, bu e’lon yo‘lovchi tarafda “Eltish xizmati” sahifasida ham ko‘rinadi.
+                  </Text>
+                </div>
+              </Col>
+
               <Col span={24}>
                 <Divider style={{ margin: "10px 0" }} />
                 <Text strong>
@@ -701,7 +727,7 @@ export default function DriverInterProvincial() {
                   onChange={setSelectedRideId}
                   options={rides.map((r) => ({
                     value: r.id,
-                    label: `${r.from_region || ""} → ${r.to_region || ""} • ${r.ride_date || ""} ${String(r.ride_time || "").slice(0, 5)} • ${fmtMoney(r.price)} so‘m • ${r.status}`,
+                    label: `${r.from_region || ""} → ${r.to_region || ""}${r.delivery_service ? " • ELTISH" : ""} • ${r.ride_date || ""} ${String(r.ride_time || "").slice(0, 5)} • ${fmtMoney(r.price)} so‘m • ${r.status}`,
                   }))}
                 />
 
@@ -717,6 +743,7 @@ export default function DriverInterProvincial() {
                             {selectedRide.from_region} → {selectedRide.to_region}
                           </Text>
                           <Tag>{fmtMoney(selectedRide.price)} so‘m</Tag>
+                          {selectedRide.delivery_service ? <Tag color="purple">ELTISH XIZMATI</Tag> : null}
                         </Space>
                       </Col>
 
