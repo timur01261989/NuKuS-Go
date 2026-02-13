@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from "react";
 import { 
   Card, Button, Typography, Row, Col, 
-  TimePicker, DatePicker, InputNumber, Space, Switch, 
+  TimePicker, DatePicker, InputNumber, Space, 
   message, ConfigProvider, Divider, Select, Checkbox, Tag, Skeleton 
 } from "antd";
 import { 
-  ArrowLeftOutlined, EnvironmentOutlined, 
-  ClockCircleOutlined, UserOutlined, 
-  CalendarOutlined, ShoppingOutlined,
-  CheckCircleOutlined, DeleteOutlined, SendOutlined,
-  GlobalOutlined, EnvironmentFilled
+  ArrowLeftOutlined, 
+  ClockCircleOutlined, 
+  CalendarOutlined, 
+  DeleteOutlined, SendOutlined,
+  GlobalOutlined
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { translations } from '@i18n/translations';
+// Eslatma: Supabase manzili sizning fayl tuzilishingizga qarab o'zgarishi mumkin
+// Agar xato bersa, "../../../../lib/supabase" ni to'g'rilang
 import { supabase } from "../../../../lib/supabase"; 
 
 const { Title, Text } = Typography;
@@ -21,7 +23,7 @@ const { Option } = Select;
 export default function DriverInterProvincial({ onBack }) {
   const savedLang = localStorage.getItem("appLang") || "uz_lotin";
   const t = translations[savedLang] || translations["uz_lotin"];
-  const [loading, setLoading] = useState(true); // Skeleton uchun
+  const [loading, setLoading] = useState(true); 
 
   // --- 1. VILOYATLAR VA TUMANLAR RO'YXATI ---
   const regionsData = [
@@ -83,9 +85,7 @@ export default function DriverInterProvincial({ onBack }) {
     }
   ];
 
-  // E'lon holatini o'qish (Agar oldin yaratilgan bo'lsa)
   const savedAd = JSON.parse(localStorage.getItem("activeInterProvincialAd"));
-  // Step 0: Yaratish, Step 1: Tasdiqlash, Step 2: Aktiv holat
   const [step, setStep] = useState(savedAd ? 2 : 0);
 
   const [formData, setFormData] = useState(savedAd || {
@@ -100,12 +100,10 @@ export default function DriverInterProvincial({ onBack }) {
     addToDelivery: false
   });
 
-  // Dastlabki yuklanish effekti
   useEffect(() => {
     setTimeout(() => setLoading(false), 600);
   }, []);
 
-  // --- MANTIQ: Viloyat o'zgarganda tumanlarni yangilash ---
   const handleRegionChange = (value, type) => {
     const selectedRegion = regionsData.find(r => r.name === value);
     if (!selectedRegion) return;
@@ -114,7 +112,7 @@ export default function DriverInterProvincial({ onBack }) {
       setFormData({ 
         ...formData, 
         fromRegion: value, 
-        fromDistrict: selectedRegion.districts[0] // Avtomatik 1-tumanni tanlash
+        fromDistrict: selectedRegion.districts[0] 
       });
     } else {
       setFormData({ 
@@ -125,64 +123,51 @@ export default function DriverInterProvincial({ onBack }) {
     }
   };
 
+  // ✅ YANGILANGAN HANDLE SAVE FUNKSIYASI (SUPABASE UCHUN)
   const handleSave = async () => {
     try {
-      // 1. Haydovchi tizimga kirganligini tekshiramiz
+      // 1. Foydalanuvchi borligini tekshirish
       const { data: { user } } = await supabase.auth.getUser();
-      
       if (!user) {
         message.error("Iltimos, avval tizimga kiring!");
         return;
       }
 
-      // 2. Ma'lumotlarni bazaga yuborish uchun tayyorlaymiz
-      // Eslatma: Bazada "seats" (joylar) va "scheduled_at" (ketish vaqti) ustunlari bo'lishi kerak.
-      // Agar yo'q bo'lsa, ularni qo'shing yoki muhim ma'lumotlarni commentga yozamiz.
-      
-      const { error } = await supabase
-        .from('orders')
-        .insert({
-          driver_id: user.id,            // E'lon egasi (Siz)
-          client_id: null,               // Mijoz hali yo'q (bu taksi chaqirish emas, e'lon berish)
-          service_type: 'intercity',     // <--- MUHIM: Yo'lovchi shu bo'yicha qidiradi
-          status: 'pending',             // E'lon aktiv holatda
-          
-          // Manzillar
+      // 2. Bazaga yozish
+      const { error } = await supabase.from('orders').insert({
+          driver_id: user.id,
+          service_type: 'intercity',
+          status: 'pending',
           pickup_location: `${formData.fromRegion}, ${formData.fromDistrict}`,
           dropoff_location: `${formData.toRegion}, ${formData.toDistrict}`,
-          
-          // Narx
           price: formData.price,
-          
-          // Qo'shimcha ma'lumotlar (agar bazada alohida ustunlar bo'lmasa)
-          // Masalan client_name o'rniga vaqtni yozib turamiz yoki alohida ustun ochish kerak
-          client_name: `Ketish vaqti: ${formData.date} | ${formData.time}`, 
-          client_phone: `Joylar: ${formData.seats} ta` 
-        });
+          // Vaqtinchalik yechim:
+          client_name: `Ketish: ${formData.date} | ${formData.time}`,
+          client_phone: `Joylar: ${formData.seats} ta`
+      });
 
       if (error) throw error;
 
-      // 3. Muvaffaqiyatli saqlandi
+      // 3. Lokal xotiraga saqlash va UI ni o'zgartirish
       localStorage.setItem("activeInterProvincialAd", JSON.stringify(formData));
       setStep(2);
-      message.success(t.adActive || "E'lon bazaga joylandi va yo'lovchilarga ko'rinmoqda!");
+      message.success(t.adActive || "E'lon bazaga muvaffaqiyatli joylandi!");
 
     } catch (error) {
-      console.error("Bazaga yozishda xato:", error);
-      message.error("Xatolik yuz berdi: " + error.message);
+      console.error("Xatolik:", error);
+      message.error("Xatolik: " + error.message);
     }
   };
 
   const handleCancelAd = () => {
     localStorage.removeItem("activeInterProvincialAd");
     setStep(0);
-    message.warning(t.cancelAd || "E'lon bekor qilindi");
+    message.warning(t.cancelAd || "Bekor qilindi");
   };
 
-  // --- STEP 0: E'LON YARATISH FORMASI ---
+  // --- RENDER ---
   const renderForm = () => (
     <div style={{ padding: "15px", background: "#f8f9fa", minHeight: "100vh" }}>
-      {/* HEADER */}
       <div style={{ display: "flex", alignItems: "center", marginBottom: 25 }}>
         <Button shape="circle" size="large" icon={<ArrowLeftOutlined />} onClick={onBack} style={{ border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }} />
         <Title level={4} style={{ margin: "0 0 0 15px", color: "#1890ff", fontWeight: 800 }}>{t.interProvincial || "Viloyatlar Aro"}</Title>
@@ -190,7 +175,6 @@ export default function DriverInterProvincial({ onBack }) {
 
       <Card bordered={false} style={{ borderRadius: 24, marginBottom: 15, boxShadow: "0 4px 20px rgba(0,0,0,0.05)" }}>
         <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 15 }}>
-           {/* Marshrut chizig'i */}
            <div style={{ position: 'absolute', left: 8, top: 18, bottom: 38, width: 2, background: '#e0e0e0', zIndex: 0 }}></div>
 
            {/* QAYERDAN */}
@@ -204,8 +188,7 @@ export default function DriverInterProvincial({ onBack }) {
                    value={formData.fromRegion} 
                    onChange={val => handleRegionChange(val, "from")} 
                    style={{ width: "100%", marginBottom: 8 }} 
-                   size="large" variant="borderless"
-                   suffixIcon={null}
+                   size="large" variant="borderless" suffixIcon={null}
                  >
                    {regionsData.map(r => <Option key={r.name} value={r.name}>{r.name}</Option>)}
                  </Select>
@@ -233,8 +216,7 @@ export default function DriverInterProvincial({ onBack }) {
                    value={formData.toRegion} 
                    onChange={val => handleRegionChange(val, "to")} 
                    style={{ width: "100%", marginBottom: 8 }} 
-                   size="large" variant="borderless"
-                   suffixIcon={null}
+                   size="large" variant="borderless" suffixIcon={null}
                  >
                    {regionsData.map(r => <Option key={r.name} value={r.name}>{r.name}</Option>)}
                  </Select>
@@ -253,7 +235,6 @@ export default function DriverInterProvincial({ onBack }) {
         </div>
       </Card>
 
-      {/* ELTISH INTEGRATSIYASI */}
       <Card style={{ borderRadius: 24, marginBottom: 15, boxShadow: "0 4px 20px rgba(0,0,0,0.05)", border: formData.addToDelivery ? "1px solid #52c41a" : "none" }}>
         <Checkbox checked={formData.addToDelivery} onChange={e => setFormData({...formData, addToDelivery: e.target.checked})}>
           <Space>
@@ -263,7 +244,6 @@ export default function DriverInterProvincial({ onBack }) {
         </Checkbox>
       </Card>
 
-      {/* VAQT, SANA, NARX */}
       <Card style={{ marginBottom: 15, borderRadius: 24, border: 'none', boxShadow: "0 4px 20px rgba(0,0,0,0.05)" }}>
         <Row justify="space-between" align="middle" style={{ marginBottom: 15 }}>
           <Space><CalendarOutlined style={{ color: '#1890ff' }} /> <Text strong>{t.departureDate}</Text></Space>
@@ -310,12 +290,8 @@ export default function DriverInterProvincial({ onBack }) {
         onClick={() => setStep(1)} 
         style={{ 
            height: 60, borderRadius: 18, background: "#1890ff", fontWeight: "800", fontSize: 18, marginTop: 20,
-           boxShadow: '0 8px 20px rgba(24,144,255,0.4)', border: 'none', transition: 'transform 0.1s'
+           boxShadow: '0 8px 20px rgba(24,144,255,0.4)', border: 'none'
         }}
-        onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.97)"}
-        onMouseUp={(e) => e.currentTarget.style.transform = "scale(1)"}
-        onTouchStart={(e) => e.currentTarget.style.transform = "scale(0.97)"}
-        onTouchEnd={(e) => e.currentTarget.style.transform = "scale(1)"}
       >
         {(t.createAd || t.create).toUpperCase()}
       </Button>
@@ -329,13 +305,9 @@ export default function DriverInterProvincial({ onBack }) {
            <Button shape="circle" size="large" icon={<ArrowLeftOutlined />} onClick={() => (step === 2 || step === 0) ? onBack() : setStep(0)} style={{ border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }} />
         </div>
 
-        {/* LOADING SKELETON */}
         {loading && step === 0 ? (
            <div style={{ padding: 20 }}>
               <Skeleton active paragraph={{ rows: 4 }} />
-              <br />
-              <Skeleton.Button active block style={{ height: 100, borderRadius: 20, marginBottom: 15 }} />
-              <Skeleton.Button active block style={{ height: 60, borderRadius: 20 }} />
            </div>
         ) : (
           <>
