@@ -43,16 +43,16 @@ const { Title, Text } = Typography;
  * - Passenger can see own requests after relogin
  * - Passenger can edit/cancel only when status="requested"
  * - Pickup type filter:
- *    - meet_point (Belgilangan joyga borish) => show driver meet point if exists
+ *    - meet_point (Belgilangan joyga kelish) => show driver meet point if exists
  *    - home_pickup (Uydan olib ketish) => passenger sends own geolocation (pickup_lat/lng/address)
  * - Map open button for locations
  *
  * RPCs used (expected):
  *   request_inter_prov_booking  (fallback)
- *   request_inter_prov_booking_v2 (preferred - supports pickup fields)
+ *   request_inter_prov_booking (preferred - supports pickup fields)
  *   update_inter_prov_booking_seats (fallback)
- *   edit_booking_request_v2 (preferred)
- *   cancel_inter_prov_booking (fallback)
+ *   edit_booking_request (preferred)
+ *   cancel_booking_request (fallback)
  *   cancel_booking_request (preferred)
  *
  * If some RPC doesn't exist, code tries fallback.
@@ -125,6 +125,26 @@ const getMyGeo = async () => {
 };
 
 export default function ClientInterProvincial({ onBack }) {
+
+  // In-app map modal (no new tab)
+  const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita" });
+  const openMapEmbed = ({ title = "Xarita", lat, lng, sLat, sLng, mode = "pin" }) => {
+    const safe = (v) => String(v ?? "").trim();
+    const qLat = safe(lat), qLng = safe(lng);
+    const aLat = safe(sLat), aLng = safe(sLng);
+
+    let url = "";
+    if (mode === "route" && aLat && aLng && qLat && qLng) {
+      url = `https://www.google.com/maps?saddr=${aLat},${aLng}&daddr=${qLat},${qLng}&output=embed`;
+    } else if (qLat && qLng) {
+      url = `https://www.google.com/maps?q=${qLat},${qLng}&output=embed`;
+    } else {
+      message.error("Lokatsiya topilmadi");
+      return;
+    }
+    setMapModal({ open: true, url, title });
+  };
+
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
 
@@ -417,7 +437,7 @@ export default function ClientInterProvincial({ onBack }) {
 
       // Prefer v2, fallback to v1
       let rpcErr = null;
-      const v2 = await supabase.rpc("request_inter_prov_booking_v2", {
+      const v2 = await supabase.rpc("request_inter_prov_booking", {
         p_order_id: selectedOrder.id,
         p_passenger_id: user.id,
         p_passenger_name: passengerName || "",
@@ -492,7 +512,7 @@ export default function ClientInterProvincial({ onBack }) {
       }
 
       // prefer v2 edit
-      const v2 = await supabase.rpc("edit_booking_request_v2", v2Args);
+      const v2 = await supabase.rpc("edit_booking_request", v2Args);
 
       if (v2?.error) {
         // fallback old seats-only rpc
@@ -543,7 +563,7 @@ export default function ClientInterProvincial({ onBack }) {
         });
 
         if (v2?.error) {
-          const v1 = await supabase.rpc("cancel_inter_prov_booking", {
+          const v1 = await supabase.rpc("cancel_booking_request", {
             p_booking_id: b.id,
             p_passenger_id: user.id,
           });
@@ -627,7 +647,7 @@ export default function ClientInterProvincial({ onBack }) {
             <Row gutter={12} align="middle">
               <Col xs={24} md={7}>
                 <Text type="secondary">Sana (ixtiyoriy)</Text>
-                <DatePicker value={form.date ? dayjs(form.date) : null} disabledDate={(current) => current && current < dayjs().startOf("day")} onChange={(d) => setForm((p) => ({ ...p, date: d ? d.format("YYYY-MM-DD") : "" }))} style={{ width: "100%", marginTop: 6 }} size="large" allowClear />
+                <DatePicker value={form.date ? dayjs(form.date) : null} disabledDate={(c) => c && c < dayjs().startOf('day')} disabledDate={(current) => current && current < dayjs().startOf("day")} onChange={(d) => setForm((p) => ({ ...p, date: d ? d.format("YYYY-MM-DD") : "" }))} style={{ width: "100%", marginTop: 6 }} size="large" allowClear />
               </Col>
               <Col xs={24} md={6}>
                 <Text type="secondary">Minimum joylar</Text>
@@ -642,7 +662,7 @@ export default function ClientInterProvincial({ onBack }) {
                   size="large"
                   options={[
                     { value: "all", label: "Hammasi" },
-                    { value: "meet_point", label: "Belgilangan joyga borish" },
+                    { value: "meet_point", label: "Belgilangan joyga kelish" },
                     { value: "home_pickup", label: "Uydan olib ketish" },
                   ]}
                 />
@@ -698,7 +718,7 @@ export default function ClientInterProvincial({ onBack }) {
 
                             <Space size={10} wrap style={{ marginTop: 4 }}>
                               <Tag color={order.pickup_mode === "home_pickup" ? "purple" : "blue"}>
-                                {order.pickup_mode === "home_pickup" ? "Uydan olib ketish" : "Belgilangan joyga borish"}
+                                {order.pickup_mode === "home_pickup" ? "Uydan olib ketish" : "Belgilangan joyga kelish"}
                               </Tag>
                               {order.meet_address ? <Tag>Ketish: {order.meet_address}</Tag> : null}
                               {order.dest_address ? <Tag>Manzil: {order.dest_address}</Tag> : null}
@@ -836,7 +856,7 @@ export default function ClientInterProvincial({ onBack }) {
               style={{ width: "100%", marginTop: 6 }}
               size="large"
               options={[
-                { value: "meet_point", label: "Belgilangan joyga borish" },
+                { value: "meet_point", label: "Belgilangan joyga kelish" },
                 { value: "home_pickup", label: "Uydan olib ketish" },
               ]}
             />
@@ -932,6 +952,25 @@ export default function ClientInterProvincial({ onBack }) {
           </div>
         )}
       </Modal>
+      <Modal
+        title={mapModal.title}
+        open={mapModal.open}
+        onCancel={() => setMapModal({ open: false, url: "", title: "Xarita" })}
+        footer={null}
+        width={900}
+        style={{ top: 24 }}
+      >
+        {mapModal.url ? (
+          <iframe
+            title="map"
+            src={mapModal.url}
+            style={{ width: "100%", height: 520, border: 0, borderRadius: 12 }}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
+        ) : null}
+      </Modal>
+
     </div>
   );
 }

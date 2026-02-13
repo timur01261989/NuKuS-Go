@@ -157,7 +157,7 @@ async function loadDriverBalance(driverId) {
       .from("driver_wallets")
       .select("balance")
       .eq("driver_id", driverId)
-      .single();
+      .maybeSingle();
     if (!error && data) return Number(data.balance || 0);
   } catch (e) {}
   try {
@@ -165,7 +165,7 @@ async function loadDriverBalance(driverId) {
       .from("profiles")
       .select("balance")
       .eq("id", driverId)
-      .single();
+      .maybeSingle();
     if (!error && data) return Number(data.balance || 0);
   } catch (e) {}
   return null;
@@ -174,6 +174,26 @@ async function loadDriverBalance(driverId) {
 export default function DriverInterProvincial({ onBack }) {
   const savedLang = localStorage.getItem("appLang") || "uz_lotin";
   const t = translations?.[savedLang] || translations?.["uz_lotin"] || {};
+
+
+  // In-app map modal (no new tab)
+  const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita" });
+  const openMapEmbed = ({ title = "Xarita", lat, lng, sLat, sLng, mode = "pin" }) => {
+    const safe = (v) => String(v ?? "").trim();
+    const qLat = safe(lat), qLng = safe(lng);
+    const aLat = safe(sLat), aLng = safe(sLng);
+
+    let url = "";
+    if (mode === "route" && aLat && aLng && qLat && qLng) {
+      url = `https://www.google.com/maps?saddr=${aLat},${aLng}&daddr=${qLat},${qLng}&output=embed`;
+    } else if (qLat && qLng) {
+      url = `https://www.google.com/maps?q=${qLat},${qLng}&output=embed`;
+    } else {
+      message.error("Lokatsiya topilmadi");
+      return;
+    }
+    setMapModal({ open: true, url, title });
+  };
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -318,7 +338,7 @@ export default function DriverInterProvincial({ onBack }) {
       .in("status", ["pending", "booked"])
       .order("created_at", { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (adErr) {
       // no active ad
@@ -419,7 +439,15 @@ export default function DriverInterProvincial({ onBack }) {
       const user = authData?.user;
       if (!user) return message.error("Avval login qiling");
 
-      const scheduledAt = dayjs(`${formData.date} ${formData.time}`, "YYYY-MM-DD HH:mm").toISOString();
+      const scheduledAtObj = dayjs(`${formData.date} ${formData.time}`, "YYYY-MM-DD HH:mm");
+
+      if (scheduledAtObj.isBefore(dayjs(), 'day') || scheduledAtObj.isBefore(dayjs(), 'minute')) {
+        message.error("Ketish vaqti o'tgan bo'lishi mumkin emas!");
+        setSubmitting(false);
+        return;
+      }
+
+      const scheduledAt = scheduledAtObj.toISOString();
 
       const payload = {
         driver_id: user.id,
@@ -450,7 +478,7 @@ export default function DriverInterProvincial({ onBack }) {
         dest_address: destAddress || null,
       };
 
-      const { data, error } = await supabase.from("orders").insert(payload).select("*").single();
+      const { data, error } = await supabase.from("orders").insert(payload).select("*").maybeSingle();
       if (error) throw error;
 
       setActiveAd(data);
@@ -472,7 +500,15 @@ export default function DriverInterProvincial({ onBack }) {
 
     setSubmitting(true);
     try {
-      const scheduledAt = dayjs(`${formData.date} ${formData.time}`, "YYYY-MM-DD HH:mm").toISOString();
+      const scheduledAtObj = dayjs(`${formData.date} ${formData.time}`, "YYYY-MM-DD HH:mm");
+
+      if (scheduledAtObj.isBefore(dayjs(), 'day') || scheduledAtObj.isBefore(dayjs(), 'minute')) {
+        message.error("Ketish vaqti o'tgan bo'lishi mumkin emas!");
+        setSubmitting(false);
+        return;
+      }
+
+      const scheduledAt = scheduledAtObj.toISOString();
 
       const hasRequestsOrAccepted = requests.length + accepted.length > 0;
       const seatsPatch = hasRequestsOrAccepted ? {} : { seats_total: formData.seatsTotal, seats_available: formData.seatsTotal };
@@ -504,7 +540,7 @@ export default function DriverInterProvincial({ onBack }) {
         ...seatsPatch,
       };
 
-      const { data, error } = await supabase.from("orders").update(patch).eq("id", activeAd.id).select("*").single();
+      const { data, error } = await supabase.from("orders").update(patch).eq("id", activeAd.id).select("*").maybeSingle();
       if (error) throw error;
 
       setActiveAd(data);
@@ -701,6 +737,25 @@ export default function DriverInterProvincial({ onBack }) {
             />
           )}
         </Modal>
+      <Modal
+        title={mapModal.title}
+        open={mapModal.open}
+        onCancel={() => setMapModal({ open: false, url: "", title: "Xarita" })}
+        footer={null}
+        width={900}
+        style={{ top: 24 }}
+      >
+        {mapModal.url ? (
+          <iframe
+            title="map"
+            src={mapModal.url}
+            style={{ width: "100%", height: 520, border: 0, borderRadius: 12 }}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
+        ) : null}
+      </Modal>
+
 
         {/* Active Ad */}
         {activeAd ? (
@@ -844,7 +899,7 @@ export default function DriverInterProvincial({ onBack }) {
                 <Row gutter={12}>
                   <Col xs={24} md={12}>
                     <Text type="secondary">Sana</Text>
-                    <DatePicker value={dayjs(formData.date)} disabledDate={(current) => current && current < dayjs().startOf("day")} onChange={(d) => setFormData((p) => ({ ...p, date: d ? d.format("YYYY-MM-DD") : "" }))} style={{ width: "100%", marginTop: 6 }} size="large" />
+                    <DatePicker disabledDate={(c) => c && c < dayjs().startOf('day')} value={dayjs(formData.date)} disabledDate={(current) => current && current < dayjs().startOf("day")} onChange={(d) => setFormData((p) => ({ ...p, date: d ? d.format("YYYY-MM-DD") : "" }))} style={{ width: "100%", marginTop: 6 }} size="large" />
                   </Col>
                   <Col xs={24} md={12}>
                     <Text type="secondary">Vaqt</Text>
@@ -1140,7 +1195,7 @@ export default function DriverInterProvincial({ onBack }) {
             <Row gutter={12}>
               <Col xs={24} md={12}>
                 <Text type="secondary">Sana</Text>
-                <DatePicker value={dayjs(formData.date)} disabledDate={(current) => current && current < dayjs().startOf("day")} onChange={(d) => setFormData((p) => ({ ...p, date: d ? d.format("YYYY-MM-DD") : "" }))} style={{ width: "100%", marginTop: 6 }} size="large" />
+                <DatePicker disabledDate={(c) => c && c < dayjs().startOf('day')} value={dayjs(formData.date)} disabledDate={(current) => current && current < dayjs().startOf("day")} onChange={(d) => setFormData((p) => ({ ...p, date: d ? d.format("YYYY-MM-DD") : "" }))} style={{ width: "100%", marginTop: 6 }} size="large" />
               </Col>
               <Col xs={24} md={12}>
                 <Text type="secondary">Vaqt</Text>
