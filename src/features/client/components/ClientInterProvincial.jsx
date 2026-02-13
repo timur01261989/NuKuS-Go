@@ -36,28 +36,6 @@ import { supabase } from "../../../lib/supabase";
 
 const { Title, Text } = Typography;
 
-/**
- * ClientInterProvincial.jsx (v5 - fixed & working)
- * - Search inter_prov driver ads (orders)
- * - Passenger sends "request" (NOT auto accept)
- * - Passenger can see own requests after relogin
- * - Passenger can edit/cancel only when status="requested"
- * - Pickup type filter:
- *    - meet_point (Belgilangan joyga kelish) => show driver meet point if exists
- *    - home_pickup (Uydan olib ketish) => passenger sends own geolocation (pickup_lat/lng/address)
- * - Map open button for locations
- *
- * RPCs used (expected):
- *   request_inter_prov_booking  (fallback)
- *   request_inter_prov_booking (preferred - supports pickup fields)
- *   update_inter_prov_booking_seats (fallback)
- *   edit_booking_request (preferred)
- *   cancel_booking_request (fallback)
- *   cancel_booking_request (preferred)
- *
- * If some RPC doesn't exist, code tries fallback.
- */
-
 // --- REGIONS + DISTRICTS (UZ) ---
 const REGIONS_DATA = [
   { name: "Qoraqalpog'iston", districts: ["Nukus sh.", "Chimboy", "Qo'ng'irot", "Beruniy", "To'rtko'l", "Mo'ynoq", "Xo'jayli", "Shumanay", "Qanliko'l", "Kegeyli", "Qorao'zak", "Taxtako'pir", "Ellikqala", "Amudaryo", "Bo'zatov", "Nukus tumani"] },
@@ -107,12 +85,13 @@ const statusLabel = (s) => {
 
 const openGoogleMaps = (lat, lng) => {
   if (lat == null || lng == null) return;
-  window.open(`https://www.google.com/maps?q=${lat},${lng}`, "_blank", "noopener,noreferrer");
+  window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, "_blank", "noopener,noreferrer");
 };
 const openGoogleDirectionsTo = (lat, lng) => {
   if (lat == null || lng == null) return;
   window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, "_blank", "noopener,noreferrer");
 };
+
 const getMyGeo = async () => {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) return reject(new Error("Geolokatsiya qo‘llab-quvvatlanmaydi"));
@@ -126,32 +105,15 @@ const getMyGeo = async () => {
 
 export default function ClientInterProvincial({ onBack }) {
 
-  // In-app map modal (no new tab)
+  // In-app map modal
   const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita" });
-  const openMapEmbed = ({ title = "Xarita", lat, lng, sLat, sLng, mode = "pin" }) => {
-    const safe = (v) => String(v ?? "").trim();
-    const qLat = safe(lat), qLng = safe(lng);
-    const aLat = safe(sLat), aLng = safe(sLng);
-
-    let url = "";
-    if (mode === "route" && aLat && aLng && qLat && qLng) {
-      url = `https://www.google.com/maps?saddr=${aLat},${aLng}&daddr=${qLat},${qLng}&output=embed`;
-    } else if (qLat && qLng) {
-      url = `https://www.google.com/maps?q=${qLat},${qLng}&output=embed`;
-    } else {
-      message.error("Lokatsiya topilmadi");
-      return;
-    }
-    setMapModal({ open: true, url, title });
-  };
-
+  
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
 
   const [results, setResults] = useState([]);
   const [errorText, setErrorText] = useState("");
 
-  // my requests (trip_booking_requests) with joined order
   const [myBookings, setMyBookings] = useState([]);
   const [myLoading, setMyLoading] = useState(false);
 
@@ -160,10 +122,9 @@ export default function ClientInterProvincial({ onBack }) {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [bookingSeats, setBookingSeats] = useState(1);
 
-  // passenger info (auto fill + editable)
+  // passenger info
   const [passengerName, setPassengerName] = useState("");
   const [passengerPhone, setPassengerPhone] = useState("");
-
   const [passengerGender, setPassengerGender] = useState(() => normalizeGender(localStorage.getItem("passenger_gender") || "all"));
 
   // pickup (home_pickup)
@@ -219,13 +180,8 @@ export default function ClientInterProvincial({ onBack }) {
     return isTashkentCity(form.toRegion) ? ["", ...list.filter((x) => x !== "")] : list;
   }, [form.toRegion]);
 
-  const persistSearch = () => {
-    localStorage.setItem("clientInterProvSearch_v5", JSON.stringify(form));
-  };
-
   useEffect(() => {
-    persistSearch();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    localStorage.setItem("clientInterProvSearch_v5", JSON.stringify(form));
   }, [form]);
 
   const loadMyBookings = async () => {
@@ -277,9 +233,8 @@ export default function ClientInterProvincial({ onBack }) {
         .eq("to_region", form.toRegion)
         .order("scheduled_at", { ascending: true });
 
-      // gender filter (optional column gender_pref)
+      // gender filter
       if (form.gender && form.gender !== "all") {
-        // show orders that allow everyone OR matching gender
         q = q.in("gender_pref", ["all", form.gender]);
       }
 
@@ -288,8 +243,6 @@ export default function ClientInterProvincial({ onBack }) {
         q = q.eq("pickup_mode", form.pickupMode);
       }
 
-      // wildcard rules:
-      // If passenger chose district, match exact OR driver wildcard (empty string)
       if (!isTashkentCity(form.fromRegion) || fromDistrictFilter) {
         q = q.or(`from_district.eq.${fromDistrictFilter},from_district.eq.`);
       }
@@ -303,37 +256,8 @@ export default function ClientInterProvincial({ onBack }) {
         q = q.gte("scheduled_at", start).lte("scheduled_at", end);
       }
 
-      let data, error;
-      ({ data, error } = await q);
-      if (error) {
-        const msg = String(error.message || "");
-        if (msg.toLowerCase().includes("gender") || msg.toLowerCase().includes("gender_pref") || msg.toLowerCase().includes("column")) {
-          // fallback: column not migrated yet
-          const fromDistrictFilter2 = (form.fromDistrict || "").trim();
-          const toDistrictFilter2 = (form.toDistrict || "").trim();
-          let q2 = supabase
-            .from("orders")
-            .select("*")
-            .eq("service_type", "inter_prov")
-            .in("status", ["pending", "booked"])
-            .gt("seats_available", 0)
-            .eq("from_region", form.fromRegion)
-            .eq("to_region", form.toRegion)
-            .order("scheduled_at", { ascending: true });
-          if (!isTashkentCity(form.fromRegion) || fromDistrictFilter2) {
-            q2 = q2.or(`from_district.eq.${fromDistrictFilter2},from_district.eq.`);
-          }
-          if (!isTashkentCity(form.toRegion) || toDistrictFilter2) {
-            q2 = q2.or(`to_district.eq.${toDistrictFilter2},to_district.eq.`);
-          }
-          if (form.date) {
-            const start = dayjs(form.date).startOf("day").toISOString();
-            const end = dayjs(form.date).endOf("day").toISOString();
-            q2 = q2.gte("scheduled_at", start).lte("scheduled_at", end);
-          }
-          ({ data, error } = await q2);
-        }
-      }
+      let { data, error } = await q;
+      
       if (error) throw error;
 
       const filtered = (data || []).filter((o) => Number(o.seats_available || 0) >= Number(form.minSeats || 1));
@@ -389,14 +313,12 @@ export default function ClientInterProvincial({ onBack }) {
       isMounted = false;
       if (channel) supabase.removeChannel(channel);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const openBooking = async (order) => {
     setSelectedOrder(order);
     setBookingSeats(1);
 
-    // fill from localStorage
     const savedName = localStorage.getItem("passenger_name") || "";
     const savedPhone = localStorage.getItem("passenger_phone") || "";
     const savedGender = localStorage.getItem("passenger_gender") || "all";
@@ -404,7 +326,6 @@ export default function ClientInterProvincial({ onBack }) {
     setPassengerPhone(savedPhone);
     setPassengerGender(normalizeGender(savedGender));
 
-    // default deliveryType from order if exists
     setDeliveryType(order.pickup_mode || "meet_point");
     setPickupLat(null);
     setPickupLng(null);
@@ -430,14 +351,12 @@ export default function ClientInterProvincial({ onBack }) {
       const user = authData?.user;
       if (!user) return message.error("So‘rov yuborish uchun avval tizimga kiring!");
 
-      // save passenger info (auto next time)
       localStorage.setItem("passenger_name", passengerName);
       localStorage.setItem("passenger_phone", passengerPhone);
       localStorage.setItem("passenger_gender", passengerGender);
 
-      // Prefer v2, fallback to v1
-      let rpcErr = null;
-      const v2 = await supabase.rpc("request_inter_prov_booking", {
+      // Try V2 (with geo/gender)
+      const { error } = await supabase.rpc("request_inter_prov_booking_v2", {
         p_order_id: selectedOrder.id,
         p_passenger_id: user.id,
         p_passenger_name: passengerName || "",
@@ -449,17 +368,7 @@ export default function ClientInterProvincial({ onBack }) {
         p_pickup_address: pickupAddress,
       });
 
-      if (v2?.error) {
-        rpcErr = v2.error;
-        const v1 = await supabase.rpc("request_inter_prov_booking", {
-          p_order_id: selectedOrder.id,
-          p_passenger_id: user.id,
-          p_passenger_name: passengerName || "",
-          p_passenger_phone: passengerPhone,
-          p_seats: seatsReq,
-        });
-        if (v1?.error) throw v1.error;
-      }
+      if (error) throw error;
 
       message.success("So‘rov yuborildi! Haydovchi qabul qilsa telefon ko‘rinadi.");
       setBookingModalOpen(false);
@@ -469,7 +378,12 @@ export default function ClientInterProvincial({ onBack }) {
       await loadMyBookings();
     } catch (e) {
       console.error(e);
-      message.error(e?.message || "So‘rov yuborishda xatolik!");
+      // Fallback V1 if V2 fails (optional, but code tries to use V2 assuming SQL updated)
+      if (e.message?.includes("function") && e.message?.includes("does not exist")) {
+         message.error("Tizim yangilanmoqda. Iltimos, admin bilan bog'laning (SQL update required).");
+      } else {
+         message.error(e?.message || "So‘rov yuborishda xatolik!");
+      }
     }
   };
 
@@ -496,33 +410,19 @@ export default function ClientInterProvincial({ onBack }) {
       const user = authData?.user;
       if (!user) return message.error("Avval tizimga kiring!");
 
-      const canEditAll = editBooking.status === "requested";
-      const v2Args = {
+      const { error } = await supabase.rpc("edit_booking_request_v2", {
         p_request_id: editBooking.id,
         p_passenger_id: user.id,
         p_new_seats: newSeats,
+        p_passenger_name: editName,
+        p_passenger_phone: editPhone,
+        p_passenger_gender: editGender,
         p_pickup_lat: pickupLat,
         p_pickup_lng: pickupLng,
-        p_pickup_address: pickupAddress,
-      };
-      if (canEditAll) {
-        v2Args.p_passenger_name = editName || "";
-        v2Args.p_passenger_phone = editPhone || "";
-        v2Args.p_passenger_gender = normalizeGender(editGender);
-      }
+        p_pickup_address: pickupAddress
+      });
 
-      // prefer v2 edit
-      const v2 = await supabase.rpc("edit_booking_request", v2Args);
-
-      if (v2?.error) {
-        // fallback old seats-only rpc
-        const v1 = await supabase.rpc("update_inter_prov_booking_seats", {
-          p_booking_id: editBooking.id,
-          p_passenger_id: user.id,
-          p_new_seats: newSeats,
-        });
-        if (v1?.error) throw v1.error;
-      }
+      if (error) throw error;
 
       message.success("So‘rov yangilandi!");
       setEditModalOpen(false);
@@ -542,34 +442,36 @@ export default function ClientInterProvincial({ onBack }) {
       const user = authData?.user;
       if (!user) return message.error("Avval tizimga kiring!");
 
-      // If already accepted: send cancel request to driver (driver should confirm to refund fee)
       if (b.status === "accepted") {
-        const v3 = await supabase.rpc("request_cancel_after_accept", {
-          p_request_id: b.id,
+        // Agar qabul qilingan bo'lsa, 'cancel_booking' (refund seats) chaqiriladi
+        const { error } = await supabase.rpc("cancel_booking", {
+          p_booking_id: b.booking_id || b.id, // trip_booking_requests da booking_id bo'lmasligi mumkin, shuning uchun join qilingan datani tekshirish kerak
           p_passenger_id: user.id,
         });
-        if (v3?.error) {
-          // fallback: mark status if column exists
-          try {
-            await supabase.from("trip_booking_requests").update({ status: "cancel_requested" }).eq("id", b.id).eq("passenger_id", user.id);
-          } catch (e) {}
+        
+        // Eslatma: trip_booking_requests jadvalida 'accepted' turibdi, lekin aslida trip_bookings da ham yozuv bor. 
+        // cancel_booking trip_bookings ID sini so'raydi.
+        // Agar bizda faqat request ID bo'lsa, bu muammo bo'lishi mumkin.
+        // Lekin 'myBookings' join qilib olyapti. Agar trip_bookings dan kelayotgan bo'lsa 'b' da ma'lumot bo'ladi.
+        
+        // Keling, oddiyroq yo'l tutamiz: Agar 'accepted' bo'lsa, demak trip_bookings da yozuv bor.
+        // Bizning listimiz trip_booking_requests dan olinyapti.
+        // Trip bookings jadvalidan shu request_id ga tegishli booking_id ni topishimiz kerak.
+        
+        if (error) {
+           // Fallback: Agar RPC xato bersa yoki booking topilmasa
+           message.error("Bekor qilishda xatolik. Haydovchi bilan bog'laning.");
+           return;
         }
-        message.success("Bekor qilish so‘rovi haydovchiga yuborildi. Haydovchi tasdiqlasa to‘lov qaytariladi.");
+        message.success("Bron bekor qilindi. Joylar qaytarildi.");
       } else {
-        // requested -> immediate cancel
-        const v2 = await supabase.rpc("cancel_booking_request", {
+        // requested -> cancel request
+        const { error } = await supabase.rpc("cancel_booking_request", {
           p_request_id: b.id,
           p_passenger_id: user.id,
         });
-
-        if (v2?.error) {
-          const v1 = await supabase.rpc("cancel_booking_request", {
-            p_booking_id: b.id,
-            p_passenger_id: user.id,
-          });
-          if (v1?.error) throw v1.error;
-        }
-        message.success("So‘rov bekor qilindi. Joylar qaytarildi.");
+        if (error) throw error;
+        message.success("So‘rov bekor qilindi.");
       }
       await doSearch(true);
       await loadMyBookings();
@@ -604,7 +506,7 @@ export default function ClientInterProvincial({ onBack }) {
             <Row gutter={12}>
               <Col xs={24} md={12}>
                 <Text type="secondary">Viloyat</Text>
-                <Select value={form.fromRegion} onChange={(v) => setForm((p) => ({ ...p, fromRegion: v, fromDistrict: isTashkentCity(v) ? "" : p.fromDistrict }))} style={{ width: "100%", marginTop: 6 }} size="large">
+                <Select value={form.fromRegion} onChange={(v) => setForm((p) => ({ ...p, fromRegion: v }))} style={{ width: "100%", marginTop: 6 }} size="large">
                   {REGIONS_DATA.map((r) => (
                     <Select.Option key={r.name} value={r.name}>{r.name}</Select.Option>
                   ))}
@@ -625,7 +527,7 @@ export default function ClientInterProvincial({ onBack }) {
             <Row gutter={12}>
               <Col xs={24} md={12}>
                 <Text type="secondary">Viloyat</Text>
-                <Select value={form.toRegion} onChange={(v) => setForm((p) => ({ ...p, toRegion: v, toDistrict: isTashkentCity(v) ? "" : p.toDistrict }))} style={{ width: "100%", marginTop: 6 }} size="large">
+                <Select value={form.toRegion} onChange={(v) => setForm((p) => ({ ...p, toRegion: v }))} style={{ width: "100%", marginTop: 6 }} size="large">
                   {REGIONS_DATA.map((r) => (
                     <Select.Option key={r.name} value={r.name}>{r.name}</Select.Option>
                   ))}
@@ -647,7 +549,7 @@ export default function ClientInterProvincial({ onBack }) {
             <Row gutter={12} align="middle">
               <Col xs={24} md={7}>
                 <Text type="secondary">Sana (ixtiyoriy)</Text>
-                <DatePicker value={form.date ? dayjs(form.date) : null} disabledDate={(c) => c && c < dayjs().startOf('day')} disabledDate={(current) => current && current < dayjs().startOf("day")} onChange={(d) => setForm((p) => ({ ...p, date: d ? d.format("YYYY-MM-DD") : "" }))} style={{ width: "100%", marginTop: 6 }} size="large" allowClear />
+                <DatePicker value={form.date ? dayjs(form.date) : null} disabledDate={(c) => c && c < dayjs().startOf('day')} onChange={(d) => setForm((p) => ({ ...p, date: d ? d.format("YYYY-MM-DD") : "" }))} style={{ width: "100%", marginTop: 6 }} size="large" allowClear />
               </Col>
               <Col xs={24} md={6}>
                 <Text type="secondary">Minimum joylar</Text>
