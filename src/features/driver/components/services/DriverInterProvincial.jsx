@@ -1,12 +1,36 @@
 import React, { useMemo, useState, useEffect } from "react";
 import {
-  Card, Button, Typography, Row, Col,
-  TimePicker, DatePicker, InputNumber, Space,
-  message, ConfigProvider, Divider, Select, Tag, Skeleton
+  Card,
+  Button,
+  Typography,
+  Row,
+  Col,
+  TimePicker,
+  DatePicker,
+  InputNumber,
+  Space,
+  message,
+  ConfigProvider,
+  Divider,
+  Select,
+  Tag,
+  Skeleton,
+  List,
+  Modal,
+  Input,
+  Badge,
 } from "antd";
 import {
-  ArrowLeftOutlined, EnvironmentFilled, ClockCircleOutlined, CalendarOutlined,
-  UserOutlined, DeleteOutlined, SendOutlined
+  ArrowLeftOutlined,
+  EnvironmentFilled,
+  ClockCircleOutlined,
+  CalendarOutlined,
+  UserOutlined,
+  DeleteOutlined,
+  SendOutlined,
+  EditOutlined,
+  BellOutlined,
+  SaveOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { translations } from "@i18n/translations";
@@ -29,22 +53,32 @@ const REGIONS_DATA = [
   { name: "Sirdaryo", districts: ["Guliston sh.", "Shirin", "Yangiyer", "Boyovut", "Mirzaobod", "Oqoltin", "Sayhunobod", "Sardoba", "Xovos"] },
   { name: "Andijon", districts: ["Andijon sh.", "Asaka", "Xonobod", "Shahrixon", "Oltinkul", "Baliqchi", "Bo'z", "Buloqboshi", "Izboskan", "Jalaquduq", "Marhamat", "Paxtaobod", "Qo'rg'ontepa", "Xo'jaobod"] },
   { name: "Farg'ona", districts: ["Farg'ona sh.", "Qo'qon", "Marg'ilon", "Quva", "Quvasoy", "Beshariq", "Bog'dod", "Buvayda", "Dang'ara", "Yozyovon", "Oltiariq", "Rishton", "So'x", "Toshloq", "Uchko'prik", "O'zbekiston", "Furqat"] },
-  { name: "Namangan", districts: ["Namangan sh.", "Chortoq", "Chust", "Kosonsoy", "Mingbuloq", "Norin", "Pop", "To'raqo'rg'on", "Uchqo'rg'on", "Uychi", "Yangiqo'rg'on"] }
+  { name: "Namangan", districts: ["Namangan sh.", "Chortoq", "Chust", "Kosonsoy", "Mingbuloq", "Norin", "Pop", "To'raqo'rg'on", "Uchqo'rg'on", "Uychi", "Yangiqo'rg'on"] },
 ];
 
 const getDistricts = (regionName) => {
-  const region = REGIONS_DATA.find(r => r.name === regionName);
+  const region = REGIONS_DATA.find((r) => r.name === regionName);
   return region ? region.districts : [];
 };
 
+const isTashkentCity = (regionName) => regionName === "Toshkent shahri";
 
-// STATUS:
-// - pending   => e'lon ochiq
-// - booked    => yo'lovchi band qildi (client_id to'ldiriladi)
-// - cancelled => haydovchi bekor qildi
-//
-// service_type:
-// - inter_prov => viloyat/tumanlar aro e'lon
+// district bo‘sh bo‘lsa “Hammasi” deb ko‘rsatamiz
+const districtLabel = (district) => (district && district.trim() ? district : "Hammasi");
+
+const formatMoney = (n) => {
+  const v = Number(n || 0);
+  return v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+};
+
+// orderdan route info
+const routeText = (o) => {
+  const fromR = o.from_region || "-";
+  const fromD = districtLabel(o.from_district);
+  const toR = o.to_region || "-";
+  const toD = districtLabel(o.to_district);
+  return `${fromR} / ${fromD}  →  ${toR} / ${toD}`;
+};
 
 export default function DriverInterProvincial({ onBack }) {
   const savedLang = localStorage.getItem("appLang") || "uz_lotin";
@@ -52,21 +86,32 @@ export default function DriverInterProvincial({ onBack }) {
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [activeAd, setActiveAd] = useState(null);
 
+  const [activeAd, setActiveAd] = useState(null); // driverning aktiv e’loni
+  const [bookings, setBookings] = useState([]); // yo‘lovchilar bronlari
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+
+  const [editMode, setEditMode] = useState(false);
+
+  // --- Driver profil ma’lumotlari (yo‘lovchi band qilganda saqlash uchun kerak) ---
+  // (Sizda drivers table borligi ko‘rindi. Undan phone va name olib qo‘yamiz)
+  const [driverProfile, setDriverProfile] = useState({ name: "", phone: "" });
+
+  // --- Forma ---
   const [formData, setFormData] = useState(() => {
-    const saved = localStorage.getItem("activeInterProvAdDraft");
+    const saved = localStorage.getItem("driverInterProvDraft_v2");
     if (saved) {
       try {
         const p = JSON.parse(saved);
         return {
           fromRegion: p.fromRegion || "Qoraqalpog'iston",
-          fromDistrict: p.fromDistrict || "Nukus sh.",
+          fromDistrict: p.fromDistrict ?? "Nukus sh.",
           toRegion: p.toRegion || "Toshkent shahri",
-          toDistrict: p.toDistrict || "Yunusobod",
+          toDistrict: p.toDistrict ?? "", // Toshkent shahri uchun tuman bo‘sh bo‘lishi mumkin
           date: p.date || dayjs().format("YYYY-MM-DD"),
           time: p.time || "09:00",
-          seats: Number(p.seats || 4),
+          seatsTotal: Number(p.seatsTotal || 4),
           price: Number(p.price || 150000),
         };
       } catch (e) {}
@@ -75,34 +120,85 @@ export default function DriverInterProvincial({ onBack }) {
       fromRegion: "Qoraqalpog'iston",
       fromDistrict: "Nukus sh.",
       toRegion: "Toshkent shahri",
-      toDistrict: "Yunusobod",
+      toDistrict: "", // Toshkent shahri uchun tuman tanlanmasa ham bo‘ladi
       date: dayjs().format("YYYY-MM-DD"),
       time: "09:00",
-      seats: 4,
+      seatsTotal: 4,
       price: 150000,
     };
   });
 
-  const fromDistricts = useMemo(() => getDistricts(formData.fromRegion), [formData.fromRegion]);
-  const toDistricts = useMemo(() => getDistricts(formData.toRegion), [formData.toRegion]);
+  const fromDistricts = useMemo(() => {
+    const list = getDistricts(formData.fromRegion);
+    // Toshkent shahri bo‘lsa — “Hammasi (bo‘sh)” variantini qo‘shamiz
+    if (isTashkentCity(formData.fromRegion)) return ["", ...list];
+    return list;
+  }, [formData.fromRegion]);
+
+  const toDistricts = useMemo(() => {
+    const list = getDistricts(formData.toRegion);
+    if (isTashkentCity(formData.toRegion)) return ["", ...list];
+    return list;
+  }, [formData.toRegion]);
 
   useEffect(() => {
+    // default district mos kelmasa — birinchisiga tushiramiz
     if (!fromDistricts.includes(formData.fromDistrict)) {
-      setFormData(prev => ({ ...prev, fromDistrict: fromDistricts[0] || "" }));
+      setFormData((prev) => ({ ...prev, fromDistrict: fromDistricts[0] ?? "" }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.fromRegion]);
 
   useEffect(() => {
     if (!toDistricts.includes(formData.toDistrict)) {
-      setFormData(prev => ({ ...prev, toDistrict: toDistricts[0] || "" }));
+      setFormData((prev) => ({ ...prev, toDistrict: toDistricts[0] ?? "" }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.toRegion]);
 
   useEffect(() => {
-    localStorage.setItem("activeInterProvAdDraft", JSON.stringify(formData));
+    localStorage.setItem("driverInterProvDraft_v2", JSON.stringify(formData));
   }, [formData]);
+
+  const loadActiveAd = async (userId) => {
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("driver_id", userId)
+      .eq("service_type", "inter_prov")
+      .in("status", ["pending", "booked"])
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (error) throw error;
+    return data?.[0] || null;
+  };
+
+  const loadBookings = async (orderId) => {
+    const { data, error } = await supabase
+      .from("trip_bookings")
+      .select("*")
+      .eq("order_id", orderId)
+      .eq("status", "active")
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return data || [];
+  };
+
+  const loadNotifications = async (userId) => {
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    return data || [];
+  };
+
+  const markNotifRead = async (notifIds) => {
+    if (!notifIds?.length) return;
+    await supabase.from("notifications").update({ is_read: true }).in("id", notifIds);
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -116,47 +212,123 @@ export default function DriverInterProvincial({ onBack }) {
           return;
         }
 
-        const { data, error } = await supabase
-          .from("orders")
-          .select("*")
-          .eq("driver_id", user.id)
-          .eq("service_type", "inter_prov")
-          .in("status", ["pending", "booked"])
-          .order("created_at", { ascending: false })
-          .limit(1);
+        // driver profile (agar sizda drivers table bo‘lsa)
+        try {
+          const { data: d, error: derr } = await supabase
+            .from("drivers")
+            .select("name, phone")
+            .eq("id", user.id)
+            .maybeSingle();
+          if (!derr && d) setDriverProfile({ name: d.name || "", phone: d.phone || "" });
+        } catch (e) {}
 
-        if (error) throw error;
-        setActiveAd(data && data.length ? data[0] : null);
+        const ad = await loadActiveAd(user.id);
+        setActiveAd(ad);
+
+        const notifs = await loadNotifications(user.id);
+        setNotifications(notifs);
+
+        if (ad?.id) {
+          const b = await loadBookings(ad.id);
+          setBookings(b);
+        }
+
+        // Realtime: bookings + notifications
+        const bookingChannel = supabase
+          .channel("realtime_trip_bookings_driver")
+          .on(
+            "postgres_changes",
+            { event: "*", schema: "public", table: "trip_bookings" },
+            async (payload) => {
+              // faqat activeAd bo‘lsa refresh
+              if (!activeAd?.id) return;
+              // refresh bookings + activeAd seats
+              try {
+                const freshAd = await loadActiveAd(user.id);
+                setActiveAd(freshAd);
+                if (freshAd?.id) {
+                  const b = await loadBookings(freshAd.id);
+                  setBookings(b);
+                }
+              } catch (e) {}
+            }
+          )
+          .subscribe();
+
+        const notifChannel = supabase
+          .channel("realtime_notifications_driver")
+          .on(
+            "postgres_changes",
+            { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+            async () => {
+              try {
+                const notifs2 = await loadNotifications(user.id);
+                setNotifications(notifs2);
+              } catch (e) {}
+            }
+          )
+          .subscribe();
+
+        return () => {
+          supabase.removeChannel(bookingChannel);
+          supabase.removeChannel(notifChannel);
+        };
       } catch (e) {
         console.error(e);
+        message.error(e?.message || "Xatolik!");
       } finally {
-        setTimeout(() => setLoading(false), 450);
+        setTimeout(() => setLoading(false), 350);
       }
     };
     init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const validate = () => {
-    if (!formData.fromRegion || !formData.fromDistrict || !formData.toRegion || !formData.toDistrict) {
-      message.error("Viloyat va tumanlarni to'liq tanlang!");
+    if (!formData.fromRegion || formData.fromRegion.trim() === "") {
+      message.error("Qayerdan viloyatini tanlang!");
       return false;
     }
-    if (formData.fromRegion === formData.toRegion && formData.fromDistrict === formData.toDistrict) {
-      message.error("Qayerdan va qayerga bir xil bo'lmasin!");
+
+    // Toshkent shahri bo‘lmasa tuman majburiy
+    if (!isTashkentCity(formData.fromRegion) && (!formData.fromDistrict || !formData.fromDistrict.trim())) {
+      message.error("Qayerdan tumanini tanlang!");
       return false;
     }
+
+    if (!formData.toRegion || formData.toRegion.trim() === "") {
+      message.error("Qayerga viloyatini tanlang!");
+      return false;
+    }
+    if (!isTashkentCity(formData.toRegion) && (!formData.toDistrict || !formData.toDistrict.trim())) {
+      message.error("Qayerga tumanini tanlang!");
+      return false;
+    }
+
+    // bir xil bo‘lmasin (hammasi/bo‘sh variantlarda ham tekshiramiz)
+    if (
+      formData.fromRegion === formData.toRegion &&
+      (formData.fromDistrict || "") === (formData.toDistrict || "")
+    ) {
+      message.error("Qayerdan va qayerga bir xil bo‘lmasin!");
+      return false;
+    }
+
     if (!formData.date || !formData.time) {
       message.error("Sana va vaqtni tanlang!");
       return false;
     }
-    if (!formData.seats || formData.seats < 1) {
-      message.error("O'rindiqlar soni kamida 1 bo'lishi kerak!");
+
+    if (!formData.seatsTotal || formData.seatsTotal < 1) {
+      message.error("O‘rindiqlar soni kamida 1 bo‘lishi kerak!");
       return false;
     }
+
     if (!formData.price || formData.price < 1000) {
-      message.error("Narxni to'g'ri kiriting!");
+      message.error("Narxni to‘g‘ri kiriting!");
       return false;
     }
+
     return true;
   };
 
@@ -173,31 +345,94 @@ export default function DriverInterProvincial({ onBack }) {
         return;
       }
 
-      const scheduledAt = `${formData.date} ${formData.time}`;
+      const scheduledAt = dayjs(`${formData.date} ${formData.time}`, "YYYY-MM-DD HH:mm").toISOString();
 
-      // Minimal DB mosligi uchun:
-      // client_name  => scheduledAt ("YYYY-MM-DD HH:mm")
-      // client_phone => seats
       const payload = {
         driver_id: user.id,
         client_id: null,
         service_type: "inter_prov",
         status: "pending",
-        pickup_location: `${formData.fromRegion}, ${formData.fromDistrict}`,
-        dropoff_location: `${formData.toRegion}, ${formData.toDistrict}`,
+
+        // Structured route (search uchun)
+        from_region: formData.fromRegion,
+        from_district: (formData.fromDistrict || "").trim(), // Toshkent shahri bo‘lsa "" bo‘lishi mumkin
+        to_region: formData.toRegion,
+        to_district: (formData.toDistrict || "").trim(),
+
+        scheduled_at: scheduledAt,
+        seats_total: formData.seatsTotal,
+        seats_available: formData.seatsTotal,
+
+        // display uchun (eski UIlar)
+        pickup_location: `${formData.fromRegion}, ${districtLabel(formData.fromDistrict)}`,
+        dropoff_location: `${formData.toRegion}, ${districtLabel(formData.toDistrict)}`,
         price: formData.price,
-        client_name: scheduledAt,
-        client_phone: String(formData.seats),
       };
 
       const { data, error } = await supabase.from("orders").insert(payload).select("*").single();
       if (error) throw error;
 
       setActiveAd(data);
-      message.success("E'lon yaratildi! Yo'lovchilar endi qidiruvda ko'radi.");
+      setBookings([]);
+      setEditMode(false);
+      message.success("E’lon yaratildi! Yo‘lovchilar qidiruvda ko‘radi.");
     } catch (e) {
       console.error(e);
       message.error(e?.message || "Xatolik yuz berdi!");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const saveEdits = async () => {
+    if (!activeAd) return;
+    if (!validate()) return;
+
+    setSubmitting(true);
+    try {
+      const scheduledAt = dayjs(`${formData.date} ${formData.time}`, "YYYY-MM-DD HH:mm").toISOString();
+
+      // Eslatma:
+      // seats_total ni o‘zgartirsak, seats_available ham o‘zgaradi, lekin bronlar bo‘lsa ehtiyot bo‘lish kerak.
+      // Shuning uchun: seats_total ni faqat aktiv bron yo‘q bo‘lsa o‘zgartiramiz.
+      const hasBookings = bookings.length > 0;
+      const seatsPatch = hasBookings
+        ? {}
+        : { seats_total: formData.seatsTotal, seats_available: formData.seatsTotal };
+
+      const patch = {
+        from_region: formData.fromRegion,
+        from_district: (formData.fromDistrict || "").trim(),
+        to_region: formData.toRegion,
+        to_district: (formData.toDistrict || "").trim(),
+        scheduled_at: scheduledAt,
+        price: formData.price,
+        pickup_location: `${formData.fromRegion}, ${districtLabel(formData.fromDistrict)}`,
+        dropoff_location: `${formData.toRegion}, ${districtLabel(formData.toDistrict)}`,
+        ...seatsPatch,
+      };
+
+      const { data, error } = await supabase.from("orders").update(patch).eq("id", activeAd.id).select("*").single();
+      if (error) throw error;
+
+      setActiveAd(data);
+      setEditMode(false);
+
+      // Notification (o‘zingizga yoki yo‘lovchiga ham yuborish mumkin)
+      try {
+        await supabase.from("notifications").insert({
+          user_id: data.driver_id,
+          type: "order_updated",
+          title: "E’lon yangilandi",
+          body: `Yo‘nalish/vaqt/narx yangilandi: ${routeText(data)}`,
+          order_id: data.id,
+        });
+      } catch (e) {}
+
+      message.success("E’lon yangilandi!");
+    } catch (e) {
+      console.error(e);
+      message.error(e?.message || "Saqlashda xatolik!");
     } finally {
       setSubmitting(false);
     }
@@ -208,14 +443,13 @@ export default function DriverInterProvincial({ onBack }) {
 
     setSubmitting(true);
     try {
-      const { error } = await supabase
-        .from("orders")
-        .update({ status: "cancelled" })
-        .eq("id", activeAd.id);
-
+      const { error } = await supabase.from("orders").update({ status: "cancelled" }).eq("id", activeAd.id);
       if (error) throw error;
+
       setActiveAd(null);
-      message.success("E'lon bekor qilindi.");
+      setBookings([]);
+      setEditMode(false);
+      message.success("E’lon bekor qilindi.");
     } catch (e) {
       console.error(e);
       message.error(e?.message || "Bekor qilishda xatolik!");
@@ -224,76 +458,383 @@ export default function DriverInterProvincial({ onBack }) {
     }
   };
 
-  const prettyRoute = (pickup, dropoff) => {
-    const a = (pickup || "").split(",").map(s => s.trim());
-    const b = (dropoff || "").split(",").map(s => s.trim());
-    return {
-      fromR: a[0] || "-",
-      fromD: a[1] || "-",
-      toR: b[0] || "-",
-      toD: b[1] || "-",
-    };
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
+
+  const openNotifications = async () => {
+    setNotifOpen(true);
+    const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id);
+    await markNotifRead(unreadIds);
+    const { data: authData } = await supabase.auth.getUser();
+    if (authData?.user?.id) {
+      try {
+        const notifs2 = await loadNotifications(authData.user.id);
+        setNotifications(notifs2);
+      } catch (e) {}
+    }
   };
 
-  const activeInfo = activeAd ? prettyRoute(activeAd.pickup_location, activeAd.dropoff_location) : null;
+  const fillFormFromActive = (o) => {
+    if (!o) return;
+    const sched = o.scheduled_at ? dayjs(o.scheduled_at) : null;
+
+    setFormData({
+      fromRegion: o.from_region || formData.fromRegion,
+      fromDistrict: o.from_district ?? "",
+      toRegion: o.to_region || formData.toRegion,
+      toDistrict: o.to_district ?? "",
+      date: sched ? sched.format("YYYY-MM-DD") : dayjs().format("YYYY-MM-DD"),
+      time: sched ? sched.format("HH:mm") : "09:00",
+      seatsTotal: Number(o.seats_total || 4),
+      price: Number(o.price || 0),
+    });
+  };
+
+  useEffect(() => {
+    if (activeAd) fillFormFromActive(activeAd);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeAd?.id]);
 
   if (loading) {
     return (
       <div style={{ padding: 16 }}>
-        <Skeleton active paragraph={{ rows: 10 }} />
+        <Skeleton active paragraph={{ rows: 12 }} />
       </div>
     );
   }
 
   return (
     <ConfigProvider theme={{ token: { colorPrimary: "#1890ff", borderRadius: 12 } }}>
-      <div style={{ padding: 16, maxWidth: 900, margin: "0 auto" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-          <Button icon={<ArrowLeftOutlined />} onClick={onBack} shape="circle" />
-          <Title level={4} style={{ margin: 0 }}>Tumanlar/Viloyatlar aro — Haydovchi e'loni</Title>
-          <Tag color="purple">inter_prov</Tag>
+      <div style={{ padding: 16, maxWidth: 980, margin: "0 auto" }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Button icon={<ArrowLeftOutlined />} onClick={onBack} shape="circle" />
+            <div>
+              <Title level={4} style={{ margin: 0 }}>
+                Tumanlar/Viloyatlar aro — Haydovchi e’loni
+              </Title>
+              <Text type="secondary">service_type: <b>inter_prov</b></Text>
+            </div>
+          </div>
+
+          <div>
+            <Badge count={unreadCount} overflowCount={99}>
+              <Button icon={<BellOutlined />} onClick={openNotifications}>
+                Bildirishnomalar
+              </Button>
+            </Badge>
+          </div>
         </div>
 
+        {/* Notifications modal */}
+        <Modal
+          title="Bildirishnomalar"
+          open={notifOpen}
+          onCancel={() => setNotifOpen(false)}
+          footer={null}
+        >
+          {notifications.length === 0 ? (
+            <Text type="secondary">Hozircha bildirishnoma yo‘q.</Text>
+          ) : (
+            <List
+              dataSource={notifications}
+              renderItem={(n) => (
+                <List.Item>
+                  <List.Item.Meta
+                    title={
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <Tag color={n.is_read ? "default" : "blue"}>{n.type}</Tag>
+                        <span style={{ fontWeight: 600 }}>{n.title}</span>
+                      </div>
+                    }
+                    description={
+                      <div>
+                        <div>{n.body}</div>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          {dayjs(n.created_at).format("YYYY-MM-DD HH:mm")}
+                        </Text>
+                      </div>
+                    }
+                  />
+                </List.Item>
+              )}
+            />
+          )}
+        </Modal>
+
+        {/* Active Ad card */}
         {activeAd ? (
           <Card style={{ borderRadius: 18, border: "none", boxShadow: "0 6px 20px rgba(0,0,0,0.06)" }}>
             <Row gutter={12} align="middle">
               <Col xs={24} md={16}>
                 <Space direction="vertical" size={6} style={{ width: "100%" }}>
-                  <Text type="secondary">Sizning aktiv e'loningiz</Text>
+                  <Text type="secondary">Sizning aktiv e’loningiz</Text>
                   <Title level={5} style={{ margin: 0 }}>
                     <EnvironmentFilled style={{ marginRight: 8, color: "#1890ff" }} />
-                    {activeInfo.fromR} / {activeInfo.fromD}  →  {activeInfo.toR} / {activeInfo.toD}
+                    {routeText(activeAd)}
                   </Title>
 
                   <Space size={16} wrap>
-                    <Text><CalendarOutlined /> <b>Sana:</b> {(activeAd.client_name || "").split(" ")[0] || "-"}</Text>
-                    <Text><ClockCircleOutlined /> <b>Vaqt:</b> {(activeAd.client_name || "").split(" ")[1] || "-"}</Text>
-                    <Text><UserOutlined /> <b>Joylar:</b> {activeAd.client_phone || "-"}</Text>
-                    <Text><b>Narx:</b> {activeAd.price} so'm</Text>
+                    <Text>
+                      <CalendarOutlined /> <b>Sana:</b>{" "}
+                      {activeAd.scheduled_at ? dayjs(activeAd.scheduled_at).format("YYYY-MM-DD") : "-"}
+                    </Text>
+                    <Text>
+                      <ClockCircleOutlined /> <b>Vaqt:</b>{" "}
+                      {activeAd.scheduled_at ? dayjs(activeAd.scheduled_at).format("HH:mm") : "-"}
+                    </Text>
+                    <Text>
+                      <UserOutlined /> <b>Joylar:</b>{" "}
+                      <b>{activeAd.seats_available ?? "-"}</b> / {activeAd.seats_total ?? "-"}
+                    </Text>
+                    <Text>
+                      <b>Narx:</b> {formatMoney(activeAd.price)} so‘m
+                    </Text>
                   </Space>
 
-                  <Tag color={activeAd.status === "pending" ? "green" : "gold"} style={{ padding: "4px 10px", borderRadius: 999, width: "fit-content" }}>
-                    {activeAd.status === "pending" ? "Ochiq" : "Band qilingan"}
-                  </Tag>
-
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    * Yo'lovchi band qilsa status "booked" bo'ladi (client_id to'ldiriladi).
-                  </Text>
+                  <Space size={10} wrap style={{ marginTop: 8 }}>
+                    <Tag
+                      color={activeAd.status === "pending" ? "green" : "gold"}
+                      style={{ padding: "4px 10px", borderRadius: 999 }}
+                    >
+                      {activeAd.status === "pending" ? "Ochiq" : "Bron qilingan (joy kamaymoqda)"}
+                    </Tag>
+                    {Number(activeAd.seats_available || 0) <= 0 ? (
+                      <Tag color="red" style={{ padding: "4px 10px", borderRadius: 999 }}>
+                        Joylar to‘ldi
+                      </Tag>
+                    ) : null}
+                  </Space>
                 </Space>
               </Col>
 
               <Col xs={24} md={8}>
-                <Space direction="vertical" style={{ width: "100%" }}>
-                  <Button danger type="primary" icon={<DeleteOutlined />} block size="large" onClick={cancelAd} loading={submitting}>
-                    E'lonni bekor qilish
+                <Space direction="vertical" style={{ width: "100%" }} size={10}>
+                  <Button
+                    icon={<EditOutlined />}
+                    block
+                    size="large"
+                    onClick={() => setEditMode((p) => !p)}
+                    style={{ borderRadius: 14, height: 44 }}
+                  >
+                    {editMode ? "Tahrirni yopish" : "E’lonni tahrirlash"}
+                  </Button>
+
+                  <Button
+                    danger
+                    type="primary"
+                    icon={<DeleteOutlined />}
+                    block
+                    size="large"
+                    onClick={cancelAd}
+                    loading={submitting}
+                    style={{ borderRadius: 14, height: 44 }}
+                  >
+                    E’lonni bekor qilish
                   </Button>
                 </Space>
               </Col>
             </Row>
+
+            {/* Edit form */}
+            {editMode ? (
+              <div style={{ marginTop: 16 }}>
+                <Divider orientation="left">Tahrirlash</Divider>
+
+                <Row gutter={12}>
+                  <Col xs={24} md={12}>
+                    <Text type="secondary">Qayerdan viloyat</Text>
+                    <Select
+                      value={formData.fromRegion}
+                      onChange={(v) => setFormData((p) => ({ ...p, fromRegion: v }))}
+                      style={{ width: "100%", marginTop: 6 }}
+                      size="large"
+                    >
+                      {REGIONS_DATA.map((r) => (
+                        <Select.Option key={r.name} value={r.name}>
+                          {r.name}
+                        </Select.Option>
+                      ))}
+                    </Select>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Text type="secondary">Qayerdan tuman</Text>
+                    <Select
+                      value={formData.fromDistrict}
+                      onChange={(v) => setFormData((p) => ({ ...p, fromDistrict: v }))}
+                      style={{ width: "100%", marginTop: 6 }}
+                      size="large"
+                    >
+                      {fromDistricts.map((d) => (
+                        <Select.Option key={`${d}`} value={d}>
+                          {districtLabel(d)}
+                        </Select.Option>
+                      ))}
+                    </Select>
+                    {isTashkentCity(formData.fromRegion) ? (
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        * Toshkent shahri uchun tumanni tanlamasangiz ham bo‘ladi (Hammasi).
+                      </Text>
+                    ) : null}
+                  </Col>
+                </Row>
+
+                <Divider />
+
+                <Row gutter={12}>
+                  <Col xs={24} md={12}>
+                    <Text type="secondary">Qayerga viloyat</Text>
+                    <Select
+                      value={formData.toRegion}
+                      onChange={(v) => setFormData((p) => ({ ...p, toRegion: v }))}
+                      style={{ width: "100%", marginTop: 6 }}
+                      size="large"
+                    >
+                      {REGIONS_DATA.map((r) => (
+                        <Select.Option key={r.name} value={r.name}>
+                          {r.name}
+                        </Select.Option>
+                      ))}
+                    </Select>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Text type="secondary">Qayerga tuman</Text>
+                    <Select
+                      value={formData.toDistrict}
+                      onChange={(v) => setFormData((p) => ({ ...p, toDistrict: v }))}
+                      style={{ width: "100%", marginTop: 6 }}
+                      size="large"
+                    >
+                      {toDistricts.map((d) => (
+                        <Select.Option key={`${d}`} value={d}>
+                          {districtLabel(d)}
+                        </Select.Option>
+                      ))}
+                    </Select>
+                    {isTashkentCity(formData.toRegion) ? (
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        * Toshkent shahri uchun tumanni tanlamasangiz ham bo‘ladi (Hammasi).
+                      </Text>
+                    ) : null}
+                  </Col>
+                </Row>
+
+                <Divider />
+
+                <Row gutter={12}>
+                  <Col xs={24} md={12}>
+                    <Text type="secondary">Sana</Text>
+                    <DatePicker
+                      value={dayjs(formData.date)}
+                      onChange={(d) => setFormData((p) => ({ ...p, date: d ? d.format("YYYY-MM-DD") : "" }))}
+                      style={{ width: "100%", marginTop: 6 }}
+                      size="large"
+                    />
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Text type="secondary">Vaqt</Text>
+                    <TimePicker
+                      value={dayjs(formData.time, "HH:mm")}
+                      onChange={(tVal) => setFormData((p) => ({ ...p, time: tVal ? tVal.format("HH:mm") : "" }))}
+                      format="HH:mm"
+                      style={{ width: "100%", marginTop: 6 }}
+                      size="large"
+                    />
+                  </Col>
+                </Row>
+
+                <Divider />
+
+                <Row gutter={12}>
+                  <Col xs={24} md={12}>
+                    <Text type="secondary">Narx (so‘m)</Text>
+                    <InputNumber
+                      min={1000}
+                      step={1000}
+                      value={formData.price}
+                      onChange={(v) => setFormData((p) => ({ ...p, price: Number(v || 0) }))}
+                      style={{ width: "100%", marginTop: 6 }}
+                      size="large"
+                    />
+                  </Col>
+
+                  <Col xs={24} md={12}>
+                    <Text type="secondary">O‘rindiqlar (faqat bron yo‘q bo‘lsa o‘zgaradi)</Text>
+                    <InputNumber
+                      min={1}
+                      max={20}
+                      value={formData.seatsTotal}
+                      onChange={(v) => setFormData((p) => ({ ...p, seatsTotal: Number(v || 1) }))}
+                      style={{ width: "100%", marginTop: 6 }}
+                      size="large"
+                      disabled={bookings.length > 0}
+                    />
+                    {bookings.length > 0 ? (
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        * Bronlar bor: joylar sonini o‘zgartirish bloklangan.
+                      </Text>
+                    ) : null}
+                  </Col>
+                </Row>
+
+                <Divider />
+
+                <Button
+                  type="primary"
+                  size="large"
+                  block
+                  icon={<SaveOutlined />}
+                  onClick={saveEdits}
+                  loading={submitting}
+                  style={{ borderRadius: 14, height: 48 }}
+                >
+                  Saqlash
+                </Button>
+              </div>
+            ) : null}
+
+            {/* Bookings list */}
+            <div style={{ marginTop: 18 }}>
+              <Divider orientation="left">Bronlar (yo‘lovchilar)</Divider>
+
+              {bookings.length === 0 ? (
+                <Text type="secondary">Hozircha bron yo‘q. Yo‘lovchi “Band qilish” bosganda shu yerda chiqadi.</Text>
+              ) : (
+                <List
+                  dataSource={bookings}
+                  itemLayout="horizontal"
+                  renderItem={(b) => (
+                    <List.Item>
+                      <List.Item.Meta
+                        title={
+                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            <Tag color="blue">{b.seats} ta joy</Tag>
+                            <span style={{ fontWeight: 600 }}>{b.passenger_name || "Yo‘lovchi"}</span>
+                          </div>
+                        }
+                        description={
+                          <div>
+                            <div>
+                              <Text type="secondary">Telefon:</Text> <b>{b.passenger_phone || "-"}</b>
+                            </div>
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              {dayjs(b.created_at).format("YYYY-MM-DD HH:mm")}
+                            </Text>
+                          </div>
+                        }
+                      />
+                    </List.Item>
+                  )}
+                />
+              )}
+            </div>
           </Card>
         ) : (
+          // Create form
           <Card style={{ borderRadius: 18, border: "none", boxShadow: "0 6px 20px rgba(0,0,0,0.06)" }}>
-            <Title level={5} style={{ marginTop: 0 }}>Yangi e'lon yaratish</Title>
+            <Title level={5} style={{ marginTop: 0 }}>
+              Yangi e’lon yaratish
+            </Title>
 
             <Divider orientation="left">Qayerdan</Divider>
             <Row gutter={12}>
@@ -301,12 +842,14 @@ export default function DriverInterProvincial({ onBack }) {
                 <Text type="secondary">Viloyat</Text>
                 <Select
                   value={formData.fromRegion}
-                  onChange={(v) => setFormData(prev => ({ ...prev, fromRegion: v }))}
+                  onChange={(v) => setFormData((p) => ({ ...p, fromRegion: v }))}
                   style={{ width: "100%", marginTop: 6 }}
                   size="large"
                 >
-                  {REGIONS_DATA.map(r => (
-                    <Select.Option key={r.name} value={r.name}>{r.name}</Select.Option>
+                  {REGIONS_DATA.map((r) => (
+                    <Select.Option key={r.name} value={r.name}>
+                      {r.name}
+                    </Select.Option>
                   ))}
                 </Select>
               </Col>
@@ -314,14 +857,21 @@ export default function DriverInterProvincial({ onBack }) {
                 <Text type="secondary">Tuman/Shahar</Text>
                 <Select
                   value={formData.fromDistrict}
-                  onChange={(v) => setFormData(prev => ({ ...prev, fromDistrict: v }))}
+                  onChange={(v) => setFormData((p) => ({ ...p, fromDistrict: v }))}
                   style={{ width: "100%", marginTop: 6 }}
                   size="large"
                 >
-                  {fromDistricts.map(d => (
-                    <Select.Option key={d} value={d}>{d}</Select.Option>
+                  {fromDistricts.map((d) => (
+                    <Select.Option key={`${d}`} value={d}>
+                      {districtLabel(d)}
+                    </Select.Option>
                   ))}
                 </Select>
+                {isTashkentCity(formData.fromRegion) ? (
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    * Toshkent shahri uchun tumanni tanlamasangiz ham bo‘ladi (Hammasi).
+                  </Text>
+                ) : null}
               </Col>
             </Row>
 
@@ -331,12 +881,14 @@ export default function DriverInterProvincial({ onBack }) {
                 <Text type="secondary">Viloyat</Text>
                 <Select
                   value={formData.toRegion}
-                  onChange={(v) => setFormData(prev => ({ ...prev, toRegion: v }))}
+                  onChange={(v) => setFormData((p) => ({ ...p, toRegion: v }))}
                   style={{ width: "100%", marginTop: 6 }}
                   size="large"
                 >
-                  {REGIONS_DATA.map(r => (
-                    <Select.Option key={r.name} value={r.name}>{r.name}</Select.Option>
+                  {REGIONS_DATA.map((r) => (
+                    <Select.Option key={r.name} value={r.name}>
+                      {r.name}
+                    </Select.Option>
                   ))}
                 </Select>
               </Col>
@@ -344,14 +896,21 @@ export default function DriverInterProvincial({ onBack }) {
                 <Text type="secondary">Tuman/Shahar</Text>
                 <Select
                   value={formData.toDistrict}
-                  onChange={(v) => setFormData(prev => ({ ...prev, toDistrict: v }))}
+                  onChange={(v) => setFormData((p) => ({ ...p, toDistrict: v }))}
                   style={{ width: "100%", marginTop: 6 }}
                   size="large"
                 >
-                  {toDistricts.map(d => (
-                    <Select.Option key={d} value={d}>{d}</Select.Option>
+                  {toDistricts.map((d) => (
+                    <Select.Option key={`${d}`} value={d}>
+                      {districtLabel(d)}
+                    </Select.Option>
                   ))}
                 </Select>
+                {isTashkentCity(formData.toRegion) ? (
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    * Toshkent shahri uchun tumanni tanlamasangiz ham bo‘ladi (Hammasi).
+                  </Text>
+                ) : null}
               </Col>
             </Row>
 
@@ -362,7 +921,7 @@ export default function DriverInterProvincial({ onBack }) {
                 <Text type="secondary">Sana</Text>
                 <DatePicker
                   value={dayjs(formData.date)}
-                  onChange={(d) => setFormData(prev => ({ ...prev, date: d ? d.format("YYYY-MM-DD") : "" }))}
+                  onChange={(d) => setFormData((p) => ({ ...p, date: d ? d.format("YYYY-MM-DD") : "" }))}
                   style={{ width: "100%", marginTop: 6 }}
                   size="large"
                 />
@@ -371,7 +930,7 @@ export default function DriverInterProvincial({ onBack }) {
                 <Text type="secondary">Vaqt</Text>
                 <TimePicker
                   value={dayjs(formData.time, "HH:mm")}
-                  onChange={(tVal) => setFormData(prev => ({ ...prev, time: tVal ? tVal.format("HH:mm") : "" }))}
+                  onChange={(tVal) => setFormData((p) => ({ ...p, time: tVal ? tVal.format("HH:mm") : "" }))}
                   format="HH:mm"
                   style={{ width: "100%", marginTop: 6 }}
                   size="large"
@@ -383,23 +942,23 @@ export default function DriverInterProvincial({ onBack }) {
 
             <Row gutter={12}>
               <Col xs={24} md={12}>
-                <Text type="secondary">Bo'sh o'rindiqlar</Text>
+                <Text type="secondary">Bo‘sh o‘rindiqlar</Text>
                 <InputNumber
                   min={1}
                   max={20}
-                  value={formData.seats}
-                  onChange={(v) => setFormData(prev => ({ ...prev, seats: Number(v || 1) }))}
+                  value={formData.seatsTotal}
+                  onChange={(v) => setFormData((p) => ({ ...p, seatsTotal: Number(v || 1) }))}
                   style={{ width: "100%", marginTop: 6 }}
                   size="large"
                 />
               </Col>
               <Col xs={24} md={12}>
-                <Text type="secondary">Narx (so'm)</Text>
+                <Text type="secondary">Narx (so‘m)</Text>
                 <InputNumber
                   min={1000}
                   step={1000}
                   value={formData.price}
-                  onChange={(v) => setFormData(prev => ({ ...prev, price: Number(v || 0) }))}
+                  onChange={(v) => setFormData((p) => ({ ...p, price: Number(v || 0) }))}
                   style={{ width: "100%", marginTop: 6 }}
                   size="large"
                 />
@@ -417,13 +976,18 @@ export default function DriverInterProvincial({ onBack }) {
               loading={submitting}
               style={{ borderRadius: 14, height: 48 }}
             >
-              E'lonni yaratish
+              E’lonni yaratish
             </Button>
 
             <div style={{ marginTop: 10 }}>
               <Text type="secondary" style={{ fontSize: 12 }}>
-                * E'lon yaratilgandan so'ng, yo'lovchi "Viloyatlar aro" sahifasida aynan shu yo'nalish bo'yicha qidirsa,
-                sizning e'loningiz chiqadi.
+                * E’lon yaratilgandan so‘ng yo‘lovchi “Viloyatlar aro” sahifasida aynan shu yo‘nalish bo‘yicha qidirsa,
+                sizning e’loningiz chiqadi.
+              </Text>
+              <br />
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                * Toshkent shahri uchun tumanni tanlamasangiz, yo‘lovchi Toshkent shahri ichidagi istalgan tumanni tanlab qidirsa ham
+                sizning e’lon chiqadi (wildcard).
               </Text>
             </div>
           </Card>
