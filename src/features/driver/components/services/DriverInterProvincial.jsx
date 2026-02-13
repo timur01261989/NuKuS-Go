@@ -125,7 +125,7 @@ export default function DriverInterProvincial({ onBack }) {
     }
   };
 
-  cconst handleSave = async () => {
+  const handleSave = async () => {
     try {
       // 1. Haydovchi tizimga kirganligini tekshiramiz
       const { data: { user } } = await supabase.auth.getUser();
