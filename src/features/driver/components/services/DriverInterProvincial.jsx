@@ -110,6 +110,189 @@ const routeText = (o) => {
   return `${fromR} / ${fromD}  →  ${toR} / ${toD}`;
 };
 
+
+
+/** Leaflet CDN loader (no new tab map picker) */
+const loadLeafletCDN = () =>
+  new Promise((resolve, reject) => {
+    if (typeof window !== "undefined" && window.L) return resolve(window.L);
+    const idCss = "leaflet-css-cdn";
+    const idJs = "leaflet-js-cdn";
+
+    const ensureCss = () => {
+      if (document.getElementById(idCss)) return;
+      const link = document.createElement("link");
+      link.id = idCss;
+      link.rel = "stylesheet";
+      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      link.integrity = "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=";
+      link.crossOrigin = "";
+      document.head.appendChild(link);
+    };
+
+    const ensureJs = () => {
+      if (document.getElementById(idJs)) return;
+      const script = document.createElement("script");
+      script.id = idJs;
+      script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+      script.integrity = "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=";
+      script.crossOrigin = "";
+      script.async = true;
+      script.onload = () => resolve(window.L);
+      script.onerror = () => reject(new Error("Leaflet yuklanmadi"));
+      document.body.appendChild(script);
+    };
+
+    try {
+      ensureCss();
+      ensureJs();
+    } catch (e) {
+      reject(e);
+    }
+  });
+
+const reverseGeocodeOSM = async (lat, lng) => {
+  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(
+    lat
+  )}&lon=${encodeURIComponent(lng)}`;
+  const res = await fetch(url, {
+    headers: { "Accept": "application/json" },
+  });
+  if (!res.ok) throw new Error("Manzil topilmadi");
+  const data = await res.json();
+  return data?.display_name || "";
+};
+
+const LocationPickerModal = ({ open, title = "Xaritadan tanlash", initialCenter, onCancel, onSelect }) => {
+  const [loading, setLoading] = useState(false);
+  const [addr, setAddr] = useState("");
+  const [center, setCenter] = useState(initialCenter || { lat: 41.311081, lng: 69.240562 }); // Tashkent
+  const mapId = useMemo(() => `leaflet_pick_${Math.random().toString(36).slice(2)}`, []);
+
+  useEffect(() => {
+    if (!open) return;
+    let map;
+    let cancelled = false;
+
+    const init = async () => {
+      try {
+        setLoading(true);
+        const L = await loadLeafletCDN();
+        if (cancelled) return;
+
+        const el = document.getElementById(mapId);
+        if (!el) return;
+
+        // cleanup old
+        if (el._leaflet_id) {
+          try { el._leaflet_id = null; } catch {}
+        }
+
+        map = L.map(el, { zoomControl: true }).setView([center.lat, center.lng], 15);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
+          attribution: "&copy; OpenStreetMap",
+        }).addTo(map);
+
+        const updateCenter = async () => {
+          const c = map.getCenter();
+          const next = { lat: Number(c.lat), lng: Number(c.lng) };
+          setCenter(next);
+          try {
+            const a = await reverseGeocodeOSM(next.lat, next.lng);
+            if (!cancelled) setAddr(a);
+          } catch {
+            if (!cancelled) setAddr("");
+          }
+        };
+
+        map.on("moveend", updateCenter);
+        // initial reverse
+        await updateCenter();
+
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    init();
+
+    return () => {
+      cancelled = true;
+      try {
+        if (map) map.remove();
+      } catch {}
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  return (
+    <Modal
+      open={open}
+      title={title}
+      onCancel={onCancel}
+      footer={[
+        <Button key="cancel" onClick={onCancel}>Bekor qilish</Button>,
+        <Button
+          key="ok"
+          type="primary"
+          onClick={() => onSelect?.({ ...center, address: addr })}
+          disabled={!center?.lat || !center?.lng}
+          loading={loading}
+        >
+          Tanlash
+        </Button>,
+      ]}
+      width="100%"
+      style={{ top: 0, padding: 0 }}
+      styles={{ body: { height: "calc(100vh - 140px)" } }}
+    >
+      <div style={{ position: "relative", height: "100%" }}>
+        <div id={mapId} style={{ height: "100%", width: "100%", borderRadius: 12, overflow: "hidden" }} />
+        {/* Center pin */}
+        <div
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: "50%",
+            transform: "translate(-50%, -100%)",
+            zIndex: 999,
+            pointerEvents: "none",
+            fontSize: 34,
+            filter: "drop-shadow(0 6px 10px rgba(0,0,0,.45))",
+          }}
+        >
+          📍
+        </div>
+        <div
+          style={{
+            position: "absolute",
+            left: 12,
+            right: 12,
+            bottom: 12,
+            zIndex: 999,
+            background: "rgba(0,0,0,.55)",
+            border: "1px solid rgba(255,255,255,.15)",
+            borderRadius: 12,
+            padding: 10,
+            backdropFilter: "blur(6px)",
+          }}
+        >
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <Text style={{ color: "#fff" }}>
+              {loading ? "Manzil aniqlanmoqda..." : (addr || "Manzil topilmadi (lat/lng saqlanadi)")}
+            </Text>
+            <Text style={{ color: "rgba(255,255,255,.75)", marginLeft: "auto" }}>
+              {center.lat?.toFixed?.(6)}, {center.lng?.toFixed?.(6)}
+            </Text>
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+
 const maskPhone = (p) => {
   const s = String(p || "");
   if (s.length < 6) return "********";
@@ -179,6 +362,7 @@ export default function DriverInterProvincial({ onBack }) {
 
   // In-app map modal (no new tab)
   const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita" });
+  const [meetPickModal, setMeetPickModal] = useState({ open: false, center: null });
   const openMapEmbed = ({ title = "Xarita", lat, lng, sLat, sLng, mode = "pin" }) => {
     const safe = (v) => String(v ?? "").trim();
     const qLat = safe(lat), qLng = safe(lng);
@@ -197,6 +381,7 @@ export default function DriverInterProvincial({ onBack }) {
   };
 
   const [loading, setLoading] = useState(true);
+  const [acceptingIds, setAcceptingIds] = useState(() => new Set());
   const [submitting, setSubmitting] = useState(false);
   const [errorText, setErrorText] = useState("");
 
@@ -785,6 +970,20 @@ export default function DriverInterProvincial({ onBack }) {
             />
           )}
         </Modal>
+
+      <LocationPickerModal
+        open={meetPickModal.open}
+        title="Ketish joyini xaritadan tanlang"
+        initialCenter={meetPickModal.center}
+        onCancel={() => setMeetPickModal({ open: false, center: null })}
+        onSelect={({ lat, lng, address }) => {
+          setMeetLat(lat);
+          setMeetLng(lng);
+          if (address) setMeetAddress(address);
+          setMeetPickModal({ open: false, center: null });
+        }}
+      />
+
       <Modal
         title={mapModal.title}
         open={mapModal.open}
