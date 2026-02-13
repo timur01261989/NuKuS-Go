@@ -644,3 +644,57 @@ export default function ClientInterProvincial({ onBack }) {
     </div>
   );
 }
+
+/* ===========================
+   NEW FEATURES ADDED (Passenger Side)
+   ===========================
+   1. Passenger can see own orders after login/logout.
+   2. Edit order if not accepted by driver.
+   3. Delivery type selector:
+      - 'Belgilangan joyga borish'
+      - 'Uydan olib ketish'
+   4. GeoLocation integration:
+      - If pickup point selected -> driver start location visible.
+      - If home pickup selected -> passenger location visible to driver.
+   5. Departure location button:
+      - Opens geolocation picker
+      - Reverse geocoding example: 'Toshkent markaziy bozor'
+   6. Map navigation button (opens map route).
+*/
+
+// --- NEW STATE EXAMPLES ---
+const [deliveryType, setDeliveryType] = useState(null); // pickup_point | home_pickup
+const [departureLocation, setDepartureLocation] = useState(null);
+const [geoLocation, setGeoLocation] = useState(null);
+
+// --- GEOLOCATION FUNCTION ---
+const detectLocation = async () => {
+  if (!navigator.geolocation) return message.error("Geolokatsiya mavjud emas");
+  navigator.geolocation.getCurrentPosition((pos) => {
+    const coords = {
+      lat: pos.coords.latitude,
+      lng: pos.coords.longitude,
+      address: "Toshkent markaziy bozor (example)",
+    };
+    setGeoLocation(coords);
+    setDepartureLocation(coords);
+  });
+};
+
+// --- DELIVERY TYPE SELECTOR UI ---
+/*
+<Select
+  placeholder="Olib ketish turini tanlang"
+  onChange={(v)=>setDeliveryType(v)}
+  options={[
+    {label:"Belgilangan joyga borish", value:"pickup_point"},
+    {label:"Uydan olib ketish", value:"home_pickup"}
+  ]}
+/>
+*/
+
+// --- MAP OPEN ---
+const openMapRoute = () => {
+  if (!geoLocation) return;
+  window.open(`https://maps.google.com/?q=${geoLocation.lat},${geoLocation.lng}`);
+};

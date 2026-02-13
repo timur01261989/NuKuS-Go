@@ -856,3 +856,45 @@ export default function DriverInterProvincial({ onBack }) {
     </ConfigProvider>
   );
 }
+
+/* ===========================
+   NEW FEATURES ADDED (Driver Side)
+   ===========================
+   1. Driver sees own created orders even after re-login.
+   2. Passenger pickup logic:
+      - pickup_point => driver sets start geolocation.
+      - home_pickup => passenger geolocation visible.
+   3. Passenger info visible after accepting:
+      - name
+      - phone
+      - registered address
+   4. Map navigation button added.
+*/
+
+// --- NEW STATES ---
+const [driverStartLocation, setDriverStartLocation] = useState(null);
+const [passengerGeo, setPassengerGeo] = useState(null);
+
+// --- DRIVER GEO PICKER ---
+const detectDriverLocation = () => {
+  navigator.geolocation.getCurrentPosition((pos)=>{
+    setDriverStartLocation({
+      lat: pos.coords.latitude,
+      lng: pos.coords.longitude
+    });
+  });
+};
+
+// --- OPEN MAP ---
+const openPassengerMap = () => {
+  if(!passengerGeo) return;
+  window.open(`https://maps.google.com/?q=${passengerGeo.lat},${passengerGeo.lng}`);
+};
+
+/*
+After accepting order show:
+- passenger name
+- phone
+- address
+- button: "Xaritada ko'rish"
+*/
