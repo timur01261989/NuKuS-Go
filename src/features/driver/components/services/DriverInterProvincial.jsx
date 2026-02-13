@@ -23,68 +23,69 @@ export default function DriverInterProvincial({ onBack }) {
   const t = translations[savedLang] || translations["uz_lotin"];
   const [loading, setLoading] = useState(true); // Skeleton uchun
 
-  // --- MA'LUMOTLAR BAZASI (TO'LIQ RO'YXAT) ---
+  // --- 1. VILOYATLAR VA TUMANLAR RO'YXATI ---
   const regionsData = [
-    { 
-      name: "Toshkent shahri", 
-      districts: ["Yunusobod", "Chilonzor", "Mirzo Ulug'bek", "Yashnobod", "Yakkasaroy", "Sergeli", "Uchtepa", "Olmazor", "Bektemir", "Mirobod", "Shayxontohur", "Yangihayot"] 
-    },
     { 
       name: "Qoraqalpog'iston", 
       districts: ["Nukus sh.", "Chimboy", "Qo'ng'irot", "Beruniy", "To'rtko'l", "Mo'ynoq", "Xo'jayli", "Shumanay", "Qanliko'l", "Kegeyli", "Qorao'zak", "Taxtako'pir", "Ellikqala", "Amudaryo", "Bo'zatov", "Nukus tumani"] 
+    },
+    { 
+      name: "Toshkent shahri", 
+      districts: ["Yunusobod", "Chilonzor", "Mirzo Ulug'bek", "Yashnobod", "Yakkasaroy", "Sergeli", "Uchtepa", "Olmazor", "Bektemir", "Mirobod", "Shayxontohur", "Yangihayot"] 
     },
     { 
       name: "Toshkent viloyati", 
       districts: ["Nurafshon", "Angren", "Olmaliq", "Chirchiq", "Bekobod", "Yangiyo'l", "Oqqo'rg'on", "Ohangaron", "Bo'stonliq", "Bo'ka", "Zangiota", "Qibray", "Quyichirchiq", "Parkent", "Piskent", "O'rtachirchiq", "Chinoz", "Yuqorichirchiq", "Toshkent tumani"] 
     },
     { 
-      name: "Andijon", 
-      districts: ["Andijon sh.", "Asaka", "Xonobod", "Shahrixon", "Oltinkul", "Baliqchi", "Bo'z", "Buloqboshi", "Izboskan", "Jalaquduq", "Marhamat", "Paxtaobod", "Qo'rg'ontepa", "Xo'jaobod"] 
+      name: "Xorazm", 
+      districts: ["Urganch sh.", "Xiva", "Bog'ot", "Gurlan", "Qo'shko'pir", "Shovot", "Xonqa", "Yangiariq", "Yangibozor", "Tuproqqala", "Hazorasp"] 
     },
     { 
       name: "Buxoro", 
       districts: ["Buxoro sh.", "Kogon", "G'ijduvon", "Jondor", "Qorako'l", "Qorovulbozor", "Olot", "Peshku", "Romitan", "Shofirkon", "Vobkent"] 
     },
     { 
-      name: "Farg'ona", 
-      districts: ["Farg'ona sh.", "Qo'qon", "Marg'ilon", "Quva", "Quvasoy", "Beshariq", "Bog'dod", "Buvayda", "Dang'ara", "Yozyovon", "Oltiariq", "Rishton", "So'x", "Toshloq", "Uchko'prik", "O'zbekiston", "Furqat"] 
-    },
-    { 
-      name: "Jizzax", 
-      districts: ["Jizzax sh.", "Arnasoy", "Baxmal", "Do'stlik", "Forish", "G'allaorol", "Sharof Rashidov", "Mirzachul", "Paxtakor", "Yangiobod", "Zomin", "Zafarobod"] 
-    },
-    { 
-      name: "Xorazm", 
-      districts: ["Urganch sh.", "Xiva", "Bog'ot", "Gurlan", "Qo'shko'pir", "Shovot", "Xonqa", "Yangiariq", "Yangibozor", "Tuproqqala", "Hazorasp"] 
-    },
-    { 
-      name: "Namangan", 
-      districts: ["Namangan sh.", "Chust", "Pop", "Chortoq", "Kosonsoy", "Mingbuloq", "Norin", "Uychi", "Uchqo'rg'on", "Yangiqo'rg'on", "To'raqo'rg'on"] 
-    },
-    { 
       name: "Navoiy", 
       districts: ["Navoiy sh.", "Zarafshon", "Karmana", "Konimex", "Navbahor", "Nurota", "Tomdi", "Uchquduq", "Xatirchi", "Qiziltepa"] 
-    },
-    { 
-      name: "Qashqadaryo", 
-      districts: ["Qarshi sh.", "Shahrisabz", "Muborak", "Dehqonobod", "Kasbi", "Kitob", "Koson", "Mirishkor", "Nishon", "Chiroqchi", "Yakkabog'", "Qamashi", "G'uzor"] 
     },
     { 
       name: "Samarqand", 
       districts: ["Samarqand sh.", "Kattaqo'rg'on", "Ishtixon", "Jomboy", "Narpay", "Nurobod", "Oqdaryo", "Paxtachi", "Payariq", "Pastdarg'om", "Toyloq", "Bulung'ur", "Urgut"] 
     },
     { 
-      name: "Sirdaryo", 
-      districts: ["Guliston sh.", "Shirin", "Yangiyer", "Boyovut", "Mirzaobod", "Oqoltin", "Sayhunobod", "Sardoba", "Xovos"] 
+      name: "Qashqadaryo", 
+      districts: ["Qarshi sh.", "Shahrisabz", "Muborak", "Dehqonobod", "Kasbi", "Kitob", "Koson", "Mirishkor", "Nishon", "Chiroqchi", "Yakkabog'", "Qamashi", "G'uzor"] 
     },
     { 
       name: "Surxondaryo", 
       districts: ["Termiz sh.", "Angor", "Boysun", "Denov", "Jarqo'rg'on", "Muzrabot", "Oltinsoy", "Sariosiyo", "Sherobod", "Sho'rchi", "Uzun", "Qiziriq", "Qumqo'rg'on"] 
+    },
+    { 
+      name: "Jizzax", 
+      districts: ["Jizzax sh.", "Arnasoy", "Baxmal", "Do'stlik", "Forish", "G'allaorol", "Sharof Rashidov", "Mirzachul", "Paxtakor", "Yangiobod", "Zomin", "Zafarobod"] 
+    },
+    { 
+      name: "Sirdaryo", 
+      districts: ["Guliston sh.", "Shirin", "Yangiyer", "Boyovut", "Mirzaobod", "Oqoltin", "Sayhunobod", "Sardoba", "Xovos"] 
+    },
+    { 
+      name: "Andijon", 
+      districts: ["Andijon sh.", "Asaka", "Xonobod", "Shahrixon", "Oltinkul", "Baliqchi", "Bo'z", "Buloqboshi", "Izboskan", "Jalaquduq", "Marhamat", "Paxtaobod", "Qo'rg'ontepa", "Xo'jaobod"] 
+    },
+    { 
+      name: "Farg'ona", 
+      districts: ["Farg'ona sh.", "Qo'qon", "Marg'ilon", "Quva", "Quvasoy", "Beshariq", "Bog'dod", "Buvayda", "Dang'ara", "Yozyovon", "Oltiariq", "Rishton", "So'x", "Toshloq", "Uchko'prik", "O'zbekiston", "Furqat"] 
+    },
+    { 
+      name: "Namangan", 
+      districts: ["Namangan sh.", "Chust", "Pop", "Chortoq", "Kosonsoy", "Mingbuloq", "Norin", "Uychi", "Uchqo'rg'on", "Yangiqo'rg'on", "To'raqo'rg'on"] 
     }
   ];
 
-  // E'lon holatini o'qish
+  // E'lon holatini o'qish (Agar oldin yaratilgan bo'lsa)
   const savedAd = JSON.parse(localStorage.getItem("activeInterProvincialAd"));
+  // Step 0: Yaratish, Step 1: Tasdiqlash, Step 2: Aktiv holat
   const [step, setStep] = useState(savedAd ? 2 : 0);
 
   const [formData, setFormData] = useState(savedAd || {
@@ -124,24 +125,67 @@ export default function DriverInterProvincial({ onBack }) {
     }
   };
 
-  const handleSave = () => {
-    localStorage.setItem("activeInterProvincialAd", JSON.stringify(formData));
-    setStep(2);
-    message.success(t.adActive);
+  cconst handleSave = async () => {
+    try {
+      // 1. Haydovchi tizimga kirganligini tekshiramiz
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        message.error("Iltimos, avval tizimga kiring!");
+        return;
+      }
+
+      // 2. Ma'lumotlarni bazaga yuborish uchun tayyorlaymiz
+      // Eslatma: Bazada "seats" (joylar) va "scheduled_at" (ketish vaqti) ustunlari bo'lishi kerak.
+      // Agar yo'q bo'lsa, ularni qo'shing yoki muhim ma'lumotlarni commentga yozamiz.
+      
+      const { error } = await supabase
+        .from('orders')
+        .insert({
+          driver_id: user.id,            // E'lon egasi (Siz)
+          client_id: null,               // Mijoz hali yo'q (bu taksi chaqirish emas, e'lon berish)
+          service_type: 'intercity',     // <--- MUHIM: Yo'lovchi shu bo'yicha qidiradi
+          status: 'pending',             // E'lon aktiv holatda
+          
+          // Manzillar
+          pickup_location: `${formData.fromRegion}, ${formData.fromDistrict}`,
+          dropoff_location: `${formData.toRegion}, ${formData.toDistrict}`,
+          
+          // Narx
+          price: formData.price,
+          
+          // Qo'shimcha ma'lumotlar (agar bazada alohida ustunlar bo'lmasa)
+          // Masalan client_name o'rniga vaqtni yozib turamiz yoki alohida ustun ochish kerak
+          client_name: `Ketish vaqti: ${formData.date} | ${formData.time}`, 
+          client_phone: `Joylar: ${formData.seats} ta` 
+        });
+
+      if (error) throw error;
+
+      // 3. Muvaffaqiyatli saqlandi
+      localStorage.setItem("activeInterProvincialAd", JSON.stringify(formData));
+      setStep(2);
+      message.success(t.adActive || "E'lon bazaga joylandi va yo'lovchilarga ko'rinmoqda!");
+
+    } catch (error) {
+      console.error("Bazaga yozishda xato:", error);
+      message.error("Xatolik yuz berdi: " + error.message);
+    }
   };
 
   const handleCancelAd = () => {
     localStorage.removeItem("activeInterProvincialAd");
     setStep(0);
-    message.warning(t.cancelAd);
+    message.warning(t.cancelAd || "E'lon bekor qilindi");
   };
 
+  // --- STEP 0: E'LON YARATISH FORMASI ---
   const renderForm = () => (
     <div style={{ padding: "15px", background: "#f8f9fa", minHeight: "100vh" }}>
       {/* HEADER */}
       <div style={{ display: "flex", alignItems: "center", marginBottom: 25 }}>
         <Button shape="circle" size="large" icon={<ArrowLeftOutlined />} onClick={onBack} style={{ border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }} />
-        <Title level={4} style={{ margin: "0 0 0 15px", color: "#1890ff", fontWeight: 800 }}>{t.interProvincial}</Title>
+        <Title level={4} style={{ margin: "0 0 0 15px", color: "#1890ff", fontWeight: 800 }}>{t.interProvincial || "Viloyatlar Aro"}</Title>
       </div>
 
       <Card bordered={false} style={{ borderRadius: 24, marginBottom: 15, boxShadow: "0 4px 20px rgba(0,0,0,0.05)" }}>
@@ -297,6 +341,7 @@ export default function DriverInterProvincial({ onBack }) {
           <>
             {step === 0 && renderForm()}
 
+            {/* STEP 1: TASDIQLASH */}
             {step === 1 && (
               <div style={{ padding: 25, paddingTop: 40 }}>
                 <Title level={3} style={{ textAlign: "center", marginBottom: 30, fontWeight: 800 }}>{t.confirmDetails}</Title>
@@ -332,6 +377,7 @@ export default function DriverInterProvincial({ onBack }) {
               </div>
             )}
 
+            {/* STEP 2: AKTIV HOLAT */}
             {step === 2 && (
               <div style={{ padding: 25, height: '80vh', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <Card style={{ textAlign: "center", borderRadius: 32, boxShadow: "0 15px 40px rgba(24,144,255,0.15)", border: 'none' }}>
