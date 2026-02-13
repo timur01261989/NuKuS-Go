@@ -1,353 +1,248 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Card, Button, Typography, Avatar, message, Tag, Skeleton, Result } from 'antd';
+import React, { useState, useEffect } from "react";
 import { 
-  ArrowLeftOutlined, CarOutlined, PhoneOutlined, SearchOutlined, 
-  EnvironmentFilled, AimOutlined, UserOutlined,
-  CheckCircleOutlined, ClockCircleOutlined, CloseOutlined, LoadingOutlined,
-  EnvironmentOutlined
-} from '@ant-design/icons';
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet-routing-machine';
-import 'leaflet/dist/leaflet.css';
+  Card, Button, Typography, Row, Col, Select, 
+  DatePicker, List, Tag, Avatar, Empty, Skeleton, message, Divider 
+} from "antd";
+import { 
+  ArrowLeftOutlined, SearchOutlined, EnvironmentOutlined, 
+  CalendarOutlined, UserOutlined, PhoneOutlined, 
+  ClockCircleOutlined, CarOutlined 
+} from "@ant-design/icons";
+import dayjs from "dayjs";
 import { supabase } from "../../../lib/supabase"; 
 
-import icon from 'leaflet/dist/images/marker-icon.png';
-import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+const { Title, Text } = Typography;
+const { Option } = Select;
 
-// --- ICONS ---
-const carIcon = L.divIcon({ 
-  html: '<div style="font-size: 35px; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.3));">🚖</div>', 
-  className: 'car-marker', iconSize: [35, 35], iconAnchor: [17, 17]
-});
-let DefaultIcon = L.icon({ iconUrl: icon, shadowUrl: iconShadow, iconSize: [25, 41], iconAnchor: [12, 41] });
-L.Marker.prototype.options.icon = DefaultIcon;
-
-const { Text, Title } = Typography;
-
-const TARIFFS = [
-  { id: 'start', name: 'Start', basePrice: 4000, time: '3 min', icon: <CarOutlined /> },
-  { id: 'comfort', name: 'Komfort', basePrice: 6000, time: '5 min', icon: <CarOutlined /> },
-  { id: 'delivery', name: 'Yetkazish', basePrice: 10000, time: '10 min', icon: <EnvironmentOutlined /> },
-];
-
-// --- ROUTING ---
-function RoutingMachine({ from, to, color = '#1890ff' }) {
-  const map = useMap();
-  useEffect(() => {
-    if (!map || !from || !to) return;
-    map.eachLayer(l => { if (l.options && l.options.name === 'route-line') map.removeLayer(l) });
-
-    const control = L.Routing.control({
-      waypoints: [L.latLng(from), L.latLng(to)],
-      lineOptions: { styles: [{ color: color, weight: 6, opacity: 0.8 }] },
-      createMarker: () => null, 
-      addWaypoints: false, 
-      show: false, 
-      fitSelectedRoutes: true, 
-      router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }) 
-    }).addTo(map);
-
-    control.getPlan().options.name = 'route-line';
-    return () => { try { map.removeControl(control) } catch(e){} };
-  }, [map, from, to, color]);
-  return null;
-}
-
-function MapFlyTo({ center, trigger }) {
-    const map = useMap();
-    useEffect(() => { if (center && trigger) map.flyTo(center, 16, { animate: true, duration: 1.5 }); }, [trigger, center, map]);
-    return null;
-}
-
-// --- OVOZLI YORDAMCHI ---
-const playSoundOrSpeak = (text, audioFile) => {
-    const path = audioFile ? `/sounds/${audioFile}` : null;
-
-    if (path) {
-        const audio = new Audio(path);
-        audio.play().catch(e => {
-            console.log("Audio file topilmadi, robot gapiradi:", e);
-            speak(text); 
-        });
-    } else {
-        speak(text);
-    }
-};
-
-const speak = (text) => {
-    if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'uz-UZ'; 
-        utterance.rate = 1.0; 
-        window.speechSynthesis.speak(utterance);
-    }
-};
-
-export default function ClientOrderCreate({ onBack }) {
-  const [mode, setMode] = useState('main'); 
-  const [userLoc, setUserLoc] = useState([42.4619, 59.6166]); 
-  const [destLoc, setDestLoc] = useState(null);
-  const [driverLoc, setDriverLoc] = useState(null);
-  const [realDriver, setRealDriver] = useState(null);
-  const [pinAddress, setPinAddress] = useState("Manzilni tanlang");
-  const [currentOrderId, setCurrentOrderId] = useState(null);
+export default function ClientInterProvincial({ onBack }) {
   const [loading, setLoading] = useState(false);
-  const [waitTime, setWaitTime] = useState(0);
-  const [finalPrice, setFinalPrice] = useState(0);
-  const [flyTrigger, setFlyTrigger] = useState(0);
-  const [selectedTariff, setSelectedTariff] = useState(TARIFFS[0]);
+  const [orders, setOrders] = useState([]);
+  
+  // Qidiruv filtrlari
+  const [filterData, setFilterData] = useState({
+    fromRegion: null,
+    toRegion: null,
+    date: dayjs().format("YYYY-MM-DD")
+  });
 
-  // --- 1. GPS ---
+  // Viloyatlar ro'yxati (Haydovchi tomoni bilan bir xil)
+  const regionsData = [
+    { name: "Toshkent shahri" }, { name: "Qoraqalpog'iston" }, { name: "Toshkent viloyati" },
+    { name: "Andijon" }, { name: "Buxoro" }, { name: "Farg'ona" }, { name: "Jizzax" },
+    { name: "Xorazm" }, { name: "Namangan" }, { name: "Navoiy" }, { name: "Qashqadaryo" },
+    { name: "Samarqand" }, { name: "Sirdaryo" }, { name: "Surxondaryo" }
+  ];
+
+  // Dastlabki yuklanish (Hamma reyslarni ko'rsatish)
   useEffect(() => {
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(p => {
-            const pos = [p.coords.latitude, p.coords.longitude];
-            setUserLoc(pos);
-            checkActiveOrder(pos);
-            setFlyTrigger(prev => prev + 1);
-        });
-    } else checkActiveOrder([42.4619, 59.6166]);
+    fetchOrders();
   }, []);
 
-  // --- 2. BAZANI TEKSHIRISH ---
-  const checkActiveOrder = async (currentPos) => {
-      const savedOrderId = localStorage.getItem('activeOrderId');
-      if (!savedOrderId) return;
-      const { data } = await supabase.from('orders').select('*').eq('id', savedOrderId).single();
-      if (data) {
-          setCurrentOrderId(data.id);
-          handleStatusChange(data.status, data);
-      }
-  };
+  const fetchOrders = async (isSearch = false) => {
+    setLoading(true);
+    try {
+      let query = supabase
+        .from('orders')
+        .select(`
+          *,
+          drivers (
+            first_name,
+            phone,
+            car_model,
+            car_color,
+            plate_number,
+            avatar_url
+          )
+        `)
+        .eq('service_type', 'intercity') // Faqat viloyatlar aro
+        .eq('status', 'pending')         // Faqat aktiv e'lonlar
+        .not('driver_id', 'is', null);   // Haydovchi yaratgan bo'lishi kerak
 
-  // --- 3. REALTIME KUZATISH ---
-  useEffect(() => {
-    if (!currentOrderId) return;
-    const channel = supabase.channel(`client-order-${currentOrderId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${currentOrderId}` }, 
-      (payload) => { handleStatusChange(payload.new.status, payload.new); })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [currentOrderId]);
-
-  // --- 4. STATUS O'ZGARISHI (LOGIKA) ---
-  const handleStatusChange = (status, data) => {
-
-      // 1. HAYDOVCHI QABUL QILDI (OVOZ BOR)
-      if (status === 'accepted') {
-          setMode('coming');
-          if (data.driver_id) fetchDriverInfo(data.driver_id);
-          speak("Haydovchi qabul qildi."); 
-      }
-
-      // 2. TAKSI YETIB KELDI (OVOZ BOR)
-      if (status === 'arrived' && mode !== 'arrived') {
-          setMode('arrived');
-          setDriverLoc(userLoc); 
-          // Siz so'ragan aniq matn:
-          playSoundOrSpeak("Taksi yetib keldi, kutish rejimi ishga tushdi.", "arrived.mp3");
-          message.success("Haydovchi yetib keldi!");
+      // Agar qidiruv tugmasi bosilgan bo'lsa, filtrlarni qo'shamiz
+      if (isSearch) {
+        if (filterData.fromRegion) {
+          query = query.ilike('pickup_location', `%${filterData.fromRegion}%`);
+        }
+        if (filterData.toRegion) {
+          query = query.ilike('dropoff_location', `%${filterData.toRegion}%`);
+        }
+        // Sana bo'yicha filtr (hozircha matn ichidan qidiradi, chunki sana alohida ustunda emas)
+        // Agar siz bazaga 'scheduled_at' ustunini qo'shgan bo'lsangiz, o'shandan foydalanamiz.
+        // Hozircha client_name ichidagi matndan qidiramiz (Haydovchi kodi shunday saqlagan edi)
+        if (filterData.date) {
+           query = query.ilike('client_name', `%${filterData.date}%`); 
+        }
       }
 
-      // 3. YURISH BOSHLANDI (OVOZ YO'Q, faqat vizual)
-      if (status === 'in_progress' && mode !== 'in_progress') {
-          setMode('in_progress');
-          // Ovoz yo'q
+      const { data, error } = await query.order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setOrders(data || []);
+      
+      if (isSearch && data.length === 0) {
+        message.info("Bu yo'nalishda hozircha reyslar yo'q");
       }
 
-      // 4. YETIB KELDIK (OVOZ YO'Q, faqat vizual)
-      if (status === 'completed') {
-          setMode('completed');
-          setFinalPrice(data.price); 
-          // Ovoz yo'q
-          localStorage.removeItem('activeOrderId');
-      }
-  };
-
-  // --- KUTISH TAYMERI ---
-  useEffect(() => {
-      let interval;
-      if (mode === 'arrived') {
-          interval = setInterval(() => setWaitTime(t => t + 1), 1000);
-      }
-      return () => clearInterval(interval);
-  }, [mode]);
-
-  const fetchDriverInfo = async (driverId) => {
-      const { data } = await supabase.from('drivers').select('*').eq('id', driverId).single();
-      if (data) setRealDriver(data);
-  };
-
-  const fetchAddress = async (lat, lng) => {
-      setPinAddress("Aniqlanmoqda...");
-      try {
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
-          const d = await res.json();
-          setPinAddress(d.address.road || "Noma'lum joy");
-      } catch (e) { setPinAddress("Manzil"); }
-  };
-
-  const startOrder = async () => {
-      setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      const dropoffText = destLoc ? `Lat: ${destLoc[0]}` : null;
-
-      const { data, error } = await supabase.from('orders').insert([{ 
-          pickup_location: pinAddress, 
-          dropoff_location: dropoffText, 
-          price: selectedTariff.basePrice, 
-          status: 'pending', service_type: 'taxi', client_id: user?.id 
-      }]).select();
-
-      if (data) {
-          setCurrentOrderId(data[0].id);
-          localStorage.setItem('activeOrderId', data[0].id);
-          setMode('searching');
-      }
+    } catch (err) {
+      console.error("Xatolik:", err);
+      message.error("Reyslarni yuklashda xatolik");
+    } finally {
       setLoading(false);
+    }
   };
 
-  const cancelOrder = async () => {
-      if (currentOrderId) await supabase.from('orders').update({ status: 'cancelled' }).eq('id', currentOrderId);
-      localStorage.removeItem('activeOrderId');
-      setMode('main'); setCurrentOrderId(null); setDriverLoc(null);
+  const handleBook = (driverPhone) => {
+    window.location.href = `tel:${driverPhone}`;
   };
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#fff' }}>
+    <div style={{ minHeight: "100vh", background: "#f0f2f5", paddingBottom: 20 }}>
+      
+      {/* 1. QIDIRUV PANELI */}
+      <div style={{ background: "#fff", padding: "15px 15px 20px", borderRadius: "0 0 24px 24px", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
+        <div style={{ display: "flex", alignItems: "center", marginBottom: 20 }}>
+          <Button shape="circle" icon={<ArrowLeftOutlined />} onClick={onBack} style={{ border: 'none', marginRight: 10 }} />
+          <Title level={4} style={{ margin: 0 }}>Reysni izlash</Title>
+        </div>
 
-        {/* XARITA QISMI */}
-        {mode !== 'completed' && (
-            <div style={{ flex: 1, position: 'relative' }}>
-                <MapContainer center={userLoc} zoom={16} zoomControl={false} style={{ height: '100%', width: '100%' }}>
-                    <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-                    <MapFlyTo center={userLoc} trigger={flyTrigger} />
+        <Row gutter={[10, 10]}>
+          <Col span={12}>
+            <Select 
+              placeholder="Qayerdan" 
+              size="large" 
+              style={{ width: "100%" }}
+              onChange={val => setFilterData({ ...filterData, fromRegion: val })}
+              allowClear
+            >
+              {regionsData.map(r => <Option key={r.name} value={r.name}>{r.name}</Option>)}
+            </Select>
+          </Col>
+          <Col span={12}>
+            <Select 
+              placeholder="Qayerga" 
+              size="large" 
+              style={{ width: "100%" }}
+              onChange={val => setFilterData({ ...filterData, toRegion: val })}
+              allowClear
+            >
+              {regionsData.map(r => <Option key={r.name} value={r.name}>{r.name}</Option>)}
+            </Select>
+          </Col>
+          <Col span={16}>
+            <DatePicker 
+              placeholder="Sana" 
+              size="large" 
+              style={{ width: "100%" }}
+              format="YYYY-MM-DD"
+              defaultValue={dayjs()}
+              onChange={(date, dateString) => setFilterData({ ...filterData, date: dateString })}
+            />
+          </Col>
+          <Col span={8}>
+            <Button 
+              type="primary" 
+              size="large" 
+              icon={<SearchOutlined />} 
+              block 
+              style={{ background: "#1890ff", borderRadius: 8 }}
+              onClick={() => fetchOrders(true)}
+            >
+              Izlash
+            </Button>
+          </Col>
+        </Row>
+      </div>
 
-                    {/* Mening joyim */}
-                    <Marker position={userLoc} icon={L.divIcon({ className: 'user-pulse-marker', html: `<div style="width: 18px; height: 18px; background: #1890ff; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 0 4px rgba(24,144,255,0.3);"></div>` })} />
+      {/* 2. REYSLAR RO'YXATI */}
+      <div style={{ padding: 15 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+           <Text type="secondary" strong>Mavjud reyslar ({orders.length})</Text>
+           {/* Agar barcha reyslarni qaytarmoqchi bo'lsa */}
+           <Button type="link" size="small" onClick={() => fetchOrders(false)}>Hammasini ko'rish</Button>
+        </div>
 
-                    {/* Manzil va Chiziq */}
-                    {(mode === 'main' || mode === 'in_progress') && destLoc && (
-                        <>
-                            <Marker position={destLoc} icon={DefaultIcon} />
-                            <RoutingMachine from={userLoc} to={destLoc} color="#1890ff" />
-                        </>
-                    )}
+        {loading ? (
+          [1, 2, 3].map(i => <Card key={i} style={{marginBottom: 10, borderRadius: 16}}><Skeleton active avatar paragraph={{rows: 2}} /></Card>)
+        ) : orders.length === 0 ? (
+          <Empty description="Hozircha reyslar topilmadi" style={{ marginTop: 50 }} />
+        ) : (
+          <List
+            dataSource={orders}
+            renderItem={item => {
+              // Haydovchi ma'lumotlarini olish
+              const driver = item.drivers || {};
+              
+              // Biz "DriverInterProvincial.jsx" da ma'lumotlarni qayerga saqlaganimizni eslaymiz:
+              // client_name = "Ketish: 2024-02-14 | 09:00"
+              // client_phone = "Joylar: 4 ta"
+              
+              const departureInfo = item.client_name || "Vaqt noma'lum";
+              const seatsInfo = item.client_phone || "Joylar noma'lum";
 
-                    {/* Haydovchi */}
-                    {(mode === 'coming' || mode === 'arrived' || mode === 'in_progress') && (
-                        <Marker position={driverLoc || [userLoc[0]+0.005, userLoc[1]+0.005]} icon={carIcon} />
-                    )}
-                </MapContainer>
-
-                <Button icon={<ArrowLeftOutlined />} shape="circle" size="large" onClick={onBack} style={{ position: 'absolute', top: 15, left: 15, zIndex: 999 }} />
-                <Button icon={<AimOutlined />} shape="circle" size="large" onClick={() => setFlyTrigger(n => n+1)} style={{ position: 'absolute', top: 80, right: 15, zIndex: 999 }} />
-            </div>
-        )}
-
-        {/* --- PANEL QISMI --- */}
-
-        {/* 1. ASOSIY EKRAN */}
-        {mode === 'main' && (
-            <Card style={{ borderRadius: '24px 24px 0 0', boxShadow: '0 -10px 40px rgba(0,0,0,0.1)' }}>
-                <div onClick={() => { 
-                    setDestLoc([userLoc[0] + 0.01, userLoc[1] + 0.01]); 
-                    message.info("Manzil tanlandi (Simulyatsiya)");
-                }} style={{ background: '#f5f5f5', padding: 15, borderRadius: 16, display: 'flex', alignItems: 'center', marginBottom: 20 }}>
-                    <SearchOutlined style={{ fontSize: 20, color: '#faad14', marginRight: 10 }} />
-                    <Text strong>{destLoc ? "Manzil tanlandi" : "Qayerga boramiz?"}</Text>
-                    {destLoc && <Button type="text" icon={<CloseOutlined />} onClick={(e) => { e.stopPropagation(); setDestLoc(null); }} />}
-                </div>
-
-                <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 10 }}>
-                    {TARIFFS.map(t => (
-                        <div key={t.id} onClick={() => setSelectedTariff(t)} style={{ minWidth: 100, padding: 10, borderRadius: 16, background: selectedTariff.id === t.id ? '#fffbe6' : '#f9f9f9', border: selectedTariff.id === t.id ? '2px solid #FFD700' : '2px solid transparent', textAlign: 'center' }}>
-                            <div style={{ fontSize: 24 }}>{t.icon}</div>
-                            <div>{t.name}</div>
-                            <div style={{ fontSize: 12, color: '#888' }}>{t.basePrice} so'm</div>
-                        </div>
-                    ))}
-                </div>
-
-                <Button type="primary" block size="large" loading={loading} onClick={startOrder} style={{ marginTop: 20, height: 55, borderRadius: 16, background: '#FFD700', color: '#000', fontWeight: 'bold' }}>
-                    Buyurtma berish
-                </Button>
-            </Card>
-        )}
-
-        {/* 3. JARAYON EKRANI */}
-        {(['searching', 'coming', 'arrived', 'in_progress'].includes(mode)) && (
-            <Card style={{ borderRadius: '24px 24px 0 0', boxShadow: '0 -10px 40px rgba(0,0,0,0.1)' }}>
-                {mode === 'searching' && (
-                    <div style={{ textAlign: 'center', padding: 20 }}>
-                        <LoadingOutlined style={{ fontSize: 40, color: '#faad14', marginBottom: 15 }} />
-                        <Title level={4}>Haydovchi qidirilmoqda...</Title>
-                        <Button danger type="text" onClick={cancelOrder}>Bekor qilish</Button>
+              return (
+                <Card 
+                  key={item.id} 
+                  hoverable 
+                  style={{ marginBottom: 15, borderRadius: 20, border: 'none', boxShadow: "0 4px 10px rgba(0,0,0,0.03)" }}
+                  bodyStyle={{ padding: 15 }}
+                >
+                  {/* Marshrut */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 15 }}>
+                    <div style={{ flex: 1 }}>
+                       <Text type="secondary" style={{ fontSize: 11 }}>Qayerdan</Text>
+                       <div style={{ fontWeight: 'bold', fontSize: 15 }}>{item.pickup_location}</div>
                     </div>
-                )}
-
-                {mode !== 'searching' && (
-                    <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 15 }}>
-                             <div>
-                                 {mode === 'coming' && <Text style={{ color: '#faad14', fontWeight: 'bold' }}>Mashina kelmoqda</Text>}
-
-                                 {mode === 'arrived' && (
-                                     <div>
-                                         <Title level={4} style={{ margin: 0, color: '#52c41a' }}>Yetib keldi!</Title>
-                                         <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'red' }}>
-                                             <ClockCircleOutlined /> 
-                                             <span>Kutish: {Math.floor(waitTime/60)}:{String(waitTime%60).padStart(2,'0')}</span>
-                                         </div>
-                                     </div>
-                                 )}
-
-                                 {mode === 'in_progress' && (
-                                     <div>
-                                         <Title level={4} style={{ margin: 0, color: '#1890ff' }}>Yo'ldamiz</Title>
-                                         <Text type="secondary">Oq yo'l!</Text>
-                                     </div>
-                                 )}
-                             </div>
-                             <Tag color="gold">5.0 ★</Tag>
-                        </div>
-
-                        <div style={{ display: 'flex', gap: 15, alignItems: 'center', background: '#f9f9f9', padding: 15, borderRadius: 20 }}>
-                           <Avatar size={50} src={realDriver?.avatar_url} icon={<UserOutlined />} />
-                           <div>
-                              <div style={{ fontWeight: 'bold' }}>{realDriver ? `${realDriver.first_name}` : 'Haydovchi'}</div>
-                              <div style={{ color: '#666', fontSize: 13 }}>{realDriver ? `${realDriver.car_model} • ${realDriver.car_color}` : '...'}</div>
-                           </div>
-                           <div style={{ marginLeft: 'auto', background: '#fff', padding: '5px 10px', borderRadius: 8, border: '1px solid #eee', fontWeight: 'bold' }}>
-                               {realDriver?.plate_number || '---'}
-                           </div>
-                        </div>
-
-                        <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-                            <Button icon={<PhoneOutlined />} style={{ flex: 1, height: 50, borderRadius: 12, background: '#e6f7ff', color: '#1890ff', border: 'none' }}>Tel</Button>
-                        </div>
+                    <div style={{ display: 'flex', alignItems: 'center', padding: '0 10px' }}>
+                       <ArrowLeftOutlined style={{ transform: 'rotate(180deg)', color: '#1890ff' }} />
                     </div>
-                )}
-            </Card>
-        )}
-
-        {/* 4. YAKUNIY CHEK */}
-        {mode === 'completed' && (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f6ffed' }}>
-                <div style={{ textAlign: 'center', padding: 30, background: '#fff', borderRadius: 30, width: '80%', boxShadow: '0 10px 40px rgba(0,0,0,0.1)' }}>
-                    <CheckCircleOutlined style={{ fontSize: 60, color: '#52c41a', marginBottom: 20 }} />
-                    <Title level={3} style={{ margin: 0 }}>Yetib keldik!</Title>
-                    <div style={{ margin: '30px 0' }}>
-                        <Text style={{ fontSize: 16, color: '#888' }}>Jami to'lov:</Text>
-                        <Title level={1} style={{ margin: 0, color: '#1890ff' }}>{parseInt(finalPrice).toLocaleString()} so'm</Title>
+                    <div style={{ flex: 1, textAlign: 'right' }}>
+                       <Text type="secondary" style={{ fontSize: 11 }}>Qayerga</Text>
+                       <div style={{ fontWeight: 'bold', fontSize: 15 }}>{item.dropoff_location}</div>
                     </div>
-                    <Button type="primary" block size="large" onClick={() => { setMode('main'); setCurrentOrderId(null); }} style={{ height: 55, borderRadius: 16, background: '#000' }}>Yopish</Button>
-                </div>
-            </div>
+                  </div>
+
+                  <Divider style={{ margin: "10px 0" }} />
+
+                  {/* Vaqt va Narx */}
+                  <Row gutter={[10, 10]} align="middle">
+                    <Col span={12}>
+                        <Tag icon={<ClockCircleOutlined />} color="blue" style={{ padding: '4px 8px', fontSize: 13 }}>
+                           {departureInfo.replace("Ketish:", "").trim()}
+                        </Tag>
+                    </Col>
+                    <Col span={12} style={{ textAlign: 'right' }}>
+                        <Text style={{ fontSize: 18, fontWeight: 900, color: '#52c41a' }}>
+                           {parseInt(item.price).toLocaleString()} so'm
+                        </Text>
+                    </Col>
+                  </Row>
+
+                  <div style={{ marginTop: 15, background: '#f9f9f9', padding: 10, borderRadius: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
+                     <Avatar size={40} icon={<UserOutlined />} src={driver.avatar_url} />
+                     <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 'bold' }}>{driver.first_name || "Haydovchi"}</div>
+                        <div style={{ fontSize: 12, color: '#888' }}>
+                           {driver.car_model} {driver.car_color} • {driver.plate_number}
+                        </div>
+                     </div>
+                     <Tag color="orange">{seatsInfo}</Tag>
+                  </div>
+
+                  <Button 
+                    type="primary" 
+                    block 
+                    icon={<PhoneOutlined />} 
+                    style={{ marginTop: 15, borderRadius: 12, height: 45, background: '#000', fontWeight: 'bold' }}
+                    onClick={() => handleBook(driver.phone)}
+                  >
+                    BOG'LANISH
+                  </Button>
+                </Card>
+              );
+            }}
+          />
         )}
-        <style>{`.user-pulse-marker { animation: pulse 2s infinite; } @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(24,144,255,0.4); } 70% { box-shadow: 0 0 0 20px rgba(24,144,255,0); } 100% { box-shadow: 0 0 0 0 rgba(24,144,255,0); } }`}</style>
+      </div>
     </div>
   );
 }
