@@ -19,7 +19,7 @@ import {
   Modal,
   Input,
   Badge,
-  Popconfirm,
+  Tabs,
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -34,7 +34,7 @@ import {
   SaveOutlined,
   CheckOutlined,
   CloseOutlined,
-  WalletOutlined,
+  EyeInvisibleOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { translations } from "@i18n/translations";
@@ -64,6 +64,7 @@ const getDistricts = (regionName) => {
   const region = REGIONS_DATA.find((r) => r.name === regionName);
   return region ? region.districts : [];
 };
+
 const isTashkentCity = (regionName) => regionName === "Toshkent shahri";
 const districtLabel = (district) => (district && district.trim() ? district : "Hammasi");
 const formatMoney = (n) => Number(n || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
@@ -76,6 +77,12 @@ const routeText = (o) => {
   return `${fromR} / ${fromD}  →  ${toR} / ${toD}`;
 };
 
+const maskPhone = (p) => {
+  const s = String(p || "");
+  if (s.length < 6) return "********";
+  return s.slice(0, 4) + "****" + s.slice(-2);
+};
+
 export default function DriverInterProvincial({ onBack }) {
   const savedLang = localStorage.getItem("appLang") || "uz_lotin";
   const t = translations[savedLang] || translations["uz_lotin"];
@@ -84,21 +91,16 @@ export default function DriverInterProvincial({ onBack }) {
   const [submitting, setSubmitting] = useState(false);
 
   const [activeAd, setActiveAd] = useState(null);
-  const [editMode, setEditMode] = useState(false);
+  const [tab, setTab] = useState("requests");
 
-  // Requests (passenger -> driver)
-  const [requests, setRequests] = useState([]);
-  // Accepted bookings
-  const [bookings, setBookings] = useState([]);
+  const [requests, setRequests] = useState([]); // status=requested
+  const [accepted, setAccepted] = useState([]); // status=accepted
 
-  // Notifications
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
 
-  // Wallet
-  const [wallet, setWallet] = useState({ balance: 0 });
-  const [topupOpen, setTopupOpen] = useState(false);
-  const [topupAmount, setTopupAmount] = useState(10000);
+  const [editMode, setEditMode] = useState(false);
+  const [driverBalance, setDriverBalance] = useState(null);
 
   const [formData, setFormData] = useState(() => {
     const saved = localStorage.getItem("driverInterProvDraft_v3");
@@ -142,209 +144,153 @@ export default function DriverInterProvincial({ onBack }) {
   }, [formData.toRegion]);
 
   useEffect(() => {
-    if (!fromDistricts.includes(formData.fromDistrict)) {
-      setFormData((p) => ({ ...p, fromDistrict: fromDistricts[0] ?? "" }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.fromRegion]);
+  let isMounted = true;
+  let channel = null;
 
-  useEffect(() => {
-    if (!toDistricts.includes(formData.toDistrict)) {
-      setFormData((p) => ({ ...p, toDistrict: toDistricts[0] ?? "" }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.toRegion]);
+  const loadAll = async () => {
+    try {
+      setLoading(true);
 
-  useEffect(() => {
-    localStorage.setItem("driverInterProvDraft_v3", JSON.stringify(formData));
-  }, [formData]);
+      // Load my ads + incoming requests + bookings + wallet + notifications
+      await loadDriverData();
+
+      // Realtime updates
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData?.user;
+
+      if (user && isMounted) {
+        channel = supabase
+          .channel("driver-interprov-live")
+          .on(
+            "postgres_changes",
+            { event: "*", schema: "public", table: "orders" },
+            (payload) => {
+              const row = payload?.new || payload?.old;
+              // Only refresh if it touches my ads
+              if (!row) return;
+              if (row.driver_id === user.id) loadDriverData();
+            }
+          )
+          .on(
+            "postgres_changes",
+            { event: "*", schema: "public", table: "trip_booking_requests" },
+            (payload) => {
+              const row = payload?.new || payload?.old;
+              if (!row) return;
+              if (row.driver_id === user.id) loadDriverData();
+            }
+          )
+          .on(
+            "postgres_changes",
+            { event: "*", schema: "public", table: "trip_bookings" },
+            (payload) => {
+              const row = payload?.new || payload?.old;
+              if (!row) return;
+              if (row.driver_id === user.id) loadDriverData();
+            }
+          )
+          .on(
+            "postgres_changes",
+            { event: "*", schema: "public", table: "notifications" },
+            (payload) => {
+              const row = payload?.new || payload?.old;
+              if (!row) return;
+              if (row.user_id === user.id) loadDriverData();
+            }
+          )
+          .subscribe();
+      }
+    } catch (e) {
+      console.error("DriverInterProvincial init error:", e);
+      if (isMounted) setError(e?.message || "Xatolik yuz berdi");
+    } finally {
+      if (isMounted) setLoading(false);
+    }
+  };
+
+  loadAll();
+
+  return () => {
+    isMounted = false;
+    if (channel) supabase.removeChannel(channel);
+  };
+}, []);
 
   const validate = () => {
-    if (!formData.fromRegion) return message.error("Qayerdan viloyatini tanlang!"), false;
+    if (!formData.fromRegion || !formData.fromRegion.trim()) {
+      message.error("Qayerdan viloyatini tanlang!");
+      return false;
+    }
     if (!isTashkentCity(formData.fromRegion) && (!formData.fromDistrict || !formData.fromDistrict.trim())) {
       message.error("Qayerdan tumanini tanlang!");
       return false;
     }
-    if (!formData.toRegion) return message.error("Qayerga viloyatini tanlang!"), false;
+
+    if (!formData.toRegion || !formData.toRegion.trim()) {
+      message.error("Qayerga viloyatini tanlang!");
+      return false;
+    }
     if (!isTashkentCity(formData.toRegion) && (!formData.toDistrict || !formData.toDistrict.trim())) {
       message.error("Qayerga tumanini tanlang!");
       return false;
     }
-    if (!formData.date || !formData.time) return message.error("Sana va vaqtni tanlang!"), false;
-    if (!formData.seatsTotal || formData.seatsTotal < 1) return message.error("Joylar kamida 1!"), false;
-    if (!formData.price || formData.price < 1000) return message.error("Narxni to‘g‘ri kiriting!"), false;
+
+    if (
+      formData.fromRegion === formData.toRegion &&
+      (formData.fromDistrict || "") === (formData.toDistrict || "")
+    ) {
+      message.error("Qayerdan va qayerga bir xil bo‘lmasin!");
+      return false;
+    }
+
+    if (!formData.date || !formData.time) {
+      message.error("Sana va vaqtni tanlang!");
+      return false;
+    }
+
+    if (!formData.seatsTotal || formData.seatsTotal < 1) {
+      message.error("O‘rindiqlar soni kamida 1 bo‘lsin!");
+      return false;
+    }
+
+    if (!formData.price || formData.price < 1000) {
+      message.error("Narxni to‘g‘ri kiriting!");
+      return false;
+    }
+
     return true;
   };
 
-  const loadActiveAd = async (userId) => {
-    const { data, error } = await supabase
-      .from("orders")
-      .select("*")
-      .eq("driver_id", userId)
-      .eq("service_type", "inter_prov")
-      .in("status", ["pending", "booked"])
-      .order("created_at", { ascending: false })
-      .limit(1);
-    if (error) throw error;
-    return data?.[0] || null;
-  };
-
-  const loadRequests = async (orderId) => {
-    const { data, error } = await supabase
-      .from("trip_booking_requests")
-      .select("*")
-      .eq("order_id", orderId)
-      .eq("status", "requested")
-      .order("created_at", { ascending: false });
-    if (error) throw error;
-    return data || [];
-  };
-
-  const loadBookings = async (orderId) => {
-    const { data, error } = await supabase
-      .from("trip_bookings")
-      .select("*")
-      .eq("order_id", orderId)
-      .eq("status", "active")
-      .order("created_at", { ascending: false });
-    if (error) throw error;
-    return data || [];
-  };
-
-  const loadNotifications = async (userId) => {
-    const { data, error } = await supabase
-      .from("notifications")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(50);
-    if (error) throw error;
-    return data || [];
-  };
-
-  const loadWallet = async (userId) => {
-    const { data, error } = await supabase
-      .from("driver_wallets")
-      .select("*")
-      .eq("driver_id", userId)
-      .maybeSingle();
-    if (error) throw error;
-    return data || { balance: 0 };
-  };
-
-  const fillFormFromActive = (o) => {
-    if (!o) return;
-    const sched = o.scheduled_at ? dayjs(o.scheduled_at) : null;
-    setFormData({
-      fromRegion: o.from_region || "Qoraqalpog'iston",
-      fromDistrict: o.from_district ?? "",
-      toRegion: o.to_region || "Toshkent shahri",
-      toDistrict: o.to_district ?? "",
-      date: sched ? sched.format("YYYY-MM-DD") : dayjs().format("YYYY-MM-DD"),
-      time: sched ? sched.format("HH:mm") : "09:00",
-      seatsTotal: Number(o.seats_total || 4),
-      price: Number(o.price || 0),
-    });
-  };
-
-  useEffect(() => {
-    const init = async () => {
-      setLoading(true);
-      try {
-        const { data: authData, error: authErr } = await supabase.auth.getUser();
-        if (authErr) throw authErr;
-        const user = authData?.user;
-        if (!user) return message.error("Avval tizimga kiring!");
-
-        const ad = await loadActiveAd(user.id);
-        setActiveAd(ad);
-        if (ad) fillFormFromActive(ad);
-
-        const notifs = await loadNotifications(user.id);
-        setNotifications(notifs);
-
-        const w = await loadWallet(user.id);
-        setWallet(w);
-
-        if (ad?.id) {
-          const reqs = await loadRequests(ad.id);
-          setRequests(reqs);
-          const b = await loadBookings(ad.id);
-          setBookings(b);
-        }
-
-        // Realtime refresh (requests, bookings, notifications, orders)
-        const ch1 = supabase
-          .channel("rt_driver_interprov")
-          .on("postgres_changes", { event: "*", schema: "public", table: "trip_booking_requests" }, async () => {
-            try {
-              const fresh = await loadActiveAd(user.id);
-              setActiveAd(fresh);
-              if (fresh?.id) {
-                const reqs = await loadRequests(fresh.id);
-                setRequests(reqs);
-              }
-            } catch {}
-          })
-          .on("postgres_changes", { event: "*", schema: "public", table: "trip_bookings" }, async () => {
-            try {
-              const fresh = await loadActiveAd(user.id);
-              setActiveAd(fresh);
-              if (fresh?.id) {
-                const b = await loadBookings(fresh.id);
-                setBookings(b);
-              }
-            } catch {}
-          })
-          .on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, async () => {
-            try {
-              const notifs2 = await loadNotifications(user.id);
-              setNotifications(notifs2);
-            } catch {}
-          })
-          .on("postgres_changes", { event: "*", schema: "public", table: "driver_wallets", filter: `driver_id=eq.${user.id}` }, async () => {
-            try {
-              const w2 = await loadWallet(user.id);
-              setWallet(w2);
-            } catch {}
-          })
-          .subscribe();
-
-        return () => supabase.removeChannel(ch1);
-      } catch (e) {
-        console.error(e);
-        message.error(e?.message || "Xatolik!");
-      } finally {
-        setTimeout(() => setLoading(false), 250);
-      }
-    };
-    init();
-  }, []);
-
   const createAd = async () => {
     if (!validate()) return;
+
     setSubmitting(true);
     try {
-      const { data: authData } = await supabase.auth.getUser();
+      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      if (authErr) throw authErr;
       const user = authData?.user;
-      if (!user) return message.error("Avval tizimga kiring!");
+      if (!user) return;
 
       const scheduledAt = dayjs(`${formData.date} ${formData.time}`, "YYYY-MM-DD HH:mm").toISOString();
 
       const payload = {
         driver_id: user.id,
+        client_id: null,
         service_type: "inter_prov",
         status: "pending",
+
         from_region: formData.fromRegion,
         from_district: (formData.fromDistrict || "").trim(),
         to_region: formData.toRegion,
         to_district: (formData.toDistrict || "").trim(),
+
         scheduled_at: scheduledAt,
         seats_total: formData.seatsTotal,
         seats_available: formData.seatsTotal,
-        price: formData.price,
+
         pickup_location: `${formData.fromRegion}, ${districtLabel(formData.fromDistrict)}`,
         dropoff_location: `${formData.toRegion}, ${districtLabel(formData.toDistrict)}`,
+        price: formData.price,
       };
 
       const { data, error } = await supabase.from("orders").insert(payload).select("*").single();
@@ -352,7 +298,7 @@ export default function DriverInterProvincial({ onBack }) {
 
       setActiveAd(data);
       setRequests([]);
-      setBookings([]);
+      setAccepted([]);
       setEditMode(false);
       message.success("E’lon yaratildi!");
     } catch (e) {
@@ -371,9 +317,10 @@ export default function DriverInterProvincial({ onBack }) {
     try {
       const scheduledAt = dayjs(`${formData.date} ${formData.time}`, "YYYY-MM-DD HH:mm").toISOString();
 
-      // seats_total ni bronlar bo‘lsa o‘zgartirmaymiz
-      const hasBookings = bookings.length > 0;
-      const seatsPatch = hasBookings ? {} : { seats_total: formData.seatsTotal, seats_available: formData.seatsTotal };
+      const hasRequestsOrAccepted = (requests.length + accepted.length) > 0;
+      const seatsPatch = hasRequestsOrAccepted
+        ? {}
+        : { seats_total: formData.seatsTotal, seats_available: formData.seatsTotal };
 
       const patch = {
         from_region: formData.fromRegion,
@@ -392,7 +339,19 @@ export default function DriverInterProvincial({ onBack }) {
 
       setActiveAd(data);
       setEditMode(false);
-      message.success("Saqlab qo‘yildi!");
+
+      // notify (optional)
+      try {
+        await supabase.from("notifications").insert({
+          user_id: data.driver_id,
+          type: "order_updated",
+          title: "E’lon yangilandi",
+          body: `Yangilandi: ${routeText(data)}`,
+          order_id: data.id,
+        });
+      } catch (e) {}
+
+      message.success("Saqlangan!");
     } catch (e) {
       console.error(e);
       message.error(e?.message || "Saqlashda xatolik!");
@@ -403,37 +362,78 @@ export default function DriverInterProvincial({ onBack }) {
 
   const cancelAd = async () => {
     if (!activeAd) return;
+
     setSubmitting(true);
     try {
       const { error } = await supabase.from("orders").update({ status: "cancelled" }).eq("id", activeAd.id);
       if (error) throw error;
+
       setActiveAd(null);
       setRequests([]);
-      setBookings([]);
+      setAccepted([]);
       setEditMode(false);
       message.success("E’lon bekor qilindi.");
     } catch (e) {
       console.error(e);
-      message.error(e?.message || "Bekor qilishda xatolik!");
+      message.error(e?.message || "Xatolik!");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const acceptRequest = async (req) => {
+  const openNotifications = async () => {
+    setNotifOpen(true);
+    const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id);
+    await markNotifRead(unreadIds);
+
+    const { data: authData } = await supabase.auth.getUser();
+    if (authData?.user?.id) {
+      try {
+        const notifs2 = await loadNotifications(authData.user.id);
+        setNotifications(notifs2);
+      } catch (e) {}
+    }
+  };
+
+  const fillFormFromActive = (o) => {
+    if (!o) return;
+    const sched = o.scheduled_at ? dayjs(o.scheduled_at) : null;
+    setFormData({
+      fromRegion: o.from_region || formData.fromRegion,
+      fromDistrict: o.from_district ?? "",
+      toRegion: o.to_region || formData.toRegion,
+      toDistrict: o.to_district ?? "",
+      date: sched ? sched.format("YYYY-MM-DD") : dayjs().format("YYYY-MM-DD"),
+      time: sched ? sched.format("HH:mm") : "09:00",
+      seatsTotal: Number(o.seats_total || 4),
+      price: Number(o.price || 0),
+    });
+  };
+
+  useEffect(() => {
+    if (activeAd) fillFormFromActive(activeAd);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeAd?.id]);
+
+  const acceptRequest = async (bookingId) => {
+    if (!activeAd) return;
     setSubmitting(true);
     try {
-      const { data: authData } = await supabase.auth.getUser();
+      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      if (authErr) throw authErr;
       const user = authData?.user;
-      if (!user) return message.error("Avval tizimga kiring!");
+      if (!user) return;
 
-      const { error } = await supabase.rpc("accept_booking_request", {
-        p_request_id: req.id,
+      const { data, error } = await supabase.rpc("accept_inter_prov_booking", {
+        p_booking_id: bookingId,
         p_driver_id: user.id,
       });
       if (error) throw error;
 
-      message.success("So‘rov qabul qilindi. Endi yo‘lovchi bilan bog‘laning.");
+      message.success("So‘rov qabul qilindi. Telefon endi ko‘rinadi. Haydovchi balansidan xizmat haqqi yechildi.");
+
+      const bal = await loadDriverBalance(user.id);
+      setDriverBalance(bal);
     } catch (e) {
       console.error(e);
       message.error(e?.message || "Qabul qilishda xatolik!");
@@ -442,21 +442,22 @@ export default function DriverInterProvincial({ onBack }) {
     }
   };
 
-  const rejectRequest = async (req) => {
+  const rejectRequest = async (bookingId) => {
+    if (!activeAd) return;
     setSubmitting(true);
     try {
-      const { data: authData } = await supabase.auth.getUser();
+      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      if (authErr) throw authErr;
       const user = authData?.user;
-      if (!user) return message.error("Avval tizimga kiring!");
+      if (!user) return;
 
-      const { error } = await supabase.rpc("reject_booking_request", {
-        p_request_id: req.id,
+      const { error } = await supabase.rpc("reject_inter_prov_booking", {
+        p_booking_id: bookingId,
         p_driver_id: user.id,
-        p_reason: "Rad etildi",
       });
       if (error) throw error;
 
-      message.success("So‘rov rad etildi.");
+      message.success("So‘rov rad etildi. Joy qaytarildi.");
     } catch (e) {
       console.error(e);
       message.error(e?.message || "Rad etishda xatolik!");
@@ -466,60 +467,6 @@ export default function DriverInterProvincial({ onBack }) {
   };
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
-
-  const openNotifications = async () => {
-    setNotifOpen(true);
-    const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id);
-    if (unreadIds.length) {
-      await supabase.from("notifications").update({ is_read: true }).in("id", unreadIds);
-      const { data: authData } = await supabase.auth.getUser();
-      if (authData?.user?.id) {
-        const notifs2 = await loadNotifications(authData.user.id);
-        setNotifications(notifs2);
-      }
-    }
-  };
-
-  const topUpBalance = async () => {
-    // Bu demo: real topup sizda click/payme bo‘ladi.
-    // Hozircha admin/driver o‘zi qo‘shishi uchun transaction qilamiz.
-    setSubmitting(true);
-    try {
-      const { data: authData } = await supabase.auth.getUser();
-      const user = authData?.user;
-      if (!user) return message.error("Avval tizimga kiring!");
-
-      const amt = Number(topupAmount || 0);
-      if (amt <= 0) return message.error("Summani to‘g‘ri kiriting!");
-
-      // ensure wallet row
-      await supabase.from("driver_wallets").upsert({ driver_id: user.id, balance: wallet.balance || 0 });
-
-      const { data: w, error: werr } = await supabase
-        .from("driver_wallets")
-        .update({ balance: (wallet.balance || 0) + amt, updated_at: new Date().toISOString() })
-        .eq("driver_id", user.id)
-        .select("*")
-        .single();
-      if (werr) throw werr;
-
-      await supabase.from("driver_transactions").insert({
-        driver_id: user.id,
-        amount: amt,
-        reason: "topup_demo",
-        meta: { source: "manual_demo" },
-      });
-
-      setWallet(w);
-      setTopupOpen(false);
-      message.success("Balans to‘ldirildi (demo).");
-    } catch (e) {
-      console.error(e);
-      message.error(e?.message || "Topup xatolik!");
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -532,38 +479,27 @@ export default function DriverInterProvincial({ onBack }) {
   return (
     <ConfigProvider theme={{ token: { colorPrimary: "#1890ff", borderRadius: 12 } }}>
       <div style={{ padding: 16, maxWidth: 980, margin: "0 auto" }}>
+        {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <Button icon={<ArrowLeftOutlined />} onClick={onBack} shape="circle" />
             <div>
-              <Title level={4} style={{ margin: 0 }}>
-                Tumanlar/Viloyatlar aro — Haydovchi e’loni
-              </Title>
+              <Title level={4} style={{ margin: 0 }}>Tumanlar/Viloyatlar aro — Haydovchi</Title>
               <Text type="secondary">service_type: <b>inter_prov</b></Text>
+              {driverBalance !== null ? (
+                <div>
+                  <Text type="secondary">Balans: </Text><b>{formatMoney(driverBalance)} so‘m</b>
+                </div>
+              ) : null}
             </div>
           </div>
 
-          <Space>
-            <Tag icon={<WalletOutlined />} color={Number(wallet.balance || 0) > 0 ? "green" : "red"}>
-              Balans: {formatMoney(wallet.balance)} so‘m
-            </Tag>
-            <Button onClick={() => setTopupOpen(true)}>Balans to‘ldirish</Button>
-
-            <Badge count={unreadCount} overflowCount={99}>
-              <Button icon={<BellOutlined />} onClick={openNotifications}>
-                Bildirishnomalar
-              </Button>
-            </Badge>
-          </Space>
+          <Badge count={unreadCount} overflowCount={99}>
+            <Button icon={<BellOutlined />} onClick={openNotifications}>
+              Bildirishnomalar
+            </Button>
+          </Badge>
         </div>
-
-        <Modal title="Balans to‘ldirish (demo)" open={topupOpen} onCancel={() => setTopupOpen(false)} onOk={topUpBalance} okText="Qo‘shish">
-          <Text type="secondary">Summani kiriting:</Text>
-          <InputNumber value={topupAmount} onChange={(v) => setTopupAmount(Number(v || 0))} style={{ width: "100%", marginTop: 8 }} min={0} step={1000} />
-          <Text type="secondary" style={{ display: "block", marginTop: 10, fontSize: 12 }}>
-            * Real loyihada bu joyga Payme/Click integratsiya qilinadi. Hozir test uchun.
-          </Text>
-        </Modal>
 
         <Modal title="Bildirishnomalar" open={notifOpen} onCancel={() => setNotifOpen(false)} footer={null}>
           {notifications.length === 0 ? (
@@ -595,43 +531,31 @@ export default function DriverInterProvincial({ onBack }) {
           )}
         </Modal>
 
+        {/* Active Ad */}
         {activeAd ? (
           <Card style={{ borderRadius: 18, border: "none", boxShadow: "0 6px 20px rgba(0,0,0,0.06)" }}>
             <Row gutter={12} align="middle">
               <Col xs={24} md={16}>
                 <Space direction="vertical" size={6} style={{ width: "100%" }}>
-                  <Text type="secondary">Sizning aktiv e’loningiz</Text>
+                  <Text type="secondary">Aktiv e’lon</Text>
                   <Title level={5} style={{ margin: 0 }}>
                     <EnvironmentFilled style={{ marginRight: 8, color: "#1890ff" }} />
                     {routeText(activeAd)}
                   </Title>
 
                   <Space size={16} wrap>
-                    <Text>
-                      <CalendarOutlined /> <b>Sana:</b>{" "}
-                      {activeAd.scheduled_at ? dayjs(activeAd.scheduled_at).format("YYYY-MM-DD") : "-"}
-                    </Text>
-                    <Text>
-                      <ClockCircleOutlined /> <b>Vaqt:</b>{" "}
-                      {activeAd.scheduled_at ? dayjs(activeAd.scheduled_at).format("HH:mm") : "-"}
-                    </Text>
-                    <Text>
-                      <UserOutlined /> <b>Joylar:</b>{" "}
-                      <b>{activeAd.seats_available ?? "-"}</b> / {activeAd.seats_total ?? "-"}
-                    </Text>
-                    <Text>
-                      <b>Narx:</b> {formatMoney(activeAd.price)} so‘m
-                    </Text>
+                    <Text><CalendarOutlined /> <b>{activeAd.scheduled_at ? dayjs(activeAd.scheduled_at).format("YYYY-MM-DD") : "-"}</b></Text>
+                    <Text><ClockCircleOutlined /> <b>{activeAd.scheduled_at ? dayjs(activeAd.scheduled_at).format("HH:mm") : "-"}</b></Text>
+                    <Text><UserOutlined /> <b>{activeAd.seats_available ?? "-"}</b> / {activeAd.seats_total ?? "-"} joy</Text>
+                    <Text><b>{formatMoney(activeAd.price)}</b> so‘m</Text>
                   </Space>
 
-                  <Space size={10} wrap style={{ marginTop: 8 }}>
+                  <Space size={10} wrap style={{ marginTop: 6 }}>
                     <Tag color={activeAd.status === "pending" ? "green" : "gold"} style={{ padding: "4px 10px", borderRadius: 999 }}>
-                      {activeAd.status === "pending" ? "Ochiq" : "Joylar kamaymoqda"}
+                      {activeAd.status === "pending" ? "Ochiq" : "Joylar band qilinmoqda"}
                     </Tag>
                     {Number(activeAd.seats_available || 0) <= 0 ? (
-                      <Tag color="red" style={{ padding: "4px 10px", borderRadius: 999 }}>
-                        Joylar to‘ldi
-                      </Tag>
+                      <Tag color="red" style={{ padding: "4px 10px", borderRadius: 999 }}>Joylar tugadi</Tag>
                     ) : null}
                   </Space>
                 </Space>
@@ -639,11 +563,26 @@ export default function DriverInterProvincial({ onBack }) {
 
               <Col xs={24} md={8}>
                 <Space direction="vertical" style={{ width: "100%" }} size={10}>
-                  <Button icon={<EditOutlined />} block size="large" onClick={() => setEditMode((p) => !p)} style={{ borderRadius: 14, height: 44 }}>
+                  <Button
+                    icon={<EditOutlined />}
+                    block
+                    size="large"
+                    onClick={() => setEditMode((p) => !p)}
+                    style={{ borderRadius: 14, height: 44 }}
+                  >
                     {editMode ? "Tahrirni yopish" : "E’lonni tahrirlash"}
                   </Button>
 
-                  <Button danger type="primary" icon={<DeleteOutlined />} block size="large" onClick={cancelAd} loading={submitting} style={{ borderRadius: 14, height: 44 }}>
+                  <Button
+                    danger
+                    type="primary"
+                    icon={<DeleteOutlined />}
+                    block
+                    size="large"
+                    onClick={cancelAd}
+                    loading={submitting}
+                    style={{ borderRadius: 14, height: 44 }}
+                  >
                     E’lonni bekor qilish
                   </Button>
                 </Space>
@@ -659,9 +598,7 @@ export default function DriverInterProvincial({ onBack }) {
                     <Text type="secondary">Qayerdan viloyat</Text>
                     <Select value={formData.fromRegion} onChange={(v) => setFormData((p) => ({ ...p, fromRegion: v }))} style={{ width: "100%", marginTop: 6 }} size="large">
                       {REGIONS_DATA.map((r) => (
-                        <Select.Option key={r.name} value={r.name}>
-                          {r.name}
-                        </Select.Option>
+                        <Select.Option key={r.name} value={r.name}>{r.name}</Select.Option>
                       ))}
                     </Select>
                   </Col>
@@ -669,16 +606,10 @@ export default function DriverInterProvincial({ onBack }) {
                     <Text type="secondary">Qayerdan tuman</Text>
                     <Select value={formData.fromDistrict} onChange={(v) => setFormData((p) => ({ ...p, fromDistrict: v }))} style={{ width: "100%", marginTop: 6 }} size="large">
                       {fromDistricts.map((d) => (
-                        <Select.Option key={`${d}`} value={d}>
-                          {districtLabel(d)}
-                        </Select.Option>
+                        <Select.Option key={`${d}`} value={d}>{districtLabel(d)}</Select.Option>
                       ))}
                     </Select>
-                    {isTashkentCity(formData.fromRegion) ? (
-                      <Text type="secondary" style={{ fontSize: 12 }}>
-                        * Toshkent shahri uchun tumanni tanlamasangiz ham bo‘ladi (Hammasi).
-                      </Text>
-                    ) : null}
+                    {isTashkentCity(formData.fromRegion) ? <Text type="secondary" style={{ fontSize: 12 }}>* Toshkent shahri uchun tumanni tanlamasa bo‘ladi.</Text> : null}
                   </Col>
                 </Row>
 
@@ -689,9 +620,7 @@ export default function DriverInterProvincial({ onBack }) {
                     <Text type="secondary">Qayerga viloyat</Text>
                     <Select value={formData.toRegion} onChange={(v) => setFormData((p) => ({ ...p, toRegion: v }))} style={{ width: "100%", marginTop: 6 }} size="large">
                       {REGIONS_DATA.map((r) => (
-                        <Select.Option key={r.name} value={r.name}>
-                          {r.name}
-                        </Select.Option>
+                        <Select.Option key={r.name} value={r.name}>{r.name}</Select.Option>
                       ))}
                     </Select>
                   </Col>
@@ -699,16 +628,10 @@ export default function DriverInterProvincial({ onBack }) {
                     <Text type="secondary">Qayerga tuman</Text>
                     <Select value={formData.toDistrict} onChange={(v) => setFormData((p) => ({ ...p, toDistrict: v }))} style={{ width: "100%", marginTop: 6 }} size="large">
                       {toDistricts.map((d) => (
-                        <Select.Option key={`${d}`} value={d}>
-                          {districtLabel(d)}
-                        </Select.Option>
+                        <Select.Option key={`${d}`} value={d}>{districtLabel(d)}</Select.Option>
                       ))}
                     </Select>
-                    {isTashkentCity(formData.toRegion) ? (
-                      <Text type="secondary" style={{ fontSize: 12 }}>
-                        * Toshkent shahri uchun tumanni tanlamasangiz ham bo‘ladi (Hammasi).
-                      </Text>
-                    ) : null}
+                    {isTashkentCity(formData.toRegion) ? <Text type="secondary" style={{ fontSize: 12 }}>* Toshkent shahri uchun tumanni tanlamasa bo‘ladi.</Text> : null}
                   </Col>
                 </Row>
 
@@ -732,15 +655,10 @@ export default function DriverInterProvincial({ onBack }) {
                     <Text type="secondary">Narx (so‘m)</Text>
                     <InputNumber min={1000} step={1000} value={formData.price} onChange={(v) => setFormData((p) => ({ ...p, price: Number(v || 0) }))} style={{ width: "100%", marginTop: 6 }} size="large" />
                   </Col>
-
                   <Col xs={24} md={12}>
-                    <Text type="secondary">O‘rindiqlar (bron bo‘lsa bloklanadi)</Text>
-                    <InputNumber min={1} max={20} value={formData.seatsTotal} onChange={(v) => setFormData((p) => ({ ...p, seatsTotal: Number(v || 1) }))} style={{ width: "100%", marginTop: 6 }} size="large" disabled={bookings.length > 0} />
-                    {bookings.length > 0 ? (
-                      <Text type="secondary" style={{ fontSize: 12 }}>
-                        * Bronlar bor: joylar sonini o‘zgartirish bloklangan.
-                      </Text>
-                    ) : null}
+                    <Text type="secondary">O‘rindiqlar (so‘rovlar bo‘lsa bloklanadi)</Text>
+                    <InputNumber min={1} max={20} value={formData.seatsTotal} onChange={(v) => setFormData((p) => ({ ...p, seatsTotal: Number(v || 1) }))} style={{ width: "100%", marginTop: 6 }} size="large" disabled={(requests.length + accepted.length) > 0} />
+                    {(requests.length + accepted.length) > 0 ? <Text type="secondary" style={{ fontSize: 12 }}>* So‘rovlar bor: o‘rindiqlar sonini o‘zgartirib bo‘lmaydi.</Text> : null}
                   </Col>
                 </Row>
 
@@ -752,113 +670,114 @@ export default function DriverInterProvincial({ onBack }) {
               </div>
             ) : null}
 
-            {/* REQUESTS */}
-            <div style={{ marginTop: 18 }}>
-              <Divider orientation="left">So‘rovlar (qabul qilish kerak)</Divider>
+            <Divider />
 
-              {requests.length === 0 ? (
-                <Text type="secondary">Hozircha so‘rov yo‘q. Yo‘lovchi “Band qilish” bosganda so‘rov keladi.</Text>
-              ) : (
-                <List
-                  dataSource={requests}
-                  itemLayout="horizontal"
-                  renderItem={(r) => (
-                    <List.Item
-                      actions={[
-                        <Popconfirm
-                          key="acc"
-                          title="So‘rovni qabul qilasizmi?"
-                          description="Qabul qilinsa joylar kamayadi va balansdan komissiya yechiladi."
-                          onConfirm={() => acceptRequest(r)}
-                        >
-                          <Button type="primary" icon={<CheckOutlined />} loading={submitting}>
-                            Qabul qilish
-                          </Button>
-                        </Popconfirm>,
-                        <Popconfirm key="rej" title="So‘rovni rad etasizmi?" onConfirm={() => rejectRequest(r)}>
-                          <Button danger icon={<CloseOutlined />} loading={submitting}>
-                            Rad etish
-                          </Button>
-                        </Popconfirm>,
-                      ]}
-                    >
-                      <List.Item.Meta
-                        title={
-                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                            <Tag color="blue">{r.seats} ta joy</Tag>
-                            <span style={{ fontWeight: 600 }}>{r.passenger_name || "Yo‘lovchi"}</span>
-                          </div>
-                        }
-                        description={
-                          <div>
-                            <div>
-                              <Text type="secondary">Telefon:</Text> <b>Qabul qilingandan keyin ko‘rinadi</b>
-                            </div>
-                            {r.note ? (
-                              <div>
-                                <Text type="secondary">Izoh:</Text> {r.note}
-                              </div>
-                            ) : null}
-                            <Text type="secondary" style={{ fontSize: 12 }}>
-                              {dayjs(r.created_at).format("YYYY-MM-DD HH:mm")}
-                            </Text>
-                          </div>
-                        }
-                      />
-                    </List.Item>
-                  )}
-                />
-              )}
-            </div>
-
-            {/* BOOKINGS */}
-            <div style={{ marginTop: 18 }}>
-              <Divider orientation="left">Qabul qilingan bronlar</Divider>
-
-              {bookings.length === 0 ? (
-                <Text type="secondary">Hozircha qabul qilingan bron yo‘q.</Text>
-              ) : (
-                <List
-                  dataSource={bookings}
-                  itemLayout="horizontal"
-                  renderItem={(b) => (
-                    <List.Item>
-                      <List.Item.Meta
-                        title={
-                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                            <Tag color="green">{b.seats} ta joy</Tag>
-                            <span style={{ fontWeight: 600 }}>{b.passenger_name || "Yo‘lovchi"}</span>
-                          </div>
-                        }
-                        description={
-                          <div>
-                            <div>
-                              <Text type="secondary">Telefon:</Text> <b>{b.passenger_phone || "-"}</b>
-                            </div>
-                            <Text type="secondary" style={{ fontSize: 12 }}>
-                              {dayjs(b.created_at).format("YYYY-MM-DD HH:mm")}
-                            </Text>
-                            <div style={{ marginTop: 6 }}>
-                              <Tag color="geekblue">Yo‘lovchi bilan bog‘laning</Tag>
-                              <Text type="secondary" style={{ fontSize: 12 }}>
-                                {" "}
-                                (Qabul qilingandan keyin telefon ko‘rinadi)
-                              </Text>
-                            </div>
-                          </div>
-                        }
-                      />
-                    </List.Item>
-                  )}
-                />
-              )}
-            </div>
+            <Tabs
+              activeKey={tab}
+              onChange={setTab}
+              items={[
+                {
+                  key: "requests",
+                  label: `So‘rovlar (${requests.length})`,
+                  children: (
+                    <>
+                      {requests.length === 0 ? (
+                        <Text type="secondary">Hozircha bron so‘rovlari yo‘q.</Text>
+                      ) : (
+                        <List
+                          dataSource={requests}
+                          itemLayout="horizontal"
+                          renderItem={(b) => (
+                            <List.Item
+                              actions={[
+                                <Button
+                                  key="accept"
+                                  type="primary"
+                                  icon={<CheckOutlined />}
+                                  loading={submitting}
+                                  onClick={() => acceptRequest(b.id)}
+                                >
+                                  Qabul qilish
+                                </Button>,
+                                <Button
+                                  key="reject"
+                                  danger
+                                  icon={<CloseOutlined />}
+                                  loading={submitting}
+                                  onClick={() => rejectRequest(b.id)}
+                                >
+                                  Rad etish
+                                </Button>,
+                              ]}
+                            >
+                              <List.Item.Meta
+                                title={
+                                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                                    <Tag color="blue">{b.seats} ta joy</Tag>
+                                    <span style={{ fontWeight: 600 }}>{b.passenger_name || "Yo‘lovchi"}</span>
+                                    <Tag icon={<EyeInvisibleOutlined />}>Telefon: {maskPhone(b.passenger_phone)}</Tag>
+                                  </div>
+                                }
+                                description={
+                                  <Text type="secondary" style={{ fontSize: 12 }}>
+                                    So‘rov vaqti: {dayjs(b.created_at).format("YYYY-MM-DD HH:mm")}
+                                  </Text>
+                                }
+                              />
+                            </List.Item>
+                          )}
+                        />
+                      )}
+                    </>
+                  ),
+                },
+                {
+                  key: "accepted",
+                  label: `Qabul qilinganlar (${accepted.length})`,
+                  children: (
+                    <>
+                      {accepted.length === 0 ? (
+                        <Text type="secondary">Hozircha qabul qilingan bronlar yo‘q.</Text>
+                      ) : (
+                        <List
+                          dataSource={accepted}
+                          itemLayout="horizontal"
+                          renderItem={(b) => (
+                            <List.Item>
+                              <List.Item.Meta
+                                title={
+                                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                                    <Tag color="green">{b.seats} ta joy</Tag>
+                                    <span style={{ fontWeight: 600 }}>{b.passenger_name || "Yo‘lovchi"}</span>
+                                    <Tag color="geekblue">Telefon: <b>{b.passenger_phone || "-"}</b></Tag>
+                                  </div>
+                                }
+                                description={
+                                  <div>
+                                    <Text type="secondary" style={{ fontSize: 12 }}>
+                                      Qabul qilingan: {dayjs(b.updated_at || b.created_at).format("YYYY-MM-DD HH:mm")}
+                                    </Text>
+                                    <div>
+                                      <Text type="secondary">
+                                        Kommentariya: <b>Yo‘lovchi bilan bog‘laning</b>
+                                      </Text>
+                                    </div>
+                                  </div>
+                                }
+                              />
+                            </List.Item>
+                          )}
+                        />
+                      )}
+                    </>
+                  ),
+                },
+              ]}
+            />
           </Card>
         ) : (
           <Card style={{ borderRadius: 18, border: "none", boxShadow: "0 6px 20px rgba(0,0,0,0.06)" }}>
-            <Title level={5} style={{ marginTop: 0 }}>
-              Yangi e’lon yaratish
-            </Title>
+            <Title level={5} style={{ marginTop: 0 }}>Yangi e’lon yaratish</Title>
 
             <Divider orientation="left">Qayerdan</Divider>
             <Row gutter={12}>
@@ -866,9 +785,7 @@ export default function DriverInterProvincial({ onBack }) {
                 <Text type="secondary">Viloyat</Text>
                 <Select value={formData.fromRegion} onChange={(v) => setFormData((p) => ({ ...p, fromRegion: v }))} style={{ width: "100%", marginTop: 6 }} size="large">
                   {REGIONS_DATA.map((r) => (
-                    <Select.Option key={r.name} value={r.name}>
-                      {r.name}
-                    </Select.Option>
+                    <Select.Option key={r.name} value={r.name}>{r.name}</Select.Option>
                   ))}
                 </Select>
               </Col>
@@ -876,9 +793,7 @@ export default function DriverInterProvincial({ onBack }) {
                 <Text type="secondary">Tuman/Shahar</Text>
                 <Select value={formData.fromDistrict} onChange={(v) => setFormData((p) => ({ ...p, fromDistrict: v }))} style={{ width: "100%", marginTop: 6 }} size="large">
                   {fromDistricts.map((d) => (
-                    <Select.Option key={`${d}`} value={d}>
-                      {districtLabel(d)}
-                    </Select.Option>
+                    <Select.Option key={`${d}`} value={d}>{districtLabel(d)}</Select.Option>
                   ))}
                 </Select>
               </Col>
@@ -890,9 +805,7 @@ export default function DriverInterProvincial({ onBack }) {
                 <Text type="secondary">Viloyat</Text>
                 <Select value={formData.toRegion} onChange={(v) => setFormData((p) => ({ ...p, toRegion: v }))} style={{ width: "100%", marginTop: 6 }} size="large">
                   {REGIONS_DATA.map((r) => (
-                    <Select.Option key={r.name} value={r.name}>
-                      {r.name}
-                    </Select.Option>
+                    <Select.Option key={r.name} value={r.name}>{r.name}</Select.Option>
                   ))}
                 </Select>
               </Col>
@@ -900,9 +813,7 @@ export default function DriverInterProvincial({ onBack }) {
                 <Text type="secondary">Tuman/Shahar</Text>
                 <Select value={formData.toDistrict} onChange={(v) => setFormData((p) => ({ ...p, toDistrict: v }))} style={{ width: "100%", marginTop: 6 }} size="large">
                   {toDistricts.map((d) => (
-                    <Select.Option key={`${d}`} value={d}>
-                      {districtLabel(d)}
-                    </Select.Option>
+                    <Select.Option key={`${d}`} value={d}>{districtLabel(d)}</Select.Option>
                   ))}
                 </Select>
               </Col>
@@ -925,7 +836,7 @@ export default function DriverInterProvincial({ onBack }) {
 
             <Row gutter={12}>
               <Col xs={24} md={12}>
-                <Text type="secondary">Bo‘sh o‘rindiqlar</Text>
+                <Text type="secondary">O‘rindiqlar</Text>
                 <InputNumber min={1} max={20} value={formData.seatsTotal} onChange={(v) => setFormData((p) => ({ ...p, seatsTotal: Number(v || 1) }))} style={{ width: "100%", marginTop: 6 }} size="large" />
               </Col>
               <Col xs={24} md={12}>

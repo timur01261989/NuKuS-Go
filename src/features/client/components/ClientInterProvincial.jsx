@@ -17,7 +17,6 @@ import {
   Modal,
   Input,
   List,
-  Popconfirm,
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -29,7 +28,7 @@ import {
   CarOutlined,
   CheckCircleOutlined,
   EditOutlined,
-  DeleteOutlined,
+  CloseCircleOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { supabase } from "../../../lib/supabase";
@@ -71,18 +70,12 @@ const routeText = (o) => {
   return `${fromR} / ${fromD}  →  ${toR} / ${toD}`;
 };
 
-// Prefill from auth user metadata/phone/localStorage
-const buildPrefill = (user) => {
-  const lsName = localStorage.getItem("passenger_name") || "";
-  const lsPhone = localStorage.getItem("passenger_phone") || "";
-
-  const metaName = user?.user_metadata?.full_name || user?.user_metadata?.name || "";
-  const authPhone = user?.phone || "";
-
-  return {
-    name: lsName || metaName || "",
-    phone: lsPhone || authPhone || "",
-  };
+const statusLabel = (s) => {
+  if (s === "requested") return { text: "So‘rov yuborildi", color: "gold" };
+  if (s === "accepted") return { text: "Qabul qilindi", color: "green" };
+  if (s === "rejected") return { text: "Rad etildi", color: "red" };
+  if (s === "cancelled") return { text: "Bekor qilingan", color: "default" };
+  return { text: s, color: "default" };
 };
 
 export default function ClientInterProvincial({ onBack }) {
@@ -92,22 +85,23 @@ export default function ClientInterProvincial({ onBack }) {
   const [results, setResults] = useState([]);
   const [errorText, setErrorText] = useState("");
 
-  // booking request modal
-  const [modalOpen, setModalOpen] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState(null);
+  // bookings list (my)
+  const [myBookings, setMyBookings] = useState([]);
+  const [myLoading, setMyLoading] = useState(false);
 
-  const [reqSeats, setReqSeats] = useState(1);
+  // booking modal
+  const [bookingModalOpen, setBookingModalOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [bookingSeats, setBookingSeats] = useState(1);
+
+  // passenger info (auto fill + editable)
   const [passengerName, setPassengerName] = useState("");
   const [passengerPhone, setPassengerPhone] = useState("");
-  const [note, setNote] = useState("");
 
-  // My requests & bookings
-  const [myRequests, setMyRequests] = useState([]);
-  const [myBookings, setMyBookings] = useState([]);
-
-  // edit request modal
-  const [editReqOpen, setEditReqOpen] = useState(false);
-  const [editingReq, setEditingReq] = useState(null);
+  // edit booking modal
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editBooking, setEditBooking] = useState(null);
+  const [editSeats, setEditSeats] = useState(1);
 
   const [form, setForm] = useState(() => {
     const saved = localStorage.getItem("clientInterProvSearch_v3");
@@ -147,73 +141,87 @@ export default function ClientInterProvincial({ onBack }) {
   }, [form.toRegion]);
 
   useEffect(() => {
-    if (!fromDistricts.includes(form.fromDistrict)) {
-      setForm((p) => ({ ...p, fromDistrict: fromDistricts[0] ?? "" }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.fromRegion]);
+  let isMounted = true;
+  let channel = null;
 
-  useEffect(() => {
-    if (!toDistricts.includes(form.toDistrict)) {
-      setForm((p) => ({ ...p, toDistrict: toDistricts[0] ?? "" }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.toRegion]);
-
-  useEffect(() => {
-    localStorage.setItem("clientInterProvSearch_v3", JSON.stringify(form));
-  }, [form]);
-
-  const loadMyData = async () => {
-    const { data: authData } = await supabase.auth.getUser();
-    const user = authData?.user;
-    if (!user) return;
-
-    const { data: reqs } = await supabase
-      .from("trip_booking_requests")
-      .select("*")
-      .eq("passenger_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(50);
-
-    const { data: bookings } = await supabase
-      .from("trip_bookings")
-      .select("*")
-      .eq("passenger_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(50);
-
-    setMyRequests(reqs || []);
-    setMyBookings(bookings || []);
-  };
-
-  useEffect(() => {
-    const init = async () => {
+  const loadAll = async () => {
+    try {
       setLoading(true);
+
+      // Initial fetch (shows list)
       await doSearch(true);
+
+      // Load my requests / bookings if logged in
       await loadMyData();
 
-      // realtime for my requests/bookings
+      // Realtime: refresh list + my data when something changes
       const { data: authData } = await supabase.auth.getUser();
       const user = authData?.user;
-      if (user) {
-        const ch = supabase
-          .channel("rt_passenger_interprov")
-          .on("postgres_changes", { event: "*", schema: "public", table: "trip_booking_requests", filter: `passenger_id=eq.${user.id}` }, async () => {
-            await loadMyData();
-          })
-          .on("postgres_changes", { event: "*", schema: "public", table: "trip_bookings", filter: `passenger_id=eq.${user.id}` }, async () => {
-            await loadMyData();
-          })
-          .subscribe();
 
-        return () => supabase.removeChannel(ch);
+      if (user && isMounted) {
+        channel = supabase
+          .channel("client-interprov-live")
+          .on(
+            "postgres_changes",
+            { event: "*", schema: "public", table: "orders" },
+            () => {
+              // refresh results
+              doSearch(false);
+            }
+          )
+          .on(
+            "postgres_changes",
+            { event: "*", schema: "public", table: "trip_booking_requests" },
+            (payload) => {
+              // If it touches me, reload my data
+              const row = payload?.new || payload?.old;
+              if (!row) return;
+              if (row.passenger_id === user.id || row.driver_id === user.id) {
+                loadMyData();
+              }
+              doSearch(false);
+            }
+          )
+          .on(
+            "postgres_changes",
+            { event: "*", schema: "public", table: "trip_bookings" },
+            (payload) => {
+              const row = payload?.new || payload?.old;
+              if (!row) return;
+              if (row.passenger_id === user.id || row.driver_id === user.id) {
+                loadMyData();
+              }
+              doSearch(false);
+            }
+          )
+          .on(
+            "postgres_changes",
+            { event: "*", schema: "public", table: "notifications" },
+            (payload) => {
+              const row = payload?.new || payload?.old;
+              if (!row) return;
+              if (row.user_id === user.id) {
+                loadMyData();
+              }
+            }
+          )
+          .subscribe();
       }
-      setLoading(false);
-    };
-    init();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    } catch (e) {
+      console.error("ClientInterProvincial init error:", e);
+      if (isMounted) setError(e?.message || "Xatolik yuz berdi");
+    } finally {
+      if (isMounted) setLoading(false);
+    }
+  };
+
+  loadAll();
+
+  return () => {
+    isMounted = false;
+    if (channel) supabase.removeChannel(channel);
+  };
+}, []);
 
   const doSearch = async (silent = false) => {
     setSearching(true);
@@ -233,11 +241,14 @@ export default function ClientInterProvincial({ onBack }) {
         .eq("to_region", form.toRegion)
         .order("scheduled_at", { ascending: true });
 
-      // Wildcard:
-      // If passenger picked district => (order district == picked) OR (order district == '')
-      // If passenger district empty AND region == Toshkent shahri => no district filter
-      if (!isTashkentCity(form.fromRegion) || fromDistrictFilter) q = q.or(`from_district.eq.${fromDistrictFilter},from_district.eq.`);
-      if (!isTashkentCity(form.toRegion) || toDistrictFilter) q = q.or(`to_district.eq.${toDistrictFilter},to_district.eq.`);
+      // wildcard rules:
+      // If passenger chose district, match exact OR driver wildcard (empty string)
+      if (!isTashkentCity(form.fromRegion) || fromDistrictFilter) {
+        q = q.or(`from_district.eq.${fromDistrictFilter},from_district.eq.`);
+      }
+      if (!isTashkentCity(form.toRegion) || toDistrictFilter) {
+        q = q.or(`to_district.eq.${toDistrictFilter},to_district.eq.`);
+      }
 
       if (form.date) {
         const start = dayjs(form.date).startOf("day").toISOString();
@@ -262,141 +273,129 @@ export default function ClientInterProvincial({ onBack }) {
     }
   };
 
-  const openRequestModal = async (order) => {
+  const openBooking = async (order) => {
     setSelectedOrder(order);
-    setReqSeats(1);
-    setNote("");
+    setBookingSeats(1);
 
-    const { data: authData } = await supabase.auth.getUser();
-    const user = authData?.user;
+    // fill from localStorage again
+    const savedName = localStorage.getItem("passenger_name") || "";
+    const savedPhone = localStorage.getItem("passenger_phone") || "";
+    setPassengerName(savedName);
+    setPassengerPhone(savedPhone);
 
-    const pre = buildPrefill(user);
-    setPassengerName(pre.name);
-    setPassengerPhone(pre.phone);
-
-    setModalOpen(true);
+    setBookingModalOpen(true);
   };
 
-  const sendRequest = async () => {
+  const confirmBookingRequest = async () => {
     try {
       if (!selectedOrder) return;
 
-      const seatsReq = Number(reqSeats || 1);
-      if (seatsReq < 1) return message.error("Joy kamida 1 bo‘lsin!");
-      if (!passengerPhone.trim()) return message.error("Telefon raqamingizni kiriting!");
+      const seatsReq = Number(bookingSeats || 1);
+      if (seatsReq < 1) {
+        message.error("Joylar soni kamida 1 bo‘lsin!");
+        return;
+      }
+
+      if (!passengerPhone.trim()) {
+        message.error("Telefon raqamingizni kiriting!");
+        return;
+      }
 
       const { data: authData, error: authErr } = await supabase.auth.getUser();
       if (authErr) throw authErr;
       const user = authData?.user;
-      if (!user) return message.error("So‘rov yuborish uchun avval tizimga kiring!");
+      if (!user) {
+        message.error("So‘rov yuborish uchun avval tizimga kiring!");
+        return;
+      }
 
-      // save local
+      // save passenger info (auto next time)
       localStorage.setItem("passenger_name", passengerName);
       localStorage.setItem("passenger_phone", passengerPhone);
 
-      // RPC: request_inter_prov_booking
+      // REQUEST (NOT auto accept)
       const { error } = await supabase.rpc("request_inter_prov_booking", {
         p_order_id: selectedOrder.id,
         p_passenger_id: user.id,
         p_passenger_name: passengerName || "",
         p_passenger_phone: passengerPhone,
         p_seats: seatsReq,
-        p_note: note || null,
       });
+
       if (error) throw error;
 
-      message.success("So‘rov yuborildi! Haydovchi qabul qilsa sizga xabar keladi.");
-      setModalOpen(false);
+      message.success("So‘rov yuborildi! Haydovchi qabul qilsa telefon ko‘rinadi.");
+      setBookingModalOpen(false);
       setSelectedOrder(null);
 
-      await loadMyData();
+      await doSearch(true);
+      await loadMyBookings();
     } catch (e) {
       console.error(e);
       message.error(e?.message || "So‘rov yuborishda xatolik!");
     }
   };
 
-  const openEditRequest = (req) => {
-    setEditingReq(req);
-    setReqSeats(req.seats);
-    setPassengerName(req.passenger_name || passengerName);
-    setPassengerPhone(req.passenger_phone || passengerPhone);
-    setNote(req.note || "");
-    setEditReqOpen(true);
+  const openEditBooking = (b) => {
+    setEditBooking(b);
+    setEditSeats(Number(b.seats || 1));
+    setEditModalOpen(true);
   };
 
-  const saveRequestEdits = async () => {
+  const saveEditBookingSeats = async () => {
     try {
-      if (!editingReq) return;
+      if (!editBooking) return;
+      const newSeats = Number(editSeats || 1);
+
       const { data: authData } = await supabase.auth.getUser();
       const user = authData?.user;
-      if (!user) return message.error("Avval tizimga kiring!");
+      if (!user) {
+        message.error("Avval tizimga kiring!");
+        return;
+      }
 
-      const seatsReq = Number(reqSeats || 1);
-      if (seatsReq < 1) return message.error("Joy kamida 1 bo‘lsin!");
-      if (!passengerPhone.trim()) return message.error("Telefon raqamingizni kiriting!");
-
-      localStorage.setItem("passenger_name", passengerName);
-      localStorage.setItem("passenger_phone", passengerPhone);
-
-      const { error } = await supabase.rpc("edit_booking_request", {
-        p_request_id: editingReq.id,
+      const { error } = await supabase.rpc("update_inter_prov_booking_seats", {
+        p_booking_id: editBooking.id,
         p_passenger_id: user.id,
-        p_seats: seatsReq,
-        p_passenger_name: passengerName || "",
-        p_passenger_phone: passengerPhone,
-        p_note: note || null,
+        p_new_seats: newSeats,
       });
+
       if (error) throw error;
 
-      message.success("So‘rov yangilandi!");
-      setEditReqOpen(false);
-      setEditingReq(null);
-      await loadMyData();
+      message.success("So‘rov joylari yangilandi!");
+      setEditModalOpen(false);
+      setEditBooking(null);
+
+      await doSearch(true);
+      await loadMyBookings();
     } catch (e) {
       console.error(e);
       message.error(e?.message || "Tahrirlashda xatolik!");
     }
   };
 
-  const cancelRequest = async (req) => {
+  const cancelBooking = async (b) => {
     try {
       const { data: authData } = await supabase.auth.getUser();
       const user = authData?.user;
-      if (!user) return message.error("Avval tizimga kiring!");
+      if (!user) {
+        message.error("Avval tizimga kiring!");
+        return;
+      }
 
-      const { error } = await supabase.rpc("cancel_booking_request", {
-        p_request_id: req.id,
+      const { error } = await supabase.rpc("cancel_inter_prov_booking", {
+        p_booking_id: b.id,
         p_passenger_id: user.id,
       });
+
       if (error) throw error;
 
-      message.success("So‘rov bekor qilindi!");
-      await loadMyData();
+      message.success("So‘rov bekor qilindi. Joylar qaytarildi.");
+      await doSearch(true);
+      await loadMyBookings();
     } catch (e) {
       console.error(e);
       message.error(e?.message || "Bekor qilishda xatolik!");
-    }
-  };
-
-  const cancelBooking = async (booking) => {
-    try {
-      const { data: authData } = await supabase.auth.getUser();
-      const user = authData?.user;
-      if (!user) return message.error("Avval tizimga kiring!");
-
-      const { error } = await supabase.rpc("cancel_booking", {
-        p_booking_id: booking.id,
-        p_passenger_id: user.id,
-      });
-      if (error) throw error;
-
-      message.success("Bron bekor qilindi!");
-      await loadMyData();
-      await doSearch(true);
-    } catch (e) {
-      console.error(e);
-      message.error(e?.message || "Bron bekor qilishda xatolik!");
     }
   };
 
@@ -412,294 +411,233 @@ export default function ClientInterProvincial({ onBack }) {
     <div style={{ padding: 16, maxWidth: 980, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={onBack} shape="circle" />
-        <Title level={4} style={{ margin: 0 }}>
-          Viloyatlar/Tumanlar aro — Yo‘lovchi qidiruvi
-        </Title>
+        <Title level={4} style={{ margin: 0 }}>Viloyatlar/Tumanlar aro — Yo‘lovchi</Title>
         <Tag color="purple">inter_prov</Tag>
       </div>
 
-      {/* My Requests/Bookings */}
-      <Card style={{ borderRadius: 18, border: "none", boxShadow: "0 6px 20px rgba(0,0,0,0.06)", marginBottom: 12 }}>
-        <Title level={5} style={{ marginTop: 0 }}>
-          Mening so‘rovlarim va bronlarim
-        </Title>
+      <Row gutter={12}>
+        <Col xs={24} lg={14}>
+          <Card style={{ borderRadius: 18, border: "none", boxShadow: "0 6px 20px rgba(0,0,0,0.06)" }}>
+            <Title level={5} style={{ marginTop: 0 }}>Qidiruv filtrlari</Title>
 
-        <Divider orientation="left">So‘rovlar</Divider>
-        {myRequests.length === 0 ? (
-          <Text type="secondary">So‘rov yo‘q.</Text>
-        ) : (
-          <List
-            dataSource={myRequests}
-            renderItem={(r) => (
-              <List.Item
-                actions={[
-                  r.status === "requested" ? (
-                    <Button key="edit" icon={<EditOutlined />} onClick={() => openEditRequest(r)}>
-                      Tahrirlash
-                    </Button>
-                  ) : null,
-                  r.status === "requested" ? (
-                    <Popconfirm key="del" title="So‘rovni bekor qilasizmi?" onConfirm={() => cancelRequest(r)}>
-                      <Button danger icon={<DeleteOutlined />}>
-                        Bekor qilish
-                      </Button>
-                    </Popconfirm>
-                  ) : null,
-                ]}
-              >
-                <List.Item.Meta
-                  title={
-                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <Tag color={r.status === "requested" ? "blue" : r.status === "accepted" ? "green" : "default"}>{r.status}</Tag>
-                      <span style={{ fontWeight: 600 }}>{r.seats} ta joy</span>
-                    </div>
-                  }
-                  description={
-                    <div>
-                      <Text type="secondary">Order:</Text> {r.order_id}
-                      <br />
-                      <Text type="secondary" style={{ fontSize: 12 }}>
-                        {dayjs(r.created_at).format("YYYY-MM-DD HH:mm")}
-                      </Text>
-                    </div>
-                  }
-                />
-              </List.Item>
+            <Divider orientation="left">Qayerdan</Divider>
+            <Row gutter={12}>
+              <Col xs={24} md={12}>
+                <Text type="secondary">Viloyat</Text>
+                <Select value={form.fromRegion} onChange={(v) => setForm((p) => ({ ...p, fromRegion: v }))} style={{ width: "100%", marginTop: 6 }} size="large">
+                  {REGIONS_DATA.map((r) => (
+                    <Select.Option key={r.name} value={r.name}>{r.name}</Select.Option>
+                  ))}
+                </Select>
+              </Col>
+              <Col xs={24} md={12}>
+                <Text type="secondary">Tuman/Shahar</Text>
+                <Select value={form.fromDistrict} onChange={(v) => setForm((p) => ({ ...p, fromDistrict: v }))} style={{ width: "100%", marginTop: 6 }} size="large">
+                  {fromDistricts.map((d) => (
+                    <Select.Option key={`${d}`} value={d}>{districtLabel(d)}</Select.Option>
+                  ))}
+                </Select>
+                {isTashkentCity(form.fromRegion) ? <Text type="secondary" style={{ fontSize: 12 }}>* Toshkent shahri uchun tumanni tanlamasa bo‘ladi.</Text> : null}
+              </Col>
+            </Row>
+
+            <Divider orientation="left">Qayerga</Divider>
+            <Row gutter={12}>
+              <Col xs={24} md={12}>
+                <Text type="secondary">Viloyat</Text>
+                <Select value={form.toRegion} onChange={(v) => setForm((p) => ({ ...p, toRegion: v }))} style={{ width: "100%", marginTop: 6 }} size="large">
+                  {REGIONS_DATA.map((r) => (
+                    <Select.Option key={r.name} value={r.name}>{r.name}</Select.Option>
+                  ))}
+                </Select>
+              </Col>
+              <Col xs={24} md={12}>
+                <Text type="secondary">Tuman/Shahar</Text>
+                <Select value={form.toDistrict} onChange={(v) => setForm((p) => ({ ...p, toDistrict: v }))} style={{ width: "100%", marginTop: 6 }} size="large">
+                  {toDistricts.map((d) => (
+                    <Select.Option key={`${d}`} value={d}>{districtLabel(d)}</Select.Option>
+                  ))}
+                </Select>
+                {isTashkentCity(form.toRegion) ? <Text type="secondary" style={{ fontSize: 12 }}>* Toshkent shahri uchun tumanni tanlamasa bo‘ladi.</Text> : null}
+              </Col>
+            </Row>
+
+            <Divider />
+
+            <Row gutter={12} align="middle">
+              <Col xs={24} md={8}>
+                <Text type="secondary">Sana (ixtiyoriy)</Text>
+                <DatePicker value={form.date ? dayjs(form.date) : null} onChange={(d) => setForm((p) => ({ ...p, date: d ? d.format("YYYY-MM-DD") : "" }))} style={{ width: "100%", marginTop: 6 }} size="large" allowClear />
+              </Col>
+              <Col xs={24} md={8}>
+                <Text type="secondary">Minimum joylar</Text>
+                <InputNumber min={1} max={20} value={form.minSeats} onChange={(v) => setForm((p) => ({ ...p, minSeats: Number(v || 1) }))} style={{ width: "100%", marginTop: 6 }} size="large" />
+              </Col>
+              <Col xs={24} md={8}>
+                <Button type="primary" size="large" block icon={<SearchOutlined />} loading={searching} onClick={() => doSearch(false)} style={{ borderRadius: 14, height: 48, marginTop: 24 }}>
+                  Qidirish
+                </Button>
+              </Col>
+            </Row>
+
+            <Divider />
+
+            <Title level={5} style={{ marginTop: 0 }}>Topilgan e’lonlar</Title>
+
+            {errorText ? (
+              <Result status="error" title="Xatolik" subTitle={errorText} />
+            ) : results.length === 0 ? (
+              <Result icon={<CarOutlined />} title="Hozircha mos e’lon topilmadi" subTitle="Filtrlarni o‘zgartiring yoki keyinroq qayta qidiring." />
+            ) : (
+              <Space direction="vertical" style={{ width: "100%" }} size={12}>
+                {results.map((order) => {
+                  const sched = order.scheduled_at ? dayjs(order.scheduled_at) : null;
+                  return (
+                    <Card key={order.id} style={{ borderRadius: 16, border: "1px solid #f0f0f0" }}>
+                      <Row gutter={12} align="middle">
+                        <Col xs={24} md={16}>
+                          <Space direction="vertical" size={4}>
+                            <Title level={5} style={{ margin: 0 }}>
+                              <EnvironmentFilled style={{ color: "#1890ff", marginRight: 8 }} />
+                              {routeText(order)}
+                            </Title>
+
+                            <Space size={16} wrap>
+                              <Text><CalendarOutlined /> <b>{sched ? sched.format("YYYY-MM-DD") : "-"}</b></Text>
+                              <Text><ClockCircleOutlined /> <b>{sched ? sched.format("HH:mm") : "-"}</b></Text>
+                              <Text><UserOutlined /> <b>{order.seats_available ?? "-"}</b> / {order.seats_total ?? "-"} joy</Text>
+                              <Text><b>{formatMoney(order.price)}</b> so‘m</Text>
+                            </Space>
+                          </Space>
+                        </Col>
+
+                        <Col xs={24} md={8}>
+                          <Button type="primary" block size="large" icon={<CheckCircleOutlined />} onClick={() => openBooking(order)} style={{ borderRadius: 14, height: 44 }}>
+                            Joy band qilish so‘rovi
+                          </Button>
+                        </Col>
+                      </Row>
+                    </Card>
+                  );
+                })}
+              </Space>
             )}
-          />
-        )}
+          </Card>
+        </Col>
 
-        <Divider orientation="left">Bronlar (qabul qilingan)</Divider>
-        {myBookings.length === 0 ? (
-          <Text type="secondary">Bron yo‘q.</Text>
-        ) : (
-          <List
-            dataSource={myBookings}
-            renderItem={(b) => (
-              <List.Item
-                actions={[
-                  b.status === "active" ? (
-                    <Popconfirm key="c" title="Bronni bekor qilasizmi?" onConfirm={() => cancelBooking(b)}>
-                      <Button danger>Bronni bekor qilish</Button>
-                    </Popconfirm>
-                  ) : null,
-                ]}
-              >
-                <List.Item.Meta
-                  title={
-                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <Tag color={b.status === "active" ? "green" : "default"}>{b.status}</Tag>
-                      <span style={{ fontWeight: 600 }}>{b.seats} ta joy</span>
-                    </div>
-                  }
-                  description={
-                    <div>
-                      <Text type="secondary">Haydovchi bilan bog‘lanish:</Text>{" "}
-                      <b>{b.status === "active" ? (b.passenger_phone ? "✅ (Sizning telefoningiz haydovchiga ko‘rindi)" : "") : "-"}</b>
-                      <br />
-                      <Text type="secondary" style={{ fontSize: 12 }}>
-                        {dayjs(b.created_at).format("YYYY-MM-DD HH:mm")}
-                      </Text>
-                    </div>
-                  }
-                />
-              </List.Item>
+        <Col xs={24} lg={10}>
+          <Card style={{ borderRadius: 18, border: "none", boxShadow: "0 6px 20px rgba(0,0,0,0.06)" }}>
+            <Title level={5} style={{ marginTop: 0 }}>Mening so‘rovlarim</Title>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              * “requested” holatda siz joyni tahrirlashingiz yoki bekor qilishingiz mumkin. Haydovchi qabul qilgach “accepted” bo‘ladi.
+            </Text>
+
+            <Divider />
+
+            {myLoading ? (
+              <Skeleton active paragraph={{ rows: 8 }} />
+            ) : myBookings.length === 0 ? (
+              <Result status="info" title="Hozircha so‘rovlar yo‘q" subTitle="E’lon topib “Joy band qilish so‘rovi” yuboring." />
+            ) : (
+              <List
+                dataSource={myBookings}
+                renderItem={(b) => {
+                  const st = statusLabel(b.status);
+                  const o = b.orders || {};
+                  return (
+                    <List.Item
+                      actions={[
+                        b.status === "requested" ? (
+                          <Button key="edit" icon={<EditOutlined />} onClick={() => openEditBooking(b)}>
+                            Tahrirlash
+                          </Button>
+                        ) : null,
+                        b.status === "requested" ? (
+                          <Button key="cancel" danger icon={<CloseCircleOutlined />} onClick={() => cancelBooking(b)}>
+                            Bekor qilish
+                          </Button>
+                        ) : null,
+                      ].filter(Boolean)}
+                    >
+                      <List.Item.Meta
+                        title={
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                            <Tag color={st.color}>{st.text}</Tag>
+                            <Tag color="blue">{b.seats} ta joy</Tag>
+                          </div>
+                        }
+                        description={
+                          <div>
+                            <div style={{ fontWeight: 600 }}>{routeText(o)}</div>
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              So‘rov: {dayjs(b.created_at).format("YYYY-MM-DD HH:mm")}
+                            </Text>
+                            {b.status === "accepted" ? (
+                              <div style={{ marginTop: 6 }}>
+                                <Text type="secondary">Kommentariya: </Text>
+                                <b>Haydovchi qabul qildi, tez orada bog‘laning.</b>
+                              </div>
+                            ) : null}
+                          </div>
+                        }
+                      />
+                    </List.Item>
+                  );
+                }}
+              />
             )}
-          />
-        )}
-      </Card>
+          </Card>
+        </Col>
+      </Row>
 
-      {/* Search Filters */}
-      <Card style={{ borderRadius: 18, border: "none", boxShadow: "0 6px 20px rgba(0,0,0,0.06)" }}>
-        <Title level={5} style={{ marginTop: 0 }}>
-          Qidiruv filtrlari
-        </Title>
-
-        <Divider orientation="left">Qayerdan</Divider>
-        <Row gutter={12}>
-          <Col xs={24} md={12}>
-            <Text type="secondary">Viloyat</Text>
-            <Select value={form.fromRegion} onChange={(v) => setForm((p) => ({ ...p, fromRegion: v }))} style={{ width: "100%", marginTop: 6 }} size="large">
-              {REGIONS_DATA.map((r) => (
-                <Select.Option key={r.name} value={r.name}>
-                  {r.name}
-                </Select.Option>
-              ))}
-            </Select>
-          </Col>
-
-          <Col xs={24} md={12}>
-            <Text type="secondary">Tuman/Shahar</Text>
-            <Select value={form.fromDistrict} onChange={(v) => setForm((p) => ({ ...p, fromDistrict: v }))} style={{ width: "100%", marginTop: 6 }} size="large">
-              {fromDistricts.map((d) => (
-                <Select.Option key={`${d}`} value={d}>
-                  {districtLabel(d)}
-                </Select.Option>
-              ))}
-            </Select>
-            {isTashkentCity(form.fromRegion) ? (
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                * Toshkent shahri uchun tumanni tanlamasangiz ham bo‘ladi (Hammasi).
-              </Text>
-            ) : null}
-          </Col>
-        </Row>
-
-        <Divider orientation="left">Qayerga</Divider>
-        <Row gutter={12}>
-          <Col xs={24} md={12}>
-            <Text type="secondary">Viloyat</Text>
-            <Select value={form.toRegion} onChange={(v) => setForm((p) => ({ ...p, toRegion: v }))} style={{ width: "100%", marginTop: 6 }} size="large">
-              {REGIONS_DATA.map((r) => (
-                <Select.Option key={r.name} value={r.name}>
-                  {r.name}
-                </Select.Option>
-              ))}
-            </Select>
-          </Col>
-
-          <Col xs={24} md={12}>
-            <Text type="secondary">Tuman/Shahar</Text>
-            <Select value={form.toDistrict} onChange={(v) => setForm((p) => ({ ...p, toDistrict: v }))} style={{ width: "100%", marginTop: 6 }} size="large">
-              {toDistricts.map((d) => (
-                <Select.Option key={`${d}`} value={d}>
-                  {districtLabel(d)}
-                </Select.Option>
-              ))}
-            </Select>
-            {isTashkentCity(form.toRegion) ? (
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                * Toshkent shahri uchun tumanni tanlamasangiz ham bo‘ladi (Hammasi).
-              </Text>
-            ) : null}
-          </Col>
-        </Row>
-
-        <Divider />
-
-        <Row gutter={12} align="middle">
-          <Col xs={24} md={8}>
-            <Text type="secondary">Sana (ixtiyoriy)</Text>
-            <DatePicker value={form.date ? dayjs(form.date) : null} onChange={(d) => setForm((p) => ({ ...p, date: d ? d.format("YYYY-MM-DD") : "" }))} style={{ width: "100%", marginTop: 6 }} size="large" allowClear />
-          </Col>
-
-          <Col xs={24} md={8}>
-            <Text type="secondary">Minimum joylar</Text>
-            <InputNumber min={1} max={20} value={form.minSeats} onChange={(v) => setForm((p) => ({ ...p, minSeats: Number(v || 1) }))} style={{ width: "100%", marginTop: 6 }} size="large" />
-          </Col>
-
-          <Col xs={24} md={8}>
-            <Button type="primary" size="large" block icon={<SearchOutlined />} loading={searching} onClick={() => doSearch(false)} style={{ borderRadius: 14, height: 48, marginTop: 24 }}>
-              Qidirish
-            </Button>
-          </Col>
-        </Row>
-      </Card>
-
-      <div style={{ height: 14 }} />
-
-      {/* Results */}
-      <Card style={{ borderRadius: 18, border: "none", boxShadow: "0 6px 20px rgba(0,0,0,0.06)" }}>
-        <Title level={5} style={{ marginTop: 0 }}>
-          Topilgan e’lonlar
-        </Title>
-
-        {errorText ? (
-          <Result status="error" title="Xatolik" subTitle={errorText} />
-        ) : results.length === 0 ? (
-          <Result icon={<CarOutlined />} title="Hozircha mos e’lon topilmadi" subTitle="Filtrlarni o‘zgartirib ko‘ring yoki keyinroq qayta qidiring." />
-        ) : (
-          <Space direction="vertical" style={{ width: "100%" }} size={12}>
-            {results.map((order) => {
-              const sched = order.scheduled_at ? dayjs(order.scheduled_at) : null;
-
-              return (
-                <Card key={order.id} style={{ borderRadius: 16, border: "1px solid #f0f0f0" }}>
-                  <Row gutter={12} align="middle">
-                    <Col xs={24} md={16}>
-                      <Space direction="vertical" size={4}>
-                        <Title level={5} style={{ margin: 0 }}>
-                          <EnvironmentFilled style={{ color: "#1890ff", marginRight: 8 }} />
-                          {routeText(order)}
-                        </Title>
-
-                        <Space size={16} wrap>
-                          <Text>
-                            <CalendarOutlined /> <b>{sched ? sched.format("YYYY-MM-DD") : "-"}</b>
-                          </Text>
-                          <Text>
-                            <ClockCircleOutlined /> <b>{sched ? sched.format("HH:mm") : "-"}</b>
-                          </Text>
-                          <Text>
-                            <UserOutlined /> <b>{order.seats_available ?? "-"}</b> / {order.seats_total ?? "-"} joy
-                          </Text>
-                          <Text>
-                            <b>{formatMoney(order.price)}</b> so‘m
-                          </Text>
-                        </Space>
-
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          * “Band qilish” bosilganda haydovchiga so‘rov boradi. Haydovchi qabul qilgandan keyin sizga tasdiq keladi.
-                        </Text>
-                      </Space>
-                    </Col>
-
-                    <Col xs={24} md={8}>
-                      <Button type="primary" block size="large" icon={<CheckCircleOutlined />} onClick={() => openRequestModal(order)} style={{ borderRadius: 14, height: 44 }}>
-                        Band qilish (so‘rov yuborish)
-                      </Button>
-                    </Col>
-                  </Row>
-                </Card>
-              );
-            })}
-          </Space>
-        )}
-      </Card>
-
-      {/* Create request modal */}
-      <Modal title="Band qilish (haydovchiga so‘rov yuboriladi)" open={modalOpen} onCancel={() => setModalOpen(false)} onOk={sendRequest} okText="So‘rov yuborish">
+      {/* Booking request modal */}
+      <Modal
+        title="Joy band qilish so‘rovi"
+        open={bookingModalOpen}
+        onCancel={() => setBookingModalOpen(false)}
+        onOk={confirmBookingRequest}
+        okText="So‘rov yuborish"
+      >
         {!selectedOrder ? null : (
           <div>
-            <Tag color="purple" style={{ marginBottom: 8 }}>
-              {routeText(selectedOrder)}
-            </Tag>
-
+            <Tag color="purple" style={{ marginBottom: 8 }}>{routeText(selectedOrder)}</Tag>
             <div style={{ marginBottom: 10 }}>
-              <Text type="secondary">Qolgan joy:</Text> <b>{selectedOrder.seats_available ?? "-"}</b>
+              <Text type="secondary">Hozirgi qolgan joy:</Text> <b>{selectedOrder.seats_available ?? "-"}</b>
             </div>
 
             <Divider />
 
-            <Text type="secondary">Ism Familiya (ro‘yxatdan o‘tganingizdan avtomat keladi, o‘zgartirsa bo‘ladi)</Text>
+            <Text type="secondary">Ism familiya (avtomat to‘ladi, o‘zgartirish mumkin)</Text>
             <Input value={passengerName} onChange={(e) => setPassengerName(e.target.value)} placeholder="Masalan: Abdiev Timur" style={{ marginTop: 6, marginBottom: 12 }} />
 
-            <Text type="secondary">Telefon raqam (avtomat keladi, o‘zgartirsa bo‘ladi)</Text>
-            <Input value={passengerPhone} onChange={(e) => setPassengerPhone(e.target.value)} placeholder="+998 ..." style={{ marginTop: 6, marginBottom: 12 }} />
+            <Text type="secondary">Telefon raqam (avtomat to‘ladi, o‘zgartirish mumkin)</Text>
+            <Input value={passengerPhone} onChange={(e) => setPassengerPhone(e.target.value)} placeholder="+998..." style={{ marginTop: 6, marginBottom: 12 }} />
 
             <Text type="secondary">Nechta joy so‘raysiz?</Text>
-            <InputNumber min={1} max={Number(selectedOrder.seats_available || 1)} value={reqSeats} onChange={(v) => setReqSeats(Number(v || 1))} style={{ width: "100%", marginTop: 6, marginBottom: 12 }} />
+            <InputNumber min={1} max={Number(selectedOrder.seats_available || 1)} value={bookingSeats} onChange={(v) => setBookingSeats(Number(v || 1))} style={{ width: "100%", marginTop: 6 }} />
 
-            <Text type="secondary">Izoh (ixtiyoriy)</Text>
-            <Input.TextArea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder="Masalan: 2 ta joy, ertaroq bo‘lsa yaxshi..." style={{ marginTop: 6 }} />
+            <Text type="secondary" style={{ fontSize: 12, display: "block", marginTop: 10 }}>
+              * Bu yerda “so‘rov” yuboriladi. Haydovchi qabul qilmaguncha zakaz avtomatik qabul bo‘lib ketmaydi.
+            </Text>
           </div>
         )}
       </Modal>
 
-      {/* Edit request modal */}
-      <Modal title="So‘rovni tahrirlash" open={editReqOpen} onCancel={() => setEditReqOpen(false)} onOk={saveRequestEdits} okText="Saqlash">
-        {!editingReq ? null : (
+      {/* Edit booking modal */}
+      <Modal
+        title="So‘rovni tahrirlash"
+        open={editModalOpen}
+        onCancel={() => setEditModalOpen(false)}
+        onOk={saveEditBookingSeats}
+        okText="Saqlash"
+      >
+        {!editBooking ? null : (
           <div>
-            <Tag color="blue">{editingReq.status}</Tag>
-            <Divider />
-            <Text type="secondary">Ism Familiya</Text>
-            <Input value={passengerName} onChange={(e) => setPassengerName(e.target.value)} style={{ marginTop: 6, marginBottom: 12 }} />
-            <Text type="secondary">Telefon</Text>
-            <Input value={passengerPhone} onChange={(e) => setPassengerPhone(e.target.value)} style={{ marginTop: 6, marginBottom: 12 }} />
-            <Text type="secondary">Joylar</Text>
-            <InputNumber min={1} value={reqSeats} onChange={(v) => setReqSeats(Number(v || 1))} style={{ width: "100%", marginTop: 6, marginBottom: 12 }} />
-            <Text type="secondary">Izoh</Text>
-            <Input.TextArea value={note} onChange={(e) => setNote(e.target.value)} rows={3} style={{ marginTop: 6 }} />
+            <Text type="secondary">Nechta joy?</Text>
+            <InputNumber min={1} max={20} value={editSeats} onChange={(v) => setEditSeats(Number(v || 1))} style={{ width: "100%", marginTop: 6 }} />
+            <Text type="secondary" style={{ fontSize: 12, display: "block", marginTop: 10 }}>
+              * Faqat “requested” holatda tahrirlash mumkin. Joy ko‘paytirsangiz tizimda joy yetarliligi tekshiriladi.
+            </Text>
           </div>
         )}
       </Modal>
