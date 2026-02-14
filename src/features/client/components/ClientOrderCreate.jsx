@@ -81,7 +81,7 @@ async function nominatimSearch(q) {
   const url = `https://nominatim.openstreetmap.org/search?format=json&limit=7&addressdetails=1&q=${encodeURIComponent(
     q
   )}`;
-  const res = await fetch(url, { headers: { "Accept-Language": "uz,ru,en" } });
+  const res = await fetch(url, { signal, headers: { "Accept-Language": "uz,ru,en" } });
   if (!res.ok) return [];
   const data = await res.json();
   return (data || []).map((x) => ({
@@ -92,7 +92,7 @@ async function nominatimSearch(q) {
   }));
 }
 
-async function nominatimReverse(lat, lng) {
+async function nominatimReverse(lat, lng, signal) {
   const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
   const res = await fetch(url, { headers: { "Accept-Language": "uz,ru,en" } });
   if (!res.ok) return null;
@@ -143,27 +143,27 @@ function FlyTo({ center, zoom = 16 }) {
 }
 
 /** Map center tracking while selecting pickup/dest (Yandex-like: pin fixed, map moves) */
-function CenterTracker({ enabled, onCenter }) {
+function CenterTracker({ enabled, onCenter, setIsDragging }) {
   const map = useMap();
-  const last = useRef({ lat: null, lng: null, t: 0 });
 
   useEffect(() => {
     if (!enabled) return;
 
+    const onMoveStart = () => setIsDragging(true); // Harakat boshlandi
     const onMoveEnd = () => {
+      setIsDragging(false); // Harakat tugadi
       const c = map.getCenter();
-      const now = Date.now();
-      // basic debounce
-      if (now - last.current.t < 250) return;
-      last.current = { lat: c.lat, lng: c.lng, t: now };
       onCenter([c.lat, c.lng]);
     };
 
+    map.on("movestart", onMoveStart);
     map.on("moveend", onMoveEnd);
-    // fire once immediately
-    onMoveEnd();
-    return () => map.off("moveend", onMoveEnd);
-  }, [enabled, map, onCenter]);
+
+    return () => {
+      map.off("movestart", onMoveStart);
+      map.off("moveend", onMoveEnd);
+    };
+  }, [enabled, map, onCenter, setIsDragging]);
 
   return null;
 }
@@ -174,6 +174,7 @@ export default function ClientOrderCreate() {
   const [dest, setDest] = useState({ latlng: null, address: "" });
 
   const [selecting, setSelecting] = useState(null); // "pickup" | "dest" | null
+  const [isDragging, setIsDragging] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(true);
 
   const [tariff, setTariff] = useState(TARIFFS[0]);
@@ -197,6 +198,32 @@ export default function ClientOrderCreate() {
   });
   const [orderStatus, setOrderStatus] = useState(null);
   const [assignedDriver, setAssignedDriver] = useState(null);
+
+  // ✅ Serverdan aktiv buyurtmani tekshirish (localStorage bo‘sh bo‘lsa ham)
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await api.post("/api/order", { action: "active" });
+        const ord = res?.data?.order || res?.order || res?.data || null;
+        if (!mounted || !ord?.id) return;
+
+        const s = String(ord.status || "").toLowerCase();
+        if (["cancelled", "completed", "finished", "done"].includes(s)) return;
+
+        localStorage.setItem("activeOrderId", String(ord.id));
+        setOrderId(String(ord.id));
+        setOrderStatus(ord.status || null);
+        if (ord.driver || ord.assigned_driver) setAssignedDriver(ord.driver || ord.assigned_driver);
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
 
   /** seed recent places if empty */
   const seedPlaces = useMemo(
@@ -345,23 +372,43 @@ export default function ClientOrderCreate() {
   );
 
   /** Center picked from map */
+  const reverseAbortRef = useRef(null);
+  const reverseTimerRef = useRef(null);
+
   const handleCenterPicked = useCallback(
-    async (latlng) => {
+    (latlng) => {
       if (!selecting) return;
-      try {
-        const addr = await nominatimReverse(latlng[0], latlng[1]);
-        if (selecting === "pickup") {
-          setPickup({ latlng, address: addr || "Tanlangan nuqta" });
-        } else {
-          setDest({ latlng, address: addr || "Tanlangan nuqta" });
-        }
-      } catch {
-        if (selecting === "pickup") setPickup((p) => ({ ...p, latlng }));
-        else setDest((d) => ({ ...d, latlng }));
+
+      // Optimistic latlng update for immediate UI responsiveness
+      if (selecting === "pickup") {
+        setPickup((p) => ({ ...p, latlng, address: p.address || "Manzil aniqlanmoqda..." }));
+      } else {
+        setDest((d) => ({ ...d, latlng, address: d.address || "Manzil aniqlanmoqda..." }));
       }
+
+      // Debounce reverse geocode to avoid too many requests while user drags map
+      if (reverseTimerRef.current) clearTimeout(reverseTimerRef.current);
+      if (reverseAbortRef.current) reverseAbortRef.current.abort();
+
+      const controller = new AbortController();
+      reverseAbortRef.current = controller;
+
+      reverseTimerRef.current = window.setTimeout(async () => {
+        try {
+          const addr = await nominatimReverse(latlng[0], latlng[1], controller.signal);
+          if (selecting === "pickup") {
+            setPickup({ latlng, address: addr || "Tanlangan nuqta" });
+          } else {
+            setDest({ latlng, address: addr || "Tanlangan nuqta" });
+          }
+        } catch (e) {
+          // ignore aborts, keep latlng
+        }
+      }, 450);
     },
     [selecting]
   );
+
 
   /** Search */
   const runSearch = useCallback(async (type, q) => {
@@ -456,6 +503,7 @@ export default function ClientOrderCreate() {
       } catch (e2) {
         // dispatch can be async; status polling will still pick updates
         console.warn("dispatch error", e2);
+        message.error("Haydovchi qidirishda xatolik");
       }
 
     } catch (e) {
@@ -501,6 +549,44 @@ export default function ClientOrderCreate() {
 
 
   /** UI helpers */
+  const hasActiveOrder = useMemo(() => {
+    if (!orderId) return false;
+    const s = String(orderStatus || "").toLowerCase();
+    return !["cancelled", "completed", "finished", "done"].includes(s);
+  }, [orderId, orderStatus]);
+
+  const uiMode = useMemo(() => {
+    const s = String(orderStatus || "").toLowerCase();
+    if (!hasActiveOrder) return "idle";
+    if (["searching", "pending", "pending_dispatch"].includes(s)) return "searching";
+    if (["accepted", "assigned", "coming", "enroute"].includes(s)) return "coming";
+    if (["arrived"].includes(s)) return "arrived";
+    if (["in_trip", "ontrip", "driving"].includes(s)) return "in_trip";
+    return "searching";
+  }, [orderStatus, hasActiveOrder]);
+
+  const cancelActiveOrder = useCallback(async () => {
+    if (!orderId) return;
+    try {
+      await api.post("/api/order", { action: "cancel", orderId: String(orderId) });
+    } catch (e) {
+      console.warn(e);
+      // even if cancel fails, allow local reset
+    } finally {
+      localStorage.removeItem("activeOrderId");
+      setOrderId(null);
+      setOrderStatus(null);
+      setAssignedDriver(null);
+      message.info("Buyurtma bekor qilindi");
+    }
+  }, [orderId]);
+
+  const openChat = useCallback(() => {
+    message.info("Chat tez orada qo‘shiladi");
+  }, []);
+
+
+
   const bottomTitle = useMemo(() => {
     if (!pickup.latlng || !dest.latlng) return "Manzilni tanlang";
     const dist = distanceKm ? `${distanceKm.toFixed(1)} km` : "—";
@@ -517,7 +603,7 @@ export default function ClientOrderCreate() {
 
           <FlyTo center={selecting === "pickup" ? pickup.latlng || userLoc : selecting === "dest" ? dest.latlng || userLoc : null} />
 
-          <CenterTracker enabled={!!selecting} onCenter={handleCenterPicked} />
+          <CenterTracker enabled={!!selecting} onCenter={handleCenterPicked} setIsDragging={setIsDragging} />
 
           {pickup.latlng && !selecting && <Marker position={pickup.latlng} icon={pickupIcon} />}
           {dest.latlng && !selecting && <Marker position={dest.latlng} icon={destIcon} />}
@@ -532,7 +618,7 @@ export default function ClientOrderCreate() {
 
         {/* Center pin overlay */}
         {selecting && (
-          <div className="yg-centerpin" aria-hidden>
+          <div className={`yg-centerpin ${isDragging ? 'dragging' : ''}`} aria-hidden>
             <div
               style={{ position: "relative", width: 70, height: 80 }}
               dangerouslySetInnerHTML={{ __html: centerPinIcon(selecting) }}
@@ -543,7 +629,55 @@ export default function ClientOrderCreate() {
           </div>
         )}
 
+
+        {/* Active order overlays */}
+        {hasActiveOrder && (
+          <div className="yg-active">
+            {uiMode === "searching" && (
+              <Card className="yg-active-card" bodyStyle={{ padding: 14 }}>
+                <div className="yg-active-title">Mashina qidirilmoqda...</div>
+                <div className="yg-active-sub">Buyurtma: #{orderId}</div>
+                <div className="yg-active-actions">
+                  <Button danger block onClick={cancelActiveOrder}>Bekor qilish</Button>
+                </div>
+              </Card>
+            )}
+
+            {(uiMode === "coming" || uiMode === "arrived" || uiMode === "in_trip") && (
+              <Card className="yg-active-card" bodyStyle={{ padding: 14 }}>
+                <div className="yg-driver-row">
+                  <div className="yg-driver-avatar">
+                    {(assignedDriver?.photo_url || assignedDriver?.avatar) ? (
+                      <img alt="driver" src={assignedDriver.photo_url || assignedDriver.avatar} />
+                    ) : (
+                      <div className="yg-driver-placeholder">👤</div>
+                    )}
+                  </div>
+                  <div className="yg-driver-info">
+                    <div className="yg-driver-name">{assignedDriver?.name || "Haydovchi"}</div>
+                    <div className="yg-driver-car">
+                      {assignedDriver?.car_model || "Mashina"} • {assignedDriver?.plate || assignedDriver?.car_plate || "—"}
+                    </div>
+                    <div className="yg-driver-status">
+                      {uiMode === "coming" && "Yo‘lda"}
+                      {uiMode === "arrived" && "Keldi"}
+                      {uiMode === "in_trip" && "Safarda"}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="yg-active-actions two">
+                  <Button onClick={openChat} block>Chat</Button>
+                  <Button danger onClick={cancelActiveOrder} block>Bekor qilish</Button>
+                </div>
+              </Card>
+            )}
+          </div>
+        )}
+
+
         {/* Top card (Yandex-like) */}
+        {!hasActiveOrder && (
         <div className="yg-topcard">
           <Card className="yg-card" bodyStyle={{ padding: 12 }}>
             <div className="yg-row">
@@ -588,6 +722,9 @@ export default function ClientOrderCreate() {
       </div>
 
       {/* Bottom sheet */}
+        )}
+
+      {!hasActiveOrder && (
       <Drawer
         open={drawerOpen && !selecting}
         onClose={() => setDrawerOpen(false)}
@@ -684,7 +821,8 @@ export default function ClientOrderCreate() {
             Zakaz berish
           </Button>
         </div>
-      </Drawer>
+      </Drawer
+      )}>
 
       <style>{`
         .yg-root { height: 100vh; width: 100%; background:#000; overflow:hidden; }
@@ -702,8 +840,38 @@ export default function ClientOrderCreate() {
         .yg-swap { position:absolute; right:8px; top:46px; }
         .yg-swap button { border-radius: 12px; }
 
-        .yg-centerpin { position:absolute; left:50%; top:50%; transform:translate(-50%,-68%); z-index: 600; display:flex; flex-direction:column; align-items:center; gap:10px; pointer-events:none; }
-        .yg-pinlabel { background: rgba(17,17,17,.85); color:#fff; padding:6px 10px; border-radius: 12px; font-weight:600; font-size:12px; box-shadow:0 10px 24px rgba(0,0,0,.25); }
+        .yg-centerpin { 
+          position: absolute; 
+          left: 50%; 
+          top: 50%; 
+          z-index: 600; 
+          display: flex; 
+          flex-direction: column; 
+          align-items: center; 
+          gap: 10px; 
+          pointer-events: none;
+          transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+          transform: translate(-50%, -68%);
+        }
+
+        .yg-centerpin.dragging {
+          transform: translate(-50%, -90%) scale(1.15);
+        }
+
+        .yg-pinlabel { 
+          background: rgba(17,17,17,.85); 
+          color: #fff; 
+          padding: 6px 10px; 
+          border-radius: 12px; 
+          font-weight: 600; 
+          font-size: 12px; 
+          box-shadow: 0 10px 24px rgba(0,0,0,.25); 
+          transition: opacity 0.2s;
+        }
+
+        .yg-centerpin.dragging .yg-pinlabel {
+          opacity: 0.5;
+        }
 
         .yg-drawer .ant-drawer-content { border-top-left-radius: 22px; border-top-right-radius: 22px; }
         .yg-drawer .ant-drawer-header { padding: 10px 12px; }
@@ -725,6 +893,23 @@ export default function ClientOrderCreate() {
         .yg-total-value { font-weight:900; font-size:18px; }
         .yg-orderbtn { border-radius: 18px; background:#FFD400; border-color:#FFD400; color:#111; font-weight:900; padding: 0 18px; }
         .yg-orderbtn[disabled] { background: #f5f5f5 !important; border-color:#f5f5f5 !important; color: rgba(0,0,0,.35) !important; }
+
+
+        .yg-active { position:absolute; left:16px; right:16px; bottom: 16px; z-index: 650; }
+        .yg-active-card { border-radius: 20px; box-shadow: 0 -6px 26px rgba(0,0,0,.22); }
+        .yg-active-title { font-weight: 900; font-size: 16px; }
+        .yg-active-sub { margin-top: 4px; color: rgba(0,0,0,.6); font-weight: 700; }
+        .yg-active-actions { margin-top: 12px; }
+        .yg-active-actions.two { display:flex; gap: 10px; }
+        .yg-driver-row { display:flex; gap: 12px; align-items:center; }
+        .yg-driver-avatar { width: 52px; height: 52px; border-radius: 16px; overflow:hidden; background:#f5f5f5; display:flex; align-items:center; justify-content:center; }
+        .yg-driver-avatar img { width:100%; height:100%; object-fit: cover; }
+        .yg-driver-placeholder { font-size: 22px; }
+        .yg-driver-info { flex:1; min-width:0; }
+        .yg-driver-name { font-weight: 900; font-size: 15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .yg-driver-car { margin-top: 2px; color: rgba(0,0,0,.65); font-weight: 700; font-size: 12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .yg-driver-status { margin-top: 6px; font-weight: 900; font-size: 12px; }
+
 
         /* Leaflet tweaks */
         .leaflet-control-container { display:none; }
