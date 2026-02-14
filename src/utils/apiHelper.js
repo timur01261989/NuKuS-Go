@@ -109,8 +109,14 @@ class ApiError extends Error {
 // Core client defaults
 // ------------------------------
 const DEFAULTS = {
-  baseURL: safeTrimSlash(import.meta?.env?.VITE_API_BASE_URL || ""),
+  // Har ikki variantni ham tekshiramiz: VITE_API_BASE va VITE_API_BASE_URL
+  baseURL: safeTrimSlash(
+    import.meta?.env?.VITE_API_BASE || 
+    import.meta?.env?.VITE_API_BASE_URL || 
+    ""
+  ),
   timeoutMs: 15000,
+  // ... qolgan kodlar o'zgarishsiz qoladi
   // Retries are only for idempotent methods by default
   retry: {
     enabled: true,

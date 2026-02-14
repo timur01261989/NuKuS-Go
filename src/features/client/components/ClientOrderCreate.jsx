@@ -87,10 +87,11 @@ const fmtMoney = (n) => {
   return new Intl.NumberFormat("ru-RU").format(Math.round(n));
 };
 
-// ✅ Signal qo'shildi: Ortig'cha so'rovlarni bekor qilish uchun
-async function nominatimSearch(q, signal) {
-  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=7&addressdetails=1&q=${encodeURIComponent(q)}`;
-  const res = await fetch(url, { signal, headers: { "Accept-Language": "uz,ru,en" } });
+async function nominatimSearch(q) {
+  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=7&addressdetails=1&q=${encodeURIComponent(
+    q
+  )}`;
+  const res = await fetch(url, { headers: { "Accept-Language": "uz,ru,en" } });
   if (!res.ok) return [];
   const data = await res.json();
   return (data || []).map((x) => ({
@@ -109,18 +110,29 @@ async function nominatimReverse(lat, lng, signal) {
   return data?.display_name || null;
 }
 
+// OSRM yo'nalish topa olmasa ham xato bermaslik uchun:
 async function osrmRoute(from, to) {
-  const url = `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson&alternatives=false&steps=false`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("route fetch failed");
-  const data = await res.json();
-  const r = data?.routes?.[0];
-  if (!r) throw new Error("no route");
-  const coords = r.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const r = data?.routes?.[0];
+    if (r) {
+      return {
+        coords: r.geometry.coordinates.map(([lng, lat]) => [lat, lng]),
+        distanceKm: (r.distance || 0) / 1000,
+        durationMin: (r.duration || 0) / 60,
+      };
+    }
+  } catch (e) {
+    console.warn("OSRM yo'nalish chizishda xatolik:", e);
+  }
+  // Fallback: Agar yo'nalish chizib bo'lmasa, to'g'ri chiziq chizamiz
+  const approx = haversineKm(from, to);
   return {
-    coords,
-    distanceKm: (r.distance || 0) / 1000,
-    durationMin: (r.duration || 0) / 60,
+    coords: [from, to],
+    distanceKm: approx,
+    durationMin: approx * 2, // Taxminiy vaqt
   };
 }
 
@@ -151,7 +163,7 @@ function FlyTo({ center, zoom = 16 }) {
   return null;
 }
 
-/** Map center tracking while selecting pickup/dest */
+/** Map center tracking while selecting pickup/dest (Yandex-like: pin fixed, map moves) */
 function CenterTracker({ enabled, onCenter, setIsDragging }) {
   const map = useMap();
 
@@ -200,7 +212,7 @@ export default function ClientOrderCreate() {
 
   const [recentPlaces, setRecentPlaces] = useState([]);
 
-  // ✅ Order states
+  // ✅ Missing states
   const [orderId, setOrderId] = useState(() => {
     const saved = localStorage.getItem("activeOrderId");
     return saved ? String(saved) : null;
@@ -210,19 +222,17 @@ export default function ClientOrderCreate() {
 
   // ✅ Chat & Rating
   const [chatOpen, setChatOpen] = useState(false);
+
+  // --- CHAT STATE ---
   const [messages, setMessages] = useState([]);
   const [msgText, setMsgText] = useState("");
   const chatScrollRef = useRef(null);
-  const mapRef = useRef(null); 
+  const mapRef = useRef(null); // ✅ Added ref
 
   const [ratingOpen, setRatingOpen] = useState(false);
   const [ratingValue, setRatingValue] = useState(5);
   const [completedOrderId, setCompletedOrderId] = useState(null);
 
-  // ✅ Signal Refs (Abort Controllers)
-  const reverseAbortRef = useRef(null);
-  const searchAbortRef = useRef(null);
-  const reverseTimerRef = useRef(null);
 
   // ✅ Serverdan aktiv buyurtmani tekshirish
   useEffect(() => {
@@ -240,11 +250,17 @@ export default function ClientOrderCreate() {
         setOrderId(String(ord.id));
         setOrderStatus(ord.status || null);
         if (ord.driver || ord.assigned_driver) setAssignedDriver(ord.driver || ord.assigned_driver);
-      } catch { }
+      } catch {
+        // ignore
+      }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, []);
 
+
+  /** seed recent places if empty */
   const seedPlaces = useMemo(
     () => [
       { label: "Allayar Dosnazarov ko‘chasi", lat: 42.4615, lng: 59.6109, starred: true },
@@ -271,11 +287,15 @@ export default function ClientOrderCreate() {
             if (!cancelled && addr) setPickup((p) => ({ ...p, address: addr }));
           } catch {}
         },
-        () => { },
+        () => {
+          // ignore
+        },
         { enableHighAccuracy: true, timeout: 9000 }
       );
     }
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   /** Load recent places */
@@ -295,12 +315,15 @@ export default function ClientOrderCreate() {
       try {
         const res = await api.post("/api/order", { action: "history", limit: 12 });
         const rows = res?.data?.orders || res?.orders || [];
-        const mapped = (rows || []).map((o) => ({
-          label: o.dropoff_location || o.to_address || o.pickup_location || o.from_address,
-          lat: Number(o.to_lat ?? o.dest_lat ?? o.from_lat),
-          lng: Number(o.to_lng ?? o.dest_lng ?? o.from_lng),
-          starred: false,
-        })).filter((x) => x.label && Number.isFinite(x.lat) && Number.isFinite(x.lng)) || [];
+        const mapped =
+          (rows || [])
+            .map((o) => ({
+              label: o.dropoff_location || o.to_address || o.pickup_location || o.from_address,
+              lat: Number(o.to_lat ?? o.dest_lat ?? o.from_lat),
+              lng: Number(o.to_lng ?? o.dest_lng ?? o.from_lng),
+              starred: false,
+            }))
+            .filter((x) => x.label && Number.isFinite(x.lat) && Number.isFinite(x.lng)) || [];
 
         if (mapped.length) {
           const merged = [...seedPlaces];
@@ -310,7 +333,9 @@ export default function ClientOrderCreate() {
           setRecentPlaces(merged.slice(0, 12));
           localStorage.setItem("recentPlaces_v1", JSON.stringify(merged.slice(0, 12)));
         }
-      } catch { }
+      } catch {
+        // ignore
+      }
     })();
   }, [seedPlaces]);
 
@@ -336,12 +361,16 @@ export default function ClientOrderCreate() {
           try {
             const approx = haversineKm(pickup.latlng, dest.latlng);
             setDistanceKm(Number.isFinite(approx) ? approx : null);
-          } catch { setDistanceKm(null); }
+          } catch {
+            setDistanceKm(null);
+          }
           setDurationMin(null);
         }
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [pickup.latlng, dest.latlng]);
 
   const approxDistanceKm = useMemo(() => {
@@ -349,7 +378,9 @@ export default function ClientOrderCreate() {
     try {
       const d = haversineKm(pickup.latlng, dest.latlng);
       return Number.isFinite(d) ? d : null;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }, [pickup.latlng, dest.latlng]);
 
   const totalPrice = useMemo(() => {
@@ -359,45 +390,56 @@ export default function ClientOrderCreate() {
   }, [distanceKm, approxDistanceKm, tariff]);
 
   /** Save to recents */
-  const pushRecent = useCallback((place) => {
-    if (!place?.label || !Number.isFinite(place.lat) || !Number.isFinite(place.lng)) return;
-    setRecentPlaces((prev) => {
-      const next = [place, ...prev.filter((p) => p.label !== place.label)].slice(0, 12);
-      localStorage.setItem("recentPlaces_v1", JSON.stringify(next));
-      return next;
-    });
-  }, []);
+  const pushRecent = useCallback(
+    (place) => {
+      if (!place?.label || !Number.isFinite(place.lat) || !Number.isFinite(place.lng)) return;
+      setRecentPlaces((prev) => {
+        const next = [place, ...prev.filter((p) => p.label !== place.label)].slice(0, 12);
+        localStorage.setItem("recentPlaces_v1", JSON.stringify(next));
+        return next;
+      });
+    },
+    [setRecentPlaces]
+  );
 
-  /** ✅ Center picked with Abort Signal */
-  const handleCenterPicked = useCallback((latlng) => {
-    if (!selecting) return;
+  /** Center picked from map */
+  const reverseAbortRef = useRef(null);
+  const reverseTimerRef = useRef(null);
 
-    if (selecting === "pickup") {
-      setPickup((p) => ({ ...p, latlng, address: p.address || "Manzil aniqlanmoqda..." }));
-    } else {
-      setDest((d) => ({ ...d, latlng, address: d.address || "Manzil aniqlanmoqda..." }));
-    }
+  const handleCenterPicked = useCallback(
+    (latlng) => {
+      if (!selecting) return;
 
-    if (reverseTimerRef.current) clearTimeout(reverseTimerRef.current);
-    if (reverseAbortRef.current) reverseAbortRef.current.abort();
+      if (selecting === "pickup") {
+        setPickup((p) => ({ ...p, latlng, address: p.address || "Manzil aniqlanmoqda..." }));
+      } else {
+        setDest((d) => ({ ...d, latlng, address: d.address || "Manzil aniqlanmoqda..." }));
+      }
 
-    const controller = new AbortController();
-    reverseAbortRef.current = controller;
+      if (reverseTimerRef.current) clearTimeout(reverseTimerRef.current);
+      if (reverseAbortRef.current) reverseAbortRef.current.abort();
 
-    reverseTimerRef.current = window.setTimeout(async () => {
-      try {
-        const addr = await nominatimReverse(latlng[0], latlng[1], controller.signal);
-        if (selecting === "pickup") {
-          setPickup({ latlng, address: addr || "Tanlangan nuqta" });
-        } else {
-          setDest({ latlng, address: addr || "Tanlangan nuqta" });
+      const controller = new AbortController();
+      reverseAbortRef.current = controller;
+
+      reverseTimerRef.current = window.setTimeout(async () => {
+        try {
+          const addr = await nominatimReverse(latlng[0], latlng[1], controller.signal);
+          if (selecting === "pickup") {
+            setPickup({ latlng, address: addr || "Tanlangan nuqta" });
+          } else {
+            setDest({ latlng, address: addr || "Tanlangan nuqta" });
+          }
+        } catch (e) {
+          // ignore
         }
-      } catch (e) { }
-    }, 450);
-  }, [selecting]);
+      }, 450);
+    },
+    [selecting]
+  );
 
 
-  /** ✅ Search with Abort Signal */
+  /** Search */
   const runSearch = useCallback(async (type, q) => {
     const query = (q || "").trim();
     if (query.length < 3) {
@@ -405,37 +447,33 @@ export default function ClientOrderCreate() {
       else setDestSug([]);
       return;
     }
-
-    if (searchAbortRef.current) searchAbortRef.current.abort();
-    const controller = new AbortController();
-    searchAbortRef.current = controller;
-
     setSearchLoading(true);
     try {
-      const res = await nominatimSearch(query, controller.signal);
+      const res = await nominatimSearch(query);
       if (type === "pickup") setPickupSug(res);
       else setDestSug(res);
-    } catch (e) {
-      // ignore abort error
     } finally {
       setSearchLoading(false);
     }
   }, []);
 
   /** Pick from suggestion / recent */
-  const applyPlace = useCallback((type, place) => {
-    const latlng = [place.lat, place.lng];
-    if (type === "pickup") {
-      setPickup({ latlng, address: place.label });
-      setPickupQuery(place.label);
-    } else {
-      setDest({ latlng, address: place.label });
-      setDestQuery(place.label);
-    }
-    pushRecent({ label: place.label, lat: place.lat, lng: place.lng, starred: !!place.starred });
-    setSelecting(null);
-    setDrawerOpen(true);
-  }, [pushRecent]);
+  const applyPlace = useCallback(
+    (type, place) => {
+      const latlng = [place.lat, place.lng];
+      if (type === "pickup") {
+        setPickup({ latlng, address: place.label });
+        setPickupQuery(place.label);
+      } else {
+        setDest({ latlng, address: place.label });
+        setDestQuery(place.label);
+      }
+      pushRecent({ label: place.label, lat: place.lat, lng: place.lng, starred: !!place.starred });
+      setSelecting(null);
+      setDrawerOpen(true);
+    },
+    [pushRecent]
+  );
 
   const swapPoints = useCallback(() => {
     if (!pickup.latlng && !dest.latlng) return;
@@ -448,60 +486,51 @@ export default function ClientOrderCreate() {
   }, [pickup, dest]);
 
   /** Order action */
-  const handleOrder = useCallback(async () => {
-    if (!pickup.latlng || !dest.latlng) {
-      message.error("Borish va yakuniy manzilni belgilang");
-      return;
-    }
-    try {
-      const payload = {
-        status: "searching",
-        price: Math.round(totalPrice),
-        service_type: tariff.id,
-        pickup_location: pickup.address || "Belgilanmagan manzil",
-        dropoff_location: dest.address || "Belgilanmagan manzil",
-        from_lat: pickup.latlng[0],
-        from_lng: pickup.latlng[1],
-        to_lat: dest.latlng[0],
-        to_lng: dest.latlng[1],
-        distance_km: distanceKm ? Number(distanceKm.toFixed(2)) : null,
-      };
+  // handleOrder funksiyasini barqaror qilish:
+const handleOrder = useCallback(async () => {
+  if (!pickup.latlng || !dest.latlng) {
+    message.error("Manzillarni to'liq belgilang");
+    return;
+  }
+  const hide = message.loading("Buyurtma yuborilmoqda...", 0);
+  try {
+    const payload = {
+      action: "create",
+      status: "searching",
+      price: Math.round(totalPrice),
+      service_type: tariff.id,
+      pickup_location: pickup.address,
+      dropoff_location: dest.address,
+      from_lat: pickup.latlng[0],
+      from_lng: pickup.latlng[1],
+      to_lat: dest.latlng[0],
+      to_lng: dest.latlng[1],
+      distance_km: distanceKm || approxDistanceKm,
+    };
 
-      const created = await api.post("/api/order", { action: "create", ...payload });
-      const order = created?.data?.order || created?.order || created?.data || null;
-      const id = order?.id || order?.orderId || created?.data?.orderId || created?.orderId;
+    const res = await api.post("/api/order", payload);
 
-      if (!id) throw new Error("orderId not returned");
+    // Serverdan kelgan javobni tekshirish
+    const id = res?.data?.id || res?.id || res?.orderId;
+    if (!id) throw new Error("Serverdan ID kelmadi");
 
-      localStorage.setItem("activeOrderId", String(id));
-      setOrderId(String(id));
-      setOrderStatus(order?.status || "searching");
-      message.success("Buyurtma yuborildi");
-
-      try {
-        await api.post("/api/dispatch", {
-          orderId: String(id),
-          serviceType: tariff.id,
-          from: { lat: payload.from_lat, lng: payload.from_lng, address: payload.pickup_location },
-          to: { lat: payload.to_lat, lng: payload.to_lng, address: payload.dropoff_location },
-          distanceKm: payload.distance_km,
-          price: payload.price,
-        });
-      } catch (e2) {
-        console.warn("dispatch error", e2);
-      }
-
-    } catch (e) {
-      console.error(e);
-      message.error("Zakaz berishda xato");
-    }
-  }, [pickup, dest, tariff, totalPrice, distanceKm]);
+    setOrderId(String(id));
+    localStorage.setItem("activeOrderId", String(id));
+    message.success("Buyurtma qabul qilindi");
+  } catch (e) {
+    console.error("Order error:", e);
+    message.error("Zakaz berishda xatolik: " + (e.message || "Server bilan aloqa yo'q"));
+  } finally {
+    hide();
+  }
+}, [pickup, dest, tariff, totalPrice, distanceKm, approxDistanceKm]);
 
   /** Polling order status */
   useEffect(() => {
     if (!orderId) return;
 
     let stopped = false;
+
     const tick = async () => {
       try {
         const res = await api.post("/api/order", { action: "status", orderId: String(orderId) });
@@ -541,6 +570,8 @@ export default function ClientOrderCreate() {
     };
   }, [orderId, orderStatus]);
 
+
+
   /** UI helpers */
   const hasActiveOrder = useMemo(() => {
     if (!orderId) return false;
@@ -573,7 +604,11 @@ export default function ClientOrderCreate() {
     }
   }, [orderId]);
 
-  const openChat = useCallback(() => setChatOpen(true), []);
+  const openChat = useCallback(() => {
+    setChatOpen(true);
+  }, []);
+
+  const closeChat = useCallback(() => setChatOpen(false), []);
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
@@ -584,27 +619,36 @@ export default function ClientOrderCreate() {
   // --- CHAT REALTIME LOGIC ---
   useEffect(() => {
     if (!chatOpen || !orderId) return;
+
     let mounted = true;
+
     const fetchHistory = async () => {
       const { data, error } = await supabase
         .from("messages")
         .select("*")
         .eq("order_id", orderId)
         .order("created_at", { ascending: true });
+
       if (!error && data && mounted) {
         setMessages(data);
         scrollToBottom();
       }
     };
+
     fetchHistory();
+
     const channel = supabase
       .channel(`chat_room:${orderId}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `order_id=eq.${orderId}` },
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "messages", filter: `order_id=eq.${orderId}` },
         (payload) => {
           setMessages((prev) => [...prev, payload.new]);
           scrollToBottom();
         }
-      ).subscribe();
+      )
+      .subscribe();
+
     return () => {
       mounted = false;
       supabase.removeChannel(channel);
@@ -613,8 +657,10 @@ export default function ClientOrderCreate() {
 
   const handleSendMessage = useCallback(async () => {
     if (!msgText.trim() || !orderId) return;
+
     const textToSend = msgText.trim();
     setMsgText("");
+
     await supabase.from("messages").insert([{
       order_id: orderId,
       sender_role: "client",
@@ -623,12 +669,17 @@ export default function ClientOrderCreate() {
     }]);
   }, [msgText, orderId]);
 
+
+
   const submitRating = useCallback(async () => {
     try {
-      if (!completedOrderId) return setRatingOpen(false);
+      if (!completedOrderId) {
+        setRatingOpen(false);
+        return;
+      }
       await api.post("/api/order", { action: "rate", orderId: completedOrderId, rating: ratingValue });
     } catch (e) {
-      console.warn("rating error", e);
+      console.warn("rating submit error", e);
     } finally {
       setRatingOpen(false);
       setCompletedOrderId(null);
@@ -648,14 +699,14 @@ export default function ClientOrderCreate() {
     setAssignedDriver(null);
   }, []);
 
-  const bottomTitle = useMemo(() => {
+
+const bottomTitle = useMemo(() => {
     if (!pickup.latlng || !dest.latlng) return "Manzilni tanlang";
     const dist = distanceKm ? `${distanceKm.toFixed(1)} km` : "—";
     const dur = durationMin ? `${Math.round(durationMin)} min` : "—";
     return `${dist} • ${dur}`;
   }, [pickup.latlng, dest.latlng, distanceKm, durationMin]);
 
-  /** ---------------- RENDER ---------------- */
   return (
     <div className="yg-root">
       {/* MAP */}
@@ -665,7 +716,7 @@ export default function ClientOrderCreate() {
           zoom={16} 
           zoomControl={false} 
           style={{ height: "100%", width: "100%" }} 
-          whenCreated={(m) => (mapRef.current = m)}
+          ref={mapRef} // ✅ Corrected ref
         >
           <TileLayer
             url={
@@ -697,22 +748,27 @@ export default function ClientOrderCreate() {
             />
           )}
         
-          {/* Locate Me Button */}
-          <div style={{ position: "absolute", right: 16, bottom: uiMode === "idle" ? 340 : 320, zIndex: 800 }}>
-            <Button
-              shape="circle"
-              size="large"
-              icon={<AimOutlined style={{ fontSize: 22 }} />}
-              style={{ boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}
-              onClick={() => {
-                const map = mapRef.current;
-                if (map && userLoc) map.flyTo(userLoc, 16);
-              }}
-            />
-          </div>
+        <div
+          style={{
+            position: "absolute",
+            right: 16,
+            bottom: uiMode === "main" ? 280 : 320,
+            zIndex: 800,
+          }}
+        >
+          <Button
+            shape="circle"
+            size="large"
+            icon={<AimOutlined style={{ fontSize: 22 }} />}
+            style={{ boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}
+            onClick={() => {
+              const map = mapRef.current;
+              if (map && userLoc) map.flyTo(userLoc, 16);
+            }}
+          />
+        </div>
         </MapContainer>
 
-        {/* Center pin overlay */}
         {selecting && (
           <div className={`yg-centerpin ${isDragging ? 'dragging' : ''}`} aria-hidden>
             <div
@@ -724,6 +780,7 @@ export default function ClientOrderCreate() {
             </div>
           </div>
         )}
+
 
         {/* Active order overlays */}
         {hasActiveOrder && (
@@ -760,6 +817,7 @@ export default function ClientOrderCreate() {
                     </div>
                   </div>
                 </div>
+
                 <div className="yg-active-actions two">
                   <Button onClick={openChat} block>Chat</Button>
                   <Button danger onClick={cancelActiveOrder} block>Bekor qilish</Button>
@@ -769,7 +827,8 @@ export default function ClientOrderCreate() {
           </div>
         )}
 
-        {/* Top card (Yandex-like) */}
+
+        {/* Top card */}
         {!hasActiveOrder && (
           <div className="yg-topcard">
             <Card className="yg-card" bodyStyle={{ padding: 12 }}>
@@ -813,7 +872,7 @@ export default function ClientOrderCreate() {
             </Card>
           </div>
         )}
-      </div> {/* <--- YG-MAP YOPILISHI */}
+      </div> 
 
       {/* Bottom sheet */}
       {!hasActiveOrder && (
@@ -872,54 +931,59 @@ export default function ClientOrderCreate() {
             </div>
           )}
 
-          <div className="yg-tariffs">
-            {TARIFFS.map((t) => {
-              const active = t.id === tariff.id;
-              const pricePreview = distanceKm ? t.base + distanceKm * t.perKm : t.base;
-              return (
-                <div
-                  key={t.id}
-                  className={`yg-tariff ${active ? "active" : ""}`}
-                  onClick={() => setTariff(t)}
-                >
-                  <div className="yg-tariff-name">{t.name}</div>
-                  <div className="yg-tariff-sub">
-                    <ClockCircleOutlined /> {t.eta}
-                  </div>
-                  <div className="yg-tariff-price">
-                    <WalletOutlined /> {fmtMoney(pricePreview)} so‘m
-                  </div>
+        <div className="yg-tariffs">
+          {TARIFFS.map((t) => {
+            const active = t.id === tariff.id;
+            const pricePreview = distanceKm ? t.base + distanceKm * t.perKm : t.base;
+            return (
+              <div
+                key={t.id}
+                className={`yg-tariff ${active ? "active" : ""}`}
+                onClick={() => setTariff(t)}
+              >
+                <div className="yg-tariff-name">{t.name}</div>
+                <div className="yg-tariff-sub">
+                  <ClockCircleOutlined /> {t.eta}
                 </div>
-              );
-            })}
-          </div>
+                <div className="yg-tariff-price">
+                  <WalletOutlined /> {fmtMoney(pricePreview)} so‘m
+                </div>
+              </div>
+            );
+          })}
+        </div>
 
-          <div className="yg-orderbar">
-            <div className="yg-total">
-              <div className="yg-total-label">Jami</div>
-              <div className="yg-total-value">{fmtMoney(totalPrice)} so‘m</div>
-            </div>
-            <Button
-              type="primary"
-              size="large"
-              className="yg-orderbtn"
-              disabled={!pickup.latlng || !dest.latlng}
-              onClick={handleOrder}
-            >
-              Zakaz berish
-            </Button>
+        <div className="yg-orderbar">
+          <div className="yg-total">
+            <div className="yg-total-label">Jami</div>
+            <div className="yg-total-value">{fmtMoney(totalPrice)} so‘m</div>
           </div>
-        </Drawer>
-      )}
+          <Button
+            type="primary"
+            size="large"
+            className="yg-orderbtn"
+            disabled={!pickup.latlng || !dest.latlng}
+            onClick={handleOrder}
+          >
+            Zakaz berish
+          </Button>
+        </div>
+      </Drawer>
+    )}
 
+      
       {/* CHAT MODAL */}
       <Modal
         title={
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Avatar src={assignedDriver?.avatar_url} icon={<UserOutlined />} />
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>{assignedDriver?.first_name || "Haydovchi"}</div>
-              <div style={{ fontSize: 11, color: "#888" }}>{assignedDriver?.car_model || ""}</div>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>
+                {assignedDriver?.first_name || "Haydovchi"}
+              </div>
+              <div style={{ fontSize: 11, color: "#888" }}>
+                {assignedDriver?.car_model || ""}
+              </div>
             </div>
           </div>
         }
@@ -930,17 +994,56 @@ export default function ClientOrderCreate() {
         bodyStyle={{ padding: 0 }}
       >
         <div style={{ display: "flex", flexDirection: "column", height: "400px" }}>
-          <div style={{ flex: 1, overflowY: "auto", padding: "15px", background: "#f5f5f5" }}>
+          <div
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              padding: "15px",
+              background: "#f5f5f5",
+            }}
+          >
             {messages.length === 0 ? (
-              <div style={{ textAlign: "center", color: "#999", marginTop: 50 }}>Henuz xabarlar yo‘q. <br /> Haydovchiga yozing!</div>
+              <div style={{ textAlign: "center", color: "#999", marginTop: 50 }}>
+                Henuz xabarlar yo‘q. <br /> Haydovchiga yozing!
+              </div>
             ) : (
               messages.map((msg) => {
                 const isMe = msg.sender_role === "client";
                 return (
-                  <div key={msg.id} style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start", marginBottom: 10 }}>
-                    <div style={{ maxWidth: "75%", padding: "8px 12px", borderRadius: 12, background: isMe ? "#1890ff" : "#fff", color: isMe ? "#fff" : "#000", boxShadow: "0 2px 5px rgba(0,0,0,0.05)", borderTopRightRadius: isMe ? 0 : 12, borderTopLeftRadius: isMe ? 12 : 0 }}>
+                  <div
+                    key={msg.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: isMe ? "flex-end" : "flex-start",
+                      marginBottom: 10,
+                    }}
+                  >
+                    <div
+                      style={{
+                        maxWidth: "75%",
+                        padding: "8px 12px",
+                        borderRadius: 12,
+                        background: isMe ? "#1890ff" : "#fff",
+                        color: isMe ? "#fff" : "#000",
+                        boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
+                        borderTopRightRadius: isMe ? 0 : 12,
+                        borderTopLeftRadius: isMe ? 12 : 0,
+                      }}
+                    >
                       <div style={{ fontSize: 14 }}>{msg.content}</div>
-                      <div style={{ fontSize: 10, opacity: 0.7, textAlign: "right", marginTop: 2 }}>{new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+                      <div
+                        style={{
+                          fontSize: 10,
+                          opacity: 0.7,
+                          textAlign: "right",
+                          marginTop: 2,
+                        }}
+                      >
+                        {new Date(msg.created_at).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </div>
                     </div>
                   </div>
                 );
@@ -948,14 +1051,33 @@ export default function ClientOrderCreate() {
             )}
             <div ref={chatScrollRef} />
           </div>
-          <div style={{ padding: "10px", background: "#fff", borderTop: "1px solid #eee", display: "flex", gap: 10 }}>
-            <Input value={msgText} onChange={(e) => setMsgText(e.target.value)} onPressEnter={handleSendMessage} placeholder="Xabar yozing..." style={{ borderRadius: 20 }} />
-            <Button type="primary" shape="circle" icon={<SendOutlined />} onClick={handleSendMessage} />
+
+          <div
+            style={{
+              padding: "10px",
+              background: "#fff",
+              borderTop: "1px solid #eee",
+              display: "flex",
+              gap: 10,
+            }}
+          >
+            <Input
+              value={msgText}
+              onChange={(e) => setMsgText(e.target.value)}
+              onPressEnter={handleSendMessage}
+              placeholder="Xabar yozing..."
+              style={{ borderRadius: 20 }}
+            />
+            <Button
+              type="primary"
+              shape="circle"
+              icon={<SendOutlined />}
+              onClick={handleSendMessage}
+            />
           </div>
         </div>
       </Modal>
 
-      {/* Rating Modal */}
       <Modal
         open={ratingOpen}
         title="Safar yakunlandi"
@@ -964,7 +1086,9 @@ export default function ClientOrderCreate() {
         okText="Baholash"
         cancelText="Keyinroq"
       >
-        <div style={{ marginBottom: 10 }}>Haydovchini baholang:</div>
+        <div style={{ marginBottom: 10 }}>
+          Haydovchini baholang:
+        </div>
         <Rate value={ratingValue} onChange={setRatingValue} />
       </Modal>
 
@@ -974,30 +1098,100 @@ export default function ClientOrderCreate() {
         .yg-topcard { position:absolute; left:16px; right:16px; top:14px; z-index: 500; }
         .yg-card { border-radius: 18px; box-shadow: 0 12px 30px rgba(0,0,0,.18); }
         .yg-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; position:relative; }
+        .yg-row:last-child { margin-bottom:0; }
         .yg-dot { width:10px; height:10px; border-radius:50%; flex: 0 0 10px; }
-        .yg-dot.blue { background:#1677ff; } .yg-dot.red { background:#ff4d4f; }
+        .yg-dot.blue { background:#1677ff; }
+        .yg-dot.red { background:#ff4d4f; }
         .yg-addr { flex:1; font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .yg-input { flex:1; border-radius: 12px; } .yg-mini { border-radius: 12px; }
-        .yg-swap { position:absolute; right:8px; top:46px; } .yg-swap button { border-radius: 12px; }
-        .yg-centerpin { position: absolute; left: 50%; top: 50%; z-index: 600; display: flex; flex-direction: column; align-items: center; gap: 10px; pointer-events: none; transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); transform: translate(-50%, -68%); }
-        .yg-centerpin.dragging { transform: translate(-50%, -90%) scale(1.15); }
-        .yg-pinlabel { background: rgba(17,17,17,.85); color: #fff; padding: 6px 10px; border-radius: 12px; font-weight: 600; font-size: 12px; box-shadow: 0 10px 24px rgba(0,0,0,.25); transition: opacity 0.2s; }
+        .yg-input { flex:1; border-radius: 12px; }
+        .yg-mini { border-radius: 12px; }
+        .yg-swap { position:absolute; right:8px; top:46px; }
+        .yg-swap button { border-radius: 12px; }
+
+        .yg-centerpin { 
+          position: absolute; 
+          left: 50%; 
+          top: 50%; 
+          z-index: 600; 
+          display: flex; 
+          flex-direction: column; 
+          align-items: center; 
+          gap: 10px; 
+          pointer-events: none;
+          transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+          transform: translate(-50%, -68%);
+        }
+
+        .yg-centerpin.dragging {
+          transform: translate(-50%, -90%) scale(1.15);
+        }
+
+        .yg-pinlabel { 
+          background: rgba(17,17,17,.85); 
+          color: #fff; 
+          padding: 6px 10px; 
+          border-radius: 12px; 
+          font-weight: 600; 
+          font-size: 12px; 
+          box-shadow: 0 10px 24px rgba(0,0,0,.25); 
+          transition: opacity 0.2s;
+        }
+
+        .yg-centerpin.dragging .yg-pinlabel {
+          opacity: 0.5;
+        }
+
         .yg-drawer .ant-drawer-content { border-top-left-radius: 22px; border-top-right-radius: 22px; }
+        .yg-drawer .ant-drawer-header { padding: 10px 12px; }
+        .yg-section { margin-bottom: 12px; }
+        .yg-section-title { font-weight:700; margin-bottom: 6px; }
+        .yg-place { border-radius: 12px; }
+        .yg-place:hover { background: rgba(0,0,0,.03); }
+        .yg-place-text { display:block; max-width: 100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
         .yg-tariffs { display:flex; gap:10px; overflow-x:auto; padding-bottom: 8px; margin-top: 8px; }
         .yg-tariff { min-width: 150px; border:1px solid rgba(0,0,0,.08); border-radius: 16px; padding: 10px; cursor:pointer; }
         .yg-tariff.active { border-color:#111; box-shadow:0 10px 24px rgba(0,0,0,.12); }
         .yg-tariff-name { font-weight:800; }
+        .yg-tariff-sub { color: rgba(0,0,0,.65); font-size:12px; margin-top:4px; display:flex; gap:6px; align-items:center; }
+        .yg-tariff-price { margin-top:8px; font-weight:800; display:flex; gap:6px; align-items:center; }
+
         .yg-orderbar { margin-top: 10px; display:flex; align-items:center; justify-content:space-between; gap: 12px; }
+        .yg-total-label { color: rgba(0,0,0,.65); font-weight:700; font-size:12px; }
         .yg-total-value { font-weight:900; font-size:18px; }
         .yg-orderbtn { border-radius: 18px; background:#FFD400; border-color:#FFD400; color:#111; font-weight:900; padding: 0 18px; }
+        .yg-orderbtn[disabled] { background: #f5f5f5 !important; border-color:#f5f5f5 !important; color: rgba(0,0,0,.35) !important; }
+
         .yg-active { position:absolute; left:16px; right:16px; bottom: 16px; z-index: 650; }
         .yg-active-card { border-radius: 20px; box-shadow: 0 -6px 26px rgba(0,0,0,.22); }
+        .yg-active-title { font-weight: 900; font-size: 16px; }
+        .yg-active-sub { margin-top: 4px; color: rgba(0,0,0,.6); font-weight: 700; }
+        .yg-active-actions { margin-top: 12px; }
+        .yg-active-actions.two { display:flex; gap: 10px; }
         .yg-driver-row { display:flex; gap: 12px; align-items:center; }
         .yg-driver-avatar { width: 52px; height: 52px; border-radius: 16px; overflow:hidden; background:#f5f5f5; display:flex; align-items:center; justify-content:center; }
         .yg-driver-avatar img { width:100%; height:100%; object-fit: cover; }
-        .yg-driver-name { font-weight: 900; font-size: 15px; }
-        .user-marker-pulse { width: 20px; height: 20px; background: #1890ff; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 0 0 rgba(24, 144, 255, 0.7); animation: pulse-blue 2s infinite; }
-        @keyframes pulse-blue { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(24, 144, 255, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(24, 144, 255, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(24, 144, 255, 0); } }
+        .yg-driver-placeholder { font-size: 22px; }
+        .yg-driver-info { flex:1; min-width:0; }
+        .yg-driver-name { font-weight: 900; font-size: 15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .yg-driver-car { margin-top: 2px; color: rgba(0,0,0,.65); font-weight: 700; font-size: 12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .yg-driver-status { margin-top: 6px; font-weight: 900; font-size: 12px; }
+
+.user-marker-pulse {
+  width: 20px;
+  height: 20px;
+  background: #1890ff;
+  border-radius: 50%;
+  border: 3px solid white;
+  box-shadow: 0 0 0 0 rgba(24, 144, 255, 0.7);
+  animation: pulse-blue 2s infinite;
+}
+
+@keyframes pulse-blue {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(24, 144, 255, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(24, 144, 255, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(24, 144, 255, 0); }
+}
         .leaflet-control-container { display:none; }
       `}</style>
     </div>
