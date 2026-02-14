@@ -196,14 +196,7 @@ function CirclePulse({ center }) {
   );
 }
 
-export default function ClientOrderCreate() {
-  // ... boshqa statelar (userLoc, pickup, dest va h.k.)
-  
-  // 👇 SHU YERGA QO'SHING
-  const [dispatchIdx, setDispatchIdx] = useState(0); 
-  const [nearbyCars, setNearbyCars] = useState([]); // Agar bu yo'q bo'lsa, buni ham qo'shing
-  
-  // ...
+
 /** Map center tracking while selecting pickup/dest (Yandex-like: pin fixed, map moves) */
 function CenterTracker({ enabled, onCenter, setIsDragging }) {
   const map = useMap();
@@ -387,21 +380,6 @@ export default function ClientOrderCreate() {
     })();
   }, [seedPlaces]);
 
-// ... boshqa useEffectlar ...
-
-  // 👇 SHU YERGA QO'SHING (Animatsiya uchun)
-  useEffect(() => {
-    // uiMode o'rniga orderStatus ishlatganimiz xavfsizroq
-    if (orderStatus !== "searching") return; 
-
-    const interval = setInterval(() => {
-      setDispatchIdx((prev) => prev + 1);
-    }, 1500);
-    
-    return () => clearInterval(interval);
-  }, [orderStatus]); // uiMode o'rniga orderStatus
-
-  // ... handleOrder va boshqa funksiyalar ...
   /** Route calculation */
   useEffect(() => {
     // Debounce + Abort old OSRM request (map dragging can trigger many updates)
@@ -879,14 +857,12 @@ const bottomTitle = useMemo(() => {
               pathOptions={{ color: "#00C853", weight: 6, opacity: 0.95, lineCap: "round" }}
             />
           )}
-
           {/* SEARCHING: Yandex-go'ga o'xshash yaqin mashinalar + dispatch chizig'i */}
           {uiMode === "searching" && (pickup.latlng || userLoc) && (
             <>
-              {/* 1. Pulsating circle (Markaziy to'lqin) */}
+              {/* pulsating circle */}
               <CirclePulse center={pickup.latlng || userLoc} />
 
-              {/* 2. Yaqin atrofdagi mashinalar */}
               {nearbyCars.map((c) => (
                 <Marker
                   key={c.id}
@@ -895,32 +871,24 @@ const bottomTitle = useMemo(() => {
                 />
               ))}
 
-              {/* 3. Dispatch chizig'i (Buyurtma yuborilayotgan mashinaga chiziq tortish) */}
               {nearbyCars.length > 0 && (
                 <Polyline
                   positions={[
                     pickup.latlng || userLoc,
-                    [
-                      nearbyCars[dispatchIdx % nearbyCars.length].lat, 
-                      nearbyCars[dispatchIdx % nearbyCars.length].lng
-                    ],
+                    [nearbyCars[dispatchIdx % nearbyCars.length].lat, nearbyCars[dispatchIdx % nearbyCars.length].lng],
                   ]}
                   pathOptions={{ color: "#00C853", weight: 4, opacity: 0.9, lineCap: "round" }}
                 />
               )}
             </>
           )}
-          )}
+
         
-                  {/* "MENING JOYLASHUVIM" TUGMASI */}
         <div
           style={{
             position: "absolute",
             right: 16,
-            // "uiMode" o'rniga "mode" ishlatamiz. 
-            // Agar "initial" (boshlang'ich) holatda bo'lsa pastroqda (280px), 
-            // boshqa holatlarda (masalan, marshrut ko'rishda) balandroqda (320px) turadi.
-            bottom: mode === "initial" ? 280 : 320,
+            bottom: uiMode === "main" ? 280 : 320,
             zIndex: 800,
           }}
         >
@@ -931,14 +899,11 @@ const bottomTitle = useMemo(() => {
             style={{ boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}
             onClick={() => {
               const map = mapRef.current;
-              // userLoc mavjudligini tekshiramiz
-              if (map && userLoc) {
-                map.flyTo(userLoc, 16, { animate: true, duration: 1 });
-              }
+              if (map && userLoc) map.flyTo(userLoc, 16);
             }}
           />
         </div>
-      </MapContainer>
+        </MapContainer>
 
         {selecting && (
           <div className={`yg-centerpin ${isDragging ? 'dragging' : ''}`} aria-hidden>
@@ -1026,42 +991,42 @@ const bottomTitle = useMemo(() => {
                   allowClear
                 />
                 <Button
-                    size="small"
-                    className="yg-mini"
-                    onClick={() => {
-                      setSelecting("dest");
-                      setDrawerOpen(false);
-                    }}
-                  >
-                    Xaritadan
-                  </Button>
-                </div>
-
-                <div className="yg-swap">
-                  <Button icon={<SwapOutlined />} onClick={swapPoints} />
-                </div>
-              </Card>
-            </div>
-          )}
-        </div>
-
-        {/* Bottom sheet */}
-        {!hasActiveOrder && (
-          <Drawer
-            open={drawerOpen && !selecting}
-            onClose={() => setDrawerOpen(false)}
-            placement="bottom"
-            height={380}
-            bodyStyle={{ padding: 12 }}
-            mask={false}
-            className="yg-drawer"
-            title={
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <EnvironmentOutlined />
-                <span>{bottomTitle}</span>
+                  size="small"
+                  className="yg-mini"
+                  onClick={() => {
+                    setSelecting("dest");
+                    setDrawerOpen(false);
+                  }}
+                >
+                  Xaritadan
+                </Button>
               </div>
-            }
-          >
+
+              <div className="yg-swap">
+                <Button icon={<SwapOutlined />} onClick={swapPoints} />
+              </div>
+            </Card>
+          </div>
+        )}
+      </div> 
+
+      {/* Bottom sheet */}
+      {!hasActiveOrder && (
+        <Drawer
+          open={drawerOpen && !selecting}
+          onClose={() => setDrawerOpen(false)}
+          placement="bottom"
+          height={380}
+          bodyStyle={{ padding: 12 }}
+          mask={false}
+          className="yg-drawer"
+          title={
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <EnvironmentOutlined />
+              <span>{bottomTitle}</span>
+            </div>
+          }
+        >
           <div className="yg-section">
             <div className="yg-section-title">Oldingi manzillar</div>
             <List
