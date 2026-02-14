@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import {
   Card,
   Button,
@@ -8,7 +8,6 @@ import {
   TimePicker,
   DatePicker,
   InputNumber,
-  Switch,
   Space,
   message,
   ConfigProvider,
@@ -19,6 +18,7 @@ import {
   List,
   Modal,
   Input,
+  Switch,
   Badge,
   Tabs,
 } from "antd";
@@ -110,189 +110,6 @@ const routeText = (o) => {
   return `${fromR} / ${fromD}  →  ${toR} / ${toD}`;
 };
 
-
-
-/** Leaflet CDN loader (no new tab map picker) */
-const loadLeafletCDN = () =>
-  new Promise((resolve, reject) => {
-    if (typeof window !== "undefined" && window.L) return resolve(window.L);
-    const idCss = "leaflet-css-cdn";
-    const idJs = "leaflet-js-cdn";
-
-    const ensureCss = () => {
-      if (document.getElementById(idCss)) return;
-      const link = document.createElement("link");
-      link.id = idCss;
-      link.rel = "stylesheet";
-      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-      link.integrity = "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=";
-      link.crossOrigin = "";
-      document.head.appendChild(link);
-    };
-
-    const ensureJs = () => {
-      if (document.getElementById(idJs)) return;
-      const script = document.createElement("script");
-      script.id = idJs;
-      script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-      script.integrity = "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=";
-      script.crossOrigin = "";
-      script.async = true;
-      script.onload = () => resolve(window.L);
-      script.onerror = () => reject(new Error("Leaflet yuklanmadi"));
-      document.body.appendChild(script);
-    };
-
-    try {
-      ensureCss();
-      ensureJs();
-    } catch (e) {
-      reject(e);
-    }
-  });
-
-const reverseGeocodeOSM = async (lat, lng) => {
-  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(
-    lat
-  )}&lon=${encodeURIComponent(lng)}`;
-  const res = await fetch(url, {
-    headers: { "Accept": "application/json" },
-  });
-  if (!res.ok) throw new Error("Manzil topilmadi");
-  const data = await res.json();
-  return data?.display_name || "";
-};
-
-const LocationPickerModal = ({ open, title = "Xaritadan tanlash", initialCenter, onCancel, onSelect }) => {
-  const [loading, setLoading] = useState(false);
-  const [addr, setAddr] = useState("");
-  const [center, setCenter] = useState(initialCenter || { lat: 41.311081, lng: 69.240562 }); // Tashkent
-  const mapId = useMemo(() => `leaflet_pick_${Math.random().toString(36).slice(2)}`, []);
-
-  useEffect(() => {
-    if (!open) return;
-    let map;
-    let cancelled = false;
-
-    const init = async () => {
-      try {
-        setLoading(true);
-        const L = await loadLeafletCDN();
-        if (cancelled) return;
-
-        const el = document.getElementById(mapId);
-        if (!el) return;
-
-        // cleanup old
-        if (el._leaflet_id) {
-          try { el._leaflet_id = null; } catch {}
-        }
-
-        map = L.map(el, { zoomControl: true }).setView([center.lat, center.lng], 15);
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          maxZoom: 19,
-          attribution: "&copy; OpenStreetMap",
-        }).addTo(map);
-
-        const updateCenter = async () => {
-          const c = map.getCenter();
-          const next = { lat: Number(c.lat), lng: Number(c.lng) };
-          setCenter(next);
-          try {
-            const a = await reverseGeocodeOSM(next.lat, next.lng);
-            if (!cancelled) setAddr(a);
-          } catch {
-            if (!cancelled) setAddr("");
-          }
-        };
-
-        map.on("moveend", updateCenter);
-        // initial reverse
-        await updateCenter();
-
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    init();
-
-    return () => {
-      cancelled = true;
-      try {
-        if (map) map.remove();
-      } catch {}
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
-  return (
-    <Modal
-      open={open}
-      title={title}
-      onCancel={onCancel}
-      footer={[
-        <Button key="cancel" onClick={onCancel}>Bekor qilish</Button>,
-        <Button
-          key="ok"
-          type="primary"
-          onClick={() => onSelect?.({ ...center, address: addr })}
-          disabled={!center?.lat || !center?.lng}
-          loading={loading}
-        >
-          Tanlash
-        </Button>,
-      ]}
-      width="100%"
-      style={{ top: 0, padding: 0 }}
-      styles={{ body: { height: "calc(100vh - 140px)" } }}
-    >
-      <div style={{ position: "relative", height: "100%" }}>
-        <div id={mapId} style={{ height: "100%", width: "100%", borderRadius: 12, overflow: "hidden" }} />
-        {/* Center pin */}
-        <div
-          style={{
-            position: "absolute",
-            left: "50%",
-            top: "50%",
-            transform: "translate(-50%, -100%)",
-            zIndex: 999,
-            pointerEvents: "none",
-            fontSize: 34,
-            filter: "drop-shadow(0 6px 10px rgba(0,0,0,.45))",
-          }}
-        >
-          📍
-        </div>
-        <div
-          style={{
-            position: "absolute",
-            left: 12,
-            right: 12,
-            bottom: 12,
-            zIndex: 999,
-            background: "rgba(0,0,0,.55)",
-            border: "1px solid rgba(255,255,255,.15)",
-            borderRadius: 12,
-            padding: 10,
-            backdropFilter: "blur(6px)",
-          }}
-        >
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <Text style={{ color: "#fff" }}>
-              {loading ? "Manzil aniqlanmoqda..." : (addr || "Manzil topilmadi (lat/lng saqlanadi)")}
-            </Text>
-            <Text style={{ color: "rgba(255,255,255,.75)", marginLeft: "auto" }}>
-              {center.lat?.toFixed?.(6)}, {center.lng?.toFixed?.(6)}
-            </Text>
-          </div>
-        </div>
-      </div>
-    </Modal>
-  );
-};
-
-
 const maskPhone = (p) => {
   const s = String(p || "");
   if (s.length < 6) return "********";
@@ -361,8 +178,28 @@ export default function DriverInterProvincial({ onBack }) {
 
 
   // In-app map modal (no new tab)
-  const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita" });
-  const [meetPickModal, setMeetPickModal] = useState({ open: false, center: null });
+  
+  // Driver current location (auto)
+  const [driverGeo, setDriverGeo] = useState({ lat: null, lng: null, ts: 0 });
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        setDriverGeo({ lat: pos.coords.latitude, lng: pos.coords.longitude, ts: Date.now() });
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
+    );
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
+
+  // Map picker modal (YandexGo style: center pin, move map)
+  const [pickerModal, setPickerModal] = useState({ open: false, target: "meet" });
+  const [pickerState, setPickerState] = useState({ lat: null, lng: null, address: "" });
+  const pickerMapRef = useRef(null);
+  const leafletRef = useRef({ L: null, map: null, markerEl: null });
+
+const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita" });
   const openMapEmbed = ({ title = "Xarita", lat, lng, sLat, sLng, mode = "pin" }) => {
     const safe = (v) => String(v ?? "").trim();
     const qLat = safe(lat), qLng = safe(lng);
@@ -380,8 +217,155 @@ export default function DriverInterProvincial({ onBack }) {
     setMapModal({ open: true, url, title });
   };
 
+  // --- Leaflet loader (no npm) + YandexGo-like picker ---
+  const loadLeaflet = async () => {
+    if (leafletRef.current.L) return leafletRef.current.L;
+    // load css
+    if (!document.getElementById("leaflet-css")) {
+      const link = document.createElement("link");
+      link.id = "leaflet-css";
+      link.rel = "stylesheet";
+      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      document.head.appendChild(link);
+    }
+    // load js
+    await new Promise((resolve, reject) => {
+      if (window.L) return resolve();
+      const s = document.createElement("script");
+      s.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+      s.async = true;
+      s.onload = resolve;
+      s.onerror = reject;
+      document.body.appendChild(s);
+    });
+    leafletRef.current.L = window.L;
+    return window.L;
+  };
+
+  const reverseGeocodeOSM = async (lat, lng) => {
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?lat=${encodeURIComponent(
+        lat
+      )}&lon=${encodeURIComponent(lng)}&format=json&zoom=18&addressdetails=1`;
+      const res = await fetch(url, { headers: { "Accept": "application/json" } });
+      const js = await res.json();
+      return js?.display_name || "";
+    } catch {
+      return "";
+    }
+  };
+
+  useEffect(() => {
+    const run = async () => {
+      if (!pickerModal.open) return;
+
+      const L = await loadLeaflet();
+
+      // initial center
+      const initLat = pickerState.lat ?? driverGeo.lat ?? meetLat ?? 41.311081;
+      const initLng = pickerState.lng ?? driverGeo.lng ?? meetLng ?? 69.240562;
+
+      // destroy old map
+      try {
+        if (leafletRef.current.map) {
+          leafletRef.current.map.remove();
+          leafletRef.current.map = null;
+        }
+      } catch {}
+
+      const map = L.map(pickerMapRef.current, {
+        center: [initLat, initLng],
+        zoom: 15,
+        zoomControl: true,
+      });
+
+      leafletRef.current.map = map;
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap",
+      }).addTo(map);
+
+      // center pin overlay (not draggable)
+      const pin = document.createElement("div");
+      pin.style.position = "absolute";
+      pin.style.left = "50%";
+      pin.style.top = "50%";
+      pin.style.transform = "translate(-50%, -100%)";
+      pin.style.zIndex = "999";
+      pin.style.width = "26px";
+      pin.style.height = "26px";
+      pin.style.borderRadius = "50%";
+      pin.style.background = "rgba(255, 193, 7, 0.95)";
+      pin.style.boxShadow = "0 8px 20px rgba(0,0,0,0.35)";
+      pin.style.border = "2px solid rgba(0,0,0,0.25)";
+      pin.title = "Markaz";
+      leafletRef.current.markerEl = pin;
+
+      const wrap = pickerMapRef.current?.parentElement;
+      if (wrap && !wrap.querySelector(".center-pin")) {
+        pin.className = "center-pin";
+        wrap.style.position = "relative";
+        wrap.appendChild(pin);
+      }
+
+      let timer = null;
+      const updateCenter = async () => {
+        const c = map.getCenter();
+        const lat = +c.lat.toFixed(6);
+        const lng = +c.lng.toFixed(6);
+        setPickerState((p) => ({ ...p, lat, lng }));
+        const addr = await reverseGeocodeOSM(lat, lng);
+        setPickerState((p) => ({ ...p, address: addr || p.address }));
+      };
+
+      // initial
+      await updateCenter();
+
+      map.on("moveend", () => {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(updateCenter, 250);
+      });
+    };
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickerModal.open]);
+
+  const openPickupPicker = async () => {
+    try {
+      // Prefer current geolocation as start
+      let base = null;
+      try {
+        base = await getMyGeo();
+      } catch {
+        base = null;
+      }
+      if (base?.lat && base?.lng) {
+        setPickerState({ lat: base.lat, lng: base.lng, address: "" });
+      } else {
+        setPickerState({ lat: meetLat ?? null, lng: meetLng ?? null, address: meetAddress || "" });
+      }
+      setPickerModal({ open: true, target: "meet" });
+    } catch (e) {
+      console.error(e);
+      message.error("Lokatsiya oynasini ochib bo‘lmadi");
+    }
+  };
+
+  const applyPickerToMeet = () => {
+    if (!pickerState.lat || !pickerState.lng) {
+      message.error("Lokatsiya tanlanmadi");
+      return;
+    }
+    setMeetLat(pickerState.lat);
+    setMeetLng(pickerState.lng);
+    setMeetAddress(pickerState.address || "");
+    setPickerModal({ open: false, target: "meet" });
+    message.success("Ketish joyi tanlandi");
+  };
+
+
   const [loading, setLoading] = useState(true);
-  const [acceptingIds, setAcceptingIds] = useState(() => new Set());
   const [submitting, setSubmitting] = useState(false);
   const [errorText, setErrorText] = useState("");
 
@@ -402,14 +386,13 @@ export default function DriverInterProvincial({ onBack }) {
 
   // pickup/destination extra
   const [pickupMode, setPickupMode] = useState("meet_point"); // meet_point | home_pickup
+  const [deliveryService, setDeliveryService] = useState(false); // eltish xizmati
   const [meetLat, setMeetLat] = useState(null);
   const [meetLng, setMeetLng] = useState(null);
   const [meetAddress, setMeetAddress] = useState("");
   const [destLat, setDestLat] = useState(null);
   const [destLng, setDestLng] = useState(null);
   const [destAddress, setDestAddress] = useState("");
-
-  const [deliveryService, setDeliveryService] = useState(false);
 
   // Swap direction to quickly create a "return" ride draft
   const prepareReturnDraft = () => {
@@ -523,90 +506,88 @@ export default function DriverInterProvincial({ onBack }) {
     });
 
     setPickupMode(o.pickup_mode || "meet_point");
+    setDeliveryService(!!o.delivery_service);
     setMeetLat(o.meet_lat ?? null);
     setMeetLng(o.meet_lng ?? null);
     setMeetAddress(o.meet_address || "");
     setDestLat(o.dest_lat ?? null);
     setDestLng(o.dest_lng ?? null);
     setDestAddress(o.dest_address || "");
-    setDeliveryService(!!o.delivery_service);
   };
 
   const loadDriverData = async () => {
-try {
-  setLoading(true);
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
+    if (!user) {
+      setActiveAd(null);
+      setRequests([]);
+      setAccepted([]);
+      setNotifications([]);
+      setDriverBalance(null);
+      return;
+    }
 
-  const {
-    data: { user },
-    error: userErr,
-  } = await supabase.auth.getUser();
-  if (userErr) throw userErr;
+    const bal = await loadDriverBalance(user.id);
+    setDriverBalance(bal);
 
-  if (!user) {
-    setActiveAd(null);
-    setRequests([]);
-    setAccepted([]);
-    return;
-  }
+    const { data: ad, error: adErr } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("driver_id", user.id)
+      .eq("service_type", "inter_prov")
+      .in("status", ["pending", "booked"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  // 1) Active ride
-  const { data: ride, error: rideErr } = await supabase
-    .from("inter_prov_rides")
-    .select("*")
-    .eq("driver_id", user.id)
-    .in("status", ["open", "active"])
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    if (adErr) {
+      // no active ad
+      setActiveAd(null);
+      setRequests([]);
+      setAccepted([]);
+    } else {
+      setActiveAd(ad);
+      fillFormFromActive(ad);
 
-  if (rideErr) throw rideErr;
+      const { data: reqs } = await supabase
+        .from("trip_booking_requests")
+        .select("*")
+        .eq("order_id", ad.id)
+        .eq("status", "requested")
+        .order("created_at", { ascending: false });
+      // Auto-expire requests older than 2 hours (if not accepted)
+      try {
+        const now = Date.now();
+        const expiredIds = (reqs || [])
+          .filter((r) => r?.created_at && now - new Date(r.created_at).getTime() > 2 * 60 * 60 * 1000)
+          .map((r) => r.id);
+        if (expiredIds.length) {
+          await supabase
+            .from("trip_booking_requests")
+            .update({ status: "expired", updated_at: new Date().toISOString() })
+            .in("id", expiredIds)
+            .eq("status", "requested");
+        }
+      } catch {}
 
-  if (!ride) {
-    setActiveAd(null);
-    setRequests([]);
-    setAccepted([]);
-    return;
-  }
 
-  // 2) Fetch bookings for this ride
-  const { data: bookings, error: bErr } = await supabase
-    .from("inter_prov_bookings")
-    .select("*")
-    .eq("ride_id", ride.id)
-    .order("created_at", { ascending: false });
+      const { data: accs } = await supabase
+        .from("trip_booking_requests")
+        .select("*")
+        .eq("driver_id", user.id)
+        .eq("order_id", ad.id)
+        .eq("status", "accepted")
+        .order("updated_at", { ascending: false });
 
-  if (bErr) throw bErr;
+      setRequests(reqs || []);
+      setAccepted(accs || []);
+    }
 
-  const req = (bookings || []).filter((b) => b.status === "requested" || b.status === "pending");
-  const acc = (bookings || []).filter((b) => b.status === "accepted");
-
-  const acceptedSeats = acc.reduce((sum, b) => sum + Number(b.seats || 0), 0);
-  const seats_total = Number(ride.seats || 0);
-  const seats_available = Math.max(0, seats_total - acceptedSeats);
-
-  const scheduled_at = ride.ride_date && ride.ride_time ? `${ride.ride_date}T${ride.ride_time}` : null;
-
-  // Keep UI compatibility with previous fields
-  setActiveAd({
-    ...ride,
-    seats_total,
-    seats_available,
-    scheduled_at,
-    service_type: "inter_prov",
-    delivery_service: false,
-  });
-
-  setRequests(req);
-  setAccepted(acc);
-} catch (e) {
-  console.error("loadDriverData error:", e);
-  setActiveAd(null);
-  setRequests([]);
-  setAccepted([]);
-} finally {
-  setLoading(false);
-}
-};
+    try {
+      const nots = await loadNotifications(user.id);
+      setNotifications(nots);
+    } catch (e) {}
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -624,12 +605,12 @@ try {
         if (user && isMounted) {
           channel = supabase
             .channel("driver-interprov-live")
-            .on("postgres_changes", { event: "*", schema: "public", table: "inter_prov_rides" }, (payload) => {
+            .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, (payload) => {
               const row = payload?.new || payload?.old;
               if (!row) return;
               if (row.driver_id === user.id) loadDriverData();
             })
-            .on("postgres_changes", { event: "*", schema: "public", table: "inter_prov_bookings" }, (payload) => {
+            .on("postgres_changes", { event: "*", schema: "public", table: "trip_booking_requests" }, (payload) => {
               const row = payload?.new || payload?.old;
               if (!row) return;
               if (row.driver_id === user.id) loadDriverData();
@@ -663,201 +644,187 @@ try {
   }, [formData]);
 
   const createAd = async () => {
-try {
-  setCreating(true);
+    if (!validate()) return;
 
-  const {
-    data: { user },
-    error: userErr,
-  } = await supabase.auth.getUser();
-  if (userErr) throw userErr;
-  if (!user) {
-    alert("Avval tizimga kiring (login).");
-    return;
-  }
+    setSubmitting(true);
+    try {
+      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      if (authErr) throw authErr;
+      const user = authData?.user;
+      if (!user) return message.error("Avval login qiling");
 
-  const seatsTotal = Number(formData.seatsTotal || 0);
-  if (!Number.isFinite(seatsTotal) || seatsTotal <= 0) {
-    alert("O'rinlar soni noto‘g‘ri.");
-    return;
-  }
+      if (ACCEPT_FEE_SUM > 0) {
+        const bal = Number(driverBalance ?? 0);
+        if (!Number.isFinite(bal) || bal < ACCEPT_FEE_SUM) {
+          return message.error(`Balans yetarli emas. Qabul qilish narxi: ${ACCEPT_FEE_SUM} so‘m`);
+        }
+      }
 
-  const priceNum = Number(formData.price || 0);
-  if (!Number.isFinite(priceNum) || priceNum < 0) {
-    alert("Narx noto‘g‘ri.");
-    return;
-  }
+      const scheduledAtObj = dayjs(`${formData.date} ${formData.time}`, "YYYY-MM-DD HH:mm");
 
-  // Map to inter_prov_rides schema
-  const payload = {
-    driver_id: user.id,
-    from_region: formData.fromRegion || null,
-    from_district: formData.fromDistrict || null,
-    to_region: formData.toRegion || null,
-    to_district: formData.toDistrict || null,
-    pickup_location: formData.pickupLocation || null,
-    dropoff_location: formData.dropoffLocation || null,
-    pickup_mode: formData.pickupMode || "meet_point",
-    meet_lat: formData.meetLat ?? null,
-    meet_lng: formData.meetLng ?? null,
-    meet_address: formData.meetAddress || null,
-    dest_lat: formData.destLat ?? null,
-    dest_lng: formData.destLng ?? null,
-    dest_address: formData.destAddress || null,
-    seats: seatsTotal,
-    price: Math.trunc(priceNum),
-    ride_date: formData.date || null,
-    ride_time: formData.time || null,
-    status: "open",
+      if (scheduledAtObj.isBefore(dayjs(), 'day') || scheduledAtObj.isBefore(dayjs(), 'minute')) {
+        message.error("Ketish vaqti o'tgan bo'lishi mumkin emas!");
+        setSubmitting(false);
+        return;
+      }
+
+      const scheduledAt = scheduledAtObj.toISOString();
+
+      const payload = {
+        driver_id: user.id,
+        client_id: null,
+        service_type: "inter_prov",
+        status: "pending",
+
+        from_region: formData.fromRegion,
+        from_district: (formData.fromDistrict || "").trim(),
+        to_region: formData.toRegion,
+        to_district: (formData.toDistrict || "").trim(),
+
+        scheduled_at: scheduledAt,
+        seats_total: formData.seatsTotal,
+        seats_available: formData.seatsTotal,
+
+        pickup_location: `${formData.fromRegion}, ${districtLabel(formData.fromDistrict)}`,
+        dropoff_location: `${formData.toRegion}, ${districtLabel(formData.toDistrict)}`,
+        price: formData.price,
+        gender_pref: normalizeGender(formData.genderPref),
+
+        pickup_mode: pickupMode,
+        delivery_service: deliveryService,
+        meet_lat: meetLat,
+        meet_lng: meetLng,
+        meet_address: meetAddress || null,
+        dest_lat: null,
+        dest_lng: null,
+        dest_address: null,
+      };
+
+      const { data, error } = await supabase.from("orders").insert(payload).select("*").maybeSingle();
+      if (error) throw error;
+
+      setActiveAd(data);
+      setRequests([]);
+      setAccepted([]);
+      setEditMode(false);
+      message.success("E’lon yaratildi!");
+    } catch (e) {
+      console.error(e);
+      message.error(e?.message || "Xatolik!");
+    } finally {
+      setSubmitting(false);
+    }
   };
-
-  const { data: ins, error } = await supabase.from("inter_prov_rides").insert(payload).select("*").single();
-  if (error) throw error;
-
-  // Compute UI fields to keep the rest of component unchanged
-  const scheduled_at =
-    payload.ride_date && payload.ride_time ? `${payload.ride_date}T${payload.ride_time}` : null;
-
-  const uiAd = {
-    ...ins,
-    seats_total: payload.seats,
-    seats_available: payload.seats, // will be recalculated on refresh
-    scheduled_at,
-    service_type: "inter_prov",
-    delivery_service: false,
-  };
-
-  setActiveAd(uiAd);
-  setEditMode(true);
-  setShowCreate(false);
-
-  await loadDriverData();
-} catch (e) {
-  console.error("createAd error:", e);
-  alert(e?.message || "E'lon yaratishda xatolik.");
-} finally {
-  setCreating(false);
-}
-};
 
   const saveEdits = async () => {
-try {
-  if (!activeAd?.id) return;
+    if (!activeAd) return;
+    if (!validate()) return;
 
-  setSaving(true);
+    setSubmitting(true);
+    try {
+      const scheduledAtObj = dayjs(`${formData.date} ${formData.time}`, "YYYY-MM-DD HH:mm");
 
-  const seatsTotal = Number(editForm.seatsTotal || 0);
-  if (!Number.isFinite(seatsTotal) || seatsTotal <= 0) {
-    alert("O'rinlar soni noto‘g‘ri.");
-    return;
-  }
+      if (scheduledAtObj.isBefore(dayjs(), 'day') || scheduledAtObj.isBefore(dayjs(), 'minute')) {
+        message.error("Ketish vaqti o'tgan bo'lishi mumkin emas!");
+        setSubmitting(false);
+        return;
+      }
 
-  const priceNum = Number(editForm.price || 0);
-  if (!Number.isFinite(priceNum) || priceNum < 0) {
-    alert("Narx noto‘g‘ri.");
-    return;
-  }
+      const scheduledAt = scheduledAtObj.toISOString();
 
-  const payload = {
-    from_region: editForm.fromRegion || null,
-    from_district: editForm.fromDistrict || null,
-    to_region: editForm.toRegion || null,
-    to_district: editForm.toDistrict || null,
-    pickup_location: editForm.pickupLocation || null,
-    dropoff_location: editForm.dropoffLocation || null,
-    pickup_mode: editForm.pickupMode || "meet_point",
-    meet_lat: editForm.meetLat ?? null,
-    meet_lng: editForm.meetLng ?? null,
-    meet_address: editForm.meetAddress || null,
-    dest_lat: editForm.destLat ?? null,
-    dest_lng: editForm.destLng ?? null,
-    dest_address: editForm.destAddress || null,
-    seats: seatsTotal,
-    price: Math.trunc(priceNum),
-    ride_date: editForm.date || null,
-    ride_time: editForm.time || null,
-    status: activeAd.status || "open",
+      const hasRequestsOrAccepted = requests.length + accepted.length > 0;
+      const seatsPatch = hasRequestsOrAccepted ? {} : { seats_total: formData.seatsTotal, seats_available: formData.seatsTotal };
+
+      const patch = {
+        from_region: formData.fromRegion,
+        from_district: (formData.fromDistrict || "").trim(),
+        to_region: formData.toRegion,
+        to_district: (formData.toDistrict || "").trim(),
+        scheduled_at: scheduledAt,
+        price: formData.price,
+        gender_pref: normalizeGender(formData.genderPref),
+        pickup_mode: pickupMode,
+        delivery_service: deliveryService,
+        meet_lat: meetLat,
+        meet_lng: meetLng,
+        meet_address: meetAddress || null,
+        dest_lat: null,
+        dest_lng: null,
+        dest_address: null,
+        pickup_location: `${formData.fromRegion}, ${districtLabel(formData.fromDistrict)}`,
+        dropoff_location: `${formData.toRegion}, ${districtLabel(formData.toDistrict)}`,
+        ...seatsPatch,
+      };
+
+      const { data, error } = await supabase.from("orders").update(patch).eq("id", activeAd.id).select("*").maybeSingle();
+      if (error) throw error;
+
+      setActiveAd(data);
+      setEditMode(false);
+
+      // optional notify
+      try {
+        await supabase.from("notifications").insert({
+          user_id: data.driver_id,
+          type: "order_updated",
+          title: "E’lon yangilandi",
+          body: `Yangilandi: ${routeText(data)}`,
+          order_id: data.id,
+        });
+      } catch (e) {}
+
+      message.success("Saqlangan!");
+    } catch (e) {
+      console.error(e);
+      message.error(e?.message || "Saqlashda xatolik!");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const { data: upd, error } = await supabase
-    .from("inter_prov_rides")
-    .update(payload)
-    .eq("id", activeAd.id)
-    .select("*")
-    .single();
-
-  if (error) throw error;
-
-  const scheduled_at = payload.ride_date && payload.ride_time ? `${payload.ride_date}T${payload.ride_time}` : null;
-
-  setActiveAd((prev) => ({
-    ...prev,
-    ...upd,
-    seats_total: payload.seats,
-    scheduled_at,
-  }));
-
-  await loadDriverData();
-  setEditMode(false);
-} catch (e) {
-  console.error("saveEdits error:", e);
-  alert(e?.message || "Saqlashda xatolik.");
-} finally {
-  setSaving(false);
-}
-};
-
   const cancelAd = async () => {
-try {
-  if (!activeAd?.id) return;
+    if (!activeAd) return;
+    setSubmitting(true);
+    try {
+      const { error } = await supabase.from("orders").update({ status: "cancelled" }).eq("id", activeAd.id);
+      if (error) throw error;
 
-  if (!confirm("E'lonni yopmoqchimisiz?")) return;
-
-  setCancelling(true);
-
-  // Prefer RPC if exists, else update status directly
-  const { error: rpcErr } = await supabase.rpc("cancel_booking", { p_ride_id: activeAd.id });
-
-  if (rpcErr) {
-    const { error } = await supabase.from("inter_prov_rides").update({ status: "cancelled" }).eq("id", activeAd.id);
-    if (error) throw error;
-
-    // Also cancel pending bookings
-    await supabase.from("inter_prov_bookings").update({ status: "cancelled" }).eq("ride_id", activeAd.id);
-  }
-
-  setActiveAd(null);
-  setRequests([]);
-  setAccepted([]);
-} catch (e) {
-  console.error("cancelAd error:", e);
-  alert(e?.message || "Bekor qilishda xatolik.");
-} finally {
-  setCancelling(false);
-}
-};
+      setActiveAd(null);
+      setRequests([]);
+      setAccepted([]);
+      setEditMode(false);
+      message.success("E’lon bekor qilindi.");
+    } catch (e) {
+      console.error(e);
+      message.error(e?.message || "Xatolik!");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const finishTrip = async () => {
-try {
-  if (!activeAd?.id) return;
+    if (!activeAd) return;
+    setSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from("orders")
+        .update({ status: "completed", completed_at: new Date().toISOString() })
+        .eq("id", activeAd.id);
+      if (error) throw error;
 
-  if (!confirm("Safarni yakunlash (yopish)ni xohlaysizmi?")) return;
-
-  setFinishing(true);
-
-  const { error } = await supabase.from("inter_prov_rides").update({ status: "closed" }).eq("id", activeAd.id);
-  if (error) throw error;
-
-  setActiveAd(null);
-  setRequests([]);
-  setAccepted([]);
-} catch (e) {
-  console.error("finishTrip error:", e);
-  alert(e?.message || "Yakunlashda xatolik.");
-} finally {
-  setFinishing(false);
-}
-};
+      message.success("Safar yakunlandi (manzilga yetib keldik). Yangi buyurtma berishingiz mumkin.");
+      // keep draft for quick re-create
+      setActiveAd(null);
+      setRequests([]);
+      setAccepted([]);
+      setEditMode(false);
+    } catch (e) {
+      console.error(e);
+      message.error(e?.message || "Safarni yakunlashda xatolik!");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const openNotifications = async () => {
     setNotifOpen(true);
@@ -874,68 +841,78 @@ try {
   };
 
   const acceptRequest = async (bookingId) => {
-try {
-  if (!req?.id) return;
+    if (!activeAd) return;
+    setSubmitting(true);
+    try {
+      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      if (authErr) throw authErr;
+      const user = authData?.user;
+      if (!user) return message.error("Avval login qiling");
 
-  setActionLoading((prev) => ({ ...prev, [req.id]: true }));
+      if (ACCEPT_FEE_SUM > 0) {
+        const bal = Number(driverBalance ?? 0);
+        if (!Number.isFinite(bal) || bal < ACCEPT_FEE_SUM) {
+          return message.error(`Balans yetarli emas. Qabul qilish narxi: ${ACCEPT_FEE_SUM} so‘m`);
+        }
+      }
 
-  // Try RPC first (recommended to enforce seat checks)
-  let rpcOk = false;
+      const { error } = await supabase
+        .from("trip_booking_requests")
+        .update({
+          status: "accepted",
+          driver_id: user.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", bookingId)
+        .eq("status", "requested");
+      if (error) throw error;
 
-  const { error: rpcErr1 } = await supabase.rpc("accept_inter_prov_booking", { p_booking_id: req.id });
-  if (!rpcErr1) rpcOk = true;
-
-  if (!rpcOk) {
-    const { error: rpcErr2 } = await supabase.rpc("accept_booking_request_v2", { p_booking_id: req.id });
-    if (!rpcErr2) rpcOk = true;
-  }
-
-  if (!rpcOk) {
-    const { error } = await supabase
-      .from("inter_prov_bookings")
-      .update({ status: "accepted", accepted_at: new Date().toISOString() })
-      .eq("id", req.id);
-    if (error) throw error;
-  }
-
-  await loadDriverData();
-} catch (e) {
-  console.error("acceptRequest error:", e);
-  alert(e?.message || "Qabul qilishda xatolik.");
-} finally {
-  setActionLoading((prev) => ({ ...prev, [req?.id]: false }));
-}
-};
+      message.success("So‘rov qabul qilindi. Telefon endi ko‘rinadi.");
+      await loadDriverData();
+    } catch (e) {
+      console.error(e);
+      message.error(e?.message || "Qabul qilishda xatolik!");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const rejectRequest = async (bookingId) => {
-try {
-  if (!req?.id) return;
+    if (!activeAd) return;
+    setSubmitting(true);
+    try {
+      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      if (authErr) throw authErr;
+      const user = authData?.user;
+      if (!user) return message.error("Avval login qiling");
 
-  setActionLoading((prev) => ({ ...prev, [req.id]: true }));
+      if (ACCEPT_FEE_SUM > 0) {
+        const bal = Number(driverBalance ?? 0);
+        if (!Number.isFinite(bal) || bal < ACCEPT_FEE_SUM) {
+          return message.error(`Balans yetarli emas. Qabul qilish narxi: ${ACCEPT_FEE_SUM} so‘m`);
+        }
+      }
 
-  let rpcOk = false;
+      const { error } = await supabase
+        .from("trip_booking_requests")
+        .update({
+          status: "rejected",
+          driver_id: user.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", bookingId)
+        .eq("status", "requested");
+      if (error) throw error;
 
-  const { error: rpcErr1 } = await supabase.rpc("reject_inter_prov_booking", { p_booking_id: req.id });
-  if (!rpcErr1) rpcOk = true;
-
-  if (!rpcOk) {
-    const { error: rpcErr2 } = await supabase.rpc("reject_booking_request", { p_booking_id: req.id });
-    if (!rpcErr2) rpcOk = true;
-  }
-
-  if (!rpcOk) {
-    const { error } = await supabase.from("inter_prov_bookings").update({ status: "rejected" }).eq("id", req.id);
-    if (error) throw error;
-  }
-
-  await loadDriverData();
-} catch (e) {
-  console.error("rejectRequest error:", e);
-  alert(e?.message || "Rad etishda xatolik.");
-} finally {
-  setActionLoading((prev) => ({ ...prev, [req?.id]: false }));
-}
-};
+      message.success("So‘rov rad etildi. Joy qaytarildi.");
+      await loadDriverData();
+    } catch (e) {
+      console.error(e);
+      message.error(e?.message || "Rad etishda xatolik!");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
@@ -1000,20 +977,6 @@ try {
             />
           )}
         </Modal>
-
-      <LocationPickerModal
-        open={meetPickModal.open}
-        title="Ketish joyini xaritadan tanlang"
-        initialCenter={meetPickModal.center}
-        onCancel={() => setMeetPickModal({ open: false, center: null })}
-        onSelect={({ lat, lng, address }) => {
-          setMeetLat(lat);
-          setMeetLng(lng);
-          if (address) setMeetAddress(address);
-          setMeetPickModal({ open: false, center: null });
-        }}
-      />
-
       <Modal
         title={mapModal.title}
         open={mapModal.open}
@@ -1031,6 +994,47 @@ try {
             referrerPolicy="no-referrer-when-downgrade"
           />
         ) : null}
+      </Modal>
+
+      <Modal
+        title="Ketish joyini xaritadan tanlash"
+        open={pickerModal.open}
+        onCancel={() => setPickerModal({ open: false, target: "meet" })}
+        footer={null}
+        width="100%"
+        style={{ top: 0, padding: 0 }}
+        bodyStyle={{ padding: 0, height: "calc(100vh - 55px)" }}
+        centered
+      >
+        <div style={{ position: "relative", width: "100%", height: "calc(100vh - 55px)" }}>
+          <div ref={pickerMapRef} style={{ width: "100%", height: "100%" }} />
+          <div
+            style={{
+              position: "absolute",
+              left: 12,
+              right: 12,
+              bottom: 12,
+              padding: 12,
+              borderRadius: 12,
+              background: "rgba(0,0,0,0.55)",
+              backdropFilter: "blur(10px)",
+              color: "white",
+            }}
+          >
+            <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 6 }}>
+              Xaritani siljiting — o‘rtadagi belgi turgan joy tanlanadi
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
+              {pickerState.address || "Manzil aniqlanmoqda..."}
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <Button onClick={() => setPickerModal({ open: false, target: "meet" })}>Bekor</Button>
+              <Button type="primary" onClick={applyPickerToMeet}>
+                Tanlash
+              </Button>
+            </div>
+          </div>
+        </div>
       </Modal>
 
 
@@ -1220,6 +1224,13 @@ try {
                       size="large"
                       options={GENDER_OPTIONS}
                     />
+                    <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10 }}>
+                      <Switch checked={deliveryService} onChange={(v) => setDeliveryService(!!v)} />
+                      <Text style={{ fontWeight: 600 }}>Eltish xizmati</Text>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        (belgilansa yo‘lovchi tomonda “Eltish xizmati” bo‘limida chiqadi)
+                      </Text>
+                    </div>
                     <Text type="secondary" style={{ fontSize: 12 }}>* Kimlar uchun: erkak/ayol/hamma.</Text>
                   </Col>
                   <Col xs={24} md={12}>
@@ -1239,12 +1250,6 @@ try {
                         ? "* Yo‘lovchi so‘rov yuborganda uy lokatsiyasini yuboradi, siz acceptdan keyin ko‘rasiz."
                         : "* Yo‘lovchi siz belgilagan ketish joyiga keladi."}
                     </Text>
-
-                    <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10 }}>
-                      <Switch checked={deliveryService} onChange={(v) => setDeliveryService(v)} />
-                      <Text strong>Eltish xizmati</Text>
-                      <Text type="secondary" style={{ fontSize: 12 }}>* Belgilansa yo‘lovchi tomonda “Eltish xizmati” bo‘limida chiqadi.</Text>
-                    </div>
                   </Col>
                   <Col xs={24} md={12}>
                     <Text type="secondary">Ketish joyi (meet point)</Text>
@@ -1256,37 +1261,25 @@ try {
                             const p = await getMyGeo();
                             setMeetLat(p.lat);
                             setMeetLng(p.lng);
+                            const addr = await reverseGeocodeOSM(p.lat, p.lng);
+                            if (addr) setMeetAddress(addr);
                             message.success("Ketish joyi lokatsiyasi olindi");
                           } catch (e) {
                             message.error("Lokatsiyani olishda xatolik");
                           }
                         }}
                       >
-                        Geolokatsiya
+                        Geolokatsiyadan olish
                       </Button>
+
+                      <Button onClick={openPickupPicker}>Xaritadan tanlash</Button>
+
                       {meetLat != null && meetLng != null ? (
-                        <>
-                          <Button onClick={() => openMapEmbed({ title: "Xarita", lat: meetLat, lng: meetLng, mode: "pin" })}>Xarita</Button>
-                          <Button onClick={() => openMapEmbed({ title: "Yo‘l", lat: meetLat, lng: meetLng, sLat: meetLat, sLng: meetLng, mode: "route" })}>Yo‘l</Button>
-                        </>
+                        <Button onClick={() => openMapEmbed({ title: "Ketish joyi", lat: meetLat, lng: meetLng, mode: "pin" })}>
+                          Ko‘rish
+                        </Button>
                       ) : null}
                     </Space>
-                    <Row gutter={8} style={{ marginTop: 8 }}>
-                      <Col xs={12}>
-                        <Input
-                          value={meetLat ?? ""}
-                          onChange={(e) => setMeetLat(e.target.value === "" ? null : Number(e.target.value))}
-                          placeholder="Lat (masalan: 42.46)"
-                        />
-                      </Col>
-                      <Col xs={12}>
-                        <Input
-                          value={meetLng ?? ""}
-                          onChange={(e) => setMeetLng(e.target.value === "" ? null : Number(e.target.value))}
-                          placeholder="Lng (masalan: 59.61)"
-                        />
-                      </Col>
-                    </Row>
                     <Input value={meetAddress} onChange={(e) => setMeetAddress(e.target.value)} placeholder="Masalan: Nukus avtovokzal" style={{ marginTop: 8 }} />
                   </Col>
                 </Row>
@@ -1296,9 +1289,9 @@ try {
                 <Row gutter={12}>
                   <Col xs={24} md={12}>
                     <Text type="secondary">Borish lokatsiyasi shart emas</Text>
-                    <Text type="secondary" style={{ fontSize: 12, display: "block", marginTop: 6 }}>
-                      * Boradigan joy yuqorida (viloyat/tuman) bilan ma’lum. Lokatsiya belgilash kerak emas.
-                    </Text>
+                    <div style={{ marginTop: 8, opacity: 0.85, fontSize: 12 }}>
+                      Boradigan joy viloyat/tuman orqali aniqlanadi. Lokatsiya koordinatasi kiritish shart emas.
+                    </div>
                   </Col>
                   <Col xs={24} md={12}>
                     <Button type="primary" size="large" block icon={<SaveOutlined />} onClick={saveEdits} loading={submitting} style={{ borderRadius: 14, height: 48, marginTop: 24 }}>
@@ -1329,9 +1322,22 @@ try {
                           renderItem={(b) => (
                             <List.Item
                               actions={[
-                                <Button key="accept" type="primary" icon={<CheckOutlined />} loading={submitting} onClick={() => acceptRequest(b.id)}>
-                                  Qabul qilish
-                                </Button>,
+                                <div
+                                  key="acceptWrap"
+                                  style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4 }}
+                                >
+                                  <Button
+                                    type="primary"
+                                    icon={<CheckOutlined />}
+                                    loading={submitting}
+                                    onClick={() => acceptRequest(b.id)}
+                                  >
+                                    Qabul qilish
+                                  </Button>
+                                  <span style={{ fontSize: 11, opacity: 0.8 }}>
+                                    (Qabul qilsangiz hisobingizdan {ACCEPT_FEE_SUM.toLocaleString()} so‘m yechiladi)
+                                  </span>
+                                </div>,
                                 <Button key="reject" danger icon={<CloseOutlined />} loading={submitting} onClick={() => rejectRequest(b.id)}>
                                   Rad etish
                                 </Button>,
@@ -1401,7 +1407,12 @@ try {
 
                                     {b.pickup_address ? (
                                       <div style={{ marginTop: 6 }}>
-                                        <Tag color="purple">Uy manzili</Tag> <b>{b.pickup_address}</b>
+                                        <Tag color="purple">Uy manzili</Tag> <b style={{ cursor: "pointer" }} onClick={() => openMapEmbed({ title: "Yo‘l", lat: b.pickup_lat, lng: b.pickup_lng, sLat: driverGeo.lat, sLng: driverGeo.lng, mode: "route" })}>{b.pickup_address}</b>
+                                        <div style={{ marginTop: 8 }}>
+                                          <Button size="small" onClick={() => openMapEmbed({ title: "Yo‘l", lat: b.pickup_lat, lng: b.pickup_lng, sLat: driverGeo.lat, sLng: driverGeo.lng, mode: "route" })}>
+                                            Navigator (yo‘l ko‘rsatish)
+                                          </Button>
+                                        </div>
                                       </div>
                                     ) : null}
 

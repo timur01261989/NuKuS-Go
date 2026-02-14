@@ -16,6 +16,7 @@ import {
   Divider,
   Modal,
   Input,
+  Switch,
   List,
 } from "antd";
 import {
@@ -97,189 +98,6 @@ const routeText = (o) => {
   return `${fromR} / ${fromD}  →  ${toR} / ${toD}`;
 };
 
-
-
-/** Leaflet CDN loader (no new tab map picker) */
-const loadLeafletCDN = () =>
-  new Promise((resolve, reject) => {
-    if (typeof window !== "undefined" && window.L) return resolve(window.L);
-    const idCss = "leaflet-css-cdn";
-    const idJs = "leaflet-js-cdn";
-
-    const ensureCss = () => {
-      if (document.getElementById(idCss)) return;
-      const link = document.createElement("link");
-      link.id = idCss;
-      link.rel = "stylesheet";
-      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-      link.integrity = "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=";
-      link.crossOrigin = "";
-      document.head.appendChild(link);
-    };
-
-    const ensureJs = () => {
-      if (document.getElementById(idJs)) return;
-      const script = document.createElement("script");
-      script.id = idJs;
-      script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-      script.integrity = "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=";
-      script.crossOrigin = "";
-      script.async = true;
-      script.onload = () => resolve(window.L);
-      script.onerror = () => reject(new Error("Leaflet yuklanmadi"));
-      document.body.appendChild(script);
-    };
-
-    try {
-      ensureCss();
-      ensureJs();
-    } catch (e) {
-      reject(e);
-    }
-  });
-
-const reverseGeocodeOSM = async (lat, lng) => {
-  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(
-    lat
-  )}&lon=${encodeURIComponent(lng)}`;
-  const res = await fetch(url, {
-    headers: { "Accept": "application/json" },
-  });
-  if (!res.ok) throw new Error("Manzil topilmadi");
-  const data = await res.json();
-  return data?.display_name || "";
-};
-
-const LocationPickerModal = ({ open, title = "Xaritadan tanlash", initialCenter, onCancel, onSelect }) => {
-  const [loading, setLoading] = useState(false);
-  const [addr, setAddr] = useState("");
-  const [center, setCenter] = useState(initialCenter || { lat: 41.311081, lng: 69.240562 }); // Tashkent
-  const mapId = useMemo(() => `leaflet_pick_${Math.random().toString(36).slice(2)}`, []);
-
-  useEffect(() => {
-    if (!open) return;
-    let map;
-    let cancelled = false;
-
-    const init = async () => {
-      try {
-        setLoading(true);
-        const L = await loadLeafletCDN();
-        if (cancelled) return;
-
-        const el = document.getElementById(mapId);
-        if (!el) return;
-
-        // cleanup old
-        if (el._leaflet_id) {
-          try { el._leaflet_id = null; } catch {}
-        }
-
-        map = L.map(el, { zoomControl: true }).setView([center.lat, center.lng], 15);
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          maxZoom: 19,
-          attribution: "&copy; OpenStreetMap",
-        }).addTo(map);
-
-        const updateCenter = async () => {
-          const c = map.getCenter();
-          const next = { lat: Number(c.lat), lng: Number(c.lng) };
-          setCenter(next);
-          try {
-            const a = await reverseGeocodeOSM(next.lat, next.lng);
-            if (!cancelled) setAddr(a);
-          } catch {
-            if (!cancelled) setAddr("");
-          }
-        };
-
-        map.on("moveend", updateCenter);
-        // initial reverse
-        await updateCenter();
-
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    init();
-
-    return () => {
-      cancelled = true;
-      try {
-        if (map) map.remove();
-      } catch {}
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
-  return (
-    <Modal
-      open={open}
-      title={title}
-      onCancel={onCancel}
-      footer={[
-        <Button key="cancel" onClick={onCancel}>Bekor qilish</Button>,
-        <Button
-          key="ok"
-          type="primary"
-          onClick={() => onSelect?.({ ...center, address: addr })}
-          disabled={!center?.lat || !center?.lng}
-          loading={loading}
-        >
-          Tanlash
-        </Button>,
-      ]}
-      width="100%"
-      style={{ top: 0, padding: 0 }}
-      styles={{ body: { height: "calc(100vh - 140px)" } }}
-    >
-      <div style={{ position: "relative", height: "100%" }}>
-        <div id={mapId} style={{ height: "100%", width: "100%", borderRadius: 12, overflow: "hidden" }} />
-        {/* Center pin */}
-        <div
-          style={{
-            position: "absolute",
-            left: "50%",
-            top: "50%",
-            transform: "translate(-50%, -100%)",
-            zIndex: 999,
-            pointerEvents: "none",
-            fontSize: 34,
-            filter: "drop-shadow(0 6px 10px rgba(0,0,0,.45))",
-          }}
-        >
-          📍
-        </div>
-        <div
-          style={{
-            position: "absolute",
-            left: 12,
-            right: 12,
-            bottom: 12,
-            zIndex: 999,
-            background: "rgba(0,0,0,.55)",
-            border: "1px solid rgba(255,255,255,.15)",
-            borderRadius: 12,
-            padding: 10,
-            backdropFilter: "blur(6px)",
-          }}
-        >
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <Text style={{ color: "#fff" }}>
-              {loading ? "Manzil aniqlanmoqda..." : (addr || "Manzil topilmadi (lat/lng saqlanadi)")}
-            </Text>
-            <Text style={{ color: "rgba(255,255,255,.75)", marginLeft: "auto" }}>
-              {center.lat?.toFixed?.(6)}, {center.lng?.toFixed?.(6)}
-            </Text>
-          </div>
-        </div>
-      </div>
-    </Modal>
-  );
-};
-
-
 const statusLabel = (s) => {
   if (s === "requested") return { text: "So‘rov yuborildi", color: "gold" };
   if (s === "accepted") return { text: "Qabul qilindi", color: "green" };
@@ -310,8 +128,27 @@ const getMyGeo = async () => {
 export default function ClientInterProvincial({ onBack }) {
 
   // In-app map modal (no new tab)
-  const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita" });
-  const [pickModal, setPickModal] = useState({ open: false, center: null });
+  
+  // Client current location (auto)
+  const [clientGeo, setClientGeo] = useState({ lat: null, lng: null, ts: 0 });
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => setClientGeo({ lat: pos.coords.latitude, lng: pos.coords.longitude, ts: Date.now() }),
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
+    );
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
+
+  // Map picker modal (center pin)
+  const [pickerModal, setPickerModal] = useState({ open: false });
+  const [pickerState, setPickerState] = useState({ lat: null, lng: null, address: "" });
+  const pickerMapRef = useRef(null);
+  const leafletRef = useRef({ L: null, map: null, markerEl: null });
+
+  const [deliveryOnly, setDeliveryOnly] = useState(false); // Eltish xizmati filter
+const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita" });
   const openMapEmbed = ({ title = "Xarita", lat, lng, sLat, sLng, mode = "pin" }) => {
     const safe = (v) => String(v ?? "").trim();
     const qLat = safe(lat), qLng = safe(lng);
@@ -328,6 +165,132 @@ export default function ClientInterProvincial({ onBack }) {
     }
     setMapModal({ open: true, url, title });
   };
+
+  // --- Leaflet loader (no npm) + YandexGo-like picker ---
+  const loadLeaflet = async () => {
+    if (leafletRef.current.L) return leafletRef.current.L;
+    if (!document.getElementById("leaflet-css")) {
+      const link = document.createElement("link");
+      link.id = "leaflet-css";
+      link.rel = "stylesheet";
+      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      document.head.appendChild(link);
+    }
+    await new Promise((resolve, reject) => {
+      if (window.L) return resolve();
+      const s = document.createElement("script");
+      s.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+      s.async = true;
+      s.onload = resolve;
+      s.onerror = reject;
+      document.body.appendChild(s);
+    });
+    leafletRef.current.L = window.L;
+    return window.L;
+  };
+
+  const reverseGeocodeOSM = async (lat, lng) => {
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?lat=${encodeURIComponent(
+        lat
+      )}&lon=${encodeURIComponent(lng)}&format=json&zoom=18&addressdetails=1`;
+      const res = await fetch(url, { headers: { "Accept": "application/json" } });
+      const js = await res.json();
+      return js?.display_name || "";
+    } catch {
+      return "";
+    }
+  };
+
+  useEffect(() => {
+    const run = async () => {
+      if (!pickerModal.open) return;
+      const L = await loadLeaflet();
+      const initLat = pickerState.lat ?? clientGeo.lat ?? pickupLat ?? 41.311081;
+      const initLng = pickerState.lng ?? clientGeo.lng ?? pickupLng ?? 69.240562;
+
+      try {
+        if (leafletRef.current.map) {
+          leafletRef.current.map.remove();
+          leafletRef.current.map = null;
+        }
+      } catch {}
+
+      const map = L.map(pickerMapRef.current, { center: [initLat, initLng], zoom: 15 });
+      leafletRef.current.map = map;
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap",
+      }).addTo(map);
+
+      const pin = document.createElement("div");
+      pin.style.position = "absolute";
+      pin.style.left = "50%";
+      pin.style.top = "50%";
+      pin.style.transform = "translate(-50%, -100%)";
+      pin.style.zIndex = "999";
+      pin.style.width = "26px";
+      pin.style.height = "26px";
+      pin.style.borderRadius = "50%";
+      pin.style.background = "rgba(255, 193, 7, 0.95)";
+      pin.style.boxShadow = "0 8px 20px rgba(0,0,0,0.35)";
+      pin.style.border = "2px solid rgba(0,0,0,0.25)";
+      pin.className = "center-pin";
+
+      const wrap = pickerMapRef.current?.parentElement;
+      if (wrap) {
+        wrap.style.position = "relative";
+        // remove previous
+        const old = wrap.querySelector(".center-pin");
+        if (old) old.remove();
+        wrap.appendChild(pin);
+      }
+
+      let timer = null;
+      const updateCenter = async () => {
+        const c = map.getCenter();
+        const lat = +c.lat.toFixed(6);
+        const lng = +c.lng.toFixed(6);
+        setPickerState((p) => ({ ...p, lat, lng }));
+        const addr = await reverseGeocodeOSM(lat, lng);
+        setPickerState((p) => ({ ...p, address: addr || p.address }));
+      };
+
+      await updateCenter();
+      map.on("moveend", () => {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(updateCenter, 250);
+      });
+    };
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickerModal.open]);
+
+  const openPickupPicker = async () => {
+    let base = null;
+    try {
+      base = await getMyGeo();
+    } catch {
+      base = null;
+    }
+    if (base?.lat && base?.lng) setPickerState({ lat: base.lat, lng: base.lng, address: "" });
+    else setPickerState({ lat: pickupLat ?? null, lng: pickupLng ?? null, address: pickupAddress || "" });
+    setPickerModal({ open: true });
+  };
+
+  const applyPickerToPickup = () => {
+    if (!pickerState.lat || !pickerState.lng) {
+      message.error("Lokatsiya tanlanmadi");
+      return;
+    }
+    setPickupLat(pickerState.lat);
+    setPickupLng(pickerState.lng);
+    setPickupAddress(pickerState.address || pickupAddress);
+    setPickerModal({ open: false });
+    message.success("Uy manzili tanlandi");
+  };
+
 
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
@@ -349,7 +312,6 @@ export default function ClientInterProvincial({ onBack }) {
   const [passengerPhone, setPassengerPhone] = useState("");
 
   const [passengerGender, setPassengerGender] = useState(() => normalizeGender(localStorage.getItem("passenger_gender") || "all"));
-  const [listMode, setListMode] = useState("ride"); // ride | delivery
 
   // pickup (home_pickup)
   const [deliveryType, setDeliveryType] = useState("meet_point"); // meet_point | home_pickup
@@ -414,73 +376,129 @@ export default function ClientInterProvincial({ onBack }) {
   }, [form]);
 
   const loadMyBookings = async () => {
-try {
-  setMyBookingsLoading(true);
-  const {
-    data: { user },
-    error: userErr,
-  } = await supabase.auth.getUser();
-  if (userErr) throw userErr;
-  if (!user) {
-    setMyBookings([]);
-    return;
-  }
+    setMyLoading(true);
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData?.user;
+      if (!user) {
+        setMyBookings([]);
+        return;
+      }
 
-  // inter_prov_bookings -> inter_prov_rides (aliased as "order" to keep UI intact)
-  const { data, error } = await supabase
-    .from("inter_prov_bookings")
-    .select("*, order:inter_prov_rides(*)")
-    .eq("passenger_id", user.id)
-    .order("created_at", { ascending: false });
+      // auto-fill from meta if local storage empty
+      const metaName = user?.user_metadata?.full_name || user?.user_metadata?.name || "";
+      const metaPhone = user?.user_metadata?.phone || user?.phone || "";
+      if (!localStorage.getItem("passenger_name") && metaName) localStorage.setItem("passenger_name", metaName);
+      if (!localStorage.getItem("passenger_phone") && metaPhone) localStorage.setItem("passenger_phone", metaPhone);
 
-  if (error) throw error;
+      const { data, error } = await supabase
+        .from("trip_booking_requests")
+        .select("*, orders(*)")
+        .eq("passenger_id", user.id)
+        .order("created_at", { ascending: false });
 
-  setMyBookings(Array.isArray(data) ? data : []);
-} catch (e) {
-  console.error("loadMyBookings error:", e);
-  setMyBookings([]);
-} finally {
-  setMyBookingsLoading(false);
-}
-};
+      if (error) throw error;
+      setMyBookings(data || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setMyLoading(false);
+    }
+  };
 
   const doSearch = async (silent = false) => {
-try {
-  setSearching(true);
+    setSearching(true);
+    setErrorText("");
 
-  // Build query on inter_prov_rides (we keep variable name "orders" in state for UI compatibility)
-  let q = supabase.from("inter_prov_rides").select("*").order("created_at", { ascending: false }).limit(60);
+    try {
+      const fromDistrictFilter = (form.fromDistrict || "").trim();
+      const toDistrictFilter = (form.toDistrict || "").trim();
 
-  // status filter: show only open/active rides
-  q = q.in("status", ["open", "active"]);
+      let q = supabase
+        .from("orders")
+        .select("*")
+        .eq("service_type", "inter_prov")
+        .in("status", ["pending", "booked"])
+        .gt("seats_available", 0)
+        .eq("from_region", form.fromRegion)
+        // delivery service filter
+        
+        
+        .eq("to_region", form.toRegion)
+        .order("scheduled_at", { ascending: true });
 
-  if (fromRegion) q = q.eq("from_region", fromRegion);
-  if (fromDistrict) q = q.eq("from_district", fromDistrict);
-  if (toRegion) q = q.eq("to_region", toRegion);
-  if (toDistrict) q = q.eq("to_district", toDistrict);
+      // gender filter (optional column gender_pref)
+      if (form.gender && form.gender !== "all") {
+        // show orders that allow everyone OR matching gender
+        q = q.in("gender_pref", ["all", form.gender]);
+      }
 
-  // Date filter
-  if (rideDate) q = q.eq("ride_date", rideDate);
+      // pickup mode filter
+      if (form.pickupMode && form.pickupMode !== "all") {
+        q = q.eq("pickup_mode", form.pickupMode);
+      }
 
-  // Pickup mode: listMode = "ride" or "delivery"
-  // deliveryType typically = "meet_point" | "home_pickup" (or similar)
-  if (listMode === "delivery") {
-    q = q.eq("pickup_mode", "delivery");
-  } else if (deliveryType) {
-    q = q.eq("pickup_mode", deliveryType);
-  }
+      // wildcard rules:
+      // If passenger chose district, match exact OR driver wildcard (empty string)
+      if (!isTashkentCity(form.fromRegion) || fromDistrictFilter) {
+        q = q.or(`from_district.eq.${fromDistrictFilter},from_district.eq.`);
+      }
+      if (!isTashkentCity(form.toRegion) || toDistrictFilter) {
+        q = q.or(`to_district.eq.${toDistrictFilter},to_district.eq.`);
+      }
 
-  const { data, error } = await q;
-  if (error) throw error;
+      if (form.date) {
+        const start = dayjs(form.date).startOf("day").toISOString();
+        const end = dayjs(form.date).endOf("day").toISOString();
+        q = q.gte("scheduled_at", start).lte("scheduled_at", end);
+      }
 
-  setOrders(Array.isArray(data) ? data : []);
-} catch (e) {
-  console.error("doSearch error:", e);
-  setOrders([]);
-} finally {
-  setSearching(false);
-}
-};
+      let data, error;
+      ({ data, error } = await q);
+      if (error) {
+        const msg = String(error.message || "");
+        if (msg.toLowerCase().includes("gender") || msg.toLowerCase().includes("gender_pref") || msg.toLowerCase().includes("column")) {
+          // fallback: column not migrated yet
+          const fromDistrictFilter2 = (form.fromDistrict || "").trim();
+          const toDistrictFilter2 = (form.toDistrict || "").trim();
+          let q2 = supabase
+            .from("orders")
+            .select("*")
+            .eq("service_type", "inter_prov")
+            .in("status", ["pending", "booked"])
+            .gt("seats_available", 0)
+            .eq("from_region", form.fromRegion)
+            .eq("to_region", form.toRegion)
+            .order("scheduled_at", { ascending: true });
+          if (!isTashkentCity(form.fromRegion) || fromDistrictFilter2) {
+            q2 = q2.or(`from_district.eq.${fromDistrictFilter2},from_district.eq.`);
+          }
+          if (!isTashkentCity(form.toRegion) || toDistrictFilter2) {
+            q2 = q2.or(`to_district.eq.${toDistrictFilter2},to_district.eq.`);
+          }
+          if (form.date) {
+            const start = dayjs(form.date).startOf("day").toISOString();
+            const end = dayjs(form.date).endOf("day").toISOString();
+            q2 = q2.gte("scheduled_at", start).lte("scheduled_at", end);
+          }
+          ({ data, error } = await q2);
+        }
+      }
+      if (error) throw error;
+
+      const filtered = (data || []).filter((o) => Number(o.seats_available || 0) >= Number(form.minSeats || 1));
+      setResults(filtered);
+
+      if (!silent) message.success(`Topildi: ${filtered.length} ta e’lon`);
+    } catch (e) {
+      console.error(e);
+      setResults([]);
+      setErrorText(e?.message || "Qidiruvda xatolik!");
+      if (!silent) message.error(e?.message || "Qidiruvda xatolik!");
+    } finally {
+      setSearching(false);
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -498,11 +516,11 @@ try {
         if (user && isMounted) {
           channel = supabase
             .channel("client-interprov-live")
-            .on("postgres_changes", { event: "*", schema: "public", table: "inter_prov_rides" }, () => doSearch(true))
-            .on("postgres_changes", { event: "*", schema: "public", table: "inter_prov_bookings" }, (payload) => {
+            .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => doSearch(true))
+            .on("postgres_changes", { event: "*", schema: "public", table: "trip_booking_requests" }, (payload) => {
               const row = payload?.new || payload?.old;
               if (!row) return;
-              if (row.passenger_id === user.id) loadMyBookings();
+              if (row.passenger_id === user.id || row.driver_id === user.id) loadMyBookings();
               doSearch(true);
             })
             .subscribe();
@@ -525,140 +543,85 @@ try {
   }, []);
 
   const openBooking = async (order) => {
-try {
-  const rideId = order?.id;
-  if (!rideId) return;
+    setSelectedOrder(order);
+    setBookingSeats(1);
 
-  // Ensure we have the latest ride row
-  const { data: ride, error } = await supabase.from("inter_prov_rides").select("*").eq("id", rideId).maybeSingle();
-  if (error) throw error;
+    // fill from localStorage
+    const savedName = localStorage.getItem("passenger_name") || "";
+    const savedPhone = localStorage.getItem("passenger_phone") || "";
+    const savedGender = localStorage.getItem("passenger_gender") || "all";
+    setPassengerName(savedName);
+    setPassengerPhone(savedPhone);
+    setPassengerGender(normalizeGender(savedGender));
 
-  if (!ride) {
-    alert("E'lon topilmadi.");
-    return;
-  }
+    // default deliveryType from order if exists
+    setDeliveryType(order.pickup_mode || "meet_point");
+    setPickupLat(null);
+    setPickupLng(null);
+    setPickupAddress("");
 
-  setSelectedOrder(ride);
-  setIsRequestModalOpen(true);
-
-  // Default pickup mode selection for request modal
-  if (ride.pickup_mode) {
-    setDeliveryType(ride.pickup_mode);
-    setListMode(ride.pickup_mode === "delivery" ? "delivery" : "ride");
-  }
-} catch (e) {
-  console.error("openBooking error:", e);
-  alert(e?.message || "Ochishda xatolik.");
-}
-};
-
-  const confirmBookingRequest = async () => {
-try {
-  if (!selectedOrder?.id) return;
-
-  const {
-    data: { user },
-    error: userErr,
-  } = await supabase.auth.getUser();
-  if (userErr) throw userErr;
-  if (!user) {
-    alert("Avval tizimga kiring (login).");
-    return;
-  }
-
-  if (!passengerPhone?.trim()) {
-    alert("Telefon raqamingizni kiriting.");
-    return;
-  }
-
-  const seatsNum = Number(seatsToBook || 0);
-  if (!Number.isFinite(seatsNum) || seatsNum <= 0) {
-    alert("O'rinlar soni noto‘g‘ri.");
-    return;
-  }
-
-  // Normalization (UI may pass different labels)
-  const pickupModeWanted = listMode === "delivery" ? "delivery" : (deliveryType || selectedOrder.pickup_mode || "meet_point");
-
-  // Try RPC v2 first, then fallback to v1, then direct insert.
-  let rpcError = null;
-
-  // v2 parameters (most flexible)
-  const rpcArgsV2 = {
-    p_ride_id: selectedOrder.id,
-    p_passenger_id: user.id,
-    p_passenger_phone: passengerPhone.trim(),
-    p_passenger_gender: passengerGender || null,
-    p_seats: seatsNum,
-    p_pickup_mode: pickupModeWanted,
-    p_pickup_lat: pickupLat ?? null,
-    p_pickup_lng: pickupLng ?? null,
-    p_pickup_address: pickupAddress || null,
+    setBookingModalOpen(true);
   };
 
-  const { data: rpcDataV2, error: rpcErrV2 } = await supabase.rpc("request_inter_prov_booking_v2", rpcArgsV2);
+  const confirmBookingRequest = async () => {
+    try {
+      if (!selectedOrder) return;
 
-  if (rpcErrV2) {
-    rpcError = rpcErrV2;
+      const seatsReq = Number(bookingSeats || 1);
+      if (seatsReq < 1) return message.error("Joylar soni kamida 1 bo‘lsin!");
+      if (!passengerPhone.trim()) return message.error("Telefon raqamingizni kiriting!");
 
-    // v1 fallback (some projects used p_order_id instead of p_ride_id)
-    const rpcArgsV1 = {
-      p_order_id: selectedOrder.id,
-      p_passenger_id: user.id,
-      p_passenger_phone: passengerPhone.trim(),
-      p_passenger_gender: passengerGender || null,
-      p_seats: seatsNum,
-      p_pickup_mode: pickupModeWanted,
-      p_pickup_lat: pickupLat ?? null,
-      p_pickup_lng: pickupLng ?? null,
-      p_pickup_address: pickupAddress || null,
-    };
+      if (deliveryType === "home_pickup") {
+        if (pickupLat == null || pickupLng == null) return message.error("Uydan olib ketish uchun lokatsiya yuboring!");
+      }
 
-    const { error: rpcErrV1 } = await supabase.rpc("request_inter_prov_booking", rpcArgsV1);
+      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      if (authErr) throw authErr;
+      const user = authData?.user;
+      if (!user) return message.error("So‘rov yuborish uchun avval tizimga kiring!");
 
-    if (rpcErrV1) {
-      rpcError = rpcErrV1;
+      // save passenger info (auto next time)
+      localStorage.setItem("passenger_name", passengerName);
+      localStorage.setItem("passenger_phone", passengerPhone);
+      localStorage.setItem("passenger_gender", passengerGender);
 
-      // Direct insert fallback
-      const { error: insErr } = await supabase.from("inter_prov_bookings").insert({
-        ride_id: selectedOrder.id,
-        passenger_id: user.id,
-        passenger_phone: passengerPhone.trim(),
-        passenger_gender: passengerGender || null,
-        seats: seatsNum,
-        pickup_lat: pickupLat ?? null,
-        pickup_lng: pickupLng ?? null,
-        pickup_address: pickupAddress || null,
-        status: "requested",
+      // Prefer v2, fallback to v1
+      let rpcErr = null;
+      const v2 = await supabase.rpc("request_inter_prov_booking", {
+        p_order_id: selectedOrder.id,
+        p_passenger_id: user.id,
+        p_passenger_name: passengerName || "",
+        p_passenger_phone: passengerPhone,
+        p_passenger_gender: normalizeGender(passengerGender),
+        p_seats: seatsReq,
+        p_pickup_lat: pickupLat,
+        p_pickup_lng: pickupLng,
+        p_pickup_address: pickupAddress,
       });
 
-      if (insErr) throw insErr;
+      if (v2?.error) {
+        rpcErr = v2.error;
+        const v1 = await supabase.rpc("request_inter_prov_booking", {
+          p_order_id: selectedOrder.id,
+          p_passenger_id: user.id,
+          p_passenger_name: passengerName || "",
+          p_passenger_phone: passengerPhone,
+          p_seats: seatsReq,
+        });
+        if (v1?.error) throw v1.error;
+      }
+
+      message.success("So‘rov yuborildi! Haydovchi qabul qilsa telefon ko‘rinadi.");
+      setBookingModalOpen(false);
+      setSelectedOrder(null);
+
+      await doSearch(true);
+      await loadMyBookings();
+    } catch (e) {
+      console.error(e);
+      message.error(e?.message || "So‘rov yuborishda xatolik!");
     }
-  }
-
-  // Refresh bookings + search list
-  await loadMyBookings();
-  await doSearch();
-
-  // Close modal
-  setIsRequestModalOpen(false);
-  setEditBookingModal(false);
-  setSelectedBooking(null);
-
-  // Clear pickup info for next time
-  setPickupLat(null);
-  setPickupLng(null);
-  setPickupAddress("");
-
-  if (rpcError) {
-    // If we fell back successfully, keep quiet; but log for debugging.
-    console.warn("request booking RPC fallback used:", rpcError);
-  }
-} catch (e) {
-  console.error("confirmBookingRequest error:", e);
-  alert(e?.message || "So'rov yuborishda xatolik.");
-}
-};
+  };
 
   const openEditBooking = (b) => {
     setEditBooking(b);
@@ -673,89 +636,98 @@ try {
   };
 
   const saveEditBookingSeats = async () => {
-try {
-  if (!selectedBooking?.id) return;
+    try {
+      if (!editBooking) return;
 
-  const seatsNum = Number(editSeats || 0);
-  if (!Number.isFinite(seatsNum) || seatsNum <= 0) {
-    alert("O'rinlar soni noto‘g‘ri.");
-    return;
-  }
+      const newSeats = Number(editSeats || 1);
+      if (newSeats < 1) return message.error("Joy kamida 1 bo‘lsin!");
 
-  // Prefer RPC v2, then v1, then direct update
-  let rpcErr = null;
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData?.user;
+      if (!user) return message.error("Avval tizimga kiring!");
 
-  const { error: rpcErrV2 } = await supabase.rpc("edit_booking_request_v2", {
-    p_booking_id: selectedBooking.id,
-    p_seats: seatsNum,
-  });
+      const canEditAll = editBooking.status === "requested";
+      const v2Args = {
+        p_request_id: editBooking.id,
+        p_passenger_id: user.id,
+        p_new_seats: newSeats,
+        p_pickup_lat: pickupLat,
+        p_pickup_lng: pickupLng,
+        p_pickup_address: pickupAddress,
+      };
+      if (canEditAll) {
+        v2Args.p_passenger_name = editName || "";
+        v2Args.p_passenger_phone = editPhone || "";
+        v2Args.p_passenger_gender = normalizeGender(editGender);
+      }
 
-  if (rpcErrV2) {
-    rpcErr = rpcErrV2;
-    const { error: rpcErrV1 } = await supabase.rpc("edit_booking_request", {
-      p_booking_id: selectedBooking.id,
-      p_seats: seatsNum,
-    });
+      // prefer v2 edit
+      const v2 = await supabase.rpc("edit_booking_request", v2Args);
 
-    if (rpcErrV1) {
-      rpcErr = rpcErrV1;
+      if (v2?.error) {
+        // fallback old seats-only rpc
+        const v1 = await supabase.rpc("update_inter_prov_booking_seats", {
+          p_booking_id: editBooking.id,
+          p_passenger_id: user.id,
+          p_new_seats: newSeats,
+        });
+        if (v1?.error) throw v1.error;
+      }
 
-      const { error } = await supabase
-        .from("inter_prov_bookings")
-        .update({ seats: seatsNum })
-        .eq("id", selectedBooking.id);
+      message.success("So‘rov yangilandi!");
+      setEditModalOpen(false);
+      setEditBooking(null);
 
-      if (error) throw error;
+      await doSearch(true);
+      await loadMyBookings();
+    } catch (e) {
+      console.error(e);
+      message.error(e?.message || "Tahrirlashda xatolik!");
     }
-  }
-
-  await loadMyBookings();
-  await doSearch();
-
-  setEditBookingModal(false);
-  setSelectedBooking(null);
-
-  if (rpcErr) console.warn("edit booking RPC fallback used:", rpcErr);
-} catch (e) {
-  console.error("saveEditBookingSeats error:", e);
-  alert(e?.message || "Tahrirlashda xatolik.");
-}
-};
+  };
 
   const cancelBooking = async (b) => {
-try {
-  if (!booking?.id) return;
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData?.user;
+      if (!user) return message.error("Avval tizimga kiring!");
 
-  const {
-    data: { user },
-    error: userErr,
-  } = await supabase.auth.getUser();
-  if (userErr) throw userErr;
+      // If already accepted: send cancel request to driver (driver should confirm to refund fee)
+      if (b.status === "accepted") {
+        const v3 = await supabase.rpc("request_cancel_after_accept", {
+          p_request_id: b.id,
+          p_passenger_id: user.id,
+        });
+        if (v3?.error) {
+          // fallback: mark status if column exists
+          try {
+            await supabase.from("trip_booking_requests").update({ status: "cancel_requested" }).eq("id", b.id).eq("passenger_id", user.id);
+          } catch (e) {}
+        }
+        message.success("Bekor qilish so‘rovi haydovchiga yuborildi. Haydovchi tasdiqlasa to‘lov qaytariladi.");
+      } else {
+        // requested -> immediate cancel
+        const v2 = await supabase.rpc("cancel_booking_request", {
+          p_request_id: b.id,
+          p_passenger_id: user.id,
+        });
 
-  // Prefer RPC if exists
-  let rpcWorked = false;
-  const { error: rpcErr } = await supabase.rpc("cancel_booking_request", { p_booking_id: booking.id });
-
-  if (!rpcErr) rpcWorked = true;
-
-  if (!rpcWorked) {
-    // Fallback to status update
-    const { error } = await supabase
-      .from("inter_prov_bookings")
-      .update({ status: "cancelled" })
-      .eq("id", booking.id)
-      .eq("passenger_id", user?.id);
-
-    if (error) throw error;
-  }
-
-  await loadMyBookings();
-  await doSearch();
-} catch (e) {
-  console.error("cancelBooking error:", e);
-  alert(e?.message || "Bekor qilishda xatolik.");
-}
-};
+        if (v2?.error) {
+          const v1 = await supabase.rpc("cancel_booking_request", {
+            p_booking_id: b.id,
+            p_passenger_id: user.id,
+          });
+          if (v1?.error) throw v1.error;
+        }
+        message.success("So‘rov bekor qilindi. Joylar qaytarildi.");
+      }
+      await doSearch(true);
+      await loadMyBookings();
+    } catch (e) {
+      console.error(e);
+      message.error(e?.message || "Bekor qilishda xatolik!");
+    }
+  };
 
   if (loading) {
     return (
@@ -776,19 +748,7 @@ try {
       <Row gutter={12}>
         <Col xs={24} lg={14}>
           <Card style={{ borderRadius: 18, border: "none", boxShadow: "0 6px 20px rgba(0,0,0,0.06)" }}>
-            <Title level={5} style={{ marginTop: 0, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span>Qidiruv filtrlari</span>
-              <Select
-                value={listMode}
-                onChange={(v) => setListMode(v)}
-                size="middle"
-                style={{ width: 200 }}
-                options={[
-                  { value: "ride", label: "Yo‘lovchi tashish" },
-                  { value: "delivery", label: "Eltish xizmati" },
-                ]}
-              />
-            </Title>
+            <Title level={5} style={{ marginTop: 0 }}>Qidiruv filtrlari</Title>
 
             <Divider orientation="left">Qayerdan</Divider>
             <Row gutter={12}>
@@ -880,6 +840,11 @@ try {
             <Divider />
 
             <Title level={5} style={{ marginTop: 0 }}>Topilgan e’lonlar</Title>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <Switch checked={deliveryOnly} onChange={(v) => setDeliveryOnly(!!v)} />
+              <Text style={{ fontWeight: 600 }}>Eltish xizmati</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>(faqat “eltish xizmati” e’lonlarini ko‘rsatish)</Text>
+            </div>
 
             {errorText ? (
               <Result status="error" title="Xatolik" subTitle={errorText} />
@@ -1069,6 +1034,8 @@ try {
                         const p = await getMyGeo();
                         setPickupLat(p.lat);
                         setPickupLng(p.lng);
+                        const addr = await reverseGeocodeOSM(p.lat, p.lng);
+                        if (addr) setPickupAddress(addr);
                         message.success("Lokatsiya olindi");
                       } catch (e) {
                         message.error("Lokatsiyani olishda xatolik");
@@ -1078,9 +1045,11 @@ try {
                     Geolokatsiyadan olish
                   </Button>
 
+                  <Button onClick={openPickupPicker}>Xaritadan tanlash</Button>
+
                   {pickupLat != null && pickupLng != null ? (
                     <>
-                      <Button onClick={() => openMapEmbed({ title: "Xarita", lat: pickupLat, lng: pickupLng, mode: "pin" })}>Xarita</Button>
+                      <Button onClick={() => openMapEmbed({ title: "Xarita", lat: pickupLat, lng: pickupLng, mode: "pin" })}>Ko‘rish</Button>
                       <Button type="primary" onClick={() => openMapEmbed({ title: "Yo‘l", lat: pickupLat, lng: pickupLng, sLat: null, sLng: null, mode: "route" })}>Yo‘l</Button>
                     </>
                   ) : null}
@@ -1142,20 +1111,6 @@ try {
           </div>
         )}
       </Modal>
-
-      <LocationPickerModal
-        open={pickModal.open}
-        title="Uy manzilini xaritadan tanlang"
-        initialCenter={pickModal.center}
-        onCancel={() => setPickModal({ open: false, center: null })}
-        onSelect={({ lat, lng, address }) => {
-          setPickupLat(lat);
-          setPickupLng(lng);
-          if (address) setPickupAddress(address);
-          setPickModal({ open: false, center: null });
-        }}
-      />
-
       <Modal
         title={mapModal.title}
         open={mapModal.open}
@@ -1175,6 +1130,49 @@ try {
         ) : null}
       </Modal>
 
+      <Modal
+        title="Uy manzilini xaritadan tanlash"
+        open={pickerModal.open}
+        onCancel={() => setPickerModal({ open: false })}
+        footer={null}
+        width="100%"
+        style={{ top: 0, padding: 0 }}
+        bodyStyle={{ padding: 0, height: "calc(100vh - 55px)" }}
+        centered
+      >
+        <div style={{ position: "relative", width: "100%", height: "calc(100vh - 55px)" }}>
+          <div ref={pickerMapRef} style={{ width: "100%", height: "100%" }} />
+          <div
+            style={{
+              position: "absolute",
+              left: 12,
+              right: 12,
+              bottom: 12,
+              padding: 12,
+              borderRadius: 12,
+              background: "rgba(0,0,0,0.55)",
+              backdropFilter: "blur(10px)",
+              color: "white",
+            }}
+          >
+            <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 6 }}>
+              Xaritani siljiting — o‘rtadagi belgi turgan joy tanlanadi
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
+              {pickerState.address || "Manzil aniqlanmoqda..."}
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <Button onClick={() => setPickerModal({ open: false })}>Bekor</Button>
+              <Button type="primary" onClick={applyPickerToPickup}>
+                Tanlash
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
     </div>
   );
-}
+}      if (deliveryOnly) {
+        q = q.eq("delivery_service", true);
+      }
