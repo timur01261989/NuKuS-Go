@@ -116,14 +116,6 @@ const maskPhone = (p) => {
   return s.slice(0, 4) + "****" + s.slice(-2);
 };
 
-const openGoogleMaps = (lat, lng, title = "Xarita") => {
-  if (lat == null || lng == null) return;
-  openMapEmbed({ title, lat, lng, mode: "pin" });
-};
-const openGoogleDirectionsTo = (lat, lng, sLat, sLng, title = "Yo‘l") => {
-  if (lat == null || lng == null) return;
-  openMapEmbed({ title, lat, lng, sLat, sLng, mode: "route" });
-};
 const getMyGeo = async () => {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) return reject(new Error("Geolokatsiya qo‘llab-quvvatlanmaydi"));
@@ -199,7 +191,7 @@ export default function DriverInterProvincial({ onBack }) {
   const pickerMapRef = useRef(null);
   const leafletRef = useRef({ L: null, map: null, markerEl: null });
 
-const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita" });
+  const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita" });
   const openMapEmbed = ({ title = "Xarita", lat, lng, sLat, sLng, mode = "pin" }) => {
     const safe = (v) => String(v ?? "").trim();
     const qLat = safe(lat), qLng = safe(lng);
@@ -1543,8 +1535,6 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
 
             <Divider />
 
-            
-<Divider />
 
             <Row gutter={12}>
               <Col xs={24} md={12}>
