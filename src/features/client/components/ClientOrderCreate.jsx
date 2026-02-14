@@ -854,8 +854,9 @@ const bottomTitle = useMemo(() => {
           {routeCoords.length > 1 && (
             <Polyline
               positions={routeCoords}
-              pathOptions={{ color: "#00C853", weight: 6, opacity: 0.95, lineCap: "round" }
-            } />
+              pathOptions={{ color: "#00C853", weight: 6, opacity: 0.95, lineCap: "round" }}
+            />
+          )}
 
           {/* SEARCHING: Yandex-go'ga o'xshash yaqin mashinalar + dispatch chizig'i */}
           {uiMode === "searching" && (pickup.latlng || userLoc) && (
@@ -870,7 +871,8 @@ const bottomTitle = useMemo(() => {
                   icon={carIcon}
                 />
               ))}
-
+            </>
+          )}
               {nearbyCars.length > 0 && (
                 <Polyline
                   positions={[
