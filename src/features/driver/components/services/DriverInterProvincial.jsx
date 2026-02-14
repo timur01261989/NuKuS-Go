@@ -190,6 +190,7 @@ export default function DriverInterProvincial({ onBack }) {
       () => {},
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
     );
+
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
@@ -363,6 +364,19 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
     setPickerModal({ open: false, target: "meet" });
     message.success("Ketish joyi tanlandi");
   };
+
+  const applyPickerToDest = () => {
+    if (!pickerState.lat || !pickerState.lng) {
+      message.error("Lokatsiya tanlanmadi");
+      return;
+    }
+    setDestLat(pickerState.lat);
+    setDestLng(pickerState.lng);
+    setDestAddress(pickerState.address || "");
+    setPickerModal({ open: false, target: "dest" });
+    message.success("Manzil tanlandi");
+  };
+
 
 
   const [loading, setLoading] = useState(true);
@@ -631,7 +645,6 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
     };
 
     init();
-
     return () => {
       isMounted = false;
       if (channel) supabase.removeChannel(channel);
@@ -695,9 +708,12 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
         meet_lat: meetLat,
         meet_lng: meetLng,
         meet_address: meetAddress || null,
-        dest_lat: null,
-        dest_lng: null,
-        dest_address: null,
+        dest_lat: destLat,
+        dest_lng: destLng,
+        dest_address: (destAddress || null),
+        dest_lat: destLat,
+        dest_lng: destLng,
+        dest_address: (destAddress || null),
       };
 
       const { data, error } = await supabase.from("orders").insert(payload).select("*").maybeSingle();
@@ -748,9 +764,12 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
         meet_lat: meetLat,
         meet_lng: meetLng,
         meet_address: meetAddress || null,
-        dest_lat: null,
-        dest_lng: null,
-        dest_address: null,
+        dest_lat: destLat,
+        dest_lng: destLng,
+        dest_address: (destAddress || null),
+        dest_lat: destLat,
+        dest_lng: destLng,
+        dest_address: (destAddress || null),
         pickup_location: `${formData.fromRegion}, ${districtLabel(formData.fromDistrict)}`,
         dropoff_location: `${formData.toRegion}, ${districtLabel(formData.toDistrict)}`,
         ...seatsPatch,
@@ -867,6 +886,37 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
         .eq("status", "requested");
       if (error) throw error;
 
+      // Decrement seats_available in orders (best-effort, with optimistic lock)
+      try {
+        const orderId = activeAd.id;
+        const { data: curOrder, error: oErr } = await supabase
+          .from("orders")
+          .select("id,seats_available,seats_total,status")
+          .eq("id", orderId)
+          .maybeSingle();
+        if (oErr) throw oErr;
+
+        const curSeats = Number(curOrder?.seats_available ?? 0);
+        if (curSeats > 0) {
+          const nextSeats = curSeats - 1;
+          const nextStatus = nextSeats <= 0 ? "full" : (curOrder?.status || "pending");
+
+          const { data: updOrder, error: uErr } = await supabase
+            .from("orders")
+            .update({ seats_available: nextSeats, status: nextStatus })
+            .eq("id", orderId)
+            .eq("seats_available", curSeats)
+            .select("*")
+            .maybeSingle();
+
+          if (!uErr && updOrder) {
+            setActiveAd(updOrder);
+          }
+        }
+      } catch (eSeats) {
+        console.warn("seats decrement failed", eSeats);
+      }
+
       message.success("So‘rov qabul qilindi. Telefon endi ko‘rinadi.");
       await loadDriverData();
     } catch (e) {
@@ -917,12 +967,16 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   if (loading) {
-    return (
+    const isAdFull = Number(activeAd?.seats_available ?? 0) <= 0 || activeAd?.status === "full";
+
+  return (
       <div style={{ padding: 16 }}>
         <Skeleton active paragraph={{ rows: 12 }} />
       </div>
     );
   }
+
+  const isAdFull = Number(activeAd?.seats_available ?? 0) <= 0 || activeAd?.status === "full";
 
   return (
     <ConfigProvider theme={{ token: { colorPrimary: "#1890ff", borderRadius: 12 } }}>
@@ -1028,8 +1082,14 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
               {pickerState.address || "Manzil aniqlanmoqda..."}
             </div>
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <Button onClick={() => setPickerModal({ open: false, target: "meet" })}>Bekor</Button>
-              <Button type="primary" onClick={applyPickerToMeet}>
+              <Button onClick={() => setPickerModal({ open: false, target: pickerModal.target })}>Bekor</Button>
+              <Button
+                type="primary"
+                onClick={() => {
+                  if (pickerModal.target === "dest") applyPickerToDest();
+                  else applyPickerToMeet();
+                }}
+              >
                 Tanlash
               </Button>
             </div>
@@ -1080,6 +1140,9 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
 
               <Col xs={24} md={8}>
                 <Space direction="vertical" style={{ width: "100%" }} size={10}>
+                  {!isAdFull ? (
+                    <>
+
                   <Button
                     icon={<EditOutlined />}
                     block
@@ -1125,6 +1188,30 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
                   >
                     Qaytish e’loni uchun yo‘nalishni almashtirish
                   </Button>
+                
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        type="primary"
+                        block
+                        size="large"
+                        icon={<SendOutlined />}
+                        onClick={() => {
+                          // Hide full ad and allow creating a new one
+                          setActiveAd(null);
+                          setRequests([]);
+                          setAccepted([]);
+                          setEditMode(false);
+                          setTab("requests");
+                          message.info("Yangi e’lon yaratishingiz mumkin");
+                        }}
+                        style={{ borderRadius: 14, height: 44 }}
+                      >
+                        Yangi buyurtma berish
+                      </Button>
+                    </>
+                  )}
                 </Space>
               </Col>
             </Row>
@@ -1397,6 +1484,11 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
                                     <Tag color="green">{b.seats} ta joy</Tag>
                                     <span style={{ fontWeight: 600 }}>{b.passenger_name || "Yo‘lovchi"}</span>
                                     <Tag color="geekblue">Telefon: <b>{b.passenger_phone || "-"}</b></Tag>
+                                    {b.pickup_lat != null && b.pickup_lng != null ? (
+                                      <Button size="small" onClick={() => openMapEmbed({ title: "Yo‘lovchi manzili", lat: b.pickup_lat, lng: b.pickup_lng, mode: "pin" })}>
+                                        Yo‘lovchi manzili
+                                      </Button>
+                                    ) : null}
                                   </div>
                                 }
                                 description={
@@ -1553,17 +1645,24 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
                   <Button
                     icon={<AimOutlined />}
                     onClick={async () => {
+                      // Open map picker to choose destination
                       try {
-                        const p = await getMyGeo();
-                        setDestLat(p.lat);
-                        setDestLng(p.lng);
-                        message.success("Manzil lokatsiyasi olindi");
+                        await ensurePickerReady();
+                        setPickerModal({ open: true, target: "dest" });
+                        // if we already have coords, set picker center to them
+                        if (destLat != null && destLng != null) {
+                          setTimeout(() => {
+                            try {
+                              leafletRef.current?.map?.setView?.([destLat, destLng], 15);
+                            } catch {}
+                          }, 200);
+                        }
                       } catch (e) {
-                        message.error("Lokatsiyani olishda xatolik");
+                        message.error("Xaritani ochib bo‘lmadi");
                       }
                     }}
                   >
-                    Geolokatsiya
+                    Xaritadan tanlash
                   </Button>
                   {destLat != null && destLng != null ? (
                     <>

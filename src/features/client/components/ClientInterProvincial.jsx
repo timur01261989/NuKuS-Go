@@ -205,16 +205,7 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
   useEffect(() => {
     const run = async () => {
       if (!pickerModal.open) return;
-      if (!pickerMapRef.current) return;
-
-      let L;
-      try {
-        L = await loadLeaflet();
-      } catch (e) {
-        console.error(e);
-        message.error("Xarita yuklanmadi. Internetni tekshiring.");
-        return;
-      }
+      const L = await loadLeaflet();
       const initLat = pickerState.lat ?? clientGeo.lat ?? pickupLat ?? 41.311081;
       const initLng = pickerState.lng ?? clientGeo.lng ?? pickupLng ?? 69.240562;
 
@@ -701,8 +692,6 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
       const user = authData?.user;
       if (!user) return message.error("Avval tizimga kiring!");
 
-      const orderId = b?.order_id ?? b?.orders?.id;
-
       // If already accepted: send cancel request to driver (driver should confirm to refund fee)
       if (b.status === "accepted") {
         const v3 = await supabase.rpc("request_cancel_after_accept", {
@@ -718,70 +707,20 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
         message.success("Bekor qilish so‘rovi haydovchiga yuborildi. Haydovchi tasdiqlasa to‘lov qaytariladi.");
       } else {
         // requested -> immediate cancel
-        // Prefer common param names; if RPC doesn't exist / bad signature, fallback to direct updates.
-        const tryRpc = async () => {
-          // 1) most common signature
-          let r = await supabase.rpc("cancel_booking_request", {
-            p_request_id: b.id,
-            p_passenger_id: user.id,
-          });
-          if (!r?.error) return r;
+        const v2 = await supabase.rpc("cancel_booking_request", {
+          p_request_id: b.id,
+          p_passenger_id: user.id,
+        });
 
-          // 2) alternate signature
-          r = await supabase.rpc("cancel_booking_request", {
+        if (v2?.error) {
+          const v1 = await supabase.rpc("cancel_booking_request", {
             p_booking_id: b.id,
             p_passenger_id: user.id,
           });
-          return r;
-        };
-
-        const rpcRes = await tryRpc();
-
-        if (rpcRes?.error) {
-          // Fallback: cancel request row + return seats on order (best-effort)
-          // This fixes cases where RPC is missing (404) or signature mismatch (400).
-          try {
-            await supabase
-              .from("trip_booking_requests")
-              .update({ status: "cancelled" })
-              .eq("id", b.id)
-              .eq("passenger_id", user.id);
-          } catch (e) {}
-
-          if (orderId) {
-            try {
-              // read current order to compute safe seats_available update
-              const { data: ord, error: ordErr } = await supabase
-                .from("orders")
-                .select("id,seats_available,seats_total,status")
-                .eq("id", orderId)
-                .maybeSingle();
-
-              if (!ordErr && ord) {
-                const curAvail = Number(ord.seats_available ?? 0);
-                const seatsTotal = Number(ord.seats_total ?? 0);
-                const addBack = Number(b?.seats ?? 0);
-                const nextAvail = seatsTotal > 0 ? Math.min(seatsTotal, curAvail + addBack) : (curAvail + addBack);
-
-                // If order was booked because seats ran out, and now seats returned, move back to pending.
-                const nextStatus = ord.status === "booked" && nextAvail > 0 ? "pending" : ord.status;
-
-                await supabase
-                  .from("orders")
-                  .update({ seats_available: nextAvail, status: nextStatus })
-                  .eq("id", ord.id);
-              }
-            } catch (e) {
-              // ignore (best-effort)
-            }
-          }
-
-          message.success("So‘rov bekor qilindi. Joylar qaytarildi.");
-        } else {
-          message.success("So‘rov bekor qilindi. Joylar qaytarildi.");
+          if (v1?.error) throw v1.error;
         }
+        message.success("So‘rov bekor qilindi. Joylar qaytarildi.");
       }
-
       await doSearch(true);
       await loadMyBookings();
     } catch (e) {
