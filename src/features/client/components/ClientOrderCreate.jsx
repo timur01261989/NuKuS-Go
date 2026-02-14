@@ -1,142 +1,83 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-// UI komponentlar faqat 'antd' dan olinadi
-import { Button, Card, Drawer, Input, List, Space, Typography, message, Modal, Rate, Avatar } from "antd";
-
-// Ikonkalar faqat '@ant-design/icons' dan olinadi
+// UI components ONLY from antd
 import {
-  EnvironmentOutlined,
-  SearchOutlined,
-  SwapOutlined,
-  StarFilled,
-  ClockCircleOutlined,
-  WalletOutlined,
+  Avatar,
+  Button,
+  Card,
+  Drawer,
+  Input,
+  List,
+  Modal,
+  Rate,
+  Space,
+  Spin,
+  Tag,
+  Typography,
+  message,
+} from "antd";
+
+// Icons ONLY from @ant-design/icons
+import {
   AimOutlined,
+  ArrowLeftOutlined,
+  CloseOutlined,
+  EnvironmentOutlined,
+  ExclamationCircleOutlined,
+  FlagOutlined,
   SendOutlined,
-  UserOutlined
+  SwapOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
 
-import { MapContainer, TileLayer, Marker, Polyline, Circle, useMap } from "react-leaflet";
+import { MapContainer, Marker, Polyline, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-import { playAliceVoice } from "@/utils/AudioPlayer";
 import api from "@/utils/apiHelper";
 import { supabase } from "@/lib/supabase";
+import { playAliceVoice } from "@/utils/AudioPlayer";
 
 const { Text, Title } = Typography;
 
-/** ---------------- ICONS (Yandex-like pins) ---------------- */
-const pickupIcon = L.divIcon({
-  html: `
-    <div style="
-      width:38px;height:38px;border-radius:19px;
-      background:#111; display:flex;align-items:center;justify-content:center;
-      box-shadow:0 8px 18px rgba(0,0,0,.25);
-      border:2px solid #fff;
-      font-size:20px;
-    ">🙋</div>
-  `,
-  className: "",
-  iconSize: [38, 38],
-  iconAnchor: [19, 38],
-});
+/**
+ * YANDEX-LIKE CITY TAXI ORDER CREATE (single-file)
+ * - Map center pin with lift while dragging
+ * - Pickup = center of map on main screen
+ * - Destination can be typed or selected via map center
+ * - Route + distance via OSRM (fallback: straight line)
+ * - Tariffs + total price
+ * - Create order even without destination
+ * - Searching screen with waves + nearby cars simulation
+ * - Accepted screen with driver tracking + chat + details
+ */
 
-const destIcon = L.divIcon({
-  html: `
-    <div style="
-      width:40px;height:40px;border-radius:20px;
-      background:#FFD400; display:flex;align-items:center;justify-content:center;
-      box-shadow:0 8px 18px rgba(0,0,0,.25);
-      border:2px solid #111;
-      font-size:18px;
-    ">🎯</div>
-  `,
-  className: "",
-  iconSize: [40, 40],
-  iconAnchor: [20, 40],
-});
+/** ----------------------------- Helpers ----------------------------- */
 
-const centerPinIcon = (type) => `
-  <div style="
-    width:46px;height:46px;border-radius:23px;
-    background:${type === "pickup" ? "#111" : "#FFD400"};
-    display:flex;align-items:center;justify-content:center;
-    box-shadow:0 10px 22px rgba(0,0,0,.25);
-    border:2px solid ${type === "pickup" ? "#fff" : "#111"};
-    font-size:22px;
-  ">${type === "pickup" ? "🙋" : "🎯"}</div>
-  <div style="
-    position:absolute;left:50%;transform:translateX(-50%);
-    top:44px;width:0;height:0;
-    border-left:10px solid transparent;border-right:10px solid transparent;
-    border-top:16px solid ${type === "pickup" ? "#111" : "#FFD400"};
-    filter: drop-shadow(0 6px 10px rgba(0,0,0,.25));
-  "></div>
-`;
+const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 
-/** ---------------- TARIFFS ---------------- */
-const TARIFFS = [
-  { id: "start", name: "Start", base: 6000, perKm: 1500, eta: "3 min" },
-  { id: "comfort", name: "Komfort", base: 10000, perKm: 2000, eta: "5 min" },
-  { id: "delivery", name: "Yetkazish", base: 8000, perKm: 1700, eta: "8 min" },
-];
-
-const fmtMoney = (n) => {
+function fmtMoney(n) {
   if (!Number.isFinite(n)) return "—";
   return new Intl.NumberFormat("ru-RU").format(Math.round(n));
-};
-
-async function nominatimSearch(q, signal) {
-  // countrycodes=uz natijalarni faqat O'zbekiston bilan cheklaydi
-  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=7&addressdetails=1&q=${encodeURIComponent(q)}&countrycodes=uz`;
-  try {
-    const res = await fetch(url, { signal, headers: { "Accept-Language": "uz,ru,en" } });
-
-const carIcon = L.divIcon({
-  html: `
-    <div style="
-      width:34px;height:34px;border-radius:17px;
-      background:#FFD400;
-      display:flex;align-items:center;justify-content:center;
-      box-shadow:0 10px 22px rgba(0,0,0,.25);
-      border:2px solid #fff;
-      font-size:18px;
-    ">🚕</div>
-  `,
-  className: "",
-  iconSize: [34, 34],
-  iconAnchor: [17, 17],
-});
-
-
-    const data = await res.json();
-    return (data || []).map((x) => ({
-      id: x.place_id,
-      label: x.display_name,
-      lat: parseFloat(x.lat),
-      lng: parseFloat(x.lon),
-    }));
-  } catch (e) {
-    if (e?.name === "AbortError") return [];
-    return [];
-  }
 }
 
-
-async function nominatimReverse(lat, lng, signal) {
-  const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
-  const res = await fetch(url, { signal, headers: { "Accept-Language": "uz,ru,en" } });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data?.display_name || null;
+function haversineKm(a, b) {
+  const R = 6371;
+  const dLat = ((b[0] - a[0]) * Math.PI) / 180;
+  const dLng = ((b[1] - a[1]) * Math.PI) / 180;
+  const lat1 = (a[0] * Math.PI) / 180;
+  const lat2 = (b[0] * Math.PI) / 180;
+  const s1 = Math.sin(dLat / 2);
+  const s2 = Math.sin(dLng / 2);
+  const h = s1 * s1 + Math.cos(lat1) * Math.cos(lat2) * s2 * s2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
 // OSRM yo'nalish topa olmasa ham xato bermaslik uchun:
-async function osrmRoute(from, to, signal) {
+async function osrmRoute(from, to) {
   try {
     const url = `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`;
-    const res = await fetch(url, { signal });
+    const res = await fetch(url);
     const data = await res.json();
     const r = data?.routes?.[0];
     if (r) {
@@ -150,63 +91,114 @@ async function osrmRoute(from, to, signal) {
     console.warn("OSRM yo'nalish chizishda xatolik:", e);
   }
   // Fallback: Agar yo'nalish chizib bo'lmasa, to'g'ri chiziq chizamiz
-  const approx = haversineKm(from, to);
   return {
     coords: [from, to],
-    distanceKm: approx,
-    durationMin: approx * 2, // Taxminiy vaqt
+    distanceKm: haversineKm(from, to),
+    durationMin: haversineKm(from, to) * 2, // Taxminiy vaqt
   };
 }
 
-/** Fallback distance if OSRM fails */
-function haversineKm(a, b) {
-  const R = 6371;
-  const dLat = ((b[0] - a[0]) * Math.PI) / 180;
-  const dLng = ((b[1] - a[1]) * Math.PI) / 180;
-  const lat1 = (a[0] * Math.PI) / 180;
-  const lat2 = (b[0] * Math.PI) / 180;
-
-  const s =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.sin(dLng / 2) * Math.sin(dLng / 2) * Math.cos(lat1) * Math.cos(lat2);
-
-  return 2 * R * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+async function nominatimReverse(lat, lng, signal) {
+  const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
+  try {
+    const res = await fetch(url, { signal, headers: { "Accept-Language": "uz,ru,en" } });
+    const data = await res.json();
+    return data?.display_name || null;
+  } catch (e) {
+    if (e?.name === "AbortError") return null;
+    return null;
+  }
 }
 
+async function nominatimSearch(q, signal) {
+  // countrycodes=uz natijalarni faqat O'zbekiston bilan cheklaydi
+  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=7&addressdetails=1&q=${encodeURIComponent(
+    q
+  )}&countrycodes=uz`;
+  try {
+    const res = await fetch(url, { signal, headers: { "Accept-Language": "uz,ru,en" } });
+    const data = await res.json();
+    return (data || []).map((x) => ({
+      id: x.place_id,
+      label: x.display_name,
+      lat: parseFloat(x.lat),
+      lng: parseFloat(x.lon),
+    }));
+  } catch (e) {
+    if (e?.name === "AbortError") return [];
+    return [];
+  }
+}
 
-/** Move map to center helper */
+function randAround([lat, lng], meters = 900) {
+  // very rough: 1 deg lat ~ 111km; 1 deg lng ~ 111km*cos(lat)
+  const dLat = (meters / 111000) * (Math.random() - 0.5) * 2;
+  const dLng = (meters / (111000 * Math.cos((lat * Math.PI) / 180))) * (Math.random() - 0.5) * 2;
+  return [lat + dLat, lng + dLng];
+}
+
+/** ----------------------------- Leaflet icons ----------------------------- */
+
+// Center pin (pickup vs dest) like Yandex: square yellow with person & pole
+const svgPickupPin = `
+<svg width="70" height="86" viewBox="0 0 70 86" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="12" y="6" width="46" height="46" rx="12" fill="#FFD400"/>
+  <path d="M35 25c2.8 0 5-2.2 5-5s-2.2-5-5-5-5 2.2-5 5 2.2 5 5 5Z" fill="#111"/>
+  <path d="M23 42c2.5-7.5 7.5-12 12-12s9.5 4.5 12 12" stroke="#111" stroke-width="4" stroke-linecap="round"/>
+  <rect x="33" y="52" width="4" height="28" rx="2" fill="#111"/>
+</svg>`;
+
+const svgDestPin = `
+<svg width="70" height="86" viewBox="0 0 70 86" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="12" y="6" width="46" height="46" rx="12" fill="#EDEDED"/>
+  <path d="M25 34l10-12 10 12" stroke="#111" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M25 24l10 12 10-12" stroke="#111" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="33" y="52" width="4" height="28" rx="2" fill="#111"/>
+  <circle cx="35" cy="80" r="6" fill="#fff" stroke="#111" stroke-width="4"/>
+</svg>`;
+
+const pickupMarkerIcon = L.divIcon({
+  className: "",
+  html: `<div class='yg-miniPin'>${svgPickupPin}</div>`,
+  iconSize: [70, 86],
+  iconAnchor: [35, 80],
+});
+
+const destMarkerIcon = L.divIcon({
+  className: "",
+  html: `<div class='yg-miniPin'>${svgDestPin}</div>`,
+  iconSize: [70, 86],
+  iconAnchor: [35, 80],
+});
+
+const carIcon = (bearing = 0) =>
+  L.divIcon({
+    className: "",
+    html: `<div class='yg-car' style='transform: rotate(${bearing}deg);'>🚕</div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+  });
+
+/** ----------------------------- Map helpers ----------------------------- */
+
 function FlyTo({ center, zoom = 16 }) {
   const map = useMap();
   useEffect(() => {
-    if (center && Array.isArray(center)) {
-      map.flyTo(center, zoom, { animate: true, duration: 0.8 });
-    }
-  }, [center, zoom, map]);
+    if (!center) return;
+    map.flyTo(center, zoom, { duration: 0.7 });
+  }, [map, center, zoom]);
   return null;
 }
 
-function CirclePulse({ center }) {
-  // 3 halqadan iborat animatsiya (Yandex-go'ga o'xshash)
-  return (
-    <>
-      <Circle center={center} radius={40} pathOptions={{ color: "#00C853", opacity: 0.18, fillOpacity: 0.06 }} />
-      <Circle center={center} radius={80} pathOptions={{ color: "#00C853", opacity: 0.12, fillOpacity: 0.03 }} />
-      <Circle center={center} radius={140} pathOptions={{ color: "#00C853", opacity: 0.08, fillOpacity: 0.015 }} />
-    </>
-  );
-}
-
-
-/** Map center tracking while selecting pickup/dest (Yandex-like: pin fixed, map moves) */
 function CenterTracker({ enabled, onCenter, setIsDragging }) {
   const map = useMap();
 
   useEffect(() => {
     if (!enabled) return;
 
-    const onMoveStart = () => setIsDragging(true); // Harakat boshlandi
+    const onMoveStart = () => setIsDragging(true);
     const onMoveEnd = () => {
-      setIsDragging(false); // Harakat tugadi
+      setIsDragging(false);
       const c = map.getCenter();
       onCenter([c.lat, c.lng]);
     };
@@ -223,515 +215,364 @@ function CenterTracker({ enabled, onCenter, setIsDragging }) {
   return null;
 }
 
-export default function ClientOrderCreate() {
-  const [userLoc, setUserLoc] = useState([42.4602, 59.6166]); // Nukus fallback
-  const [pickup, setPickup] = useState({ latlng: null, address: "Hozirgi joylashuv..." });
+function FitRoute({ from, to, bottomPad = 320 }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!from || !to) return;
+    try {
+      const b = L.latLngBounds(from, to);
+      map.fitBounds(b, {
+        paddingTopLeft: [50, 50],
+        paddingBottomRight: [50, bottomPad],
+      });
+    } catch {
+      // ignore
+    }
+  }, [map, from, to, bottomPad]);
+  return null;
+}
+
+/** ----------------------------- Tariffs ----------------------------- */
+
+const TARIFFS = [
+  { id: "start", name: "Start", base: 6500, perKm: 1500, etaMin: 2 },
+  { id: "comfort", name: "Komfort", base: 7500, perKm: 1800, etaMin: 4 },
+  { id: "econom", name: "Shahar bo'yicha", base: 4500, perKm: 1300, etaMin: 6 },
+];
+
+/** ----------------------------- Main Component ----------------------------- */
+
+export default function ClientOrderCreateYandexStyle() {
+  // --- core states ---
+  const [stage, setStage] = useState("home");
+  // stages:
+  // home -> dest_sheet -> dest_map -> confirm -> searching -> accepted
+
+  const [drawerOpen, setDrawerOpen] = useState(true);
+  const [destSheetOpen, setDestSheetOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [ratingOpen, setRatingOpen] = useState(false);
+
+  const [userLoc, setUserLoc] = useState(null);
+  const [pickup, setPickup] = useState({ latlng: null, address: "" });
   const [dest, setDest] = useState({ latlng: null, address: "" });
 
-  const [selecting, setSelecting] = useState(null); // "pickup" | "dest" | null
+  const [selecting, setSelecting] = useState(null); // null | 'pickup' | 'dest'
   const [isDragging, setIsDragging] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(true);
 
   const [tariff, setTariff] = useState(TARIFFS[0]);
-
   const [routeCoords, setRouteCoords] = useState([]);
   const [distanceKm, setDistanceKm] = useState(null);
   const [durationMin, setDurationMin] = useState(null);
-
-  const [pickupQuery, setPickupQuery] = useState("");
-  const [destQuery, setDestQuery] = useState("");
-  const [pickupSug, setPickupSug] = useState([]);
-  const [destSug, setDestSug] = useState([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-
-  const [recentPlaces, setRecentPlaces] = useState([]);
-
-  // ✅ Missing states
-  const [orderId, setOrderId] = useState(() => {
-    const saved = localStorage.getItem("activeOrderId");
-    return saved ? String(saved) : null;
-  });
-  const [orderStatus, setOrderStatus] = useState(null);
-  const [assignedDriver, setAssignedDriver] = useState(null);
-
-  // --- SEARCHING MAP VISUALS (Yandex-like) ---
-  const [nearbyCars, setNearbyCars] = useState([]);
-  const [dispatchIdx, setDispatchIdx] = useState(0);
-
-  // ✅ Chat & Rating
-  const [chatOpen, setChatOpen] = useState(false);
-
-  // --- CHAT STATE ---
-  const [messages, setMessages] = useState([]);
-  const [msgText, setMsgText] = useState("");
-  const chatScrollRef = useRef(null);
-  const osrmAbortRef = useRef(null);
-  const osrmDebounceRef = useRef(null);
-
-  const mapRef = useRef(null); // ✅ Added ref
-
-  const [ratingOpen, setRatingOpen] = useState(false);
-  const [ratingValue, setRatingValue] = useState(5);
-  const [completedOrderId, setCompletedOrderId] = useState(null);
-
-
-  // ✅ Serverdan aktiv buyurtmani tekshirish
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const res = await api.post("/api/order", { action: "active" });
-        const ord = res?.data?.order || res?.order || res?.data || null;
-        if (!mounted || !ord?.id) return;
-
-        const s = String(ord.status || "").toLowerCase();
-        if (["cancelled", "completed", "finished", "done"].includes(s)) return;
-
-        localStorage.setItem("activeOrderId", String(ord.id));
-        setOrderId(String(ord.id));
-        setOrderStatus(ord.status || null);
-        if (ord.driver || ord.assigned_driver) setAssignedDriver(ord.driver || ord.assigned_driver);
-      } catch {
-        // ignore
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-
-  /** seed recent places if empty */
-  const seedPlaces = useMemo(
-    () => [
-      { label: "Allayar Dosnazarov ko‘chasi", lat: 42.4615, lng: 59.6109, starred: true },
-      { label: "Spartak Stadium, Bustansaray ko‘chasi", lat: 42.4629, lng: 59.6232, starred: true },
-      { label: "Registon ko‘chasi", lat: 42.4549, lng: 59.6172, starred: false },
-    ],
-    []
-  );
-
-  /** Geolocation */
-  useEffect(() => {
-    let cancelled = false;
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          if (cancelled) return;
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          setUserLoc([lat, lng]);
-          setPickup((p) => ({ ...p, latlng: [lat, lng] }));
-
-          try {
-            const addr = await nominatimReverse(lat, lng);
-            if (!cancelled && addr) setPickup((p) => ({ ...p, address: addr }));
-          } catch {}
-        },
-        () => {
-          // ignore
-        },
-        { enableHighAccuracy: true, timeout: 9000 }
-      );
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  /** Load recent places */
-  useEffect(() => {
-    (async () => {
-      const raw = localStorage.getItem("recentPlaces_v1");
-      if (raw) {
-        try {
-          const arr = JSON.parse(raw);
-          if (Array.isArray(arr) && arr.length) {
-            setRecentPlaces(arr.slice(0, 12));
-            return;
-          }
-        } catch {}
-      }
-      setRecentPlaces(seedPlaces);
-      try {
-        const res = await api.post("/api/order", { action: "history", limit: 12 });
-        const rows = res?.data?.orders || res?.orders || [];
-        const mapped =
-          (rows || [])
-            .map((o) => ({
-              label: o.dropoff_location || o.to_address || o.pickup_location || o.from_address,
-              lat: Number(o.to_lat ?? o.dest_lat ?? o.from_lat),
-              lng: Number(o.to_lng ?? o.dest_lng ?? o.from_lng),
-              starred: false,
-            }))
-            .filter((x) => x.label && Number.isFinite(x.lat) && Number.isFinite(x.lng)) || [];
-
-        if (mapped.length) {
-          const merged = [...seedPlaces];
-          for (const it of mapped) {
-            if (!merged.some((m) => m.label === it.label)) merged.push(it);
-          }
-          setRecentPlaces(merged.slice(0, 12));
-          localStorage.setItem("recentPlaces_v1", JSON.stringify(merged.slice(0, 12)));
-        }
-      } catch {
-        // ignore
-      }
-    })();
-  }, [seedPlaces]);
-
-  /** Route calculation */
-  useEffect(() => {
-    // Debounce + Abort old OSRM request (map dragging can trigger many updates)
-    if (osrmDebounceRef.current) {
-      clearTimeout(osrmDebounceRef.current);
-      osrmDebounceRef.current = null;
-    }
-    if (osrmAbortRef.current) {
-      try { osrmAbortRef.current.abort(); } catch {}
-      osrmAbortRef.current = null;
-    }
-
-    if (!pickup.latlng || !dest.latlng) {
-      setRouteCoords([]);
-      setDistanceKm(null);
-      setDurationMin(null);
-      return;
-    }
-
-    const from = pickup.latlng;
-    const to = dest.latlng;
-
-    // show immediate fallback line while OSRM loads (prevents UI from feeling "stuck")
-    setRouteCoords([from, to]);
-
-    osrmDebounceRef.current = setTimeout(() => {
-      const ctrl = new AbortController();
-      osrmAbortRef.current = ctrl;
-
-      (async () => {
-        try {
-          const r = await osrmRoute(from, to, ctrl.signal);
-          // If aborted, ignore
-          if (ctrl.signal.aborted) return;
-
-          setRouteCoords(Array.isArray(r?.coords) ? r.coords : [from, to]);
-          setDistanceKm(Number.isFinite(r?.distanceKm) ? r.distanceKm : haversineKm(from, to));
-          setDurationMin(Number.isFinite(r?.durationMin) ? r.durationMin : (haversineKm(from, to) * 2));
-        } catch (e) {
-          // Abort is not an error for UI
-          if (ctrl.signal.aborted) return;
-
-          // Fallback: straight line + haversine
-          const approx = haversineKm(from, to);
-          setRouteCoords([from, to]);
-          setDistanceKm(Number.isFinite(approx) ? approx : null);
-          setDurationMin(Number.isFinite(approx) ? approx * 2 : null);
-        }
-      })();
-    }, 250);
-
-    return () => {
-      if (osrmDebounceRef.current) {
-        clearTimeout(osrmDebounceRef.current);
-        osrmDebounceRef.current = null;
-      }
-      if (osrmAbortRef.current) {
-        try { osrmAbortRef.current.abort(); } catch {}
-        osrmAbortRef.current = null;
-      }
-    };
-  }, [pickup.latlng, dest.latlng]);
-
-
   const approxDistanceKm = useMemo(() => {
-    if (!pickup.latlng || !dest.latlng) return null;
-    try {
-      const d = haversineKm(pickup.latlng, dest.latlng);
-      return Number.isFinite(d) ? d : null;
-    } catch {
-      return null;
-    }
+    if (pickup.latlng && dest.latlng) return haversineKm(pickup.latlng, dest.latlng);
+    return null;
   }, [pickup.latlng, dest.latlng]);
 
   const totalPrice = useMemo(() => {
-    const d = Number.isFinite(distanceKm) ? distanceKm : approxDistanceKm;
-    if (!Number.isFinite(d)) return tariff.base;
-    return Math.round(tariff.base + d * tariff.perKm);
-  }, [distanceKm, approxDistanceKm, tariff]);
+    // If destination not selected yet, show base price only.
+    const km = distanceKm ?? approxDistanceKm;
+    if (!km || !Number.isFinite(km)) return tariff.base;
+    return tariff.base + km * tariff.perKm;
+  }, [tariff, distanceKm, approxDistanceKm]);
 
-  /** Save to recents */
-  const pushRecent = useCallback(
-    (place) => {
-      if (!place?.label || !Number.isFinite(place.lat) || !Number.isFinite(place.lng)) return;
-      setRecentPlaces((prev) => {
-        const next = [place, ...prev.filter((p) => p.label !== place.label)].slice(0, 12);
-        localStorage.setItem("recentPlaces_v1", JSON.stringify(next));
-        return next;
+  // --- search input / history ---
+  const [destQuery, setDestQuery] = useState("");
+  const [destSuggestions, setDestSuggestions] = useState([]);
+  const [history, setHistory] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("taxiHistory") || "[]");
+    } catch {
+      return [];
+    }
+  });
+
+  // --- order states ---
+  const [orderId, setOrderId] = useState(() => localStorage.getItem("activeOrderId") || "");
+  const [orderStatus, setOrderStatus] = useState(null); // searching | accepted | arrived | completed | canceled
+  const [assignedDriver, setAssignedDriver] = useState(null);
+
+  // --- searching animation / cars ---
+  const [nearCars, setNearCars] = useState([]);
+  const [activeCarIdx, setActiveCarIdx] = useState(0);
+
+  // --- chat state ---
+  const [messagesState, setMessagesState] = useState([]);
+  const [msgText, setMsgText] = useState("");
+  const chatScrollRef = useRef(null);
+
+  // --- refs ---
+  const mapRef = useRef(null);
+  const reverseAbortRef = useRef(null);
+  const searchAbortRef = useRef(null);
+  const pollRef = useRef(null);
+
+  const isNight = useMemo(() => document.body.classList.contains("night-mode-active"), []);
+
+  /** ----------------------------- Location init ----------------------------- */
+  useEffect(() => {
+    let alive = true;
+    const fallback = [42.4602, 59.6176]; // Nukus-ish (fallback)
+
+    const onOk = (pos) => {
+      if (!alive) return;
+      const c = [pos.coords.latitude, pos.coords.longitude];
+      setUserLoc(c);
+      setPickup((p) => ({ ...p, latlng: c }));
+      // reverse pickup
+      (async () => {
+        const addr = await nominatimReverse(c[0], c[1]);
+        if (addr && alive) setPickup({ latlng: c, address: addr });
+      })();
+    };
+
+    const onErr = async () => {
+      if (!alive) return;
+      setUserLoc(fallback);
+      setPickup({ latlng: fallback, address: "" });
+      const addr = await nominatimReverse(fallback[0], fallback[1]);
+      if (addr && alive) setPickup({ latlng: fallback, address: addr });
+    };
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(onOk, onErr, {
+        enableHighAccuracy: true,
+        timeout: 12000,
+        maximumAge: 4000,
       });
+    } else {
+      onErr();
+    }
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  /** ----------------------------- Active order check (server-side) ----------------------------- */
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await api.post("/api/order", { action: "active" });
+        const active = res?.data || res;
+        if (!alive) return;
+        if (active?.id) {
+          setOrderId(String(active.id));
+          localStorage.setItem("activeOrderId", String(active.id));
+          setOrderStatus(active.status || "searching");
+          setAssignedDriver(active.assigned_driver || active.assignedDriver || null);
+          // load pickup/dest if server has it
+          if (active.from_lat && active.from_lng) {
+            setPickup((p) => ({ ...p, latlng: [active.from_lat, active.from_lng], address: active.pickup_location || p.address }));
+          }
+          if (active.to_lat && active.to_lng) {
+            setDest((d) => ({ ...d, latlng: [active.to_lat, active.to_lng], address: active.dropoff_location || d.address }));
+          }
+          // switch stage
+          if ((active.status || "").toLowerCase() === "accepted") {
+            setStage("accepted");
+            setDrawerOpen(false);
+          } else {
+            setStage("searching");
+            setDrawerOpen(false);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  /** ----------------------------- Suggest / History ----------------------------- */
+  useEffect(() => {
+    if (!destSheetOpen) return;
+    const q = destQuery.trim();
+    if (!q) {
+      setDestSuggestions([]);
+      return;
+    }
+
+    if (searchAbortRef.current) searchAbortRef.current.abort();
+    const ac = new AbortController();
+    searchAbortRef.current = ac;
+
+    const t = setTimeout(async () => {
+      const list = await nominatimSearch(q, ac.signal);
+      setDestSuggestions(list);
+    }, 260);
+
+    return () => {
+      clearTimeout(t);
+      ac.abort();
+    };
+  }, [destQuery, destSheetOpen]);
+
+  const saveHistory = useCallback(
+    (item) => {
+      const next = [item, ...history.filter((x) => x.id !== item.id)].slice(0, 10);
+      setHistory(next);
+      localStorage.setItem("taxiHistory", JSON.stringify(next));
     },
-    [setRecentPlaces]
+    [history]
   );
 
-  /** Center picked from map */
-  const reverseAbortRef = useRef(null);
-  const reverseTimerRef = useRef(null);
-
+  /** ----------------------------- Center picked (reverse geocode with debounce/abort) ----------------------------- */
   const handleCenterPicked = useCallback(
-    (latlng) => {
+    async (latlng) => {
       if (!selecting) return;
 
+      // update instantly
       if (selecting === "pickup") {
-        setPickup((p) => ({ ...p, latlng, address: p.address || "Manzil aniqlanmoqda..." }));
+        setPickup((p) => ({ ...p, latlng }));
       } else {
-        setDest((d) => ({ ...d, latlng, address: d.address || "Manzil aniqlanmoqda..." }));
+        setDest((d) => ({ ...d, latlng }));
       }
 
-      if (reverseTimerRef.current) clearTimeout(reverseTimerRef.current);
+      // Debounced reverse
       if (reverseAbortRef.current) reverseAbortRef.current.abort();
+      const ac = new AbortController();
+      reverseAbortRef.current = ac;
 
-      const controller = new AbortController();
-      reverseAbortRef.current = controller;
+      const addr = await nominatimReverse(latlng[0], latlng[1], ac.signal);
+      if (!addr) return;
 
-      reverseTimerRef.current = window.setTimeout(async () => {
-        try {
-          const addr = await nominatimReverse(latlng[0], latlng[1], controller.signal);
-          if (selecting === "pickup") {
-            setPickup({ latlng, address: addr || "Tanlangan nuqta" });
-          } else {
-            setDest({ latlng, address: addr || "Tanlangan nuqta" });
-          }
-        } catch (e) {
-          // ignore
-        }
-      }, 450);
+      if (selecting === "pickup") {
+        setPickup({ latlng, address: addr });
+      } else {
+        setDest({ latlng, address: addr });
+      }
     },
     [selecting]
   );
 
-
-  /** Search */
-  const runSearch = useCallback(async (type, q) => {
-    const query = (q || "").trim();
-    if (query.length < 3) {
-      if (type === "pickup") setPickupSug([]);
-      else setDestSug([]);
-      return;
-    }
-    setSearchLoading(true);
-    try {
-      const res = await nominatimSearch(query);
-      if (type === "pickup") setPickupSug(res);
-      else setDestSug(res);
-    } finally {
-      setSearchLoading(false);
-    }
-  }, []);
-
-  /** Pick from suggestion / recent */
-  const applyPlace = useCallback(
-    (type, place) => {
-      const latlng = [place.lat, place.lng];
-      if (type === "pickup") {
-        setPickup({ latlng, address: place.label });
-        setPickupQuery(place.label);
-      } else {
-        setDest({ latlng, address: place.label });
-        setDestQuery(place.label);
-      }
-      pushRecent({ label: place.label, lat: place.lat, lng: place.lng, starred: !!place.starred });
-      setSelecting(null);
-      setDrawerOpen(true);
-    },
-    [pushRecent]
-  );
-
-  const swapPoints = useCallback(() => {
-    if (!pickup.latlng && !dest.latlng) return;
-    const p = pickup;
-    const d = dest;
-    setPickup(d.latlng ? d : { ...p, address: p.address });
-    setDest(p.latlng ? p : { ...d, address: d.address });
-    setPickupQuery(d.address || "");
-    setDestQuery(p.address || "");
-  }, [pickup, dest]);
-
-  /** Order action */
-  // handleOrder funksiyasini barqaror qilish:
-const handleOrder = useCallback(async () => {
-  // ✅ Yandex Go kabi: Yakuniy manzil bo'lmasa ham zakaz yuborish mumkin
-  if (!pickup.latlng) {
-    message.error("Ketish manzilini belgilang");
-    return;
-  }
-
-  const hide = message.loading("Buyurtma yuborilmoqda...", 0);
-  try {
-    const from = pickup.latlng;
-    const to = dest.latlng;
-
-    const payload = {
-      action: "create",
-      status: "searching",
-      price: Math.round(totalPrice),
-      service_type: tariff.id,
-
-      pickup_location: pickup.address || "Aniqlanmoqda...",
-      dropoff_location: dest.address || "",
-
-      from_lat: from[0],
-      from_lng: from[1],
-
-      // ✅ to_* bo'lmasa server null/undefined qabul qilishi kerak
-      to_lat: to ? to[0] : null,
-      to_lng: to ? to[1] : null,
-
-      distance_km: to ? (distanceKm || approxDistanceKm || 0) : 0,
-    };
-
-    const res = await api.post("/api/order", payload);
-
-    // Serverdan kelgan javobni tekshirish
-    const id = res?.data?.id || res?.id || res?.orderId;
-    if (!id) throw new Error("Serverdan ID kelmadi");
-
-    setOrderId(String(id));
-    localStorage.setItem("activeOrderId", String(id));
-    setOrderStatus("searching");
-    message.success("Zakaz yuborildi. Mashina qidirilmoqda...");
-  } catch (e) {
-    console.error("Order error:", e);
-    message.error("Zakaz berishda xatolik: " + (e?.message || "Server bilan aloqa yo'q"));
-  } finally {
-    hide();
-  }
-}, [pickup, dest, tariff, totalPrice, distanceKm, approxDistanceKm]);
-
-
-  /** Polling order status */
+  /** ----------------------------- Route build (when both points selected) ----------------------------- */
   useEffect(() => {
-    if (!orderId) return;
-
-    let stopped = false;
-
-    const tick = async () => {
-      try {
-        const res = await api.post("/api/order", { action: "status", orderId: String(orderId) });
-        const ord = res?.data?.order || res?.order || res?.data || null;
-        if (!ord || stopped) return;
-
-        // ✅ Status o'zgarishi va ovozli xabarlar
-        if (ord.status === 'driver_assigned' && orderStatus !== 'driver_assigned') {
-          playAliceVoice('driver_found'); 
-        }
-        if (ord.status === 'arrived' && orderStatus !== 'arrived') {
-          playAliceVoice('arrived'); 
-        }
-
-        setOrderStatus(ord.status || null);
-        if (ord.driver || ord.assigned_driver) setAssignedDriver(ord.driver || ord.assigned_driver);
-
-        const s = String(ord.status || "").toLowerCase();
-        if (["cancelled", "completed", "finished", "done"].includes(s)) {
-          if (["completed","finished","done"].includes(s)) {
-            setCompletedOrderId(orderId);
-            setRatingOpen(true);
-          }
-          localStorage.removeItem("activeOrderId");
-          setOrderId(null);
-        }
-      } catch (e) {
-        console.warn("status poll error", e);
+    let alive = true;
+    (async () => {
+      if (!pickup.latlng || !dest.latlng) {
+        setRouteCoords([]);
+        setDistanceKm(null);
+        setDurationMin(null);
+        return;
       }
-    };
-
-    tick();
-    const t = setInterval(tick, 4000);
+      const r = await osrmRoute(pickup.latlng, dest.latlng);
+      if (!alive) return;
+      setRouteCoords(r.coords || []);
+      setDistanceKm(r.distanceKm ?? null);
+      setDurationMin(r.durationMin ?? null);
+    })();
     return () => {
-      stopped = true;
-      clearInterval(t);
+      alive = false;
     };
-  }, [orderId, orderStatus]);
+  }, [pickup.latlng, dest.latlng]);
 
-
-
-  /** UI helpers */
-  const hasActiveOrder = useMemo(() => {
-    if (!orderId) return false;
-    const s = String(orderStatus || "").toLowerCase();
-    return !["cancelled", "completed", "finished", "done"].includes(s);
-  }, [orderId, orderStatus]);
-
-  const uiMode = useMemo(() => {
-    const s = String(orderStatus || "").toLowerCase();
-    if (!hasActiveOrder) return "idle";
-    if (["searching", "pending", "pending_dispatch"].includes(s)) return "searching";
-    if (["accepted", "assigned", "coming", "enroute"].includes(s)) return "coming";
-    if (["arrived"].includes(s)) return "arrived";
-    if (["in_trip", "ontrip", "driving"].includes(s)) return "in_trip";
-    return "searching";
-  }, [orderStatus, hasActiveOrder]);
-
-  // --- SEARCHING VISUAL EFFECT (nearby cars + cycling dispatch line) ---
+  /** ----------------------------- Searching (cars simulation & active line) ----------------------------- */
   useEffect(() => {
-    if (uiMode !== "searching") return;
+    if (stage !== "searching" || !pickup.latlng) return;
 
-    const base = pickup.latlng || userLoc;
-
-    // generate cars only once per searching session
-    setNearbyCars((prev) => {
-      if (prev && prev.length >= 5) return prev;
-      const cars = Array.from({ length: 6 }).map((_, i) => {
-        // random ~0.2-1.0 km around
-        const r = 0.002 + Math.random() * 0.006;
-        const a = Math.random() * Math.PI * 2;
-        const lat = base[0] + Math.cos(a) * r;
-        const lng = base[1] + Math.sin(a) * r;
-        return { id: `car_${i}`, lat, lng, bearing: Math.round(Math.random() * 359) };
-      });
-      return cars;
+    // create cars around pickup
+    const cars = new Array(6).fill(0).map(() => {
+      const pos = randAround(pickup.latlng, 2200);
+      const bearing = Math.floor(Math.random() * 360);
+      return { id: crypto.randomUUID?.() || String(Math.random()), pos, bearing };
     });
+    setNearCars(cars);
+    setActiveCarIdx(0);
 
-    const t = setInterval(() => {
-      setDispatchIdx((x) => x + 1);
+    const timer = setInterval(() => {
+      setActiveCarIdx((i) => (i + 1) % Math.max(1, cars.length));
     }, 2200);
 
-    return () => clearInterval(t);
-  }, [uiMode, pickup.latlng, userLoc]);
+    return () => clearInterval(timer);
+  }, [stage, pickup.latlng]);
 
-  const cancelActiveOrder = useCallback(async () => {
+  /** ----------------------------- Poll order status ----------------------------- */
+  const startPolling = useCallback(
+    (id) => {
+      if (!id) return;
+      if (pollRef.current) clearInterval(pollRef.current);
+
+      pollRef.current = setInterval(async () => {
+        try {
+          const res = await api.post("/api/order", { action: "status", id });
+          const st = (res?.data?.status || res?.status || "").toLowerCase();
+          if (!st) return;
+
+          setOrderStatus(st);
+          const driver = res?.data?.assigned_driver || res?.assigned_driver || res?.assignedDriver || null;
+          if (driver) setAssignedDriver(driver);
+
+          if (st === "accepted" || st === "arrived") {
+            setStage("accepted");
+          }
+          if (st === "completed") {
+            setStage("home");
+            setDrawerOpen(true);
+            setDestSheetOpen(false);
+            setDetailsOpen(false);
+            setChatOpen(false);
+            setOrderId("");
+            setOrderStatus(null);
+            setAssignedDriver(null);
+            localStorage.removeItem("activeOrderId");
+            setRatingOpen(true);
+          }
+          if (st === "canceled") {
+            setStage("home");
+            setDrawerOpen(true);
+            setDestSheetOpen(false);
+            setDetailsOpen(false);
+            setChatOpen(false);
+            setOrderId("");
+            setOrderStatus(null);
+            setAssignedDriver(null);
+            localStorage.removeItem("activeOrderId");
+            message.info("Buyurtma bekor qilindi");
+          }
+        } catch {
+          // ignore
+        }
+      }, 2500);
+    },
+    [setOrderStatus]
+  );
+
+  useEffect(() => {
     if (!orderId) return;
-    try {
-      await api.post("/api/order", { action: "cancel", orderId: String(orderId) });
-    } catch (e) {
-      console.warn(e);
-    } finally {
-      localStorage.removeItem("activeOrderId");
-      setOrderId(null);
-      setOrderStatus(null);
-      setAssignedDriver(null);
-      message.info("Buyurtma bekor qilindi");
-    }
-  }, [orderId]);
+    startPolling(orderId);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [orderId, startPolling]);
 
-  const openChat = useCallback(() => {
-    setChatOpen(true);
-  }, []);
+  /** ----------------------------- Track driver on map ----------------------------- */
+  // If assignedDriver has lat/lng -> fly map to driver when accepted
+  useEffect(() => {
+    if (stage !== "accepted") return;
+    const lat = assignedDriver?.lat ?? assignedDriver?.driver_lat ?? assignedDriver?.current_lat;
+    const lng = assignedDriver?.lng ?? assignedDriver?.driver_lng ?? assignedDriver?.current_lng;
+    if (!lat || !lng) return;
+    const m = mapRef.current;
+    if (!m) return;
+    m.flyTo([lat, lng], Math.max(15, m.getZoom() || 16), { duration: 0.6 });
+  }, [stage, assignedDriver]);
 
-  const closeChat = useCallback(() => setChatOpen(false), []);
-
+  /** ----------------------------- Chat realtime logic ----------------------------- */
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
       chatScrollRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
+    }, 80);
   }, []);
 
-  // --- CHAT REALTIME LOGIC ---
   useEffect(() => {
     if (!chatOpen || !orderId) return;
 
-    let mounted = true;
-
+    // 1) history
     const fetchHistory = async () => {
       const { data, error } = await supabase
         .from("messages")
@@ -739,387 +580,693 @@ const handleOrder = useCallback(async () => {
         .eq("order_id", orderId)
         .order("created_at", { ascending: true });
 
-      if (!error && data && mounted) {
-        setMessages(data);
+      if (!error && data) {
+        setMessagesState(data);
         scrollToBottom();
       }
     };
 
     fetchHistory();
 
+    // 2) realtime
     const channel = supabase
       .channel(`chat_room:${orderId}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages", filter: `order_id=eq.${orderId}` },
         (payload) => {
-          setMessages((prev) => [...prev, payload.new]);
+          setMessagesState((prev) => [...prev, payload.new]);
           scrollToBottom();
         }
       )
       .subscribe();
 
     return () => {
-      mounted = false;
       supabase.removeChannel(channel);
     };
   }, [chatOpen, orderId, scrollToBottom]);
 
   const handleSendMessage = useCallback(async () => {
     if (!msgText.trim() || !orderId) return;
-
     const textToSend = msgText.trim();
     setMsgText("");
 
-    await supabase.from("messages").insert([{
-      order_id: orderId,
-      sender_role: "client",
-      content: textToSend,
-      created_at: new Date().toISOString()
-    }]);
+    await supabase.from("messages").insert([
+      {
+        order_id: orderId,
+        sender_role: "client",
+        content: textToSend,
+        created_at: new Date().toISOString(),
+      },
+    ]);
   }, [msgText, orderId]);
 
+  /** ----------------------------- Actions ----------------------------- */
 
-
-  const submitRating = useCallback(async () => {
-    try {
-      if (!completedOrderId) {
-        setRatingOpen(false);
-        return;
-      }
-      await api.post("/api/order", { action: "rate", orderId: completedOrderId, rating: ratingValue });
-    } catch (e) {
-      console.warn("rating submit error", e);
-    } finally {
-      setRatingOpen(false);
-      setCompletedOrderId(null);
-      localStorage.removeItem("activeOrderId");
-      setOrderId(null);
-      setOrderStatus(null);
-      setAssignedDriver(null);
-    }
-  }, [completedOrderId, ratingValue]);
-
-  const skipRating = useCallback(() => {
-    setRatingOpen(false);
-    setCompletedOrderId(null);
-    localStorage.removeItem("activeOrderId");
-    setOrderId(null);
-    setOrderStatus(null);
-    setAssignedDriver(null);
+  const openDestSheet = useCallback(() => {
+    setDestSheetOpen(true);
+    setStage("dest_sheet");
+    setDrawerOpen(false);
   }, []);
 
+  const goBackToHome = useCallback(() => {
+    setStage("home");
+    setDestSheetOpen(false);
+    setDetailsOpen(false);
+    setChatOpen(false);
+    setDrawerOpen(true);
+    setSelecting(null);
+  }, []);
 
-const bottomTitle = useMemo(() => {
-    if (!pickup.latlng || !dest.latlng) return "Manzilni tanlang";
-    const dist = distanceKm ? `${distanceKm.toFixed(1)} km` : "—";
-    const dur = durationMin ? `${Math.round(durationMin)} min` : "—";
-    return `${dist} • ${dur}`;
-  }, [pickup.latlng, dest.latlng, distanceKm, durationMin]);
+  const startDestMapPick = useCallback(() => {
+    // open destination picker on map center
+    setStage("dest_map");
+    setDestSheetOpen(false);
+    setDrawerOpen(false);
+    setSelecting("dest");
+    // move center to current map or pickup
+    const m = mapRef.current;
+    if (m) {
+      const c = m.getCenter();
+      handleCenterPicked([c.lat, c.lng]);
+    } else if (pickup.latlng) {
+      handleCenterPicked(pickup.latlng);
+    }
+  }, [handleCenterPicked, pickup.latlng]);
+
+  const confirmDest = useCallback(() => {
+    // after dest map pick -> go to confirm stage
+    setSelecting(null);
+    setStage("confirm");
+    setDrawerOpen(true);
+  }, []);
+
+  // handleOrder funksiyasini barqaror qilish:
+  const handleOrder = useCallback(async () => {
+    if (!pickup.latlng) {
+      message.error("Manzilingiz aniqlanmadi");
+      return;
+    }
+
+    const hide = message.loading("Buyurtma yuborilmoqda...", 0);
+    try {
+      const payload = {
+        action: "create",
+        status: "searching",
+        price: Math.round(totalPrice),
+        service_type: tariff.id,
+        pickup_location: pickup.address || "Pickup",
+        dropoff_location: dest.address || null,
+        from_lat: pickup.latlng[0],
+        from_lng: pickup.latlng[1],
+        to_lat: dest.latlng ? dest.latlng[0] : null,
+        to_lng: dest.latlng ? dest.latlng[1] : null,
+        distance_km: distanceKm || approxDistanceKm || 0,
+      };
+
+      const res = await api.post("/api/order", payload);
+
+      const id = res?.data?.id || res?.id || res?.orderId;
+      if (!id) throw new Error("Serverdan ID kelmadi");
+
+      setOrderId(String(id));
+      localStorage.setItem("activeOrderId", String(id));
+      setOrderStatus("searching");
+
+      setStage("searching");
+      setDrawerOpen(false);
+      setDestSheetOpen(false);
+      playAliceVoice?.("order_sent");
+
+      message.success("Buyurtma yuborildi");
+
+      // Immediately request dispatch
+      try {
+        const d = await api.post("/api/dispatch", { order_id: String(id) });
+        if (d?.error) throw new Error(d.error);
+      } catch (e) {
+        console.error("Dispatch error:", e);
+        message.error("Haydovchi qidirishda xatolik");
+      }
+    } catch (e) {
+      console.error("Order error:", e);
+      message.error("Zakaz berishda xatolik: " + (e?.message || "Server bilan aloqa yo'q"));
+    } finally {
+      hide();
+    }
+  }, [pickup, dest, tariff, totalPrice, distanceKm, approxDistanceKm]);
+
+  const handleCancel = useCallback(async () => {
+    if (!orderId) {
+      goBackToHome();
+      return;
+    }
+
+    const hide = message.loading("Bekor qilinmoqda...", 0);
+    try {
+      await api.post("/api/order", { action: "cancel", id: orderId });
+    } catch {
+      // ignore
+    } finally {
+      hide();
+      setOrderId("");
+      setOrderStatus(null);
+      setAssignedDriver(null);
+      localStorage.removeItem("activeOrderId");
+      setStage("home");
+      setDrawerOpen(true);
+      setDestSheetOpen(false);
+      setDetailsOpen(false);
+      setChatOpen(false);
+      message.success("Safar bekor qilindi");
+    }
+  }, [orderId, goBackToHome]);
+
+  /** ----------------------------- Dest selection by list ----------------------------- */
+  const selectDestFromSuggestion = useCallback(
+    async (sug) => {
+      setDest({ latlng: [sug.lat, sug.lng], address: sug.label });
+      saveHistory(sug);
+      setDestQuery("");
+      setDestSuggestions([]);
+      setDestSheetOpen(false);
+      setSelecting(null);
+      setStage("confirm");
+      setDrawerOpen(true);
+
+      // Fit map to show route
+      setTimeout(() => {
+        const m = mapRef.current;
+        if (!m) return;
+        if (pickup.latlng && [sug.lat, sug.lng]) {
+          try {
+            m.fitBounds(L.latLngBounds(pickup.latlng, [sug.lat, sug.lng]), {
+              paddingTopLeft: [50, 50],
+              paddingBottomRight: [50, 350],
+            });
+          } catch {
+            // ignore
+          }
+        }
+      }, 250);
+    },
+    [saveHistory, pickup.latlng]
+  );
+
+  /** ----------------------------- UI derived values ----------------------------- */
+
+  const pickupTitle = pickup.address ? pickup.address.split(",")[0] : "Manzilingiz aniqlanmoqda...";
+  const destTitle = dest.address ? dest.address.split(",")[0] : "Qayerga borasiz?";
+
+  const bottomPad = stage === "home" ? 280 : 330;
+
+  // Map center for initial view
+  const mapCenter = useMemo(() => {
+    return userLoc || pickup.latlng || [42.4602, 59.6176];
+  }, [userLoc, pickup.latlng]);
+
+  // route stroke (solid green)
+  const routeStroke = {
+    color: "#22C55E",
+    weight: 8,
+    opacity: 0.95,
+  };
+
+  // active driver coords if available
+  const driverLatLng = useMemo(() => {
+    const lat = assignedDriver?.lat ?? assignedDriver?.driver_lat ?? assignedDriver?.current_lat;
+    const lng = assignedDriver?.lng ?? assignedDriver?.driver_lng ?? assignedDriver?.current_lng;
+    if (lat && lng) return [Number(lat), Number(lng)];
+    return null;
+  }, [assignedDriver]);
+
+  /** ----------------------------- Render ----------------------------- */
 
   return (
     <div className="yg-root">
       {/* MAP */}
-      <div className="yg-map">
-        <MapContainer 
-          center={userLoc} 
-          zoom={16} 
-          zoomControl={false} 
-          style={{ height: "100%", width: "100%" }} 
-          ref={mapRef} // ✅ Corrected ref
+      <div className="yg-mapWrap">
+        <MapContainer
+          center={mapCenter}
+          zoom={15}
+          style={{ height: "100%", width: "100%" }}
+          whenCreated={(map) => {
+            mapRef.current = map;
+          }}
+          zoomControl={false}
         >
           <TileLayer
             url={
-              document.body.classList.contains("night-mode-active")
+              isNight
                 ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
                 : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
             }
           />
 
-          <FlyTo center={
-            hasActiveOrder && assignedDriver?.lat && assignedDriver?.lng && (uiMode === "coming" || uiMode === "arrived" || uiMode === "in_trip")
-              ? [assignedDriver.lat, assignedDriver.lng]
-              : selecting === "pickup"
-                ? pickup.latlng || userLoc
-                : selecting === "dest"
-                  ? dest.latlng || userLoc
-                  : null
-          } />
+          {/* Fly to user location first */}
+          <FlyTo center={mapCenter} zoom={15} />
 
+          {/* Track center only when selecting */}
           <CenterTracker enabled={!!selecting} onCenter={handleCenterPicked} setIsDragging={setIsDragging} />
 
-          {pickup.latlng && !selecting && <Marker position={pickup.latlng} icon={pickupIcon} />}
-          {dest.latlng && !selecting && <Marker position={dest.latlng} icon={destIcon} />}
+          {/* Fit route on confirm */}
+          {stage === "confirm" && pickup.latlng && dest.latlng && <FitRoute from={pickup.latlng} to={dest.latlng} bottomPad={bottomPad} />}
 
-          {routeCoords.length > 1 && (
-            <Polyline
-              positions={routeCoords}
-              pathOptions={{ color: "#00C853", weight: 6, opacity: 0.95, lineCap: "round" }}
-            />
+          {/* Markers */}
+          {pickup.latlng && stage !== "home" && stage !== "dest_map" && (
+            <Marker position={pickup.latlng} icon={pickupMarkerIcon} />
           )}
-          {/* SEARCHING: Yandex-go'ga o'xshash yaqin mashinalar + dispatch chizig'i */}
-          {uiMode === "searching" && (pickup.latlng || userLoc) && (
+
+          {dest.latlng && stage === "confirm" && <Marker position={dest.latlng} icon={destMarkerIcon} />}
+
+          {/* Route */}
+          {routeCoords.length >= 2 && stage === "confirm" && <Polyline positions={routeCoords} pathOptions={routeStroke} />}
+
+          {/* Searching cars */}
+          {stage === "searching" && nearCars.map((c) => <Marker key={c.id} position={c.pos} icon={carIcon(c.bearing)} />)}
+
+          {/* Driver marker + line in accepted */}
+          {stage === "accepted" && driverLatLng && (
             <>
-              {/* pulsating circle */}
-              <CirclePulse center={pickup.latlng || userLoc} />
-
-              {nearbyCars.map((c) => (
-                <Marker
-                  key={c.id}
-                  position={[c.lat, c.lng]}
-                  icon={carIcon}
-                />
-              ))}
-
-              {nearbyCars.length > 0 && (
-                <Polyline
-                  positions={[
-                    pickup.latlng || userLoc,
-                    [nearbyCars[dispatchIdx % nearbyCars.length].lat, nearbyCars[dispatchIdx % nearbyCars.length].lng],
-                  ]}
-                  pathOptions={{ color: "#00C853", weight: 4, opacity: 0.9, lineCap: "round" }}
-                />
-              )}
+              <Marker position={driverLatLng} icon={carIcon(assignedDriver?.bearing || 0)} />
+              {pickup.latlng && <Polyline positions={[driverLatLng, pickup.latlng]} pathOptions={{ color: "#22C55E", weight: 7, opacity: 0.9 }} />}
             </>
           )}
+        </MapContainer>
 
-        
-        <div
-          style={{
-            position: "absolute",
-            right: 16,
-            bottom: uiMode === "main" ? 280 : 320,
-            zIndex: 800,
-          }}
-        >
+        {/* Center Pin overlay (home + dest map) */}
+        {(stage === "home" || stage === "dest_map") && (
+          <div className={`yg-centerpin ${isDragging ? "dragging" : ""}`} aria-hidden>
+            <div
+              style={{ position: "relative", width: 70, height: 86 }}
+              dangerouslySetInnerHTML={{ __html: stage === "dest_map" ? svgDestPin : svgPickupPin }}
+            />
+            <div className="yg-pinlabel">{stage === "dest_map" ? "Yakuniy nuqta" : "Qayerdan ketasiz?"}</div>
+          </div>
+        )}
+
+        {/* Locate me button */}
+        <div className="yg-locate">
           <Button
             shape="circle"
             size="large"
             icon={<AimOutlined style={{ fontSize: 22 }} />}
-            style={{ boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}
             onClick={() => {
-              const map = mapRef.current;
-              if (map && userLoc) map.flyTo(userLoc, 16);
+              const m = mapRef.current;
+              if (m && userLoc) m.flyTo(userLoc, 16);
             }}
           />
         </div>
-        </MapContainer>
 
-        {selecting && (
-          <div className={`yg-centerpin ${isDragging ? 'dragging' : ''}`} aria-hidden>
-            <div
-              style={{ position: "relative", width: 70, height: 80 }}
-              dangerouslySetInnerHTML={{ __html: centerPinIcon(selecting) }}
-            />
-            <div className="yg-pinlabel">
-              {selecting === "pickup" ? "Qayerdan ketasiz?" : "Yakuniy nuqta"}
+        {/* Back button (like screenshot) */}
+        {(stage !== "home" && stage !== "searching" && stage !== "accepted") && (
+          <div className="yg-back">
+            <Button shape="circle" icon={<ArrowLeftOutlined />} onClick={goBackToHome} />
+          </div>
+        )}
+
+        {/* Searching waves */}
+        {stage === "searching" && (
+          <div className="yg-waves">
+            <div className="yg-wave" />
+            <div className="yg-wave" />
+            <div className="yg-wave" />
+          </div>
+        )}
+
+        {/* Searching active line to a car */}
+        {stage === "searching" && pickup.latlng && nearCars[activeCarIdx] && (
+          <svg className="yg-aimLine" viewBox="0 0 100 100" preserveAspectRatio="none">
+            {/* purely decorative - line is done by CSS gradient */}
+          </svg>
+        )}
+      </div>
+
+      {/* HOME / CONFIRM bottom sheet (Drawer) */}
+      <Drawer
+        placement="bottom"
+        open={drawerOpen}
+        closable={false}
+        height={stage === "confirm" ? 380 : 300}
+        bodyStyle={{ padding: 0, borderTopLeftRadius: 22, borderTopRightRadius: 22, overflow: "hidden" }}
+        mask={false}
+        onClose={() => setDrawerOpen(false)}
+      >
+        {stage === "home" && (
+          <div className="yg-sheet">
+            <div className="yg-sheetHead">
+              <div className="yg-logo" />
+              <Title level={2} style={{ margin: 0 }}>
+                Taksi
+              </Title>
+            </div>
+
+            <div className="yg-bigRow" onClick={openDestSheet} role="button" tabIndex={0}>
+              <div className="yg-bigRowText">Qayerga borasiz?</div>
+              <div className="yg-bigRowArrow">›</div>
+            </div>
+
+            {/* history list */}
+            <div className="yg-history">
+              <List
+                dataSource={history}
+                locale={{ emptyText: "" }}
+                renderItem={(it) => (
+                  <List.Item className="yg-hItem" onClick={() => selectDestFromSuggestion(it)}>
+                    <div className="yg-hIcon">
+                      <EnvironmentOutlined />
+                    </div>
+                    <div className="yg-hText">
+                      <div className="yg-hTitle">{String(it.label || "").split(",")[0]}</div>
+                      <div className="yg-hSub">{it.label}</div>
+                    </div>
+                  </List.Item>
+                )}
+              />
+            </div>
+
+            {/* Call taxi without destination */}
+            <div className="yg-homeActions">
+              <Button
+                type="primary"
+                className="yg-orderBtn"
+                onClick={() => {
+                  // allow without destination
+                  setStage("confirm");
+                  setDrawerOpen(true);
+                }}
+              >
+                Buyurtma berish
+              </Button>
+              <Button className="yg-smallBtn" icon={<SwapOutlined />} />
             </div>
           </div>
         )}
 
+        {stage === "confirm" && (
+          <div className="yg-sheet">
+            <div className="yg-confirmHeader">
+              <div className="yg-confirmTitle">{pickupTitle}</div>
+              <Button
+                className="yg-pill"
+                onClick={() => {
+                  // pickup change by map
+                  setSelecting("pickup");
+                  setStage("home");
+                  setDrawerOpen(false);
+                }}
+              >
+                Podyez
+              </Button>
+            </div>
 
-        {/* Active order overlays */}
-        {hasActiveOrder && (
-          <div className="yg-active">
-            {uiMode === "searching" && (
-              <Card className="yg-active-card" bodyStyle={{ padding: 14 }}>
-                <div className="yg-active-title">Mashina qidirilmoqda...</div>
-                <div className="yg-active-sub">Buyurtma: #{orderId}</div>
-                <div className="yg-active-actions">
-                  <Button danger block onClick={cancelActiveOrder}>Bekor qilish</Button>
-                </div>
-              </Card>
-            )}
-
-            {(uiMode === "coming" || uiMode === "arrived" || uiMode === "in_trip") && (
-              <Card className="yg-active-card" bodyStyle={{ padding: 14 }}>
-                <div className="yg-driver-row">
-                  <div className="yg-driver-avatar">
-                    {(assignedDriver?.photo_url || assignedDriver?.avatar) ? (
-                      <img alt="driver" src={assignedDriver.photo_url || assignedDriver.avatar} />
-                    ) : (
-                      <div className="yg-driver-placeholder">👤</div>
-                    )}
-                  </div>
-                  <div className="yg-driver-info">
-                    <div className="yg-driver-name">{assignedDriver?.name || "Haydovchi"}</div>
-                    <div className="yg-driver-car">
-                      {assignedDriver?.car_model || "Mashina"} • {assignedDriver?.plate || assignedDriver?.car_plate || "—"}
-                    </div>
-                    <div className="yg-driver-status">
-                      {uiMode === "coming" && "Yo‘lda"}
-                      {uiMode === "arrived" && "Keldi"}
-                      {uiMode === "in_trip" && "Safarda"}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="yg-active-actions two">
-                  <Button onClick={openChat} block>Chat</Button>
-                  <Button danger onClick={cancelActiveOrder} block>Bekor qilish</Button>
-                </div>
-              </Card>
-            )}
-          </div>
-        )}
-
-
-        {/* Top card */}
-        {!hasActiveOrder && (
-          <div className="yg-topcard">
-            <Card className="yg-card" bodyStyle={{ padding: 12 }}>
-              <div className="yg-row">
-                <div className="yg-dot blue" />
-                <Text className="yg-addr">{pickup.address || "Qayerdan ketasiz?"}</Text>
-                <Button size="small" className="yg-mini" onClick={() => { setSelecting("pickup"); setDrawerOpen(false); }}>
-                  Tanlash
-                </Button>
+            <div className="yg-confirmHeader" style={{ marginTop: 8 }}>
+              <div className="yg-confirmTitle">
+                {dest.address ? destTitle : <span style={{ opacity: 0.65 }}>Qayerga borasiz?</span>}
               </div>
+              <Button className="yg-pill" onClick={openDestSheet}>
+                {dest.address ? "O'zgartirish" : "Xarita"}
+              </Button>
+            </div>
 
-              <div className="yg-row">
-                <div className="yg-dot red" />
-                <Input
-                  value={destQuery}
-                  onChange={(e) => {
-                    setDestQuery(e.target.value);
-                    runSearch("dest", e.target.value);
-                  }}
-                  onFocus={() => setDrawerOpen(true)}
-                  placeholder="Qayerga borasiz?"
-                  prefix={<SearchOutlined />}
-                  className="yg-input"
-                  allowClear
-                />
-                <Button
-                  size="small"
-                  className="yg-mini"
-                  onClick={() => {
-                    setSelecting("dest");
-                    setDrawerOpen(false);
-                  }}
+            <div className="yg-routeInfo">
+              <div className="yg-routePill">
+                <FlagOutlined />
+                <span>{durationMin ? `${Math.round(durationMin)} daq` : distanceKm ? `${Math.round(distanceKm * 2)} daq` : "—"}</span>
+              </div>
+              <div className="yg-routePill" style={{ fontWeight: 800 }}>
+                {fmtMoney(totalPrice)} so'm
+              </div>
+            </div>
+
+            <div className="yg-tabs">
+              <div className="yg-tab">Navigator</div>
+              <div className="yg-tab">Transport</div>
+              <div className="yg-tab yg-tabActive">Taksi va Yetkazish</div>
+            </div>
+
+            <div className="yg-tariffs">
+              {TARIFFS.map((t) => (
+                <div
+                  key={t.id}
+                  className={`yg-tariff ${tariff.id === t.id ? "active" : ""}`}
+                  onClick={() => setTariff(t)}
                 >
-                  Xaritadan
-                </Button>
-              </div>
+                  <div className="yg-tariffEta">{t.etaMin} daq</div>
+                  <div className="yg-tariffName">{t.name}</div>
+                  <div className="yg-tariffPrice">
+                    {fmtMoney(t.base + ((distanceKm ?? approxDistanceKm) || 0) * t.perKm)} so'm
+                  </div>
+                </div>
+              ))}
+            </div>
 
-              <div className="yg-swap">
-                <Button icon={<SwapOutlined />} onClick={swapPoints} />
-              </div>
-            </Card>
+            <div className="yg-confirmActions">
+              <Button type="primary" className="yg-orderBtnYellow" onClick={handleOrder}>
+                Buyurtma berish
+              </Button>
+              <Button className="yg-smallBtn" icon={<SwapOutlined />} />
+            </div>
           </div>
         )}
-      </div> 
+      </Drawer>
 
-      {/* Bottom sheet */}
-      {!hasActiveOrder && (
-        <Drawer
-          open={drawerOpen && !selecting}
-          onClose={() => setDrawerOpen(false)}
-          placement="bottom"
-          height={380}
-          bodyStyle={{ padding: 12 }}
-          mask={false}
-          className="yg-drawer"
-          title={
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <EnvironmentOutlined />
-              <span>{bottomTitle}</span>
+      {/* DESTINATION SHEET */}
+      <Drawer
+        placement="bottom"
+        open={destSheetOpen}
+        closable={false}
+        height={560}
+        bodyStyle={{ padding: 0, borderTopLeftRadius: 22, borderTopRightRadius: 22, overflow: "hidden" }}
+        mask={false}
+        onClose={() => setDestSheetOpen(false)}
+      >
+        <div className="yg-destSheet">
+          <div className="yg-topRows">
+            <div className="yg-topRow">
+              <div className="yg-topIcon">{/* pickup icon */}</div>
+              <div className="yg-topText">
+                <div className="yg-topLabel">Yo'lovchini olish nuqtasi</div>
+                <div className="yg-topValue">{pickupTitle}</div>
+              </div>
             </div>
-          }
-        >
-          <div className="yg-section">
-            <div className="yg-section-title">Oldingi manzillar</div>
+            <div className="yg-topRow">
+              <div className="yg-topIcon">{/* dest icon */}</div>
+              <div className="yg-topText" style={{ flex: 1 }}>
+                <div className="yg-topLabel">Yakuniy manzil</div>
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <Input
+                    value={destQuery}
+                    onChange={(e) => setDestQuery(e.target.value)}
+                    placeholder="Qayerga borasiz?"
+                    style={{ borderRadius: 14, height: 42 }}
+                    prefix={<EnvironmentOutlined />}
+                  />
+                  <Button className="yg-mapBtn" onClick={startDestMapPick}>
+                    Xarita
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="yg-suggestions">
+            {/* Suggestions first, then history */}
             <List
-              size="small"
-              dataSource={recentPlaces}
-              locale={{ emptyText: "Hali manzillar yo‘q" }}
-              renderItem={(item) => (
-                <List.Item
-                  className="yg-place"
-                  onClick={() => applyPlace("dest", item)}
-                  style={{ cursor: "pointer" }}
-                >
-                  <Space>
-                    {item.starred ? <StarFilled style={{ color: "#FFD400" }} /> : <EnvironmentOutlined />}
-                    <span className="yg-place-text">{item.label}</span>
-                  </Space>
+              dataSource={destSuggestions.length ? destSuggestions : history}
+              locale={{ emptyText: "" }}
+              renderItem={(it) => (
+                <List.Item className="yg-sItem" onClick={() => selectDestFromSuggestion(it)}>
+                  <div className="yg-hIcon">
+                    <EnvironmentOutlined />
+                  </div>
+                  <div className="yg-hText">
+                    <div className="yg-hTitle">{String(it.label || "").split(",")[0]}</div>
+                    <div className="yg-hSub">{it.label}</div>
+                  </div>
                 </List.Item>
               )}
             />
           </div>
 
-          {(destSug?.length > 0 || searchLoading) && (
-            <div className="yg-section">
-              <div className="yg-section-title">Qidiruv natijalari</div>
-              <List
-                size="small"
-                loading={searchLoading}
-                dataSource={destSug}
-                renderItem={(item) => (
-                  <List.Item className="yg-place" onClick={() => applyPlace("dest", item)} style={{ cursor: "pointer" }}>
-                    <Space>
-                      <SearchOutlined />
-                      <span className="yg-place-text">{item.label}</span>
-                    </Space>
-                  </List.Item>
-                )}
-              />
-            </div>
-          )}
-
-        <div className="yg-tariffs">
-          {TARIFFS.map((t) => {
-            const active = t.id === tariff.id;
-            const pricePreview = distanceKm ? t.base + distanceKm * t.perKm : t.base;
-            return (
-              <div
-                key={t.id}
-                className={`yg-tariff ${active ? "active" : ""}`}
-                onClick={() => setTariff(t)}
-              >
-                <div className="yg-tariff-name">{t.name}</div>
-                <div className="yg-tariff-sub">
-                  <ClockCircleOutlined /> {t.eta}
-                </div>
-                <div className="yg-tariff-price">
-                  <WalletOutlined /> {fmtMoney(pricePreview)} so‘m
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="yg-orderbar">
-          <div className="yg-total">
-            <div className="yg-total-label">Jami</div>
-            <div className="yg-total-value">{fmtMoney(totalPrice)} so‘m</div>
+          <div className="yg-sheetFooter">
+            <Button icon={<ArrowLeftOutlined />} onClick={goBackToHome}>
+              Orqaga
+            </Button>
           </div>
-          <Button
-            type="primary"
-            size="large"
-            className="yg-orderbtn"
-            disabled={!pickup.latlng || !dest.latlng}
-            onClick={handleOrder}
-          >
-            Zakaz berish
-          </Button>
         </div>
       </Drawer>
-    )}
 
-      
+      {/* DESTINATION MAP PICK SMALL PRICE CARD */}
+      {stage === "dest_map" && (
+        <div className="yg-miniCard">
+          <div className="yg-miniPrice">
+            <div className="yg-miniTime">{durationMin ? `${Math.round(durationMin)} daq` : "—"}</div>
+            <div className="yg-miniMoney">{fmtMoney(totalPrice)} so'm</div>
+          </div>
+          <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+            <Button danger icon={<CloseOutlined />} onClick={goBackToHome}>
+              Bekor
+            </Button>
+            <Button type="primary" onClick={confirmDest}>
+              Tayyor
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* SEARCHING BOTTOM PANEL */}
+      {stage === "searching" && (
+        <div className="yg-searchPanel">
+          <div className="yg-searchTitle">Yaqin-atrofda mos mashina qidiryapmiz</div>
+          <div className="yg-searchSub">Moslarini qidiryapmiz</div>
+          <div className="yg-searchBtns">
+            <Button className="yg-grayBtn" icon={<CloseOutlined />} onClick={handleCancel}>
+              Safarni bekor qilish
+            </Button>
+            <Button className="yg-grayBtn" icon={<ExclamationCircleOutlined />} onClick={() => message.info("Tafsilotlar keyin")}
+            >
+              Tafsilotlar
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ACCEPTED BOTTOM PANEL */}
+      {stage === "accepted" && (
+        <div className="yg-accepted">
+          <div className="yg-notif">
+            <div className="yg-notifLeft">
+              <div className="yg-go">Go</div>
+              <div>
+                <div className="yg-notifTop">Yaqinda keladi</div>
+                <div className="yg-notifSub">1–3 daqiqadan keyin haydovchi yetib boradi</div>
+              </div>
+            </div>
+            <Button shape="circle" icon={<SwapOutlined />} onClick={() => setDetailsOpen(true)} />
+          </div>
+
+          <div className="yg-eta">~{assignedDriver?.eta_min || 2} daq va keladi</div>
+
+          <div className="yg-driverCard">
+            <div className="yg-driverRow">
+              <div className="yg-driverLeft">
+                <div className="yg-driverTitle">Haydovchi ★{assignedDriver?.rating || 4.83}</div>
+                <div className="yg-driverSub">{assignedDriver?.car_model || "Oq Chevrolet Cobalt"}</div>
+                <div className="yg-plate">{assignedDriver?.car_plate || "95S703RA"}</div>
+              </div>
+              <div className="yg-driverRight">
+                <Avatar size={64} src={assignedDriver?.avatar_url} icon={<UserOutlined />} />
+              </div>
+            </div>
+
+            <div className="yg-driverActions">
+              <Button className="yg-actionBtn" onClick={() => setChatOpen(true)}>
+                Aloqa
+              </Button>
+              <Button className="yg-actionBtn" onClick={() => message.info("Xavfsizlik")}
+              >
+                Xavfsizlik
+              </Button>
+              <Button className="yg-actionBtn" onClick={() => message.info("Ulashish")}
+              >
+                Ulashish
+              </Button>
+            </div>
+
+            <div className="yg-pickRow" onClick={() => setDetailsOpen(true)}>
+              <div className="yg-pickLabel">Mijozni olish ~{assignedDriver?.pickup_eta || "23:13"}</div>
+              <div className="yg-pickAddr">{pickupTitle}</div>
+            </div>
+          </div>
+
+          <div className="yg-detailsHint" onClick={() => setDetailsOpen(true)}>
+            <span>Yana ko'rsatish</span>
+          </div>
+        </div>
+      )}
+
+      {/* DETAILS (like screenshot #8) */}
+      <Drawer
+        placement="bottom"
+        open={detailsOpen}
+        closable={false}
+        height={560}
+        bodyStyle={{ padding: 0, borderTopLeftRadius: 22, borderTopRightRadius: 22, overflow: "hidden" }}
+        mask={false}
+        onClose={() => setDetailsOpen(false)}
+      >
+        <div className="yg-details">
+          <div className="yg-detailsTop">
+            <div className="yg-detailsHeader">
+              <div className="yg-go">Go</div>
+              <div className="yg-detailsHeaderText">Yandex Go • Hozir</div>
+            </div>
+            <Button shape="circle" icon={<CloseOutlined />} onClick={() => setDetailsOpen(false)} />
+          </div>
+
+          <div className="yg-detailBtns">
+            <Button className="yg-actionBtn" onClick={() => setChatOpen(true)}>
+              Aloqa
+            </Button>
+            <Button className="yg-actionBtn" onClick={() => message.info("Xavfsizlik")}
+            >
+              Xavfsizlik
+            </Button>
+            <Button className="yg-actionBtn" onClick={() => message.info("Ulashish")}
+            >
+              Ulashish
+            </Button>
+          </div>
+
+          <div className="yg-detailsList">
+            <div className="yg-lineItem">
+              <div className="yg-lineIcon">🙋</div>
+              <div className="yg-lineText">
+                <div className="yg-lineLabel">Mijozni olish</div>
+                <div className="yg-lineValue">{pickupTitle}</div>
+              </div>
+              <div className="yg-lineArrow">›</div>
+            </div>
+
+            <div className="yg-lineItem">
+              <div className="yg-lineIcon">🏁</div>
+              <div className="yg-lineText">
+                <div className="yg-lineLabel">Yetib kelish</div>
+                <div className="yg-lineValue">{destTitle}</div>
+              </div>
+              <div className="yg-lineArrow">›</div>
+            </div>
+
+            <div className="yg-lineItem" onClick={handleCancel}>
+              <div className="yg-lineIcon" style={{ color: "#ff4d4f" }}>
+                ✖
+              </div>
+              <div className="yg-lineText">
+                <div className="yg-lineValue" style={{ color: "#ff4d4f", fontWeight: 800 }}>
+                  Safarni bekor qilish
+                </div>
+              </div>
+              <div className="yg-lineArrow">›</div>
+            </div>
+          </div>
+
+          <div className="yg-detailsFooter">
+            <Button onClick={() => setDetailsOpen(false)} style={{ width: "100%", borderRadius: 16, height: 46 }}>
+              Yana ko'rsatish
+            </Button>
+          </div>
+        </div>
+      </Drawer>
+
       {/* CHAT MODAL */}
       <Modal
         title={
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Avatar src={assignedDriver?.avatar_url} icon={<UserOutlined />} />
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>
-                {assignedDriver?.first_name || "Haydovchi"}
-              </div>
-              <div style={{ fontSize: 11, color: "#888" }}>
-                {assignedDriver?.car_model || ""}
-              </div>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>{assignedDriver?.first_name || "Haydovchi"}</div>
+              <div style={{ fontSize: 11, color: "#888" }}>{assignedDriver?.car_model}</div>
             </div>
           </div>
         }
@@ -1129,30 +1276,20 @@ const bottomTitle = useMemo(() => {
         centered
         bodyStyle={{ padding: 0 }}
       >
-        <div style={{ display: "flex", flexDirection: "column", height: "400px" }}>
-          <div
-            style={{
-              flex: 1,
-              overflowY: "auto",
-              padding: "15px",
-              background: "#f5f5f5",
-            }}
-          >
-            {messages.length === 0 ? (
+        <div style={{ display: "flex", flexDirection: "column", height: "420px" }}>
+          <div style={{ flex: 1, overflowY: "auto", padding: 15, background: "#f5f5f5" }}>
+            {messagesState.length === 0 ? (
               <div style={{ textAlign: "center", color: "#999", marginTop: 50 }}>
-                Henuz xabarlar yo‘q. <br /> Haydovchiga yozing!
+                Henuz xabarlar yo'q.
+                <br /> Haydovchiga yozing!
               </div>
             ) : (
-              messages.map((msg) => {
+              messagesState.map((msg) => {
                 const isMe = msg.sender_role === "client";
                 return (
                   <div
-                    key={msg.id}
-                    style={{
-                      display: "flex",
-                      justifyContent: isMe ? "flex-end" : "flex-start",
-                      marginBottom: 10,
-                    }}
+                    key={msg.id || msg.created_at}
+                    style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start", marginBottom: 10 }}
                   >
                     <div
                       style={{
@@ -1167,18 +1304,8 @@ const bottomTitle = useMemo(() => {
                       }}
                     >
                       <div style={{ fontSize: 14 }}>{msg.content}</div>
-                      <div
-                        style={{
-                          fontSize: 10,
-                          opacity: 0.7,
-                          textAlign: "right",
-                          marginTop: 2,
-                        }}
-                      >
-                        {new Date(msg.created_at).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                      <div style={{ fontSize: 10, opacity: 0.7, textAlign: "right", marginTop: 2 }}>
+                        {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </div>
                     </div>
                   </div>
@@ -1190,7 +1317,7 @@ const bottomTitle = useMemo(() => {
 
           <div
             style={{
-              padding: "10px",
+              padding: 10,
               background: "#fff",
               borderTop: "1px solid #eee",
               display: "flex",
@@ -1204,131 +1331,163 @@ const bottomTitle = useMemo(() => {
               placeholder="Xabar yozing..."
               style={{ borderRadius: 20 }}
             />
-            <Button
-              type="primary"
-              shape="circle"
-              icon={<SendOutlined />}
-              onClick={handleSendMessage}
-            />
+            <Button type="primary" shape="circle" icon={<SendOutlined />} onClick={handleSendMessage} />
           </div>
         </div>
       </Modal>
 
+      {/* RATING */}
       <Modal
+        title="Safar tugadi"
         open={ratingOpen}
-        title="Safar yakunlandi"
-        onOk={submitRating}
-        onCancel={skipRating}
-        okText="Baholash"
-        cancelText="Keyinroq"
+        onCancel={() => setRatingOpen(false)}
+        onOk={() => setRatingOpen(false)}
+        okText="Yuborish"
       >
-        <div style={{ marginBottom: 10 }}>
-          Haydovchini baholang:
-        </div>
-        <Rate value={ratingValue} onChange={setRatingValue} />
+        <Space direction="vertical" style={{ width: "100%" }}>
+          <Text>Haydovchini baholang:</Text>
+          <Rate defaultValue={5} />
+        </Space>
       </Modal>
 
-<style>{`
-        .yg-root { height: 100vh; width: 100%; background:#000; overflow:hidden; }
-        .yg-map { position: relative; height: 100%; width: 100%; }
-        .yg-topcard { position:absolute; left:16px; right:16px; top:14px; z-index: 500; }
-        .yg-card { border-radius: 18px; box-shadow: 0 12px 30px rgba(0,0,0,.18); }
-        .yg-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; position:relative; }
-        .yg-row:last-child { margin-bottom:0; }
-        .yg-dot { width:10px; height:10px; border-radius:50%; flex: 0 0 10px; }
-        .yg-dot.blue { background:#1677ff; }
-        .yg-dot.red { background:#ff4d4f; }
-        .yg-addr { flex:1; font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .yg-input { flex:1; border-radius: 12px; }
-        .yg-mini { border-radius: 12px; }
-        .yg-swap { position:absolute; right:8px; top:46px; }
-        .yg-swap button { border-radius: 12px; }
+      {/* styles */}
+      <style>{`
+        .yg-root{position:relative;height:100vh;width:100%;background:#fff;}
+        .yg-mapWrap{position:absolute;inset:0;}
+        .leaflet-container{background:#dfe6ee;}
 
-        .yg-centerpin { 
-          position: absolute; 
-          left: 50%; 
-          top: 50%; 
-          z-index: 600; 
-          display: flex; 
-          flex-direction: column; 
-          align-items: center; 
-          gap: 10px; 
-          pointer-events: none;
-          transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-          transform: translate(-50%, -68%);
-        }
+        .yg-back{position:absolute;left:16px;top:16px;z-index:900;}
+        .yg-locate{position:absolute;right:16px;bottom:340px;z-index:900;}
+        .yg-locate .ant-btn{box-shadow:0 6px 18px rgba(0,0,0,.18);border:none;}
 
-        .yg-centerpin.dragging {
-          transform: translate(-50%, -90%) scale(1.15);
-        }
+        /* Center pin */
+        .yg-centerpin{position:absolute;left:50%;top:50%;z-index:800;display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:none;transition:transform .2s cubic-bezier(.175,.885,.32,1.275);transform:translate(-50%,-68%);} 
+        .yg-centerpin.dragging{transform:translate(-50%,-90%) scale(1.15);} 
+        .yg-pinlabel{background:rgba(17,17,17,.85);color:#fff;padding:6px 10px;border-radius:12px;font-weight:700;font-size:12px;box-shadow:0 10px 24px rgba(0,0,0,.25);transition:opacity .2s;}
+        .yg-centerpin.dragging .yg-pinlabel{opacity:.5;}
 
-        .yg-pinlabel { 
-          background: rgba(17,17,17,.85); 
-          color: #fff; 
-          padding: 6px 10px; 
-          border-radius: 12px; 
-          font-weight: 600; 
-          font-size: 12px; 
-          box-shadow: 0 10px 24px rgba(0,0,0,.25); 
-          transition: opacity 0.2s;
-        }
+        .yg-miniPin{filter: drop-shadow(0 10px 18px rgba(0,0,0,.25));}
 
-        .yg-centerpin.dragging .yg-pinlabel {
-          opacity: 0.5;
-        }
+        /* bottom sheet */
+        .yg-sheet{padding:16px 16px 18px 16px;}
+        .yg-sheetHead{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+        .yg-logo{width:44px;height:44px;border-radius:12px;background:conic-gradient(from 180deg, #FFD400, #fff, #111);}
 
-        .yg-drawer .ant-drawer-content { border-top-left-radius: 22px; border-top-right-radius: 22px; }
-        .yg-drawer .ant-drawer-header { padding: 10px 12px; }
-        .yg-section { margin-bottom: 12px; }
-        .yg-section-title { font-weight:700; margin-bottom: 6px; }
-        .yg-place { border-radius: 12px; }
-        .yg-place:hover { background: rgba(0,0,0,.03); }
-        .yg-place-text { display:block; max-width: 100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .yg-bigRow{height:54px;border-radius:18px;background:#f2f2f2;display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;}
+        .yg-bigRowText{font-size:16px;font-weight:700;}
+        .yg-bigRowArrow{position:absolute;right:16px;font-size:22px;opacity:.7;}
 
-        .yg-tariffs { display:flex; gap:10px; overflow-x:auto; padding-bottom: 8px; margin-top: 8px; }
-        .yg-tariff { min-width: 150px; border:1px solid rgba(0,0,0,.08); border-radius: 16px; padding: 10px; cursor:pointer; }
-        .yg-tariff.active { border-color:#111; box-shadow:0 10px 24px rgba(0,0,0,.12); }
-        .yg-tariff-name { font-weight:800; }
-        .yg-tariff-sub { color: rgba(0,0,0,.65); font-size:12px; margin-top:4px; display:flex; gap:6px; align-items:center; }
-        .yg-tariff-price { margin-top:8px; font-weight:800; display:flex; gap:6px; align-items:center; }
+        .yg-history{margin-top:12px;max-height:150px;overflow:auto;}
+        .yg-hItem{cursor:pointer;border-radius:14px;}
+        .yg-hItem:hover{background:#fafafa;}
+        .yg-hIcon{width:36px;height:36px;border-radius:18px;background:#f4f4f4;display:flex;align-items:center;justify-content:center;margin-right:10px;}
+        .yg-hText{flex:1;}
+        .yg-hTitle{font-weight:800;font-size:15px;}
+        .yg-hSub{font-size:12px;color:#8a8a8a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
-        .yg-orderbar { margin-top: 10px; display:flex; align-items:center; justify-content:space-between; gap: 12px; }
-        .yg-total-label { color: rgba(0,0,0,.65); font-weight:700; font-size:12px; }
-        .yg-total-value { font-weight:900; font-size:18px; }
-        .yg-orderbtn { border-radius: 18px; background:#FFD400; border-color:#FFD400; color:#111; font-weight:900; padding: 0 18px; }
-        .yg-orderbtn[disabled] { background: #f5f5f5 !important; border-color:#f5f5f5 !important; color: rgba(0,0,0,.35) !important; }
+        .yg-homeActions{display:flex;gap:10px;margin-top:12px;}
+        .yg-orderBtn{flex:1;height:52px;border-radius:20px;font-weight:900;font-size:16px;}
+        .yg-smallBtn{width:56px;height:52px;border-radius:20px;}
 
-        .yg-active { position:absolute; left:16px; right:16px; bottom: 16px; z-index: 650; }
-        .yg-active-card { border-radius: 20px; box-shadow: 0 -6px 26px rgba(0,0,0,.22); }
-        .yg-active-title { font-weight: 900; font-size: 16px; }
-        .yg-active-sub { margin-top: 4px; color: rgba(0,0,0,.6); font-weight: 700; }
-        .yg-active-actions { margin-top: 12px; }
-        .yg-active-actions.two { display:flex; gap: 10px; }
-        .yg-driver-row { display:flex; gap: 12px; align-items:center; }
-        .yg-driver-avatar { width: 52px; height: 52px; border-radius: 16px; overflow:hidden; background:#f5f5f5; display:flex; align-items:center; justify-content:center; }
-        .yg-driver-avatar img { width:100%; height:100%; object-fit: cover; }
-        .yg-driver-placeholder { font-size: 22px; }
-        .yg-driver-info { flex:1; min-width:0; }
-        .yg-driver-name { font-weight: 900; font-size: 15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .yg-driver-car { margin-top: 2px; color: rgba(0,0,0,.65); font-weight: 700; font-size: 12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .yg-driver-status { margin-top: 6px; font-weight: 900; font-size: 12px; }
+        /* confirm */
+        .yg-confirmHeader{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;border-radius:18px;padding:10px 12px;box-shadow:0 12px 26px rgba(0,0,0,.08);} 
+        .yg-confirmTitle{font-weight:900;font-size:16px;line-height:1.1;}
+        .yg-pill{border-radius:999px;height:36px;padding:0 14px;background:#f3f3f3;border:none;font-weight:800;}
 
-.user-marker-pulse {
-  width: 20px;
-  height: 20px;
-  background: #1890ff;
-  border-radius: 50%;
-  border: 3px solid white;
-  box-shadow: 0 0 0 0 rgba(24, 144, 255, 0.7);
-  animation: pulse-blue 2s infinite;
-}
+        .yg-routeInfo{display:flex;align-items:center;justify-content:space-between;margin-top:10px;}
+        .yg-routePill{display:flex;align-items:center;gap:8px;border-radius:14px;background:#fff;padding:8px 12px;box-shadow:0 12px 26px rgba(0,0,0,.08);}
 
-@keyframes pulse-blue {
-  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(24, 144, 255, 0.7); }
-  70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(24, 144, 255, 0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(24, 144, 255, 0); }
-}
-        .leaflet-control-container { display:none; }
+        .yg-tabs{display:flex;gap:18px;margin-top:12px;color:#b5b5b5;font-weight:800;}
+        .yg-tabActive{color:#111;background:#efefef;border-radius:999px;padding:6px 12px;}
+
+        .yg-tariffs{display:flex;gap:12px;overflow:auto;padding-top:12px;padding-bottom:10px;}
+        .yg-tariff{min-width:150px;border-radius:18px;background:#fff;box-shadow:0 12px 26px rgba(0,0,0,.08);padding:12px;cursor:pointer;}
+        .yg-tariff.active{outline:3px solid #FFD400;}
+        .yg-tariffEta{font-weight:900;color:#111;}
+        .yg-tariffName{margin-top:6px;font-weight:800;color:#777;}
+        .yg-tariffPrice{margin-top:10px;font-weight:900;font-size:18px;}
+
+        .yg-confirmActions{display:flex;gap:10px;margin-top:10px;}
+        .yg-orderBtnYellow{flex:1;height:56px;border-radius:22px;font-weight:900;font-size:18px;background:#FFD400;color:#111;border:none;}
+        .yg-orderBtnYellow:hover{background:#ffdf2d;color:#111;}
+
+        /* destination sheet */
+        .yg-destSheet{height:100%;display:flex;flex-direction:column;}
+        .yg-topRows{padding:14px 16px 10px 16px;}
+        .yg-topRow{display:flex;gap:12px;align-items:flex-start;background:#fff;border-radius:18px;padding:12px;box-shadow:0 12px 26px rgba(0,0,0,.08);margin-bottom:10px;}
+        .yg-topIcon{width:46px;height:46px;border-radius:18px;background:#f2f2f2;}
+        .yg-topLabel{font-size:12px;color:#999;font-weight:700;}
+        .yg-topValue{font-size:18px;font-weight:900;}
+        .yg-mapBtn{height:42;border-radius:14px;font-weight:800;background:#efefef;border:none;}
+
+        .yg-suggestions{flex:1;overflow:auto;padding:0 10px 10px 10px;}
+        .yg-sItem{cursor:pointer;border-radius:14px;padding-left:10px;padding-right:10px;}
+        .yg-sItem:hover{background:#fafafa;}
+        .yg-sheetFooter{padding:10px 16px;border-top:1px solid #eee;}
+
+        /* dest map mini card */
+        .yg-miniCard{position:absolute;left:50%;transform:translateX(-50%);bottom:130px;z-index:950;background:#fff;border-radius:18px;box-shadow:0 18px 38px rgba(0,0,0,.18);padding:14px 14px;min-width:260px;}
+        .yg-miniPrice{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+        .yg-miniTime{font-weight:900;font-size:14px;color:#111;}
+        .yg-miniMoney{font-weight:900;font-size:18px;color:#111;}
+
+        /* searching */
+        .yg-waves{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:700;pointer-events:none;}
+        .yg-wave{position:absolute;left:50%;top:50%;width:30px;height:30px;border-radius:50%;border:3px solid rgba(59,130,246,.35);transform:translate(-50%,-50%);animation:ygWave 2.2s infinite;}
+        .yg-wave:nth-child(2){animation-delay:.7s;}
+        .yg-wave:nth-child(3){animation-delay:1.4s;}
+        @keyframes ygWave{0%{opacity:.9;transform:translate(-50%,-50%) scale(.6);}100%{opacity:0;transform:translate(-50%,-50%) scale(7);}}
+
+        .yg-searchPanel{position:absolute;left:16px;right:16px;bottom:18px;z-index:950;background:#fff;border-radius:22px;box-shadow:0 18px 38px rgba(0,0,0,.18);padding:16px;}
+        .yg-searchTitle{font-size:18px;font-weight:900;}
+        .yg-searchSub{margin-top:4px;color:#888;font-weight:700;}
+        .yg-searchBtns{display:flex;gap:12px;margin-top:14px;}
+        .yg-grayBtn{flex:1;height:48px;border-radius:18px;background:#f2f2f2;border:none;font-weight:900;}
+
+        .yg-car{width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:20px;filter: drop-shadow(0 6px 10px rgba(0,0,0,.25));}
+
+        /* accepted */
+        .yg-accepted{position:absolute;left:16px;right:16px;bottom:18px;z-index:950;}
+        .yg-notif{background:rgba(255,255,255,.92);backdrop-filter: blur(10px);border-radius:22px;padding:12px 12px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 18px 38px rgba(0,0,0,.18);} 
+        .yg-notifLeft{display:flex;align-items:center;gap:10px;}
+        .yg-go{width:38px;height:38px;border-radius:19px;background:#2b2b2b;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;}
+        .yg-notifTop{font-weight:900;}
+        .yg-notifSub{font-size:12px;color:#666;font-weight:700;}
+        .yg-eta{margin-top:10px;background:#fff;border-radius:22px;padding:12px 14px;font-size:22px;font-weight:900;box-shadow:0 18px 38px rgba(0,0,0,.18);} 
+
+        .yg-driverCard{margin-top:10px;background:#fff;border-radius:22px;box-shadow:0 18px 38px rgba(0,0,0,.18);padding:14px;} 
+        .yg-driverRow{display:flex;justify-content:space-between;gap:12px;}
+        .yg-driverTitle{font-weight:900;font-size:16px;}
+        .yg-driverSub{color:#666;font-weight:800;margin-top:2px;}
+        .yg-plate{margin-top:8px;font-weight:900;font-size:40px;letter-spacing:2px;} 
+
+        .yg-driverActions{display:flex;gap:10px;margin-top:12px;}
+        .yg-actionBtn{flex:1;height:48px;border-radius:18px;background:#f2f2f2;border:none;font-weight:900;} 
+
+        .yg-pickRow{margin-top:14px;border-top:1px solid #eee;padding-top:10px;cursor:pointer;}
+        .yg-pickLabel{color:#777;font-weight:800;font-size:12px;}
+        .yg-pickAddr{font-weight:900;font-size:18px;margin-top:2px;} 
+
+        .yg-detailsHint{margin-top:10px;background:#fff;border-radius:18px;box-shadow:0 18px 38px rgba(0,0,0,.18);height:54px;display:flex;align-items:center;justify-content:center;font-weight:900;cursor:pointer;} 
+
+        /* details drawer */
+        .yg-details{height:100%;display:flex;flex-direction:column;padding:14px 16px 16px 16px;}
+        .yg-detailsTop{display:flex;justify-content:space-between;align-items:center;}
+        .yg-detailsHeader{display:flex;align-items:center;gap:10px;}
+        .yg-detailsHeaderText{font-weight:900;}
+        .yg-detailBtns{display:flex;gap:10px;margin-top:14px;}
+
+        .yg-detailsList{margin-top:16px;background:#fff;border-radius:22px;box-shadow:0 18px 38px rgba(0,0,0,.12);overflow:hidden;}
+        .yg-lineItem{display:flex;align-items:center;gap:12px;padding:14px 14px;border-bottom:1px solid #f0f0f0;cursor:pointer;}
+        .yg-lineItem:last-child{border-bottom:none;}
+        .yg-lineIcon{width:34px;height:34px;border-radius:17px;background:#f2f2f2;display:flex;align-items:center;justify-content:center;font-weight:900;}
+        .yg-lineText{flex:1;}
+        .yg-lineLabel{font-size:12px;color:#888;font-weight:800;}
+        .yg-lineValue{font-size:16px;font-weight:900;}
+        .yg-lineArrow{font-size:22px;opacity:.5;}
+
+        .yg-detailsFooter{margin-top:auto;}
+
       `}</style>
     </div>
   );
