@@ -33,7 +33,9 @@ import {
   AimOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-import { supabase } from "../../../lib/supabase";
+import api from "@/utils/apiHelper";
+import { haversineKm, buildRouteLine } from "@/utils/geo";
+import { smoothCoords } from "@/utils/locationSmoothing";
 
 const { Title, Text } = Typography;
 
@@ -374,39 +376,38 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
     persistSearch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form]);
-
-  const loadMyBookings = async () => {
+const loadMyBookings = async () => {
     setMyLoading(true);
     try {
-      const { data: authData } = await supabase.auth.getUser();
-      const user = authData?.user;
-      if (!user) {
+      const userId = localStorage.getItem("user_id") || localStorage.getItem("uid") || "";
+      if (!userId) {
         setMyBookings([]);
         return;
       }
 
-      // auto-fill from meta if local storage empty
-      const metaName = user?.user_metadata?.full_name || user?.user_metadata?.name || "";
-      const metaPhone = user?.user_metadata?.phone || user?.phone || "";
-      if (!localStorage.getItem("passenger_name") && metaName) localStorage.setItem("passenger_name", metaName);
-      if (!localStorage.getItem("passenger_phone") && metaPhone) localStorage.setItem("passenger_phone", metaPhone);
+      // optional meta (saved earlier during login/booking)
+      const passenger_name = localStorage.getItem("passenger_name") || "";
+      const passenger_phone = localStorage.getItem("passenger_phone") || "";
 
-      const { data, error } = await supabase
-        .from("trip_booking_requests")
-        .select("*, orders(*)")
-        .eq("passenger_id", user.id)
-        .order("created_at", { ascending: false });
+      const resp = await api.get("/api/order", {
+        query: {
+          action: "list_my_inter_prov_bookings",
+          passenger_id: userId,
+          passenger_name,
+          passenger_phone,
+        },
+      });
 
-      if (error) throw error;
-      setMyBookings(data || []);
+      const bookings = Array.isArray(resp) ? resp : (resp?.bookings || []);
+      setMyBookings(bookings);
     } catch (e) {
       console.error(e);
+      setMyBookings([]);
     } finally {
       setMyLoading(false);
     }
   };
-
-  const doSearch = async (silent = false) => {
+const doSearch = async (silent = false) => {
     setSearching(true);
     setErrorText("");
 
@@ -414,78 +415,20 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
       const fromDistrictFilter = (form.fromDistrict || "").trim();
       const toDistrictFilter = (form.toDistrict || "").trim();
 
-      let q = supabase
-        .from("orders")
-        .select("*")
-        .eq("service_type", "inter_prov")
-        .in("status", ["pending", "booked"])
-        .gt("seats_available", 0)
-        .eq("from_region", form.fromRegion)
-        // delivery service filter
-        
-        
-        .eq("to_region", form.toRegion)
-        .order("scheduled_at", { ascending: true });
+      const resp = await api.get("/api/order", {
+        query: {
+          action: "list_inter_prov",
+          from_region: form.fromRegion,
+          from_district: fromDistrictFilter,
+          to_region: form.toRegion,
+          to_district: toDistrictFilter,
+          date: form.date || "",
+          gender: form.gender || "all",
+          pickup_mode: form.pickupMode || "all",
+        },
+      });
 
-      // gender filter (optional column gender_pref)
-      if (form.gender && form.gender !== "all") {
-        // show orders that allow everyone OR matching gender
-        q = q.in("gender_pref", ["all", form.gender]);
-      }
-
-      // pickup mode filter
-      if (form.pickupMode && form.pickupMode !== "all") {
-        q = q.eq("pickup_mode", form.pickupMode);
-      }
-
-      // wildcard rules:
-      // If passenger chose district, match exact OR driver wildcard (empty string)
-      if (!isTashkentCity(form.fromRegion) || fromDistrictFilter) {
-        q = q.or(`from_district.eq.${fromDistrictFilter},from_district.eq.`);
-      }
-      if (!isTashkentCity(form.toRegion) || toDistrictFilter) {
-        q = q.or(`to_district.eq.${toDistrictFilter},to_district.eq.`);
-      }
-
-      if (form.date) {
-        const start = dayjs(form.date).startOf("day").toISOString();
-        const end = dayjs(form.date).endOf("day").toISOString();
-        q = q.gte("scheduled_at", start).lte("scheduled_at", end);
-      }
-
-      let data, error;
-      ({ data, error } = await q);
-      if (error) {
-        const msg = String(error.message || "");
-        if (msg.toLowerCase().includes("gender") || msg.toLowerCase().includes("gender_pref") || msg.toLowerCase().includes("column")) {
-          // fallback: column not migrated yet
-          const fromDistrictFilter2 = (form.fromDistrict || "").trim();
-          const toDistrictFilter2 = (form.toDistrict || "").trim();
-          let q2 = supabase
-            .from("orders")
-            .select("*")
-            .eq("service_type", "inter_prov")
-            .in("status", ["pending", "booked"])
-            .gt("seats_available", 0)
-            .eq("from_region", form.fromRegion)
-            .eq("to_region", form.toRegion)
-            .order("scheduled_at", { ascending: true });
-          if (!isTashkentCity(form.fromRegion) || fromDistrictFilter2) {
-            q2 = q2.or(`from_district.eq.${fromDistrictFilter2},from_district.eq.`);
-          }
-          if (!isTashkentCity(form.toRegion) || toDistrictFilter2) {
-            q2 = q2.or(`to_district.eq.${toDistrictFilter2},to_district.eq.`);
-          }
-          if (form.date) {
-            const start = dayjs(form.date).startOf("day").toISOString();
-            const end = dayjs(form.date).endOf("day").toISOString();
-            q2 = q2.gte("scheduled_at", start).lte("scheduled_at", end);
-          }
-          ({ data, error } = await q2);
-        }
-      }
-      if (error) throw error;
-
+      const data = Array.isArray(resp) ? resp : (resp?.orders || resp?.data || []);
       const filtered = (data || []).filter((o) => Number(o.seats_available || 0) >= Number(form.minSeats || 1));
       setResults(filtered);
 
@@ -499,45 +442,36 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
       setSearching(false);
     }
   };
-
-  useEffect(() => {
-    let isMounted = true;
-    let channel = null;
+useEffect(() => {
+    let alive = true;
 
     const loadAll = async () => {
       try {
         setLoading(true);
         await doSearch(true);
         await loadMyBookings();
-
-        const { data: authData } = await supabase.auth.getUser();
-        const user = authData?.user;
-
-        if (user && isMounted) {
-          channel = supabase
-            .channel("client-interprov-live")
-            .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => doSearch(true))
-            .on("postgres_changes", { event: "*", schema: "public", table: "trip_booking_requests" }, (payload) => {
-              const row = payload?.new || payload?.old;
-              if (!row) return;
-              if (row.passenger_id === user.id || row.driver_id === user.id) loadMyBookings();
-              doSearch(true);
-            })
-            .subscribe();
-        }
-      } catch (e) {
-        console.error("ClientInterProvincial init error:", e);
-        if (isMounted) setErrorText(e?.message || "Xatolik yuz berdi");
       } finally {
-        if (isMounted) setLoading(false);
+        if (alive) setLoading(false);
       }
     };
 
     loadAll();
 
+    // Realtime yoqilmagan bo‘lsa ham avtomatik yangilanish uchun polling.
+    const t1 = setInterval(() => {
+      if (!alive) return;
+      doSearch(true);
+    }, 8000);
+
+    const t2 = setInterval(() => {
+      if (!alive) return;
+      loadMyBookings();
+    }, 12000);
+
     return () => {
-      isMounted = false;
-      if (channel) supabase.removeChannel(channel);
+      alive = false;
+      clearInterval(t1);
+      clearInterval(t2);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -575,7 +509,8 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
         if (pickupLat == null || pickupLng == null) return message.error("Uydan olib ketishga lokatsiya yuboring!");
       }
 
-      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      const authErr = null;
+      const authData = { user: { id: (localStorage.getItem("user_id") || localStorage.getItem("uid") || "") } };
       if (authErr) throw authErr;
       const user = authData?.user;
       if (!user) return message.error("So‘rov yuborish uchun avval tizimga kiring!");
@@ -587,7 +522,8 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
 
       // Prefer v2, fallback to v1
       let rpcErr = null;
-      const v2 = await supabase.rpc("request_inter_prov_booking", {
+      const v2 = await api.post("/api/order", {
+        action: "book_inter_prov",
         p_order_id: selectedOrder.id,
         p_passenger_id: user.id,
         p_passenger_name: passengerName || "",
@@ -601,7 +537,8 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
 
       if (v2?.error) {
         rpcErr = v2.error;
-        const v1 = await supabase.rpc("request_inter_prov_booking", {
+        const v1 = await api.post("/api/order", {
+        action: "book_inter_prov",
           p_order_id: selectedOrder.id,
           p_passenger_id: user.id,
           p_passenger_name: passengerName || "",
@@ -642,8 +579,7 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
       const newSeats = Number(editSeats || 1);
       if (newSeats < 1) return message.error("Joy kamida 1 bo‘lsin!");
 
-      const { data: authData } = await supabase.auth.getUser();
-      const user = authData?.user;
+      const user = { id: (localStorage.getItem("user_id") || localStorage.getItem("uid") || "") };
       if (!user) return message.error("Avval tizimga kiring!");
 
       const canEditAll = editBooking.status === "requested";
@@ -662,11 +598,12 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
       }
 
       // prefer v2 edit
-      const v2 = await supabase.rpc("edit_booking_request", v2Args);
+      const v2 = await api.post("/api/order", { action: "edit_inter_prov_booking", ...v2Args });
 
       if (v2?.error) {
         // fallback old seats-only rpc
-        const v1 = await supabase.rpc("update_inter_prov_booking_seats", {
+        const v1 = await api.post("/api/order", {
+        action: "update_inter_prov_booking_seats",
           p_booking_id: editBooking.id,
           p_passenger_id: user.id,
           p_new_seats: newSeats,
@@ -688,32 +625,34 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
 
   const cancelBooking = async (b) => {
     try {
-      const { data: authData } = await supabase.auth.getUser();
-      const user = authData?.user;
+      const user = { id: (localStorage.getItem("user_id") || localStorage.getItem("uid") || "") };
       if (!user) return message.error("Avval tizimga kiring!");
 
       // If already accepted: send cancel request to driver (driver should confirm to refund fee)
       if (b.status === "accepted") {
-        const v3 = await supabase.rpc("request_cancel_after_accept", {
+        const v3 = await api.post("/api/order", {
+        action: "request_cancel_after_accept",
           p_request_id: b.id,
           p_passenger_id: user.id,
         });
         if (v3?.error) {
           // fallback: mark status if column exists
           try {
-            await supabase.from("trip_booking_requests").update({ status: "cancel_requested" }).eq("id", b.id).eq("passenger_id", user.id);
+            await api.post("/api/order", { action: "mark_cancel_requested", booking_id: b.id });
           } catch (e) {}
         }
         message.success("Bekor qilish so‘rovi haydovchiga yuborildi. Haydovchi tasdiqlasa to‘lov qaytariladi.");
       } else {
         // requested -> immediate cancel
-        const v2 = await supabase.rpc("cancel_booking_request", {
+        const v2 = await api.post("/api/order", {
+        action: "cancel_booking_request",
           p_request_id: b.id,
           p_passenger_id: user.id,
         });
 
         if (v2?.error) {
-          const v1 = await supabase.rpc("cancel_booking_request", {
+          const v1 = await api.post("/api/order", {
+        action: "cancel_booking_request",
             p_booking_id: b.id,
             p_passenger_id: user.id,
           });
