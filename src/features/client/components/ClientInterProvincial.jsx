@@ -1026,15 +1026,34 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
                   * Uydan olib ketishga lokatsiyangiz kerak. Haydovchi faqat qabul qilgandan keyin ko‘radi.
                 </Text>
 
-                <Space size={10} wrap style={{ width: "100%" }}>
-                        <Button
-                          icon={<EnvironmentOutlined />}
-                          onClick={openPickupPicker}
-                          style={{ borderRadius: 999 }}
-                        >
-                          Manzilni xaritadan tanlash
-                        </Button>
-                      </Space>
+                <Space style={{ marginTop: 10 }} wrap>
+                  <Button
+                    icon={<AimOutlined />}
+                    onClick={async () => {
+                      try {
+                        const p = await getMyGeo();
+                        setPickupLat(p.lat);
+                        setPickupLng(p.lng);
+                        const addr = await reverseGeocodeOSM(p.lat, p.lng);
+                        if (addr) setPickupAddress(addr);
+                        message.success("Lokatsiya olindi");
+                      } catch (e) {
+                        message.error("Lokatsiyani olishda xatolik");
+                      }
+                    }}
+                  >
+                    Geolokatsiyadan olish
+                  </Button>
+
+                  <Button onClick={openPickupPicker}>Xaritadan tanlash</Button>
+
+                  {pickupLat != null && pickupLng != null ? (
+                    <>
+                      <Button onClick={() => openMapEmbed({ title: "Xarita", lat: pickupLat, lng: pickupLng, mode: "pin" })}>Ko‘rish</Button>
+                      <Button type="primary" onClick={() => openMapEmbed({ title: "Yo‘l", lat: pickupLat, lng: pickupLng, sLat: null, sLng: null, mode: "route" })}>Yo‘l</Button>
+                    </>
+                  ) : null}
+                </Space>
 
                 <Input
                   value={pickupAddress}
