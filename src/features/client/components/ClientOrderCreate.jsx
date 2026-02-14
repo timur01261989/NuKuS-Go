@@ -1,19 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, Card, Drawer, Input, List, Space, Typography, message } from "antd";
-import {
-  EnvironmentOutlined,
-  SearchOutlined,
-  SwapOutlined,
-  StarFilled,
-  ClockCircleOutlined,
-  WalletOutlined,
+// UI komponentlar faqat 'antd' dan olinadi:
+import { Button, Card, Drawer, Input, List, Space, Typography, message, Modal, Rate, Avatar } from "antd";
+// Ikonkalar faqat '@ant-design/icons' dan olinadi:
+import { 
+  EnvironmentOutlined, SearchOutlined, SwapOutlined, StarFilled, 
+  ClockCircleOutlined, WalletOutlined, AimOutlined, SendOutlined, UserOutlined 
 } from "@ant-design/icons";
 
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-
+import { playAliceVoice } from "@/utils/AudioPlayer";
 import api from "@/utils/apiHelper";
+import { supabase } from "@/lib/supabase";
 const { Text, Title } = Typography;
 
 /** ---------------- ICONS (Yandex-like pins) ---------------- */
@@ -198,6 +197,19 @@ export default function ClientOrderCreate() {
   });
   const [orderStatus, setOrderStatus] = useState(null);
   const [assignedDriver, setAssignedDriver] = useState(null);
+
+  // ✅ Chat & Rating (connected)
+  const [chatOpen, setChatOpen] = useState(false);
+
+  // --- CHAT STATE ---
+  const [messages, setMessages] = useState([]);
+  const [msgText, setMsgText] = useState("");
+  const chatScrollRef = useRef(null);
+
+  const [ratingOpen, setRatingOpen] = useState(false);
+  const [ratingValue, setRatingValue] = useState(5);
+  const [completedOrderId, setCompletedOrderId] = useState(null);
+
 
   // ✅ Serverdan aktiv buyurtmani tekshirish (localStorage bo‘sh bo‘lsa ham)
   useEffect(() => {
@@ -529,6 +541,17 @@ export default function ClientOrderCreate() {
 
         const s = String(ord.status || "").toLowerCase();
         if (["cancelled", "completed", "finished", "done"].includes(s)) {
+        if (["completed","finished","done"].includes(s)) {
+                  setCompletedOrderId(orderId);
+                  setRatingOpen(true);
+                }
+// Status o'zgarishini tekshiradigan useEffect ichida:
+if (res.status === 'driver_assigned' && orderStatus !== 'driver_assigned') {
+   playAliceVoice('driver_found'); // "Haydovchi topildi"
+}
+if (res.status === 'arrived' && orderStatus !== 'arrived') {
+   playAliceVoice('arrived'); // "Mashina yetib keldi"
+}
           localStorage.removeItem("activeOrderId");
           setOrderId(null);
         }
@@ -582,12 +605,108 @@ export default function ClientOrderCreate() {
   }, [orderId]);
 
   const openChat = useCallback(() => {
-    message.info("Chat tez orada qo‘shiladi");
+    setChatOpen(true);
+  }, []);
+
+  const closeChat = useCallback(() => setChatOpen(false), []);
+
+  // Chat pastga tushishi uchun yordamchi
+  const scrollToBottom = useCallback(() => {
+    setTimeout(() => {
+      chatScrollRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+  }, []);
+
+  // --- CHAT REALTIME LOGIC ---
+  useEffect(() => {
+    if (!chatOpen || !orderId) return;
+
+    let mounted = true;
+
+    // 1) Eski xabarlarni yuklash
+    const fetchHistory = async () => {
+      const { data, error } = await supabase
+        .from("messages")
+        .select("*")
+        .eq("order_id", orderId)
+        .order("created_at", { ascending: true });
+
+      if (!error && data && mounted) {
+        setMessages(data);
+        scrollToBottom();
+      }
+    };
+
+    fetchHistory();
+
+    // 2) Jonli kuzatish (Realtime)
+    const channel = supabase
+      .channel(`chat_room:${orderId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "messages", filter: `order_id=eq.${orderId}` },
+        (payload) => {
+          setMessages((prev) => [...prev, payload.new]);
+          scrollToBottom();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      mounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, [chatOpen, orderId, scrollToBottom]);
+
+  // Xabar yuborish funksiyasi
+  const handleSendMessage = useCallback(async () => {
+    if (!msgText.trim() || !orderId) return;
+
+    const textToSend = msgText.trim();
+    setMsgText("");
+
+    await supabase.from("messages").insert([{
+      order_id: orderId,
+      sender_role: "client",
+      content: textToSend,
+      created_at: new Date().toISOString()
+    }]);
+  }, [msgText, orderId]);
+
+
+
+  const submitRating = useCallback(async () => {
+    try {
+      if (!completedOrderId) {
+        setRatingOpen(false);
+        return;
+      }
+      // optional backend action; safe even if not implemented (won't break UI)
+      await api.post("/api/order", { action: "rate", orderId: completedOrderId, rating: ratingValue });
+    } catch (e) {
+      console.warn("rating submit error", e);
+    } finally {
+      setRatingOpen(false);
+      setCompletedOrderId(null);
+      // clear active order after rating step
+      localStorage.removeItem("activeOrderId");
+      setOrderId(null);
+      setOrderStatus(null);
+      setAssignedDriver(null);
+    }
+  }, [completedOrderId, ratingValue]);
+
+  const skipRating = useCallback(() => {
+    setRatingOpen(false);
+    setCompletedOrderId(null);
+    localStorage.removeItem("activeOrderId");
+    setOrderId(null);
+    setOrderStatus(null);
+    setAssignedDriver(null);
   }, []);
 
 
-
-  const bottomTitle = useMemo(() => {
+const bottomTitle = useMemo(() => {
     if (!pickup.latlng || !dest.latlng) return "Manzilni tanlang";
     const dist = distanceKm ? `${distanceKm.toFixed(1)} km` : "—";
     const dur = durationMin ? `${Math.round(durationMin)} min` : "—";
@@ -598,10 +717,25 @@ export default function ClientOrderCreate() {
     <div className="yg-root">
       {/* MAP */}
       <div className="yg-map">
-        <MapContainer center={userLoc} zoom={16} zoomControl={false} style={{ height: "100%", width: "100%" }}>
-          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <MapContainer center={userLoc} zoom={16} zoomControl={false} style={{ height: "100%", width: "100%" }} whenCreated={(m) => (mapRef.current = m)}>
+          {/* Tiles (Night/Day) */}
+          <TileLayer
+            url={
+              document.body.classList.contains("night-mode-active")
+                ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+            }
+          />
 
-          <FlyTo center={selecting === "pickup" ? pickup.latlng || userLoc : selecting === "dest" ? dest.latlng || userLoc : null} />
+          <FlyTo center={
+            hasActiveOrder && assignedDriver?.lat && assignedDriver?.lng && (uiMode === "coming" || uiMode === "arrived" || uiMode === "in_trip")
+              ? [assignedDriver.lat, assignedDriver.lng]
+              : selecting === "pickup"
+                ? pickup.latlng || userLoc
+                : selecting === "dest"
+                  ? dest.latlng || userLoc
+                  : null
+          } />
 
           <CenterTracker enabled={!!selecting} onCenter={handleCenterPicked} setIsDragging={setIsDragging} />
 
@@ -614,6 +748,26 @@ export default function ClientOrderCreate() {
               pathOptions={{ color: "#00C853", weight: 6, opacity: 0.95, lineCap: "round" }}
             />
           )}
+        {/* "MENING JOYLASHUVIM" TUGMASI */}
+        <div
+          style={{
+            position: "absolute",
+            right: 16,
+            bottom: uiMode === "main" ? 280 : 320,
+            zIndex: 800,
+          }}
+        >
+          <Button
+            shape="circle"
+            size="large"
+            icon={<AimOutlined style={{ fontSize: 22 }} />}
+            style={{ boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}
+            onClick={() => {
+              const map = mapRef.current;
+              if (map && userLoc) map.flyTo(userLoc, 16);
+            }}
+          />
+        </div>
         </MapContainer>
 
         {/* Center pin overlay */}
@@ -824,7 +978,131 @@ export default function ClientOrderCreate() {
       </Drawer
       )}>
 
-      <style>{`
+      
+      {/* CHAT MODAL (YANGILANGAN) */}
+      <Modal
+        title={
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Avatar src={assignedDriver?.avatar_url} icon={<UserOutlined />} />
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>
+                {assignedDriver?.first_name || "Haydovchi"}
+              </div>
+              <div style={{ fontSize: 11, color: "#888" }}>
+                {assignedDriver?.car_model || ""}
+              </div>
+            </div>
+          </div>
+        }
+        open={chatOpen}
+        onCancel={() => setChatOpen(false)}
+        footer={null}
+        centered
+        bodyStyle={{ padding: 0 }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", height: "400px" }}>
+          {/* Xabarlar oynasi */}
+          <div
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              padding: "15px",
+              background: "#f5f5f5",
+            }}
+          >
+            {messages.length === 0 ? (
+              <div style={{ textAlign: "center", color: "#999", marginTop: 50 }}>
+                Henuz xabarlar yo‘q. <br /> Haydovchiga yozing!
+              </div>
+            ) : (
+              messages.map((msg) => {
+                const isMe = msg.sender_role === "client";
+                return (
+                  <div
+                    key={msg.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: isMe ? "flex-end" : "flex-start",
+                      marginBottom: 10,
+                    }}
+                  >
+                    <div
+                      style={{
+                        maxWidth: "75%",
+                        padding: "8px 12px",
+                        borderRadius: 12,
+                        background: isMe ? "#1890ff" : "#fff",
+                        color: isMe ? "#fff" : "#000",
+                        boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
+                        borderTopRightRadius: isMe ? 0 : 12,
+                        borderTopLeftRadius: isMe ? 12 : 0,
+                      }}
+                    >
+                      <div style={{ fontSize: 14 }}>{msg.content}</div>
+                      <div
+                        style={{
+                          fontSize: 10,
+                          opacity: 0.7,
+                          textAlign: "right",
+                          marginTop: 2,
+                        }}
+                      >
+                        {new Date(msg.created_at).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            <div ref={chatScrollRef} />
+          </div>
+
+          {/* Yozish joyi */}
+          <div
+            style={{
+              padding: "10px",
+              background: "#fff",
+              borderTop: "1px solid #eee",
+              display: "flex",
+              gap: 10,
+            }}
+          >
+            <Input
+              value={msgText}
+              onChange={(e) => setMsgText(e.target.value)}
+              onPressEnter={handleSendMessage}
+              placeholder="Xabar yozing..."
+              style={{ borderRadius: 20 }}
+            />
+            <Button
+              type="primary"
+              shape="circle"
+              icon={<SendOutlined />}
+              onClick={handleSendMessage}
+            />
+          </div>
+        </div>
+      </Modal>
+
+      {/* Rating Modal */}
+      <Modal
+        open={ratingOpen}
+        title="Safar yakunlandi"
+        onOk={submitRating}
+        onCancel={skipRating}
+        okText="Baholash"
+        cancelText="Keyinroq"
+      >
+        <div style={{ marginBottom: 10 }}>
+          Haydovchini baholang:
+        </div>
+        <Rate value={ratingValue} onChange={setRatingValue} />
+      </Modal>
+
+<style>{`
         .yg-root { height: 100vh; width: 100%; background:#000; overflow:hidden; }
         .yg-map { position: relative; height: 100%; width: 100%; }
         .yg-topcard { position:absolute; left:16px; right:16px; top:14px; z-index: 500; }
@@ -910,7 +1188,22 @@ export default function ClientOrderCreate() {
         .yg-driver-car { margin-top: 2px; color: rgba(0,0,0,.65); font-weight: 700; font-size: 12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .yg-driver-status { margin-top: 6px; font-weight: 900; font-size: 12px; }
 
+/* User Marker (Pulsatsiya effekti) */
+.user-marker-pulse {
+  width: 20px;
+  height: 20px;
+  background: #1890ff;
+  border-radius: 50%;
+  border: 3px solid white;
+  box-shadow: 0 0 0 0 rgba(24, 144, 255, 0.7);
+  animation: pulse-blue 2s infinite;
+}
 
+@keyframes pulse-blue {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(24, 144, 255, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(24, 144, 255, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(24, 144, 255, 0); }
+}
         /* Leaflet tweaks */
         .leaflet-control-container { display:none; }
       `}</style>
