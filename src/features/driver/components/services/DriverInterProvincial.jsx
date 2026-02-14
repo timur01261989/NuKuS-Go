@@ -711,9 +711,6 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
         dest_lat: destLat,
         dest_lng: destLng,
         dest_address: (destAddress || null),
-        dest_lat: destLat,
-        dest_lng: destLng,
-        dest_address: (destAddress || null),
       };
 
       const { data, error } = await supabase.from("orders").insert(payload).select("*").maybeSingle();
@@ -764,9 +761,6 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
         meet_lat: meetLat,
         meet_lng: meetLng,
         meet_address: meetAddress || null,
-        dest_lat: destLat,
-        dest_lng: destLng,
-        dest_address: (destAddress || null),
         dest_lat: destLat,
         dest_lng: destLng,
         dest_address: (destAddress || null),
