@@ -90,6 +90,14 @@ const GENDER_OPTIONS = [
 
 const normalizeGender = (v) => (v === "male" || v === "female" || v === "all" ? v : "all");
 
+const PICKUP_MODE_LABELS = {
+  all: "Hammasi",
+  meet_point: "Belgilangan joyga kelish",
+  home_pickup: "Uydan olib ketishga",
+};
+
+const pickupModeLabel = (mode) => PICKUP_MODE_LABELS[mode] || "Belgilangan joyga kelish";
+
 const routeText = (o) => {
   const fromR = o.from_region || "-";
   const fromD = districtLabel(o.from_district);
@@ -811,9 +819,9 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
                   style={{ width: "100%", marginTop: 6 }}
                   size="large"
                   options={[
-                    { value: "all", label: "Hammasi" },
-                    { value: "meet_point", label: "Belgilangan joyga kelish" },
-                    { value: "home_pickup", label: "Uydan olib ketish" },
+                    { value: "all", label: PICKUP_MODE_LABELS.all },
+                    { value: "meet_point", label: PICKUP_MODE_LABELS.meet_point },
+                    { value: "home_pickup", label: PICKUP_MODE_LABELS.home_pickup },
                   ]}
                 />
               </Col>
@@ -873,7 +881,7 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
 
                             <Space size={10} wrap style={{ marginTop: 4 }}>
                               <Tag color={order.pickup_mode === "home_pickup" ? "purple" : "blue"}>
-                                {order.pickup_mode === "home_pickup" ? "Uydan olib ketish" : "Belgilangan joyga kelish"}
+                                {pickupModeLabel(order.pickup_mode)}
                               </Tag>
                               {order.meet_address ? <Tag>Ketish: {order.meet_address}</Tag> : null}
                               {order.dest_address ? <Tag>Manzil: {order.dest_address}</Tag> : null}
@@ -1011,8 +1019,8 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
               style={{ width: "100%", marginTop: 6 }}
               size="large"
               options={[
-                { value: "meet_point", label: "Belgilangan joyga kelish" },
-                { value: "home_pickup", label: "Uydan olib ketish" },
+                { value: "meet_point", label: PICKUP_MODE_LABELS.meet_point },
+                { value: "home_pickup", label: PICKUP_MODE_LABELS.home_pickup },
               ]}
             />
 
