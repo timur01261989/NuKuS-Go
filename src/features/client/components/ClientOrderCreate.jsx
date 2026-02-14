@@ -196,7 +196,14 @@ function CirclePulse({ center }) {
   );
 }
 
-
+export default function ClientOrderCreate() {
+  // ... boshqa statelar (userLoc, pickup, dest va h.k.)
+  
+  // 👇 SHU YERGA QO'SHING
+  const [dispatchIdx, setDispatchIdx] = useState(0); 
+  const [nearbyCars, setNearbyCars] = useState([]); // Agar bu yo'q bo'lsa, buni ham qo'shing
+  
+  // ...
 /** Map center tracking while selecting pickup/dest (Yandex-like: pin fixed, map moves) */
 function CenterTracker({ enabled, onCenter, setIsDragging }) {
   const map = useMap();
@@ -380,6 +387,21 @@ export default function ClientOrderCreate() {
     })();
   }, [seedPlaces]);
 
+// ... boshqa useEffectlar ...
+
+  // 👇 SHU YERGA QO'SHING (Animatsiya uchun)
+  useEffect(() => {
+    // uiMode o'rniga orderStatus ishlatganimiz xavfsizroq
+    if (orderStatus !== "searching") return; 
+
+    const interval = setInterval(() => {
+      setDispatchIdx((prev) => prev + 1);
+    }, 1500);
+    
+    return () => clearInterval(interval);
+  }, [orderStatus]); // uiMode o'rniga orderStatus
+
+  // ... handleOrder va boshqa funksiyalar ...
   /** Route calculation */
   useEffect(() => {
     // Debounce + Abort old OSRM request (map dragging can trigger many updates)
