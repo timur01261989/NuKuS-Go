@@ -1173,6 +1173,4 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
 
     </div>
   );
-}      if (deliveryOnly) {
-        q = q.eq("delivery_service", true);
-      }
+}
