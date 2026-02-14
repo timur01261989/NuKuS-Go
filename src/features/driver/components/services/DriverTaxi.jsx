@@ -246,6 +246,14 @@ export default function DriverTaxi({ onBack }) {
   const [driverId, setDriverId] = useState(null);
   const [activeOrders, setActiveOrders] = useState([]);
   const [currentOrder, setCurrentOrder] = useState(null);
+const hasOrder = () => {
+  if (!currentOrder?.id) {
+    message.error("Buyurtma topilmadi");
+    return false;
+  }
+  return true;
+};
+
   
   // 0: List, 1: Pickupga borish, 2: Kutish, 3: Safarda, 4: Yakun
   const [tripStep, setTripStep] = useState(0); 
@@ -359,6 +367,8 @@ export default function DriverTaxi({ onBack }) {
   };
 
   const arrivedAtPickup = async () => {
+    if (!hasOrder()) return;
+
     await supabase.from("orders").update({ status: "arrived" }).eq("id", currentOrder.id);
     setTripStep(2); // Kutish
     setWaitTime(0);
@@ -371,6 +381,8 @@ export default function DriverTaxi({ onBack }) {
   };
 
   const startRide = async () => {
+    if (!hasOrder()) return;
+
     clearInterval(waitIntervalRef.current);
     await supabase.from("orders").update({ status: "in_progress" }).eq("id", currentOrder.id);
     setTripStep(3); // Safarda
@@ -379,6 +391,8 @@ export default function DriverTaxi({ onBack }) {
   };
 
   const completeRide = async () => {
+    if (!hasOrder()) return;
+
     // Narx hisoblash: Baza narxi + (Masofa * 2000 so'm) + (Kutish * 500 so'm)
     // Bu shunchaki misol logika
     const distanceCost = Math.floor(totalDist * 2000); 

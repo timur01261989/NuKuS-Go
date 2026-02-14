@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Card, Button, Typography, Avatar, message, Badge, Progress, Input, Space, Divider } from 'antd';
+import {Card, Button, Typography, Avatar, message, Badge, Progress, Input, Space, Divider, Modal, List} from 'antd';
 import {
   ArrowLeftOutlined,
   PhoneOutlined,
@@ -85,7 +85,13 @@ export default function ClientOrderCreate({ onBack }) {
   const [userLoc, setUserLoc] = useState([42.4619, 59.6166]); // Nukus
   const [destLoc, setDestLoc] = useState(null);
   const [pickupAddr, setPickupAddr] = useState("Hozirgi joylashuv...");
-  const [destAddr, setDestAddr] = useState("");
+  const \[destAddr, setDestAddr\] = useState\(\"\"\);
+const [destSearchVisible, setDestSearchVisible] = useState(false);
+const [destQuery, setDestQuery] = useState('');
+const [destResults, setDestResults] = useState([]);
+const [preStep, setPreStep] = useState('pick_dest'); // pick_dest | confirm
+const [cancelReasonVisible, setCancelReasonVisible] = useState(false);
+const [cancelReason, setCancelReason] = useState('');
   const [selectedTariff, setSelectedTariff] = useState(TARIFFS[0]);
   const [currentOrder, setCurrentOrder] = useState(null);
   const [driver, setDriver] = useState(null);
@@ -115,6 +121,56 @@ export default function ClientOrderCreate({ onBack }) {
       return d.display_name.split(',')[0] + ", " + (d.display_name.split(',')[1] || "");
     } catch { return "Nukus shaxri"; }
   };
+
+const haversineKm = (a, b) => {
+  const toRad = (x) => (x * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(b[0] - a[0]);
+  const dLon = toRad(b[1] - a[1]);
+  const lat1 = toRad(a[0]);
+  const lat2 = toRad(b[0]);
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
+};
+
+const estimateEtaMin = useMemo(() => {
+  if (!destLoc) return null;
+  const km = haversineKm(userLoc, destLoc);
+  // Shaharda o'rtacha tezlik ~22 km/soat
+  const minutes = Math.max(3, Math.round((km / 22) * 60));
+  return minutes;
+}, [userLoc, destLoc]);
+
+const openDestSearch = () => {
+  setDestSearchVisible(true);
+  setDestQuery(destAddr || '');
+  setDestResults([]);
+};
+
+const searchDestination = async (q) => {
+  setDestQuery(q);
+  if (!q || q.trim().length < 3) {
+    setDestResults([]);
+    return;
+  }
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=7&q=${encodeURIComponent(q)}`;
+    const r = await fetch(url);
+    const d = await r.json();
+    setDestResults(Array.isArray(d) ? d : []);
+  } catch (e) {
+    console.error(e);
+    setDestResults([]);
+  }
+};
+
+const chooseDestination = async (item) => {
+  const loc = [parseFloat(item.lat), parseFloat(item.lon)];
+  setDestLoc(loc);
+  setDestAddr(item.display_name);
+  setDestSearchVisible(false);
+  setPreStep('confirm');
+};
 
   const checkExistingOrder = async () => {
     const activeId = localStorage.getItem('activeOrderId');
@@ -175,11 +231,40 @@ export default function ClientOrderCreate({ onBack }) {
   };
 
   const cancelOrder = async () => {
-    await supabase.from('orders').update({ status: 'cancelled' }).eq('id', currentOrder.id);
-    localStorage.removeItem('activeOrderId');
-    setMode('main');
-    setDestLoc(null);
-  };
+  // Videodagidek: avval sababini so'raymiz
+  setCancelReasonVisible(true);
+};
+
+const confirmCancelOrder = async () => {
+  if (!currentOrder?.id) {
+    message.error("Buyurtma topilmadi");
+    setCancelReasonVisible(false);
+    return;
+  }
+
+  const { error } = await supabase
+    .from('orders')
+    .update({ status: 'cancelled', cancel_reason: cancelReason || null })
+    .eq('id', currentOrder.id);
+
+  if (error) {
+    console.error(error);
+    message.error("Bekor qilishda xatolik");
+    return;
+  }
+
+  localStorage.removeItem('activeOrderId');
+  setCurrentOrder(null);
+  setDriver(null);
+  setDriverLoc(null);
+  setMode('main');
+  setPreStep('pick_dest');
+  setDestLoc(null);
+  setDestAddr('');
+  setCancelReason('');
+  setCancelReasonVisible(false);
+};
+
 
   return (
     <div className="yandex-container">
@@ -199,63 +284,80 @@ export default function ClientOrderCreate({ onBack }) {
         <div className="top-nav">
           <Button icon={<MenuOutlined />} shape="circle" onClick={onBack} />
           {mode === 'main' && (
-            <div className="search-bar-mini" onClick={() => setMode('main')}>
-              <ClockCircleOutlined /> <span>Toshkent sh.</span>
-            </div>
-          )}
-        </div>
+  <div className="content-fade">
+    {/* PICKUP + DEST (videodagidek) */}
+    <div className="address-inputs">
+      <div className="input-row">
+        <div className="dot from"></div>
+        <div className="addr-text">{pickupAddr}</div>
       </div>
 
-      {/* BOTTOM INTERFACE */}
-      <div className={`bottom-sheet status-${mode}`}>
-        <div className="sheet-handle"></div>
+      <Divider style={{ margin: '8px 0' }} />
 
-        {/* --- STEP 1: MAIN / ADDRESS SELECTION --- */}
-        {mode === 'main' && (
-          <div className="content-fade">
-            <div className="address-inputs">
-              <div className="input-row" onClick={() => {}}>
-                <div className="dot from"></div>
-                <div className="addr-text">{pickupAddr}</div>
-              </div>
-              <Divider style={{ margin: '8px 0' }} />
-              <div className="input-row highlight">
-                <div className="dot to"></div>
-                <Input 
-                  placeholder="Qayerga borasiz?" 
-                  bordered={false} 
-                  className="addr-input" 
-                  value={destAddr}
-                  onChange={(e) => setDestAddr(e.target.value)}
-                  onFocus={() => { if(!destLoc) setDestLoc([42.4601, 59.6073]); }} 
-                />
-              </div>
-            </div>
+      <div className="input-row highlight" onClick={openDestSearch}>
+        <div className="dot to"></div>
+        <div className="addr-text placeholder">
+          {destAddr ? destAddr : "Qayerga borasiz?"}
+        </div>
+        <SearchOutlined style={{ opacity: 0.6 }} />
+      </div>
+    </div>
 
-            <div className="tariff-selector">
-              {TARIFFS.map(t => (
-                <div 
-                  key={t.id} 
-                  className={`tariff-item ${selectedTariff.id === t.id ? 'active' : ''}`}
-                  onClick={() => setSelectedTariff(t)}
-                >
-                  <div className="tariff-icon">🚖</div>
-                  <div className="tariff-name">{t.name}</div>
-                  <div className="tariff-price">{t.basePrice}</div>
-                </div>
-              ))}
-            </div>
+    {/* Videoda: dest tanlangach tarif + zakaz */}
+    {destLoc ? (
+      <>
+        <div className="mini-info-row">
+          <Space size={12}>
+            <ClockCircleOutlined />
+            <span>{estimateEtaMin ? `${estimateEtaMin} daq. atrofida` : 'Yaqin'}</span>
+          </Space>
+          <Space size={12}>
+            <SafetyOutlined />
+            <span>Xavfsiz</span>
+          </Space>
+        </div>
 
-            <Button className="order-btn" onClick={handleOrder}>
-              ZAKAZ BERISH (START)
-            </Button>
-            
-            <div className="payment-row">
-              <Space><WalletOutlined /> <span>Naqd</span></Space>
-              <span>Kommentariya &gt;</span>
+        <div className="tariff-selector">
+          {TARIFFS.map(t => (
+            <div
+              key={t.id}
+              className={`tariff-item ${selectedTariff.id === t.id ? 'active' : ''}`}
+              onClick={() => setSelectedTariff(t)}
+            >
+              <div className="tariff-icon">🚖</div>
+              <div className="tariff-name">{t.name}</div>
+              <div className="tariff-price">{t.basePrice}</div>
             </div>
+          ))}
+        </div>
+
+        <Button className="order-btn" onClick={handleOrder}>
+          Buyurtma berish
+        </Button>
+
+        <div className="payment-row">
+          <Space><WalletOutlined /> <span>Naqd</span></Space>
+          <span>Kommentariya &gt;</span>
+        </div>
+      </>
+    ) : (
+      <>
+        <div className="fav-list">
+          <div className="fav-item" onClick={() => { setDestAddr("Uy"); openDestSearch(); }}>
+            <StarFilled style={{ color: '#fadb14' }} /> <span>Uy</span>
           </div>
-        )}
+          <div className="fav-item" onClick={() => { setDestAddr("Ish"); openDestSearch(); }}>
+            <StarFilled style={{ color: '#fadb14' }} /> <span>Ish</span>
+          </div>
+        </div>
+
+        <div className="hint-row">
+          <Text type="secondary">Manzilni tanlang — keyin tarif va narx chiqadi</Text>
+        </div>
+      </>
+    )}
+  </div>
+)}
 
         {/* --- STEP 2: SEARCHING --- */}
         {mode === 'searching' && (
@@ -353,7 +455,88 @@ export default function ClientOrderCreate({ onBack }) {
         @keyframes pulse-blue { 0% { box-shadow: 0 0 0 0 rgba(24,144,255,0.4); } 70% { box-shadow: 0 0 0 15px rgba(24,144,255,0); } 100% { box-shadow: 0 0 0 0 rgba(24,144,255,0); } }
         .smooth-car-marker { transition: all 1.5s linear; }
         .leaflet-routing-container { display: none !important; }
-      `}</style>
-    </div>
+      
+.addr-text.placeholder { color: rgba(0,0,0,0.55); }
+.mini-info-row { display: flex; justify-content: space-between; padding: 10px 6px 6px; font-size: 13px; }
+.fav-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.fav-item { background: rgba(0,0,0,0.04); border-radius: 14px; padding: 12px; display: flex; gap: 10px; align-items: center; cursor: pointer; }
+.hint-row { margin-top: 10px; padding: 0 6px; }
+`}</style>
+    
+{/* DESTINATION SEARCH (videodagi "Tochka naznacheniya") */}
+<Modal
+  open={destSearchVisible}
+  title="To'xtash manzili"
+  onCancel={() => setDestSearchVisible(false)}
+  footer={null}
+  destroyOnClose
+>
+  <Input
+    value={destQuery}
+    onChange={(e) => searchDestination(e.target.value)}
+    placeholder="Manzilni yozing..."
+    prefix={<SearchOutlined />}
+    autoFocus
+  />
+
+  <div style={{ marginTop: 12 }}>
+    <List
+      bordered
+      dataSource={destResults}
+      locale={{ emptyText: destQuery?.trim()?.length >= 3 ? "Topilmadi" : "Kamida 3 ta harf yozing" }}
+      renderItem={(item) => (
+        <List.Item onClick={() => chooseDestination(item)} style={{ cursor: 'pointer' }}>
+          <EnvironmentOutlined style={{ marginRight: 8 }} />
+          <div style={{ lineHeight: 1.2 }}>
+            <div style={{ fontWeight: 600 }}>{(item.display_name || '').split(',')[0]}</div>
+            <div style={{ fontSize: 12, opacity: 0.75 }}>{item.display_name}</div>
+          </div>
+        </List.Item>
+      )}
+    />
+  </div>
+</Modal>
+
+{/* CANCEL REASON (videodagidek) */}
+<Modal
+  open={cancelReasonVisible}
+  title="Nega bekor qilyapsiz?"
+  onCancel={() => { setCancelReasonVisible(false); setCancelReason(''); }}
+  onOk={confirmCancelOrder}
+  okText="Tayyor"
+  cancelText="Yopish"
+  destroyOnClose
+>
+  <List
+    dataSource={[
+      "Haydovchi uzoq",
+      "Narx qimmat",
+      "Manzil o'zgardi",
+      "Boshqa taxi topdim",
+      "Boshqa sabab"
+    ]}
+    renderItem={(r) => (
+      <List.Item
+        onClick={() => setCancelReason(r)}
+        style={{
+          cursor: 'pointer',
+          borderRadius: 8,
+          marginBottom: 6,
+          background: cancelReason === r ? 'rgba(24,144,255,0.08)' : 'transparent'
+        }}
+      >
+        <span style={{ fontWeight: cancelReason === r ? 600 : 400 }}>{r}</span>
+      </List.Item>
+    )}
+  />
+  <Input.TextArea
+    value={cancelReason && !["Haydovchi uzoq","Narx qimmat","Manzil o'zgardi","Boshqa taxi topdim","Boshqa sabab"].includes(cancelReason) ? cancelReason : ''}
+    onChange={(e) => setCancelReason(e.target.value)}
+    placeholder="Izoh (ixtiyoriy)"
+    rows={3}
+    style={{ marginTop: 10 }}
+  />
+</Modal>
+</div>
   );
 }
