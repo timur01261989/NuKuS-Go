@@ -90,14 +90,6 @@ const GENDER_OPTIONS = [
 
 const normalizeGender = (v) => (v === "male" || v === "female" || v === "all" ? v : "all");
 
-const PICKUP_MODE_LABELS = {
-  all: "Hammasi",
-  meet_point: "Belgilangan joyga kelish",
-  home_pickup: "Uydan olib ketishga",
-};
-
-const pickupModeLabel = (mode) => PICKUP_MODE_LABELS[mode] || "Belgilangan joyga kelish";
-
 const routeText = (o) => {
   const fromR = o.from_region || "-";
   const fromD = districtLabel(o.from_district);
@@ -580,7 +572,7 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
       if (!passengerPhone.trim()) return message.error("Telefon raqamingizni kiriting!");
 
       if (deliveryType === "home_pickup") {
-        if (pickupLat == null || pickupLng == null) return message.error("Uydan olib ketish uchun lokatsiya yuboring!");
+        if (pickupLat == null || pickupLng == null) return message.error("Uydan olib ketishga lokatsiya yuboring!");
       }
 
       const { data: authData, error: authErr } = await supabase.auth.getUser();
@@ -819,9 +811,9 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
                   style={{ width: "100%", marginTop: 6 }}
                   size="large"
                   options={[
-                    { value: "all", label: PICKUP_MODE_LABELS.all },
-                    { value: "meet_point", label: PICKUP_MODE_LABELS.meet_point },
-                    { value: "home_pickup", label: PICKUP_MODE_LABELS.home_pickup },
+                    { value: "all", label: "Hammasi" },
+                    { value: "meet_point", label: "Belgilangan joyga kelish" },
+                    { value: "home_pickup", label: "Uydan olib ketishga" },
                   ]}
                 />
               </Col>
@@ -881,7 +873,7 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
 
                             <Space size={10} wrap style={{ marginTop: 4 }}>
                               <Tag color={order.pickup_mode === "home_pickup" ? "purple" : "blue"}>
-                                {pickupModeLabel(order.pickup_mode)}
+                                {order.pickup_mode === "home_pickup" ? "Uydan olib ketishga" : "Belgilangan joyga kelish"}
                               </Tag>
                               {order.meet_address ? <Tag>Ketish: {order.meet_address}</Tag> : null}
                               {order.dest_address ? <Tag>Manzil: {order.dest_address}</Tag> : null}
@@ -1019,8 +1011,8 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
               style={{ width: "100%", marginTop: 6 }}
               size="large"
               options={[
-                { value: "meet_point", label: PICKUP_MODE_LABELS.meet_point },
-                { value: "home_pickup", label: PICKUP_MODE_LABELS.home_pickup },
+                { value: "meet_point", label: "Belgilangan joyga kelish" },
+                { value: "home_pickup", label: "Uydan olib ketishga" },
               ]}
             />
 
@@ -1031,18 +1023,37 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
             ) : (
               <>
                 <Text type="secondary" style={{ fontSize: 12, display: "block", marginTop: 10 }}>
-                  * Uydan olib ketish uchun lokatsiyangiz kerak. Haydovchi faqat qabul qilgandan keyin ko‘radi.
+                  * Uydan olib ketishga lokatsiyangiz kerak. Haydovchi faqat qabul qilgandan keyin ko‘radi.
                 </Text>
 
-                <Space size={10} wrap style={{ width: "100%" }}>
-                        <Button
-                          icon={<EnvironmentOutlined />}
-                          onClick={openPickupPicker}
-                          style={{ borderRadius: 999 }}
-                        >
-                          Manzilni xaritadan tanlash
-                        </Button>
-                      </Space>
+                <Space style={{ marginTop: 10 }} wrap>
+                  <Button
+                    icon={<AimOutlined />}
+                    onClick={async () => {
+                      try {
+                        const p = await getMyGeo();
+                        setPickupLat(p.lat);
+                        setPickupLng(p.lng);
+                        const addr = await reverseGeocodeOSM(p.lat, p.lng);
+                        if (addr) setPickupAddress(addr);
+                        message.success("Lokatsiya olindi");
+                      } catch (e) {
+                        message.error("Lokatsiyani olishda xatolik");
+                      }
+                    }}
+                  >
+                    Geolokatsiyadan olish
+                  </Button>
+
+                  <Button onClick={openPickupPicker}>Xaritadan tanlash</Button>
+
+                  {pickupLat != null && pickupLng != null ? (
+                    <>
+                      <Button onClick={() => openMapEmbed({ title: "Xarita", lat: pickupLat, lng: pickupLng, mode: "pin" })}>Ko‘rish</Button>
+                      <Button type="primary" onClick={() => openMapEmbed({ title: "Yo‘l", lat: pickupLat, lng: pickupLng, sLat: null, sLng: null, mode: "route" })}>Yo‘l</Button>
+                    </>
+                  ) : null}
+                </Space>
 
                 <Input
                   value={pickupAddress}
