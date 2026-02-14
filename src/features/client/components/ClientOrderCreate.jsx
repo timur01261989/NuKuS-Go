@@ -278,7 +278,7 @@ const confirmCancelOrder = async () => {
           {destLoc && <Marker position={destLoc} />}
           {driverLoc && <Marker position={driverLoc} icon={carIcon} />}
 
-          <RoutingMachine from={userLoc} to={destLoc} active={mode === 'main' && !!destLoc} />
+          {destLoc && <RoutingMachine from={userLoc} to={destLoc} active={mode === 'main'} />}
         </MapContainer>
 
         <div className="top-nav">
@@ -537,6 +537,7 @@ const confirmCancelOrder = async () => {
     style={{ marginTop: 10 }}
   />
 </Modal>
+</div>
 </div>
   );
 }
