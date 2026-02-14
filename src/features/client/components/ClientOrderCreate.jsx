@@ -840,7 +840,7 @@ const bottomTitle = useMemo(() => {
         )}
 
 
-        {/* Top card (Yandex-like) */}
+       {/* Top card (Yandex-like) */}
         {!hasActiveOrder && (
           <div className="yg-topcard">
             <Card className="yg-card" bodyStyle={{ padding: 12 }}>
@@ -884,65 +884,66 @@ const bottomTitle = useMemo(() => {
             </Card>
           </div>
         )}
+      </div> {/* <--- YG-MAP SHU YERDA YOPILADI */}
 
-        {/* Bottom sheet */}
+      {/* Bottom sheet */}
       {!hasActiveOrder && (
-      <Drawer
-        open={drawerOpen && !selecting}
-        onClose={() => setDrawerOpen(false)}
-        placement="bottom"
-        height={380}
-        bodyStyle={{ padding: 12 }}
-        mask={false}
-        className="yg-drawer"
-        title={
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <EnvironmentOutlined />
-            <span>{bottomTitle}</span>
-          </div>
-        }
-      >
-        {/* Recent places */}
-        <div className="yg-section">
-          <div className="yg-section-title">Oldingi manzillar</div>
-          <List
-            size="small"
-            dataSource={recentPlaces}
-            locale={{ emptyText: "Hali manzillar yo‘q" }}
-            renderItem={(item) => (
-              <List.Item
-                className="yg-place"
-                onClick={() => applyPlace("dest", item)}
-                style={{ cursor: "pointer" }}
-              >
-                <Space>
-                  {item.starred ? <StarFilled style={{ color: "#FFD400" }} /> : <EnvironmentOutlined />}
-                  <span className="yg-place-text">{item.label}</span>
-                </Space>
-              </List.Item>
-            )}
-          />
-        </div>
-
-        {/* Destination search suggestions */}
-        {(destSug?.length > 0 || searchLoading) && (
+        <Drawer
+          open={drawerOpen && !selecting}
+          onClose={() => setDrawerOpen(false)}
+          placement="bottom"
+          height={380}
+          bodyStyle={{ padding: 12 }}
+          mask={false}
+          className="yg-drawer"
+          title={
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <EnvironmentOutlined />
+              <span>{bottomTitle}</span>
+            </div>
+          }
+        >
+          {/* Recent places */}
           <div className="yg-section">
-            <div className="yg-section-title">Qidiruv natijalari</div>
+            <div className="yg-section-title">Oldingi manzillar</div>
             <List
               size="small"
-              loading={searchLoading}
-              dataSource={destSug}
+              dataSource={recentPlaces}
+              locale={{ emptyText: "Hali manzillar yo‘q" }}
               renderItem={(item) => (
-                <List.Item className="yg-place" onClick={() => applyPlace("dest", item)} style={{ cursor: "pointer" }}>
+                <List.Item
+                  className="yg-place"
+                  onClick={() => applyPlace("dest", item)}
+                  style={{ cursor: "pointer" }}
+                >
                   <Space>
-                    <SearchOutlined />
+                    {item.starred ? <StarFilled style={{ color: "#FFD400" }} /> : <EnvironmentOutlined />}
                     <span className="yg-place-text">{item.label}</span>
                   </Space>
                 </List.Item>
               )}
             />
           </div>
-        )}
+
+          {/* Destination search suggestions */}
+          {(destSug?.length > 0 || searchLoading) && (
+            <div className="yg-section">
+              <div className="yg-section-title">Qidiruv natijalari</div>
+              <List
+                size="small"
+                loading={searchLoading}
+                dataSource={destSug}
+                renderItem={(item) => (
+                  <List.Item className="yg-place" onClick={() => applyPlace("dest", item)} style={{ cursor: "pointer" }}>
+                    <Space>
+                      <SearchOutlined />
+                      <span className="yg-place-text">{item.label}</span>
+                    </Space>
+                  </List.Item>
+                )}
+              />
+            </div>
+          )}
 
         {/* Tariffs */}
         <div className="yg-tariffs">
