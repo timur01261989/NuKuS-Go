@@ -85,10 +85,10 @@ export default function ClientOrderCreate({ onBack }) {
   const [userLoc, setUserLoc] = useState([42.4619, 59.6166]); // Nukus
   const [destLoc, setDestLoc] = useState(null);
   const [pickupAddr, setPickupAddr] = useState("Hozirgi joylashuv...");
-  const \[destAddr, setDestAddr\] = useState\(\"\"\);
-const [destSearchVisible, setDestSearchVisible] = useState(false);
-const [destQuery, setDestQuery] = useState('');
-const [destResults, setDestResults] = useState([]);
+    const [destAddr, setDestAddr] = useState("");
+  const [destSearchVisible, setDestSearchVisible] = useState(false);
+  const [destQuery, setDestQuery] = useState('');
+  const [destResults, setDestResults] = useState([]);
 const [preStep, setPreStep] = useState('pick_dest'); // pick_dest | confirm
 const [cancelReasonVisible, setCancelReasonVisible] = useState(false);
 const [cancelReason, setCancelReason] = useState('');
