@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Card, List, Button, Tag, Typography, message, Empty, Skeleton } from "antd";
+import { Card, List, Button, Tag, Typography, message, Empty, Skeleton, Modal } from "antd";
 import {
   CheckOutlined,
-  ClockCircleOutlined,
   CarOutlined,
   EnvironmentOutlined,
-  SendOutlined,
   PhoneOutlined,
+  RocketOutlined
 } from "@ant-design/icons";
 
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
@@ -14,7 +13,8 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 import { translations } from "@i18n/translations";
-import { supabase } from "../../../lib/supabase";
+import api from "@/utils/apiHelper"; // ✅ YANGI: API orqali ishlash
+import { playAliceVoice } from "@/utils/audioPlayer"; // ✅ Ovozli yordamchi
 
 // --- MAP ICON FIX ---
 import icon from "leaflet/dist/images/marker-icon.png";
@@ -30,15 +30,22 @@ L.Marker.prototype.options.icon = DefaultIcon;
 
 // Maxsus mashina ikonchasi
 const carIcon = L.divIcon({
-  html: '<div style="font-size: 24px;">🚖</div>',
+  html: '<div style="font-size: 24px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));">🚖</div>',
   className: "car-marker",
   iconSize: [30, 30],
   iconAnchor: [15, 15],
 });
 
+const clientIcon = L.divIcon({
+  html: '<div style="font-size: 24px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));">🙋‍♂️</div>',
+  className: "client-marker",
+  iconSize: [30, 30],
+  iconAnchor: [15, 25],
+});
+
 const { Text, Title } = Typography;
 
-// ✅ SHAHAR ICHIDAGI TARIFLAR (Viloyat buyurtmalarini ajratish uchun)
+// ✅ SHAHAR ICHIDAGI TARIFLAR
 const CITY_TARIFFS = ['start', 'comfort', 'taxi', 'econom'];
 
 // Xaritani markazlashtirish komponenti
@@ -46,7 +53,7 @@ function RecenterMap({ lat, lng }) {
   const map = useMap();
   useEffect(() => {
     if (typeof lat === "number" && typeof lng === "number") {
-      map.setView([lat, lng], 15);
+      map.setView([lat, lng], 15, { animate: true });
     }
   }, [lat, lng, map]);
   return null;
@@ -55,20 +62,21 @@ function RecenterMap({ lat, lng }) {
 // Marker harakati uchun komponent
 function SmoothDriverMarker({ position }) {
   const markerRef = useRef(null);
-
   useEffect(() => {
-    if (markerRef.current) {
+    if (markerRef.current && position) {
       const element = markerRef.current.getElement();
-      if (element) element.style.transition = "transform 2s linear";
+      if (element) {
+        element.style.transition = "transform 1s linear";
+      }
     }
   }, [position]);
-
-  return <Marker ref={markerRef} position={position} icon={carIcon} />;
+  return <Marker ref={markerRef} position={position || [0,0]} icon={carIcon} />;
 }
 
 // Koordinatalarni parsing qilish
 const parseLatLng = (locString) => {
   if (!locString || typeof locString !== "string") return null;
+  // Format: "Lat: 41.123, Lng: 69.123" yoki oddiy matn
   const match = locString.match(/Lat:\s*([0-9.]+),\s*Lng:\s*([0-9.]+)/i);
   if (!match) return null;
   const lat = parseFloat(match[1]);
@@ -81,186 +89,150 @@ export default function DriverOrderFeed() {
   const [orders, setOrders] = useState([]);
   const [activeOrder, setActiveOrder] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  // Haydovchi joylashuvi (Simulyatsiya - Nukus)
-  const [driverLoc] = useState([42.4619, 59.6166]);
+  
+  // Haydovchi joylashuvi
+  const [driverLoc, setDriverLoc] = useState([42.4619, 59.6166]); // Default Nukus
 
   const savedLang = localStorage.getItem("appLang") || "uz_lotin";
   const t = translations[savedLang] || translations["uz_lotin"];
 
-  // ✅ Shahar ichidagi buyurtmalarni yuklash (Filtrlangan)
-  const fetchOrders = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("*")
-        .in("status", ["pending", "searching"])
-        .is("driver_id", null)
-        .in("service_type", CITY_TARIFFS) // Faqat shahar tariflari
-        .order("created_at", { ascending: false });
+  // Geolokatsiyani kuzatish
+  useEffect(() => {
+    if (navigator.geolocation) {
+      const watchId = navigator.geolocation.watchPosition(
+        (pos) => setDriverLoc([pos.coords.latitude, pos.coords.longitude]),
+        (err) => console.warn("GPS error:", err),
+        { enableHighAccuracy: true }
+      );
+      return () => navigator.geolocation.clearWatch(watchId);
+    }
+  }, []);
 
-      if (error) throw error;
-      setOrders(data || []);
+  // 1. Aktiv buyurtmani tekshirish (Polling)
+  const checkActiveOrder = useCallback(async () => {
+    try {
+      // Serverdan: "Menda tugallanmagan buyurtma bormi?"
+      const res = await api.post("/api/order", { action: "active_driver" });
+      if (res.success && res.order) {
+        setActiveOrder(res.order);
+      } else {
+        // Agar aktiv buyurtma bo'lmasa, null qilamiz (serverda tugatilgan bo'lishi mumkin)
+        setActiveOrder(null); 
+      }
     } catch (err) {
-      console.error("Fetch xato:", err);
-      message.error("Buyurtmalarni yuklashda xatolik");
+      console.error("Check active order error:", err);
+    }
+  }, []);
+
+  // 2. Buyurtmalar lentasini yuklash (Polling)
+  const fetchOrders = useCallback(async () => {
+    // Agar haydovchi band bo'lsa, yangi buyurtma qidirmaymiz
+    if (activeOrder) return; 
+
+    setLoading((prev) => orders.length === 0 ? true : prev); // Faqat birinchi marta loading ko'rsatish
+    try {
+      const res = await api.post("/api/order", { 
+        action: "list_available", 
+        service_types: CITY_TARIFFS 
+      });
+      
+      if (res.success) {
+        setOrders(res.orders || []);
+      }
+    } catch (err) {
+      console.error("Fetch orders error:", err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeOrder, orders.length]);
 
-  const checkActiveOrder = useCallback(async () => {
-    try {
-      const { data: auth } = await supabase.auth.getUser();
-      const user = auth?.user;
-      if (!user?.id) return;
-
-      const { data, error } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("driver_id", user.id)
-        .in("status", ["accepted", "arrived", "in_progress"])
-        .order("updated_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.error("checkActiveOrder error:", error);
-        return;
-      }
-
-      if (data) setActiveOrder(data);
-    } catch (err) {
-      console.error("checkActiveOrder err:", err);
-    }
-  }, []);
-
+  // Polling mexanizmi (har 5 soniyada)
   useEffect(() => {
     checkActiveOrder();
     fetchOrders();
 
-    // ✅ REALTIME: Shahar ichi buyurtmalarini jonli kuzatish
-    const channel = supabase
-      .channel("driver-orders-feed")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "orders" },
-        (payload) => {
-          const rowNew = payload.new;
-          const rowOld = payload.old;
+    const interval = setInterval(() => {
+      checkActiveOrder();
+      if (!activeOrder) fetchOrders();
+    }, 5000);
 
-          // Yangi buyurtma qo'shilganda (INSERT)
-          if (payload.eventType === "INSERT") {
-            const isRelevant = ["pending", "searching"].includes(rowNew?.status);
-            const isFree = !rowNew?.driver_id;
-            const isCityService = CITY_TARIFFS.includes(rowNew?.service_type);
+    return () => clearInterval(interval);
+  }, [checkActiveOrder, fetchOrders, activeOrder]);
 
-            if (isRelevant && isFree && isCityService) {
-              setOrders((prev) => [rowNew, ...prev]);
-              message.info("Yangi shahar ichi buyurtmasi!");
-            }
-            return;
-          }
 
-          // Buyurtma o'zgarganda (UPDATE)
-          if (payload.eventType === "UPDATE") {
-            const statusOk = ["pending", "searching"].includes(rowNew?.status);
-            const isFree = !rowNew?.driver_id;
-            const isCityService = CITY_TARIFFS.includes(rowNew?.service_type);
+  // --- ACTIONS (Serverga so'rovlar) ---
 
-            // Agar endi mavjud bo'lmasa yoki boshqa turga o'tib ketsa -> o'chirish
-            if (!statusOk || !isFree || !isCityService) {
-              setOrders((prev) => prev.filter((o) => o.id !== rowNew?.id));
-            } else {
-              setOrders((prev) => {
-                const exists = prev.some((o) => o.id === rowNew.id);
-                if (!exists) return [rowNew, ...prev];
-                return prev.map((o) => (o.id === rowNew.id ? rowNew : o));
-              });
-            }
-            return;
-          }
-
-          // Buyurtma o'chirilganda (DELETE)
-          if (payload.eventType === "DELETE") {
-            setOrders((prev) => prev.filter((o) => o.id !== rowOld?.id));
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [checkActiveOrder, fetchOrders]);
-
-  // --- ACTIONS ---
-
-  const acceptOrder = async (order) => {
+  const acceptOrder = async (orderId) => {
     try {
-      const { data: auth } = await supabase.auth.getUser();
-      const user = auth?.user;
-      if (!user?.id) {
-        message.error("Tizimga kiring!");
-        return;
+      message.loading("Qabul qilinmoqda...", 1);
+      const res = await api.post("/api/order", { 
+        action: "accept", 
+        orderId: orderId,
+        driverLat: driverLoc[0],
+        driverLng: driverLoc[1]
+      });
+
+      if (res.success) {
+        message.success("Buyurtma qabul qilindi!");
+        setActiveOrder(res.order);
+        setOrders([]); // Lentani tozalash
+        playAliceVoice("order_accepted"); // 🔊 "Buyurtma qabul qilindi"
+      } else {
+        message.warning(res.message || "Bu buyurtmani boshqa haydovchi oldi");
+        fetchOrders(); // Ro'yxatni yangilash
       }
-
-      const { data, error } = await supabase
-        .from("orders")
-        .update({
-          status: "accepted",
-          driver_id: user.id,
-        })
-        .eq("id", order.id)
-        .is("driver_id", null)
-        .in("status", ["pending", "searching"])
-        .select()
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (!data) {
-        message.warning("Kechirasiz, bu buyurtmani boshqa haydovchi oldi.");
-        await fetchOrders();
-        return;
-      }
-
-      message.success("Buyurtma qabul qilindi!");
-      setActiveOrder(data);
-      setOrders((prev) => prev.filter((o) => o.id !== order.id));
     } catch (error) {
       console.error("Accept error:", error);
-      message.error(error?.message || "Xatolik yuz berdi");
+      message.error("Xatolik yuz berdi");
     }
   };
 
   const updateStatus = async (newStatus) => {
     if (!activeOrder) return;
 
-    const { data, error } = await supabase
-      .from("orders")
-      .update({ status: newStatus })
-      .eq("id", activeOrder.id)
-      .select()
-      .maybeSingle();
+    try {
+      const res = await api.post("/api/order", { 
+        action: "update_status", 
+        orderId: activeOrder.id, 
+        status: newStatus 
+      });
 
-    if (error) {
-      message.error("Status yangilashda xatolik");
-      return;
-    }
+      if (res.success) {
+        setActiveOrder(res.order);
 
-    setActiveOrder(data || { ...activeOrder, status: newStatus });
-
-    if (newStatus === "arrived") message.success("Mijozga xabar yuborildi!");
-    if (newStatus === "in_progress") message.success("Safar boshlandi!");
-    if (newStatus === "completed") {
-      message.success("Safar yakunlandi!");
-      setActiveOrder(null);
-      fetchOrders();
+        // Ovozli xabarlar va vizual effektlar
+        if (newStatus === "arrived") {
+          message.success("Mijozga xabar yuborildi!");
+          playAliceVoice("arrived"); // 🔊 "Manzilga yetib keldingiz" (yoki shunga o'xshash)
+        }
+        if (newStatus === "in_progress") {
+          message.success("Safar boshlandi!");
+          playAliceVoice("start_trip"); // 🔊 "Harakatni boshlaymiz"
+        }
+        if (newStatus === "completed") {
+          message.success(`Safar yakunlandi! Hisobingizga tushdi: ${res.price} so'm`);
+          playAliceVoice("completed"); // 🔊 "Safar yakunlandi"
+          setActiveOrder(null);
+          fetchOrders(); // Yana lentaga qaytish
+        }
+      } else {
+        message.error(res.message || "Status o'zgarmadi");
+      }
+    } catch (e) {
+      console.error(e);
+      message.error("Internet bilan aloqa yo'q");
     }
   };
 
+  const callClient = () => {
+    if (activeOrder?.passenger_phone) {
+      window.location.href = `tel:${activeOrder.passenger_phone}`;
+    } else {
+      message.info("Mijoz raqami yashirilgan");
+    }
+  };
+
+  // Tugma animatsiyasi
   const btnTouchProps = {
     onMouseDown: (e) => (e.currentTarget.style.transform = "scale(0.96)"),
     onMouseUp: (e) => (e.currentTarget.style.transform = "scale(1)"),
@@ -269,13 +241,14 @@ export default function DriverOrderFeed() {
     style: { transition: "transform 0.1s" },
   };
 
-  // --- AGAR AKTIV BUYURTMA BO'LSA -> XARITA REJIMI ---
+  // --- 1-HOLAT: AKTIV BUYURTMA (XARITA) ---
   if (activeOrder) {
-    const clientPos = parseLatLng(activeOrder.pickup_location) || [42.4619, 59.6166];
+    const clientPos = parseLatLng(activeOrder.pickup_location) || [42.4619, 59.6166]; // Fallback
     const destPos = parseLatLng(activeOrder.dropoff_location);
 
     return (
       <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
+        {/* Xarita qismi */}
         <div style={{ flex: 1, position: "relative" }}>
           <MapContainer
             center={clientPos}
@@ -284,19 +257,27 @@ export default function DriverOrderFeed() {
             zoomControl={false}
           >
             <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-            <Marker position={clientPos}>
-              <Popup>Yo'lovchi</Popup>
+            
+            {/* Yo'lovchi */}
+            <Marker position={clientPos} icon={clientIcon}>
+              <Popup>Yo'lovchi: {activeOrder.pickup_location}</Popup>
             </Marker>
+            
+            {/* Haydovchi */}
             <SmoothDriverMarker position={driverLoc} />
+            
+            {/* Manzil (agar bor bo'lsa) */}
             {destPos && (
               <Marker position={destPos}>
-                <Popup>Borish manzili</Popup>
+                <Popup>Borish: {activeOrder.dropoff_location}</Popup>
               </Marker>
             )}
+            
             <RecenterMap lat={clientPos[0]} lng={clientPos[1]} />
           </MapContainer>
         </div>
 
+        {/* Boshqaruv paneli */}
         <div
           style={{
             padding: 25,
@@ -304,8 +285,11 @@ export default function DriverOrderFeed() {
             boxShadow: "0 -10px 40px rgba(0,0,0,0.15)",
             borderRadius: "30px 30px 0 0",
             zIndex: 1000,
+            position: "relative"
           }}
         >
+          <div style={{ width: 60, height: 6, background: '#e0e0e0', borderRadius: 3, margin: '0 auto 20px auto' }} />
+          
           <div
             style={{
               display: "flex",
@@ -315,12 +299,15 @@ export default function DriverOrderFeed() {
             }}
           >
             <div style={{ maxWidth: "80%" }}>
-              <Title level={4} style={{ margin: 0, fontWeight: 800 }}>
-                Mijoz kutyapti
+              <Tag color={activeOrder.status === "accepted" ? "blue" : activeOrder.status === "arrived" ? "orange" : "green"}>
+                {activeOrder.status.toUpperCase()}
+              </Tag>
+              <Title level={4} style={{ margin: "5px 0", fontWeight: 800 }}>
+                {activeOrder.status === "in_progress" ? "Manzilga borilyapti" : "Mijoz kutyapti"}
               </Title>
               <div style={{ display: "flex", alignItems: "center", marginTop: 5 }}>
                 <EnvironmentOutlined style={{ color: "#52c41a", marginRight: 5 }} />
-                <Text type="secondary" ellipsis>
+                <Text type="secondary" ellipsis style={{maxWidth: 200}}>
                   {activeOrder.pickup_location}
                 </Text>
               </div>
@@ -330,7 +317,8 @@ export default function DriverOrderFeed() {
               size="large"
               icon={<PhoneOutlined />}
               type="primary"
-              style={{ background: "#52c41a" }}
+              onClick={callClient}
+              style={{ background: "#52c41a", width: 50, height: 50 }}
             />
           </div>
 
@@ -345,6 +333,7 @@ export default function DriverOrderFeed() {
                 height: 60,
                 borderRadius: 20,
                 background: "black",
+                fontSize: 18,
                 fontWeight: 700,
                 ...btnTouchProps.style,
               }}
@@ -365,11 +354,12 @@ export default function DriverOrderFeed() {
                 borderRadius: 20,
                 background: "#faad14",
                 color: "black",
+                fontSize: 18,
                 fontWeight: 700,
                 ...btnTouchProps.style,
               }}
             >
-              KETDIK (SAFARNI BOSHLASH) 🚖
+              KETDIK (BOSHLASH) 🚖
             </Button>
           )}
 
@@ -384,11 +374,12 @@ export default function DriverOrderFeed() {
               style={{
                 height: 60,
                 borderRadius: 20,
+                fontSize: 18,
                 fontWeight: 700,
                 ...btnTouchProps.style,
               }}
             >
-              SAFARNI YAKUNLASH ✅
+              YAKUNLASH ✅
             </Button>
           )}
         </div>
@@ -396,23 +387,23 @@ export default function DriverOrderFeed() {
     );
   }
 
-  // --- BUYURTMALAR RO'YXATI ---
+  // --- 2-HOLAT: BUYURTMALAR LENTASI (FEED) ---
   return (
     <div style={{ padding: "15px", paddingBottom: "100px", minHeight: "100vh", background: "#f8f9fa" }}>
       <Title level={4} style={{ marginBottom: 20, fontWeight: 800 }}>
         {t?.nearOrders || "Yaqin-atrofdagi buyurtmalar"}
       </Title>
 
-      {loading ? (
+      {loading && orders.length === 0 ? (
         [1, 2, 3].map((i) => (
-          <Card key={i} style={{ marginBottom: 15, borderRadius: 24 }}>
-            <Skeleton active avatar />
+          <Card key={i} style={{ marginBottom: 15, borderRadius: 24, border: 'none' }}>
+            <Skeleton active avatar paragraph={{ rows: 2 }} />
           </Card>
         ))
       ) : (
         <List
           dataSource={orders}
-          locale={{ emptyText: <Empty description="Buyurtmalar mavjud emas" /> }}
+          locale={{ emptyText: <Empty description="Hozircha buyurtmalar yo'q" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
           renderItem={(item) => (
             <Card
               key={item.id}
@@ -421,9 +412,13 @@ export default function DriverOrderFeed() {
                 borderRadius: 24,
                 boxShadow: "0 8px 20px rgba(0,0,0,0.04)",
                 border: "none",
+                position: "relative",
+                overflow: "hidden"
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 15 }}>
+              <div style={{position:'absolute', top:0, left:0, width:4, height:'100%', background: item.service_type === 'comfort' ? '#faad14' : '#1890ff'}}></div>
+              
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 15, paddingLeft: 10 }}>
                 <Tag color="blue" icon={<CarOutlined />}>
                   {(item.service_type || "taxi").toUpperCase()}
                 </Tag>
@@ -432,20 +427,30 @@ export default function DriverOrderFeed() {
                 </Title>
               </div>
 
-              <div style={{ marginBottom: 20 }}>
+              <div style={{ marginBottom: 20, paddingLeft: 10 }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 10 }}>
-                  <EnvironmentOutlined style={{ color: "#52c41a", fontSize: 18 }} />
-                  <Text strong>{item.pickup_location}</Text>
+                  <EnvironmentOutlined style={{ color: "#1890ff", fontSize: 18, marginTop: 4 }} />
+                  <div>
+                    <Text type="secondary" style={{fontSize: 11}}>Qayerdan</Text>
+                    <div style={{fontWeight: 600, fontSize: 15}}>{item.pickup_location}</div>
+                  </div>
                 </div>
-                <div style={{ borderLeft: "2px dashed #e0e0e0", height: 15, marginLeft: 9, margin: "0 0 5px 0" }}></div>
-                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                  <EnvironmentOutlined style={{ color: "#ff4d4f", fontSize: 18 }} />
-                  <Text strong>
-                    {item.dropoff_location && item.dropoff_location.includes("Lat:") 
-                      ? "Xaritada belgilangan joy" 
-                      : (item.dropoff_location || "Noma'lum")}
-                  </Text>
-                </div>
+                
+                {/* Agar borish manzili bo'lsa */}
+                {item.dropoff_location && (
+                  <>
+                    <div style={{ borderLeft: "2px dashed #e0e0e0", height: 15, marginLeft: 9, margin: "0 0 5px 0" }}></div>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                      <EnvironmentOutlined style={{ color: "#ff4d4f", fontSize: 18, marginTop: 4 }} />
+                      <div>
+                        <Text type="secondary" style={{fontSize: 11}}>Qayerga</Text>
+                        <div style={{fontWeight: 600, fontSize: 15}}>
+                          {item.dropoff_location.includes("Lat:") ? "Xaritada belgilangan" : item.dropoff_location}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
               <Button
@@ -461,9 +466,10 @@ export default function DriverOrderFeed() {
                   fontWeight: 700,
                   border: "none",
                   boxShadow: "0 4px 15px rgba(0,0,0,0.2)",
+                  fontSize: 16,
                   ...btnTouchProps.style,
                 }}
-                onClick={() => acceptOrder(item)}
+                onClick={() => acceptOrder(item.id)}
               >
                 QABUL QILISH
               </Button>

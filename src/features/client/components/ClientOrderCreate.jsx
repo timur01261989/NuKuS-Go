@@ -842,52 +842,50 @@ const bottomTitle = useMemo(() => {
 
         {/* Top card (Yandex-like) */}
         {!hasActiveOrder && (
-        <div className="yg-topcard">
-          <Card className="yg-card" bodyStyle={{ padding: 12 }}>
-            <div className="yg-row">
-              <div className="yg-dot blue" />
-              <Text className="yg-addr">{pickup.address || "Qayerdan ketasiz?"}</Text>
-              <Button size="small" className="yg-mini" onClick={() => { setSelecting("pickup"); setDrawerOpen(false); }}>
-                Tanlash
-              </Button>
-            </div>
+          <div className="yg-topcard">
+            <Card className="yg-card" bodyStyle={{ padding: 12 }}>
+              <div className="yg-row">
+                <div className="yg-dot blue" />
+                <Text className="yg-addr">{pickup.address || "Qayerdan ketasiz?"}</Text>
+                <Button size="small" className="yg-mini" onClick={() => { setSelecting("pickup"); setDrawerOpen(false); }}>
+                  Tanlash
+                </Button>
+              </div>
 
-            <div className="yg-row">
-              <div className="yg-dot red" />
-              <Input
-                value={destQuery}
-                onChange={(e) => {
-                  setDestQuery(e.target.value);
-                  runSearch("dest", e.target.value);
-                }}
-                onFocus={() => setDrawerOpen(true)}
-                placeholder="Qayerga borasiz?"
-                prefix={<SearchOutlined />}
-                className="yg-input"
-                allowClear
-              />
-              <Button
-                size="small"
-                className="yg-mini"
-                onClick={() => {
-                  setSelecting("dest");
-                  setDrawerOpen(false);
-                }}
-              >
-                Xaritadan
-              </Button>
-            </div>
+              <div className="yg-row">
+                <div className="yg-dot red" />
+                <Input
+                  value={destQuery}
+                  onChange={(e) => {
+                    setDestQuery(e.target.value);
+                    runSearch("dest", e.target.value);
+                  }}
+                  onFocus={() => setDrawerOpen(true)}
+                  placeholder="Qayerga borasiz?"
+                  prefix={<SearchOutlined />}
+                  className="yg-input"
+                  allowClear
+                />
+                <Button
+                  size="small"
+                  className="yg-mini"
+                  onClick={() => {
+                    setSelecting("dest");
+                    setDrawerOpen(false);
+                  }}
+                >
+                  Xaritadan
+                </Button>
+              </div>
 
-            <div className="yg-swap">
-              <Button icon={<SwapOutlined />} onClick={swapPoints} />
-            </div>
-          </Card>
-        </div>
-      </div>
-
-      {/* Bottom sheet */}
+              <div className="yg-swap">
+                <Button icon={<SwapOutlined />} onClick={swapPoints} />
+              </div>
+            </Card>
+          </div>
         )}
 
+        {/* Bottom sheet */}
       {!hasActiveOrder && (
       <Drawer
         open={drawerOpen && !selecting}
