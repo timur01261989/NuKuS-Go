@@ -984,8 +984,8 @@ const bottomTitle = useMemo(() => {
             Zakaz berish
           </Button>
         </div>
-      </Drawer
-      )}>
+      </Drawer>
+    )}
 
       
       {/* CHAT MODAL (YANGILANGAN) */}
