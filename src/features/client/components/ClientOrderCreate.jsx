@@ -1,20 +1,30 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-// UI komponentlar faqat 'antd' dan olinadi:
+
+// UI komponentlar faqat 'antd' dan olinadi
 import { Button, Card, Drawer, Input, List, Space, Typography, message, Modal, Rate, Avatar } from "antd";
-// Ikonkalar faqat '@ant-design/icons' dan olinadi:
-import { 
-  EnvironmentOutlined, SearchOutlined, SwapOutlined, StarFilled, 
-  ClockCircleOutlined, WalletOutlined, AimOutlined, SendOutlined, UserOutlined 
+
+// Ikonkalar faqat '@ant-design/icons' dan olinadi
+import {
+  EnvironmentOutlined,
+  SearchOutlined,
+  SwapOutlined,
+  StarFilled,
+  ClockCircleOutlined,
+  WalletOutlined,
+  AimOutlined,
+  SendOutlined,
+  UserOutlined
 } from "@ant-design/icons";
 
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+
 import { playAliceVoice } from "@/utils/AudioPlayer";
 import api from "@/utils/apiHelper";
 import { supabase } from "@/lib/supabase";
-const { Text, Title } = Typography;
 
+const { Text, Title } = Typography;
 /** ---------------- ICONS (Yandex-like pins) ---------------- */
 const pickupIcon = L.divIcon({
   html: `
