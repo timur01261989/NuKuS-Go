@@ -14,7 +14,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 import api from "@/utils/apiHelper";
-import { playAliceVoice } from "@/utils/audioPlayer"; // Ovozli yordamchi
+import { playAliceVoice } from "@/utils/AudioPlayer"; // Ovozli yordamchi
 
 const { Text, Title } = Typography;
 
