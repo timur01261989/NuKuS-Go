@@ -25,6 +25,7 @@ import api from "@/utils/apiHelper";
 import { supabase } from "@/lib/supabase";
 
 const { Text, Title } = Typography;
+
 /** ---------------- ICONS (Yandex-like pins) ---------------- */
 const pickupIcon = L.divIcon({
   html: `
@@ -90,7 +91,7 @@ async function nominatimSearch(q) {
   const url = `https://nominatim.openstreetmap.org/search?format=json&limit=7&addressdetails=1&q=${encodeURIComponent(
     q
   )}`;
-  const res = await fetch(url, { signal, headers: { "Accept-Language": "uz,ru,en" } });
+  const res = await fetch(url, { headers: { "Accept-Language": "uz,ru,en" } });
   if (!res.ok) return [];
   const data = await res.json();
   return (data || []).map((x) => ({
@@ -103,7 +104,7 @@ async function nominatimSearch(q) {
 
 async function nominatimReverse(lat, lng, signal) {
   const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
-  const res = await fetch(url, { headers: { "Accept-Language": "uz,ru,en" } });
+  const res = await fetch(url, { signal, headers: { "Accept-Language": "uz,ru,en" } });
   if (!res.ok) return null;
   const data = await res.json();
   return data?.display_name || null;
@@ -200,7 +201,7 @@ export default function ClientOrderCreate() {
 
   const [recentPlaces, setRecentPlaces] = useState([]);
 
-  // ✅ Missing states (used in code below)
+  // ✅ Missing states
   const [orderId, setOrderId] = useState(() => {
     const saved = localStorage.getItem("activeOrderId");
     return saved ? String(saved) : null;
@@ -208,20 +209,21 @@ export default function ClientOrderCreate() {
   const [orderStatus, setOrderStatus] = useState(null);
   const [assignedDriver, setAssignedDriver] = useState(null);
 
-  // ✅ Chat & Rating (connected)
+  // ✅ Chat & Rating
   const [chatOpen, setChatOpen] = useState(false);
 
   // --- CHAT STATE ---
   const [messages, setMessages] = useState([]);
   const [msgText, setMsgText] = useState("");
   const chatScrollRef = useRef(null);
+  const mapRef = useRef(null); // ✅ Added ref
 
   const [ratingOpen, setRatingOpen] = useState(false);
   const [ratingValue, setRatingValue] = useState(5);
   const [completedOrderId, setCompletedOrderId] = useState(null);
 
 
-  // ✅ Serverdan aktiv buyurtmani tekshirish (localStorage bo‘sh bo‘lsa ham)
+  // ✅ Serverdan aktiv buyurtmani tekshirish
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -269,14 +271,13 @@ export default function ClientOrderCreate() {
           setUserLoc([lat, lng]);
           setPickup((p) => ({ ...p, latlng: [lat, lng] }));
 
-          // reverse to show readable pickup address
           try {
             const addr = await nominatimReverse(lat, lng);
             if (!cancelled && addr) setPickup((p) => ({ ...p, address: addr }));
           } catch {}
         },
         () => {
-          // ignore, keep fallback
+          // ignore
         },
         { enableHighAccuracy: true, timeout: 9000 }
       );
@@ -286,10 +287,9 @@ export default function ClientOrderCreate() {
     };
   }, []);
 
-  /** Load recent places (local + last orders) */
+  /** Load recent places */
   useEffect(() => {
     (async () => {
-      // local
       const raw = localStorage.getItem("recentPlaces_v1");
       if (raw) {
         try {
@@ -300,7 +300,7 @@ export default function ClientOrderCreate() {
           }
         } catch {}
       }
-      setRecentPlaces(seedPlaces);      // server (last orders) - via api helper
+      setRecentPlaces(seedPlaces);
       try {
         const res = await api.post("/api/order", { action: "history", limit: 12 });
         const rows = res?.data?.orders || res?.orders || [];
@@ -323,7 +323,7 @@ export default function ClientOrderCreate() {
           localStorage.setItem("recentPlaces_v1", JSON.stringify(merged.slice(0, 12)));
         }
       } catch {
-        // ignore (fallback stays)
+        // ignore
       }
     })();
   }, [seedPlaces]);
@@ -347,7 +347,6 @@ export default function ClientOrderCreate() {
       } catch (e) {
         if (!cancelled) {
           setRouteCoords([]);
-          // Fallback: approximate by haversine (straight line)
           try {
             const approx = haversineKm(pickup.latlng, dest.latlng);
             setDistanceKm(Number.isFinite(approx) ? approx : null);
@@ -374,7 +373,6 @@ export default function ClientOrderCreate() {
   }, [pickup.latlng, dest.latlng]);
 
   const totalPrice = useMemo(() => {
-    // If route distance not ready yet, use approximate (straight-line) distance for a better estimate
     const d = Number.isFinite(distanceKm) ? distanceKm : approxDistanceKm;
     if (!Number.isFinite(d)) return tariff.base;
     return Math.round(tariff.base + d * tariff.perKm);
@@ -401,14 +399,12 @@ export default function ClientOrderCreate() {
     (latlng) => {
       if (!selecting) return;
 
-      // Optimistic latlng update for immediate UI responsiveness
       if (selecting === "pickup") {
         setPickup((p) => ({ ...p, latlng, address: p.address || "Manzil aniqlanmoqda..." }));
       } else {
         setDest((d) => ({ ...d, latlng, address: d.address || "Manzil aniqlanmoqda..." }));
       }
 
-      // Debounce reverse geocode to avoid too many requests while user drags map
       if (reverseTimerRef.current) clearTimeout(reverseTimerRef.current);
       if (reverseAbortRef.current) reverseAbortRef.current.abort();
 
@@ -424,7 +420,7 @@ export default function ClientOrderCreate() {
             setDest({ latlng, address: addr || "Tanlangan nuqta" });
           }
         } catch (e) {
-          // ignore aborts, keep latlng
+          // ignore
         }
       }, 450);
     },
@@ -472,13 +468,13 @@ export default function ClientOrderCreate() {
     if (!pickup.latlng && !dest.latlng) return;
     const p = pickup;
     const d = dest;
-    setPickup(d.latlng ? d : { ...p, address: p.address }); // keep if dest empty
+    setPickup(d.latlng ? d : { ...p, address: p.address });
     setDest(p.latlng ? p : { ...d, address: d.address });
     setPickupQuery(d.address || "");
     setDestQuery(p.address || "");
   }, [pickup, dest]);
 
-  /** Order action (creates order + keeps compatibility with your backend) */
+  /** Order action */
   const handleOrder = useCallback(async () => {
     if (!pickup.latlng || !dest.latlng) {
       message.error("Borish va yakuniy manzilni belgilang");
@@ -498,7 +494,6 @@ export default function ClientOrderCreate() {
         distance_km: distanceKm ? Number(distanceKm.toFixed(2)) : null,
       };
 
-      // 1) Create order (server-side handles auth/session)
       const created = await api.post("/api/order", { action: "create", ...payload });
       const order = created?.data?.order || created?.order || created?.data || null;
       const id = order?.id || order?.orderId || created?.data?.orderId || created?.orderId;
@@ -512,7 +507,6 @@ export default function ClientOrderCreate() {
       setOrderStatus(order?.status || "searching");
       message.success("Buyurtma yuborildi");
 
-      // 2) Dispatch / radar (find driver)
       try {
         await api.post("/api/dispatch", {
           orderId: String(id),
@@ -523,7 +517,6 @@ export default function ClientOrderCreate() {
           price: payload.price,
         });
       } catch (e2) {
-        // dispatch can be async; status polling will still pick updates
         console.warn("dispatch error", e2);
         message.error("Haydovchi qidirishda xatolik");
       }
@@ -534,7 +527,7 @@ export default function ClientOrderCreate() {
     }
   }, [pickup, dest, tariff, totalPrice, distanceKm]);
 
-  /** Polling order status (Vercel-friendly). Checks every 4 seconds. */
+  /** Polling order status */
   useEffect(() => {
     if (!orderId) return;
 
@@ -546,27 +539,27 @@ export default function ClientOrderCreate() {
         const ord = res?.data?.order || res?.order || res?.data || null;
         if (!ord || stopped) return;
 
+        // ✅ Status o'zgarishi va ovozli xabarlar
+        if (ord.status === 'driver_assigned' && orderStatus !== 'driver_assigned') {
+          playAliceVoice('driver_found'); 
+        }
+        if (ord.status === 'arrived' && orderStatus !== 'arrived') {
+          playAliceVoice('arrived'); 
+        }
+
         setOrderStatus(ord.status || null);
         if (ord.driver || ord.assigned_driver) setAssignedDriver(ord.driver || ord.assigned_driver);
 
         const s = String(ord.status || "").toLowerCase();
         if (["cancelled", "completed", "finished", "done"].includes(s)) {
-        if (["completed","finished","done"].includes(s)) {
-                  setCompletedOrderId(orderId);
-                  setRatingOpen(true);
-                }
-// Status o'zgarishini tekshiradigan useEffect ichida:
-if (res.status === 'driver_assigned' && orderStatus !== 'driver_assigned') {
-   playAliceVoice('driver_found'); // "Haydovchi topildi"
-}
-if (res.status === 'arrived' && orderStatus !== 'arrived') {
-   playAliceVoice('arrived'); // "Mashina yetib keldi"
-}
+          if (["completed","finished","done"].includes(s)) {
+            setCompletedOrderId(orderId);
+            setRatingOpen(true);
+          }
           localStorage.removeItem("activeOrderId");
           setOrderId(null);
         }
       } catch (e) {
-        // ignore transient errors
         console.warn("status poll error", e);
       }
     };
@@ -577,7 +570,7 @@ if (res.status === 'arrived' && orderStatus !== 'arrived') {
       stopped = true;
       clearInterval(t);
     };
-  }, [orderId]);
+  }, [orderId, orderStatus]);
 
 
 
@@ -604,7 +597,6 @@ if (res.status === 'arrived' && orderStatus !== 'arrived') {
       await api.post("/api/order", { action: "cancel", orderId: String(orderId) });
     } catch (e) {
       console.warn(e);
-      // even if cancel fails, allow local reset
     } finally {
       localStorage.removeItem("activeOrderId");
       setOrderId(null);
@@ -620,7 +612,6 @@ if (res.status === 'arrived' && orderStatus !== 'arrived') {
 
   const closeChat = useCallback(() => setChatOpen(false), []);
 
-  // Chat pastga tushishi uchun yordamchi
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
       chatScrollRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -633,7 +624,6 @@ if (res.status === 'arrived' && orderStatus !== 'arrived') {
 
     let mounted = true;
 
-    // 1) Eski xabarlarni yuklash
     const fetchHistory = async () => {
       const { data, error } = await supabase
         .from("messages")
@@ -649,7 +639,6 @@ if (res.status === 'arrived' && orderStatus !== 'arrived') {
 
     fetchHistory();
 
-    // 2) Jonli kuzatish (Realtime)
     const channel = supabase
       .channel(`chat_room:${orderId}`)
       .on(
@@ -668,7 +657,6 @@ if (res.status === 'arrived' && orderStatus !== 'arrived') {
     };
   }, [chatOpen, orderId, scrollToBottom]);
 
-  // Xabar yuborish funksiyasi
   const handleSendMessage = useCallback(async () => {
     if (!msgText.trim() || !orderId) return;
 
@@ -691,14 +679,12 @@ if (res.status === 'arrived' && orderStatus !== 'arrived') {
         setRatingOpen(false);
         return;
       }
-      // optional backend action; safe even if not implemented (won't break UI)
       await api.post("/api/order", { action: "rate", orderId: completedOrderId, rating: ratingValue });
     } catch (e) {
       console.warn("rating submit error", e);
     } finally {
       setRatingOpen(false);
       setCompletedOrderId(null);
-      // clear active order after rating step
       localStorage.removeItem("activeOrderId");
       setOrderId(null);
       setOrderStatus(null);
@@ -727,8 +713,13 @@ const bottomTitle = useMemo(() => {
     <div className="yg-root">
       {/* MAP */}
       <div className="yg-map">
-        <MapContainer center={userLoc} zoom={16} zoomControl={false} style={{ height: "100%", width: "100%" }} whenCreated={(m) => (mapRef.current = m)}>
-          {/* Tiles (Night/Day) */}
+        <MapContainer 
+          center={userLoc} 
+          zoom={16} 
+          zoomControl={false} 
+          style={{ height: "100%", width: "100%" }} 
+          ref={mapRef} // ✅ Corrected ref
+        >
           <TileLayer
             url={
               document.body.classList.contains("night-mode-active")
@@ -758,7 +749,7 @@ const bottomTitle = useMemo(() => {
               pathOptions={{ color: "#00C853", weight: 6, opacity: 0.95, lineCap: "round" }}
             />
           )}
-        {/* "MENING JOYLASHUVIM" TUGMASI */}
+        
         <div
           style={{
             position: "absolute",
@@ -780,7 +771,6 @@ const bottomTitle = useMemo(() => {
         </div>
         </MapContainer>
 
-        {/* Center pin overlay */}
         {selecting && (
           <div className={`yg-centerpin ${isDragging ? 'dragging' : ''}`} aria-hidden>
             <div
@@ -840,7 +830,7 @@ const bottomTitle = useMemo(() => {
         )}
 
 
-       {/* Top card (Yandex-like) */}
+        {/* Top card */}
         {!hasActiveOrder && (
           <div className="yg-topcard">
             <Card className="yg-card" bodyStyle={{ padding: 12 }}>
@@ -884,7 +874,7 @@ const bottomTitle = useMemo(() => {
             </Card>
           </div>
         )}
-      </div> {/* <--- YG-MAP SHU YERDA YOPILADI */}
+      </div> 
 
       {/* Bottom sheet */}
       {!hasActiveOrder && (
@@ -903,7 +893,6 @@ const bottomTitle = useMemo(() => {
             </div>
           }
         >
-          {/* Recent places */}
           <div className="yg-section">
             <div className="yg-section-title">Oldingi manzillar</div>
             <List
@@ -925,7 +914,6 @@ const bottomTitle = useMemo(() => {
             />
           </div>
 
-          {/* Destination search suggestions */}
           {(destSug?.length > 0 || searchLoading) && (
             <div className="yg-section">
               <div className="yg-section-title">Qidiruv natijalari</div>
@@ -945,7 +933,6 @@ const bottomTitle = useMemo(() => {
             </div>
           )}
 
-        {/* Tariffs */}
         <div className="yg-tariffs">
           {TARIFFS.map((t) => {
             const active = t.id === tariff.id;
@@ -968,7 +955,6 @@ const bottomTitle = useMemo(() => {
           })}
         </div>
 
-        {/* Order button */}
         <div className="yg-orderbar">
           <div className="yg-total">
             <div className="yg-total-label">Jami</div>
@@ -988,7 +974,7 @@ const bottomTitle = useMemo(() => {
     )}
 
       
-      {/* CHAT MODAL (YANGILANGAN) */}
+      {/* CHAT MODAL */}
       <Modal
         title={
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1010,7 +996,6 @@ const bottomTitle = useMemo(() => {
         bodyStyle={{ padding: 0 }}
       >
         <div style={{ display: "flex", flexDirection: "column", height: "400px" }}>
-          {/* Xabarlar oynasi */}
           <div
             style={{
               flex: 1,
@@ -1069,7 +1054,6 @@ const bottomTitle = useMemo(() => {
             <div ref={chatScrollRef} />
           </div>
 
-          {/* Yozish joyi */}
           <div
             style={{
               padding: "10px",
@@ -1096,7 +1080,6 @@ const bottomTitle = useMemo(() => {
         </div>
       </Modal>
 
-      {/* Rating Modal */}
       <Modal
         open={ratingOpen}
         title="Safar yakunlandi"
@@ -1181,7 +1164,6 @@ const bottomTitle = useMemo(() => {
         .yg-orderbtn { border-radius: 18px; background:#FFD400; border-color:#FFD400; color:#111; font-weight:900; padding: 0 18px; }
         .yg-orderbtn[disabled] { background: #f5f5f5 !important; border-color:#f5f5f5 !important; color: rgba(0,0,0,.35) !important; }
 
-
         .yg-active { position:absolute; left:16px; right:16px; bottom: 16px; z-index: 650; }
         .yg-active-card { border-radius: 20px; box-shadow: 0 -6px 26px rgba(0,0,0,.22); }
         .yg-active-title { font-weight: 900; font-size: 16px; }
@@ -1197,7 +1179,6 @@ const bottomTitle = useMemo(() => {
         .yg-driver-car { margin-top: 2px; color: rgba(0,0,0,.65); font-weight: 700; font-size: 12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .yg-driver-status { margin-top: 6px; font-weight: 900; font-size: 12px; }
 
-/* User Marker (Pulsatsiya effekti) */
 .user-marker-pulse {
   width: 20px;
   height: 20px;
@@ -1213,7 +1194,6 @@ const bottomTitle = useMemo(() => {
   70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(24, 144, 255, 0); }
   100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(24, 144, 255, 0); }
 }
-        /* Leaflet tweaks */
         .leaflet-control-container { display:none; }
       `}</style>
     </div>
