@@ -205,7 +205,16 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
   useEffect(() => {
     const run = async () => {
       if (!pickerModal.open) return;
-      const L = await loadLeaflet();
+      if (!pickerMapRef.current) return;
+
+      let L;
+      try {
+        L = await loadLeaflet();
+      } catch (e) {
+        console.error(e);
+        message.error("Xarita yuklanmadi. Internetni tekshiring.");
+        return;
+      }
       const initLat = pickerState.lat ?? clientGeo.lat ?? pickupLat ?? 41.311081;
       const initLng = pickerState.lng ?? clientGeo.lng ?? pickupLng ?? 69.240562;
 
@@ -692,6 +701,8 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
       const user = authData?.user;
       if (!user) return message.error("Avval tizimga kiring!");
 
+      const orderId = b?.order_id ?? b?.orders?.id;
+
       // If already accepted: send cancel request to driver (driver should confirm to refund fee)
       if (b.status === "accepted") {
         const v3 = await supabase.rpc("request_cancel_after_accept", {
@@ -707,59 +718,70 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
         message.success("Bekor qilish so‘rovi haydovchiga yuborildi. Haydovchi tasdiqlasa to‘lov qaytariladi.");
       } else {
         // requested -> immediate cancel
-        // Prefer RPC if exists; otherwise fallback to direct table updates (prevents 404 blank-screen)
-        const tryRpc = async (args) => {
-          const r = await supabase.rpc("cancel_booking_request", args);
-          if (!r?.error) return { ok: true };
-          // PostgREST returns 404 when RPC is missing; treat as "not available"
-          const msg = (r.error?.message || "").toLowerCase();
-          const code = String(r.error?.code || "");
-          const status = r.error?.status || r.error?.statusCode;
-          const rpcMissing = status === 404 || code === "404" || msg.includes("not found") || msg.includes("function") && msg.includes("does not exist");
-          return { ok: false, error: r.error, rpcMissing };
+        // Prefer common param names; if RPC doesn't exist / bad signature, fallback to direct updates.
+        const tryRpc = async () => {
+          // 1) most common signature
+          let r = await supabase.rpc("cancel_booking_request", {
+            p_request_id: b.id,
+            p_passenger_id: user.id,
+          });
+          if (!r?.error) return r;
+
+          // 2) alternate signature
+          r = await supabase.rpc("cancel_booking_request", {
+            p_booking_id: b.id,
+            p_passenger_id: user.id,
+          });
+          return r;
         };
 
-        let ok = false;
-        let rpcMissing = false;
-        // v2 params
-        const r2 = await tryRpc({ p_request_id: b.id, p_passenger_id: user.id });
-        if (r2.ok) ok = true;
-        else {
-          rpcMissing = !!r2.rpcMissing;
-          // v1 params (some DBs expect p_booking_id)
-          const r1 = await tryRpc({ p_booking_id: b.id, p_passenger_id: user.id });
-          if (r1.ok) ok = true;
-          else rpcMissing = rpcMissing || !!r1.rpcMissing;
-        }
+        const rpcRes = await tryRpc();
 
-        if (!ok) {
-          // Fallback: mark booking cancelled and restore seats manually
-          // 1) cancel booking request (RLS should allow passenger to update own rows)
-          const { error: upErr } = await supabase
-            .from("trip_booking_requests")
-            .update({ status: "cancelled" })
-            .eq("id", b.id)
-            .eq("passenger_id", user.id);
-          if (upErr && !rpcMissing) throw upErr;
+        if (rpcRes?.error) {
+          // Fallback: cancel request row + return seats on order (best-effort)
+          // This fixes cases where RPC is missing (404) or signature mismatch (400).
+          try {
+            await supabase
+              .from("trip_booking_requests")
+              .update({ status: "cancelled" })
+              .eq("id", b.id)
+              .eq("passenger_id", user.id);
+          } catch (e) {}
 
-          // 2) restore seats on order (best-effort; ignore if RLS prevents)
-          const orderId = b.order_id || b.orders?.id;
-          const seats = Number(b.seats || 0);
-          if (orderId && seats > 0) {
+          if (orderId) {
             try {
-              const { data: o1 } = await supabase.from("orders").select("id,seats_available,status").eq("id", orderId).maybeSingle();
-              const current = Number(o1?.seats_available || 0);
-              const next = current + seats;
-              await supabase.from("orders").update({ seats_available: next, status: next > 0 ? "pending" : (o1?.status || "pending") }).eq("id", orderId);
+              // read current order to compute safe seats_available update
+              const { data: ord, error: ordErr } = await supabase
+                .from("orders")
+                .select("id,seats_available,seats_total,status")
+                .eq("id", orderId)
+                .maybeSingle();
+
+              if (!ordErr && ord) {
+                const curAvail = Number(ord.seats_available ?? 0);
+                const seatsTotal = Number(ord.seats_total ?? 0);
+                const addBack = Number(b?.seats ?? 0);
+                const nextAvail = seatsTotal > 0 ? Math.min(seatsTotal, curAvail + addBack) : (curAvail + addBack);
+
+                // If order was booked because seats ran out, and now seats returned, move back to pending.
+                const nextStatus = ord.status === "booked" && nextAvail > 0 ? "pending" : ord.status;
+
+                await supabase
+                  .from("orders")
+                  .update({ seats_available: nextAvail, status: nextStatus })
+                  .eq("id", ord.id);
+              }
             } catch (e) {
-              // ignore
+              // ignore (best-effort)
             }
           }
-          ok = true;
-        }
 
-        if (ok) message.success("So‘rov bekor qilindi. Joylar qaytarildi.");
+          message.success("So‘rov bekor qilindi. Joylar qaytarildi.");
+        } else {
+          message.success("So‘rov bekor qilindi. Joylar qaytarildi.");
+        }
       }
+
       await doSearch(true);
       await loadMyBookings();
     } catch (e) {
