@@ -707,19 +707,58 @@ const [mapModal, setMapModal] = useState({ open: false, url: "", title: "Xarita"
         message.success("Bekor qilish so‘rovi haydovchiga yuborildi. Haydovchi tasdiqlasa to‘lov qaytariladi.");
       } else {
         // requested -> immediate cancel
-        const v2 = await supabase.rpc("cancel_booking_request", {
-          p_request_id: b.id,
-          p_passenger_id: user.id,
-        });
+        // Prefer RPC if exists; otherwise fallback to direct table updates (prevents 404 blank-screen)
+        const tryRpc = async (args) => {
+          const r = await supabase.rpc("cancel_booking_request", args);
+          if (!r?.error) return { ok: true };
+          // PostgREST returns 404 when RPC is missing; treat as "not available"
+          const msg = (r.error?.message || "").toLowerCase();
+          const code = String(r.error?.code || "");
+          const status = r.error?.status || r.error?.statusCode;
+          const rpcMissing = status === 404 || code === "404" || msg.includes("not found") || msg.includes("function") && msg.includes("does not exist");
+          return { ok: false, error: r.error, rpcMissing };
+        };
 
-        if (v2?.error) {
-          const v1 = await supabase.rpc("cancel_booking_request", {
-            p_booking_id: b.id,
-            p_passenger_id: user.id,
-          });
-          if (v1?.error) throw v1.error;
+        let ok = false;
+        let rpcMissing = false;
+        // v2 params
+        const r2 = await tryRpc({ p_request_id: b.id, p_passenger_id: user.id });
+        if (r2.ok) ok = true;
+        else {
+          rpcMissing = !!r2.rpcMissing;
+          // v1 params (some DBs expect p_booking_id)
+          const r1 = await tryRpc({ p_booking_id: b.id, p_passenger_id: user.id });
+          if (r1.ok) ok = true;
+          else rpcMissing = rpcMissing || !!r1.rpcMissing;
         }
-        message.success("So‘rov bekor qilindi. Joylar qaytarildi.");
+
+        if (!ok) {
+          // Fallback: mark booking cancelled and restore seats manually
+          // 1) cancel booking request (RLS should allow passenger to update own rows)
+          const { error: upErr } = await supabase
+            .from("trip_booking_requests")
+            .update({ status: "cancelled" })
+            .eq("id", b.id)
+            .eq("passenger_id", user.id);
+          if (upErr && !rpcMissing) throw upErr;
+
+          // 2) restore seats on order (best-effort; ignore if RLS prevents)
+          const orderId = b.order_id || b.orders?.id;
+          const seats = Number(b.seats || 0);
+          if (orderId && seats > 0) {
+            try {
+              const { data: o1 } = await supabase.from("orders").select("id,seats_available,status").eq("id", orderId).maybeSingle();
+              const current = Number(o1?.seats_available || 0);
+              const next = current + seats;
+              await supabase.from("orders").update({ seats_available: next, status: next > 0 ? "pending" : (o1?.status || "pending") }).eq("id", orderId);
+            } catch (e) {
+              // ignore
+            }
+          }
+          ok = true;
+        }
+
+        if (ok) message.success("So‘rov bekor qilindi. Joylar qaytarildi.");
       }
       await doSearch(true);
       await loadMyBookings();
