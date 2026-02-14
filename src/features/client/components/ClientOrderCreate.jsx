@@ -1,605 +1,654 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import {Card, Button, Typography, Avatar, message, Badge, Progress, Input, Space, Divider, Modal, List} from 'antd';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Button, Card, Drawer, Input, List, Space, Typography, message } from "antd";
 import {
-  ArrowLeftOutlined,
-  PhoneOutlined,
-  UserOutlined,
-  MessageOutlined,
   EnvironmentOutlined,
   SearchOutlined,
+  SwapOutlined,
   StarFilled,
-  SafetyOutlined,
-  MenuOutlined,
+  ClockCircleOutlined,
   WalletOutlined,
-  ClockCircleOutlined
-} from '@ant-design/icons';
+} from "@ant-design/icons";
 
-import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet-routing-machine';
-import 'leaflet/dist/leaflet.css';
+import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 import { supabase } from "../../../lib/supabase";
-import ChatComponent from '../../chat/components/ChatComponent';
-import RatingModal from '../../shared/components/RatingModal';
 
 const { Text, Title } = Typography;
 
-/** ---------------- MAP ICONS ---------------- */
-const userIcon = L.divIcon({
-  html: `<div class="user-marker-pulse"></div>`,
-  className: 'custom-user-icon',
-  iconSize: [20, 20],
-  iconAnchor: [10, 10]
+/** ---------------- ICONS (Yandex-like pins) ---------------- */
+const pickupIcon = L.divIcon({
+  html: `
+    <div style="
+      width:38px;height:38px;border-radius:19px;
+      background:#111; display:flex;align-items:center;justify-content:center;
+      box-shadow:0 8px 18px rgba(0,0,0,.25);
+      border:2px solid #fff;
+      font-size:20px;
+    ">🙋</div>
+  `,
+  className: "",
+  iconSize: [38, 38],
+  iconAnchor: [19, 38],
 });
 
-const carIcon = L.divIcon({
-  html: `<div style="font-size: 28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">🚖</div>`,
-  className: 'smooth-car-marker',
-  iconSize: [30, 30],
-  iconAnchor: [15, 15]
+const destIcon = L.divIcon({
+  html: `
+    <div style="
+      width:40px;height:40px;border-radius:20px;
+      background:#FFD400; display:flex;align-items:center;justify-content:center;
+      box-shadow:0 8px 18px rgba(0,0,0,.25);
+      border:2px solid #111;
+      font-size:18px;
+    ">🎯</div>
+  `,
+  className: "",
+  iconSize: [40, 40],
+  iconAnchor: [20, 40],
 });
+
+const centerPinIcon = (type) => `
+  <div style="
+    width:46px;height:46px;border-radius:23px;
+    background:${type === "pickup" ? "#111" : "#FFD400"};
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 10px 22px rgba(0,0,0,.25);
+    border:2px solid ${type === "pickup" ? "#fff" : "#111"};
+    font-size:22px;
+  ">${type === "pickup" ? "🙋" : "🎯"}</div>
+  <div style="
+    position:absolute;left:50%;transform:translateX(-50%);
+    top:44px;width:0;height:0;
+    border-left:10px solid transparent;border-right:10px solid transparent;
+    border-top:16px solid ${type === "pickup" ? "#111" : "#FFD400"};
+    filter: drop-shadow(0 6px 10px rgba(0,0,0,.25));
+  "></div>
+`;
 
 /** ---------------- TARIFFS ---------------- */
 const TARIFFS = [
-  { id: 'start', name: 'Start', basePrice: 6000, time: '3 min', color: '#FFD400' },
-  { id: 'comfort', name: 'Komfort', basePrice: 10000, time: '5 min', color: '#1890ff' },
-  { id: 'delivery', name: 'Yetkazish', basePrice: 8000, time: '8 min', color: '#52c41a' },
+  { id: "start", name: "Start", base: 6000, perKm: 1500, eta: "3 min" },
+  { id: "comfort", name: "Komfort", base: 10000, perKm: 2000, eta: "5 min" },
+  { id: "delivery", name: "Yetkazish", base: 8000, perKm: 1700, eta: "8 min" },
 ];
 
-/** ---------------- HELPERS ---------------- */
-function MapFlyTo({ center, zoom = 16 }) {
-  const map = useMap();
-  useEffect(() => {
-    if (center) map.flyTo(center, zoom, { animate: true, duration: 1.5 });
-  }, [center, map, zoom]);
-  return null;
+const fmtMoney = (n) => {
+  if (!Number.isFinite(n)) return "—";
+  return new Intl.NumberFormat("ru-RU").format(Math.round(n));
+};
+
+async function nominatimSearch(q) {
+  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=7&addressdetails=1&q=${encodeURIComponent(
+    q
+  )}`;
+  const res = await fetch(url, { headers: { "Accept-Language": "uz,ru,en" } });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data || []).map((x) => ({
+    id: x.place_id,
+    label: x.display_name,
+    lat: parseFloat(x.lat),
+    lng: parseFloat(x.lon),
+  }));
 }
 
-function RoutingMachine({ from, to, active }) {
-  const map = useMap();
-  const controlRef = useRef(null);
+async function nominatimReverse(lat, lng) {
+  const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
+  const res = await fetch(url, { headers: { "Accept-Language": "uz,ru,en" } });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data?.display_name || null;
+}
 
+async function osrmRoute(from, to) {
+  const url = `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson&alternatives=false&steps=false`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("route fetch failed");
+  const data = await res.json();
+  const r = data?.routes?.[0];
+  if (!r) throw new Error("no route");
+  const coords = r.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+  return {
+    coords,
+    distanceKm: (r.distance || 0) / 1000,
+    durationMin: (r.duration || 0) / 60,
+  };
+}
+
+/** Move map to center helper */
+function FlyTo({ center, zoom = 16 }) {
+  const map = useMap();
   useEffect(() => {
-    if (!map || !from || !to || !active) {
-      if (controlRef.current) map.removeControl(controlRef.current);
-      return;
+    if (center && Array.isArray(center)) {
+      map.flyTo(center, zoom, { animate: true, duration: 0.8 });
     }
-    controlRef.current = L.Routing.control({
-      waypoints: [L.latLng(from), L.latLng(to)],
-      lineOptions: { styles: [{ color: '#000', weight: 5, opacity: 0.6 }] },
-      createMarker: () => null,
-      addWaypoints: false,
-      show: false,
-      fitSelectedRoutes: true,
-      router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' })
-    }).addTo(map);
-    return () => { if (controlRef.current) map.removeControl(controlRef.current); };
-  }, [map, from, to, active]);
+  }, [center, zoom, map]);
   return null;
 }
 
-export default function ClientOrderCreate({ onBack }) {
-  // --- STATES ---
-  const [mode, setMode] = useState('main'); // main, searching, coming, arrived, ride, completed
-  const [userLoc, setUserLoc] = useState([42.4619, 59.6166]); // Nukus
-  const [destLoc, setDestLoc] = useState(null);
-  const [pickupAddr, setPickupAddr] = useState("Hozirgi joylashuv...");
-    const [destAddr, setDestAddr] = useState("");
-  const [destSearchVisible, setDestSearchVisible] = useState(false);
-  const [destQuery, setDestQuery] = useState('');
-  const [destResults, setDestResults] = useState([]);
-const [preStep, setPreStep] = useState('pick_dest'); // pick_dest | confirm
-const [cancelReasonVisible, setCancelReasonVisible] = useState(false);
-const [cancelReason, setCancelReason] = useState('');
-  const [selectedTariff, setSelectedTariff] = useState(TARIFFS[0]);
-  const [currentOrder, setCurrentOrder] = useState(null);
-  const [driver, setDriver] = useState(null);
-  const [driverLoc, setDriverLoc] = useState(null);
+/** Map center tracking while selecting pickup/dest (Yandex-like: pin fixed, map moves) */
+function CenterTracker({ enabled, onCenter }) {
+  const map = useMap();
+  const last = useRef({ lat: null, lng: null, t: 0 });
 
-  // Modals & UI
-  const [chatVisible, setChatVisible] = useState(false);
-  const [ratingVisible, setRatingVisible] = useState(false);
-
-  // --- INITIALIZATION ---
   useEffect(() => {
+    if (!enabled) return;
+
+    const onMoveEnd = () => {
+      const c = map.getCenter();
+      const now = Date.now();
+      // basic debounce
+      if (now - last.current.t < 250) return;
+      last.current = { lat: c.lat, lng: c.lng, t: now };
+      onCenter([c.lat, c.lng]);
+    };
+
+    map.on("moveend", onMoveEnd);
+    // fire once immediately
+    onMoveEnd();
+    return () => map.off("moveend", onMoveEnd);
+  }, [enabled, map, onCenter]);
+
+  return null;
+}
+
+export default function ClientOrderCreate() {
+  const [userLoc, setUserLoc] = useState([42.4602, 59.6166]); // Nukus fallback
+  const [pickup, setPickup] = useState({ latlng: null, address: "Hozirgi joylashuv..." });
+  const [dest, setDest] = useState({ latlng: null, address: "" });
+
+  const [selecting, setSelecting] = useState(null); // "pickup" | "dest" | null
+  const [drawerOpen, setDrawerOpen] = useState(true);
+
+  const [tariff, setTariff] = useState(TARIFFS[0]);
+
+  const [routeCoords, setRouteCoords] = useState([]);
+  const [distanceKm, setDistanceKm] = useState(null);
+  const [durationMin, setDurationMin] = useState(null);
+
+  const [pickupQuery, setPickupQuery] = useState("");
+  const [destQuery, setDestQuery] = useState("");
+  const [pickupSug, setPickupSug] = useState([]);
+  const [destSug, setDestSug] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  const [recentPlaces, setRecentPlaces] = useState([]);
+
+  /** seed recent places if empty */
+  const seedPlaces = useMemo(
+    () => [
+      { label: "Allayar Dosnazarov ko‘chasi", lat: 42.4615, lng: 59.6109, starred: true },
+      { label: "Spartak Stadium, Bustansaray ko‘chasi", lat: 42.4629, lng: 59.6232, starred: true },
+      { label: "Registon ko‘chasi", lat: 42.4549, lng: 59.6172, starred: false },
+    ],
+    []
+  );
+
+  /** Geolocation */
+  useEffect(() => {
+    let cancelled = false;
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(async (pos) => {
-        const p = [pos.coords.latitude, pos.coords.longitude];
-        setUserLoc(p);
-        const addr = await reverseGeocode(p);
-        setPickupAddr(addr);
-      });
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          if (cancelled) return;
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          setUserLoc([lat, lng]);
+          setPickup((p) => ({ ...p, latlng: [lat, lng] }));
+
+          // reverse to show readable pickup address
+          try {
+            const addr = await nominatimReverse(lat, lng);
+            if (!cancelled && addr) setPickup((p) => ({ ...p, address: addr }));
+          } catch {}
+        },
+        () => {
+          // ignore, keep fallback
+        },
+        { enableHighAccuracy: true, timeout: 9000 }
+      );
     }
-    checkExistingOrder();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const reverseGeocode = async (loc) => {
+  /** Load recent places (local + last orders) */
+  useEffect(() => {
+    (async () => {
+      // local
+      const raw = localStorage.getItem("recentPlaces_v1");
+      if (raw) {
+        try {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr) && arr.length) {
+            setRecentPlaces(arr.slice(0, 12));
+            return;
+          }
+        } catch {}
+      }
+      setRecentPlaces(seedPlaces);
+
+      // supabase (last orders)
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        const user = userData?.user;
+        if (!user) return;
+
+        const { data } = await supabase
+          .from("orders")
+          .select("pickup_location, dropoff_location, from_lat, from_lng, to_lat, to_lng, created_at")
+          .eq("client_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(12);
+
+        const mapped =
+          (data || [])
+            .map((o) => ({
+              label: o.dropoff_location || o.pickup_location,
+              lat: Number(o.to_lat || o.from_lat),
+              lng: Number(o.to_lng || o.from_lng),
+              starred: false,
+            }))
+            .filter((x) => x.label && Number.isFinite(x.lat) && Number.isFinite(x.lng)) || [];
+
+        if (mapped.length) {
+          // merge unique by label
+          const merged = [...seedPlaces];
+          for (const it of mapped) {
+            if (!merged.some((m) => m.label === it.label)) merged.push(it);
+          }
+          setRecentPlaces(merged.slice(0, 12));
+          localStorage.setItem("recentPlaces_v1", JSON.stringify(merged.slice(0, 12)));
+        }
+      } catch {
+        // ignore
+      }
+    })();
+  }, [seedPlaces]);
+
+  /** Route calculation */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!pickup.latlng || !dest.latlng) {
+        setRouteCoords([]);
+        setDistanceKm(null);
+        setDurationMin(null);
+        return;
+      }
+      try {
+        const r = await osrmRoute(pickup.latlng, dest.latlng);
+        if (cancelled) return;
+        setRouteCoords(r.coords);
+        setDistanceKm(r.distanceKm);
+        setDurationMin(r.durationMin);
+      } catch (e) {
+        if (!cancelled) {
+          setRouteCoords([]);
+          setDistanceKm(null);
+          setDurationMin(null);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [pickup.latlng, dest.latlng]);
+
+  const totalPrice = useMemo(() => {
+    if (!distanceKm) return tariff.base;
+    return tariff.base + distanceKm * tariff.perKm;
+  }, [distanceKm, tariff]);
+
+  /** Save to recents */
+  const pushRecent = useCallback(
+    (place) => {
+      if (!place?.label || !Number.isFinite(place.lat) || !Number.isFinite(place.lng)) return;
+      setRecentPlaces((prev) => {
+        const next = [place, ...prev.filter((p) => p.label !== place.label)].slice(0, 12);
+        localStorage.setItem("recentPlaces_v1", JSON.stringify(next));
+        return next;
+      });
+    },
+    [setRecentPlaces]
+  );
+
+  /** Center picked from map */
+  const handleCenterPicked = useCallback(
+    async (latlng) => {
+      if (!selecting) return;
+      try {
+        const addr = await nominatimReverse(latlng[0], latlng[1]);
+        if (selecting === "pickup") {
+          setPickup({ latlng, address: addr || "Tanlangan nuqta" });
+        } else {
+          setDest({ latlng, address: addr || "Tanlangan nuqta" });
+        }
+      } catch {
+        if (selecting === "pickup") setPickup((p) => ({ ...p, latlng }));
+        else setDest((d) => ({ ...d, latlng }));
+      }
+    },
+    [selecting]
+  );
+
+  /** Search */
+  const runSearch = useCallback(async (type, q) => {
+    const query = (q || "").trim();
+    if (query.length < 3) {
+      if (type === "pickup") setPickupSug([]);
+      else setDestSug([]);
+      return;
+    }
+    setSearchLoading(true);
     try {
-      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${loc[0]}&lon=${loc[1]}`);
-      const d = await r.json();
-      return d.display_name.split(',')[0] + ", " + (d.display_name.split(',')[1] || "");
-    } catch { return "Nukus shaxri"; }
-  };
-
-const haversineKm = (a, b) => {
-  const toRad = (x) => (x * Math.PI) / 180;
-  const R = 6371;
-  const dLat = toRad(b[0] - a[0]);
-  const dLon = toRad(b[1] - a[1]);
-  const lat1 = toRad(a[0]);
-  const lat2 = toRad(b[0]);
-  const s = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
-};
-
-const estimateEtaMin = useMemo(() => {
-  if (!destLoc) return null;
-  const km = haversineKm(userLoc, destLoc);
-  // Shaharda o'rtacha tezlik ~22 km/soat
-  const minutes = Math.max(3, Math.round((km / 22) * 60));
-  return minutes;
-}, [userLoc, destLoc]);
-
-const openDestSearch = () => {
-  setDestSearchVisible(true);
-  setDestQuery(destAddr || '');
-  setDestResults([]);
-};
-
-const searchDestination = async (q) => {
-  setDestQuery(q);
-  if (!q || q.trim().length < 3) {
-    setDestResults([]);
-    return;
-  }
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=7&q=${encodeURIComponent(q)}`;
-    const r = await fetch(url);
-    const d = await r.json();
-    setDestResults(Array.isArray(d) ? d : []);
-  } catch (e) {
-    console.error(e);
-    setDestResults([]);
-  }
-};
-
-const chooseDestination = async (item) => {
-  const loc = [parseFloat(item.lat), parseFloat(item.lon)];
-  setDestLoc(loc);
-  setDestAddr(item.display_name);
-  setDestSearchVisible(false);
-  setPreStep('confirm');
-};
-
-  const checkExistingOrder = async () => {
-    const activeId = localStorage.getItem('activeOrderId');
-    if (!activeId) return;
-    const { data } = await supabase.from('orders').select('*, drivers(*)').eq('id', activeId).single();
-    if (data && !['completed', 'cancelled'].includes(data.status)) {
-      setCurrentOrder(data);
-      syncStatus(data.status, data);
+      const res = await nominatimSearch(query);
+      if (type === "pickup") setPickupSug(res);
+      else setDestSug(res);
+    } finally {
+      setSearchLoading(false);
     }
-  };
+  }, []);
 
-  // --- REALTIME ---
-  useEffect(() => {
-    if (!currentOrder?.id) return;
-    const sub = supabase.channel(`live-${currentOrder.id}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${currentOrder.id}` }, (p) => {
-        syncStatus(p.new.status, p.new);
-      }).subscribe();
-    return () => supabase.removeChannel(sub);
-  }, [currentOrder]);
+  /** Pick from suggestion / recent */
+  const applyPlace = useCallback(
+    (type, place) => {
+      const latlng = [place.lat, place.lng];
+      if (type === "pickup") {
+        setPickup({ latlng, address: place.label });
+        setPickupQuery(place.label);
+      } else {
+        setDest({ latlng, address: place.label });
+        setDestQuery(place.label);
+      }
+      pushRecent({ label: place.label, lat: place.lat, lng: place.lng, starred: !!place.starred });
+      setSelecting(null);
+      setDrawerOpen(true);
+    },
+    [pushRecent]
+  );
 
-  useEffect(() => {
-    if (!driver?.id) return;
-    const sub = supabase.channel(`gps-${driver.id}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'drivers', filter: `id=eq.${driver.id}` }, (p) => {
-        if (p.new.lat) setDriverLoc([p.new.lat, p.new.lng]);
-      }).subscribe();
-    return () => supabase.removeChannel(sub);
-  }, [driver]);
+  const swapPoints = useCallback(() => {
+    if (!pickup.latlng && !dest.latlng) return;
+    const p = pickup;
+    const d = dest;
+    setPickup(d.latlng ? d : { ...p, address: p.address }); // keep if dest empty
+    setDest(p.latlng ? p : { ...d, address: d.address });
+    setPickupQuery(d.address || "");
+    setDestQuery(p.address || "");
+  }, [pickup, dest]);
 
-  const syncStatus = (status, data) => {
-    if (status === 'searching') setMode('searching');
-    if (status === 'accepted') { setMode('coming'); setDriver(data.drivers); }
-    if (status === 'arrived') setMode('arrived');
-    if (status === 'in_progress') setMode('ride');
-    if (status === 'completed') { setMode('completed'); setRatingVisible(true); }
-  };
-
-  // --- ACTIONS ---
-  const handleOrder = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data, error } = await supabase.from('orders').insert([{
-      client_id: user.id,
-      status: 'searching',
-      price: selectedTariff.basePrice,
-      service_type: selectedTariff.id,
-      pickup_location: pickupAddr,
-      dropoff_location: destAddr || "Belgilanmagan manzil",
-      from_lat: userLoc[0], from_lng: userLoc[1],
-      to_lat: destLoc ? destLoc[0] : userLoc[0], to_lng: destLoc ? destLoc[1] : userLoc[1]
-    }]).select().single();
-
-    if (!error) {
-      setCurrentOrder(data);
-      localStorage.setItem('activeOrderId', data.id);
-      setMode('searching');
+  /** Order action (creates order + keeps compatibility with your backend) */
+  const handleOrder = useCallback(async () => {
+    if (!pickup.latlng || !dest.latlng) {
+      message.error("Borish va yakuniy manzilni belgilang");
+      return;
     }
-  };
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData?.user;
+      if (!user) {
+        message.error("Avval tizimga kiring");
+        return;
+      }
 
-  const cancelOrder = async () => {
-  // Videodagidek: avval sababini so'raymiz
-  setCancelReasonVisible(true);
-};
+      const payload = {
+        client_id: user.id,
+        status: "searching",
+        price: Math.round(totalPrice),
+        service_type: tariff.id,
+        pickup_location: pickup.address || "Belgilanmagan manzil",
+        dropoff_location: dest.address || "Belgilanmagan manzil",
+        from_lat: pickup.latlng[0],
+        from_lng: pickup.latlng[1],
+        to_lat: dest.latlng[0],
+        to_lng: dest.latlng[1],
+        distance_km: distanceKm ? Number(distanceKm.toFixed(2)) : null,
+      };
 
-const confirmCancelOrder = async () => {
-  if (!currentOrder?.id) {
-    message.error("Buyurtma topilmadi");
-    setCancelReasonVisible(false);
-    return;
-  }
+      const { data, error } = await supabase.from("orders").insert([payload]).select().single();
+      if (error) throw error;
 
-  const { error } = await supabase
-    .from('orders')
-    .update({ status: 'cancelled', cancel_reason: cancelReason || null })
-    .eq('id', currentOrder.id);
+      localStorage.setItem("activeOrderId", data.id);
+      message.success("Buyurtma yuborildi");
+      // You can route to "searching" mode page if you have it; here we keep same screen
+    } catch (e) {
+      console.error(e);
+      message.error("Zakaz berishda xato");
+    }
+  }, [pickup, dest, tariff, totalPrice, distanceKm]);
 
-  if (error) {
-    console.error(error);
-    message.error("Bekor qilishda xatolik");
-    return;
-  }
-
-  localStorage.removeItem('activeOrderId');
-  setCurrentOrder(null);
-  setDriver(null);
-  setDriverLoc(null);
-  setMode('main');
-  setPreStep('pick_dest');
-  setDestLoc(null);
-  setDestAddr('');
-  setCancelReason('');
-  setCancelReasonVisible(false);
-};
-
+  /** UI helpers */
+  const bottomTitle = useMemo(() => {
+    if (!pickup.latlng || !dest.latlng) return "Manzilni tanlang";
+    const dist = distanceKm ? `${distanceKm.toFixed(1)} km` : "—";
+    const dur = durationMin ? `${Math.round(durationMin)} min` : "—";
+    return `${dist} • ${dur}`;
+  }, [pickup.latlng, dest.latlng, distanceKm, durationMin]);
 
   return (
-    <div className="yandex-container">
-      {/* MAP SECTION */}
-      <div className={`map-wrapper mode-${mode}`}>
-        <MapContainer center={userLoc} zoom={16} zoomControl={false} style={{ height: '100%' }}>
-          <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-          <MapFlyTo center={mode === 'coming' && driverLoc ? driverLoc : userLoc} />
-          
-          <Marker position={userLoc} icon={userIcon} />
-          {destLoc && <Marker position={destLoc} />}
-          {driverLoc && <Marker position={driverLoc} icon={carIcon} />}
+    <div className="yg-root">
+      {/* MAP */}
+      <div className="yg-map">
+        <MapContainer center={userLoc} zoom={16} zoomControl={false} style={{ height: "100%", width: "100%" }}>
+          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-          {destLoc && <RoutingMachine from={userLoc} to={destLoc} active={mode === 'main'} />}
+          <FlyTo center={selecting === "pickup" ? pickup.latlng || userLoc : selecting === "dest" ? dest.latlng || userLoc : null} />
+
+          <CenterTracker enabled={!!selecting} onCenter={handleCenterPicked} />
+
+          {pickup.latlng && !selecting && <Marker position={pickup.latlng} icon={pickupIcon} />}
+          {dest.latlng && !selecting && <Marker position={dest.latlng} icon={destIcon} />}
+
+          {routeCoords.length > 1 && (
+            <Polyline
+              positions={routeCoords}
+              pathOptions={{ color: "#00C853", weight: 6, opacity: 0.95, lineCap: "round" }}
+            />
+          )}
         </MapContainer>
 
-        <div className="top-nav">
-          <div className="nav-btn" onClick={onBack}>
-            <MenuOutlined />
-          </div>
-          <div className="right-stack">
-            <div className="nav-btn" onClick={() => setDestSearchVisible(true)} title="Qidirish">
-              <SearchOutlined />
+        {/* Center pin overlay */}
+        {selecting && (
+          <div className="yg-centerpin" aria-hidden>
+            <div
+              style={{ position: "relative", width: 70, height: 80 }}
+              dangerouslySetInnerHTML={{ __html: centerPinIcon(selecting) }}
+            />
+            <div className="yg-pinlabel">
+              {selecting === "pickup" ? "Qayerdan ketasiz?" : "Yakuniy nuqta"}
             </div>
           </div>
+        )}
+
+        {/* Top card (Yandex-like) */}
+        <div className="yg-topcard">
+          <Card className="yg-card" bodyStyle={{ padding: 12 }}>
+            <div className="yg-row">
+              <div className="yg-dot blue" />
+              <Text className="yg-addr">{pickup.address || "Qayerdan ketasiz?"}</Text>
+              <Button size="small" className="yg-mini" onClick={() => { setSelecting("pickup"); setDrawerOpen(false); }}>
+                Tanlash
+              </Button>
+            </div>
+
+            <div className="yg-row">
+              <div className="yg-dot red" />
+              <Input
+                value={destQuery}
+                onChange={(e) => {
+                  setDestQuery(e.target.value);
+                  runSearch("dest", e.target.value);
+                }}
+                onFocus={() => setDrawerOpen(true)}
+                placeholder="Qayerga borasiz?"
+                prefix={<SearchOutlined />}
+                className="yg-input"
+                allowClear
+              />
+              <Button
+                size="small"
+                className="yg-mini"
+                onClick={() => {
+                  setSelecting("dest");
+                  setDrawerOpen(false);
+                }}
+              >
+                Xaritadan
+              </Button>
+            </div>
+
+            <div className="yg-swap">
+              <Button icon={<SwapOutlined />} onClick={swapPoints} />
+            </div>
+          </Card>
         </div>
-
-        {mode === 'main' && preStep === 'pick_dest' && (
-          <>
-            <div className="floating-address">
-              <div className="row">
-                <EnvironmentOutlined />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="label">Tocka posadki</div>
-                  <div className="value">{pickupAddr || 'Hozirgi joylashuv'}</div>
-                </div>
-              </div>
-
-              <div className="divider" />
-
-              <div className="row" style={{ cursor: 'pointer' }} onClick={openDestSearch}>
-                <SearchOutlined />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="label">Punkt naznacheniya</div>
-                  <div className="value">{destAddr ? destAddr : 'Qayerga borasiz?'}</div>
-                </div>
-                <div className="pill">Karta</div>
-              </div>
-            </div>
-
-            <div className="center-pin">📍</div>
-          </>
-        )}
-
-        {mode === 'main' && preStep === 'confirm' && (
-          <div className="bottom-sheet">
-            <div className="sheet-handle" />
-
-            <div className="sheet-row">
-              <div className="sheet-left">
-                <EnvironmentOutlined />
-                <div className="sheet-addr">
-                  <div className="title">Pickup</div>
-                  <div className="main">{pickupAddr || 'Hozirgi joylashuv'}</div>
-                </div>
-              </div>
-              <Button className="small-btn">Pod&apos;yezd</Button>
-            </div>
-
-            <Divider style={{ margin: '6px 0' }} />
-
-            <div className="sheet-row" style={{ cursor: 'pointer' }} onClick={openDestSearch}>
-              <div className="sheet-left">
-                <SearchOutlined />
-                <div className="sheet-addr">
-                  <div className="title">Destination</div>
-                  <div className="main">{destAddr || 'Manzil tanlang'}</div>
-                </div>
-              </div>
-              <Button className="small-btn">+</Button>
-            </div>
-
-            <div className="tabs">
-              <div className="tab">Navigator</div>
-              <div className="tab">Transport</div>
-              <div className="tab active">Taksi</div>
-            </div>
-
-            <div className="tariff-scroll">
-              {TARIFFS.map((t) => (
-                <div
-                  key={t.id}
-                  className={`tariff-card ${selectedTariff.id === t.id ? 'active' : ''}`}
-                  onClick={() => setSelectedTariff(t)}
-                >
-                  <div className="tariff-top">
-                    <div className="tariff-name">{t.name}</div>
-                    <div className="tariff-eta">{t.eta || '5 min'}</div>
-                  </div>
-                  <div className="tariff-price">{t.basePrice}</div>
-                </div>
-              ))}
-            </div>
-
-            <Button className="order-btn" onClick={handleOrder}>
-              Zakazat&apos;
-            </Button>
-
-            <div className="payment-row">
-              <Space><WalletOutlined /> <span>Naqd</span></Space>
-              <span>Sozlamalar</span>
-            </div>
-          </div>
-        )}
-
-
-        {/* --- STEP 2: SEARCHING --- */}
-        {mode === 'searching' && (
-          <div className="searching-content">
-            <Title level={4}>Mashina qidirilmoqda...</Title>
-            <div className="loading-pulse"></div>
-            <Text type="secondary">Sizga eng yaqin haydovchi qidirilmoqda</Text>
-            <Button danger block className="cancel-btn" onClick={cancelOrder}>BEKOR QILISH</Button>
-          </div>
-        )}
-
-        {/* --- STEP 3: COMING / ARRIVED / RIDE --- */}
-        {['coming', 'arrived', 'ride'].includes(mode) && (
-          <div className="driver-card">
-            <div className="driver-main">
-              <Avatar size={64} src={driver?.avatar_url} icon={<UserOutlined />} className="driver-avatar" />
-              <div className="driver-info">
-                <Title level={4} style={{ margin: 0 }}>
-                  {driver?.first_name || "Haydovchi"} <StarFilled style={{ color: '#FFD400', fontSize: 14 }} /> 4.9
-                </Title>
-                <Text strong className="car-plate">{driver?.plate_number || "95 E 078 SA"}</Text>
-                <Text type="secondary" className="car-model">{driver?.car_model || "Oq Chevrolet Spark"}</Text>
-              </div>
-              <div className="eta-badge">
-                {mode === 'coming' ? '3 min' : mode === 'arrived' ? 'Keldi' : 'Safarda'}
-              </div>
-            </div>
-
-            <div className="action-grid">
-              <Button icon={<PhoneOutlined />} onClick={() => window.open(`tel:${driver?.phone}`)}>Qo'ng'iroq</Button>
-              <Button icon={<MessageOutlined />} onClick={() => setChatVisible(true)}>Chat</Button>
-              <Button icon={<SafetyOutlined />}>Xavfsizlik</Button>
-            </div>
-
-            {mode === 'arrived' && (
-              <div className="arrived-alert">Haydovchi yetib keldi! Chiqishingizni kutyapti.</div>
-            )}
-          </div>
-        )}
       </div>
 
-      {/* MODALS */}
-      <ChatComponent visible={chatVisible} orderId={currentOrder?.id} onClose={() => setChatVisible(false)} />
-      <RatingModal visible={ratingVisible} orderId={currentOrder?.id} onFinish={() => { setRatingVisible(false); setMode('main'); }} />
-
-      {/* CSS STYLES (Videodagi effektlar uchun) */}
-      <style>{`
-        .yandex-container { position: relative; height: 100vh; background: #f3f4f6; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto; }
-        .map-wrapper { height: 100%; }
-        .leaflet-container { height: 100% !important; width: 100% !important; }
-
-        .top-nav { position: absolute; top: 14px; left: 14px; right: 14px; z-index: 1200; display: flex; justify-content: space-between; pointer-events: none; }
-        .top-nav .nav-btn { pointer-events: all; width: 42px; height: 42px; border-radius: 999px; background: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.12); display:flex; align-items:center; justify-content:center; }
-        .top-nav .right-stack { display:flex; gap:10px; }
-
-        .floating-address { position: absolute; top: 70px; left: 14px; right: 14px; z-index: 1200; background: #fff; border-radius: 18px; box-shadow: 0 10px 30px rgba(0,0,0,.14); padding: 12px 14px; }
-        .floating-address .row { display:flex; align-items:center; gap:12px; }
-        .floating-address .label { font-size: 12px; color:#9aa0a6; line-height: 1; margin-bottom: 3px; }
-        .floating-address .value { font-size: 16px; font-weight: 700; color:#111827; }
-        .floating-address .divider { height: 1px; background:#eef0f2; margin: 10px 0; }
-        .pill { background:#f3f4f6; border-radius: 999px; padding: 8px 12px; font-weight: 700; color:#111827; }
-
-        .bottom-sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1300; background: #fff; border-radius: 22px 22px 0 0; box-shadow: 0 -10px 30px rgba(0,0,0,.18); padding: 10px 16px 14px; }
-        .sheet-handle { width: 44px; height: 5px; background: #e5e7eb; border-radius: 999px; margin: 4px auto 10px; }
-        .sheet-row { display:flex; align-items:center; justify-content: space-between; gap: 10px; padding: 10px 0; }
-        .sheet-left { display:flex; align-items:center; gap: 12px; min-width: 0; }
-        .sheet-addr { min-width: 0; }
-        .sheet-addr .title { font-size: 12px; color:#9aa0a6; line-height: 1; }
-        .sheet-addr .main { font-size: 18px; font-weight: 800; color:#111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .small-btn { border-radius: 999px !important; height: 36px !important; padding: 0 14px !important; font-weight: 800 !important; }
-        .tabs { display:flex; gap: 10px; align-items: center; justify-content: center; margin-top: 6px; }
-        .tabs .tab { padding: 10px 14px; border-radius: 999px; color:#6b7280; font-weight: 800; }
-        .tabs .tab.active { background:#f3f4f6; color:#111827; }
-        .tariff-scroll { display:flex; gap: 10px; overflow-x: auto; padding: 12px 0; }
-        .tariff-card { min-width: 160px; border-radius: 16px; padding: 12px; background:#fff; border: 1px solid #eef0f2; box-shadow: 0 8px 18px rgba(0,0,0,.06); cursor:pointer; }
-        .tariff-card.active { border-color:#111827; }
-        .tariff-top { display:flex; align-items:center; justify-content: space-between; }
-        .tariff-name { font-weight: 900; font-size: 16px; }
-        .tariff-eta { font-weight: 900; font-size: 14px; color:#6b7280; }
-        .tariff-price { margin-top: 8px; font-weight: 900; font-size: 22px; }
-        .order-btn { width: 100%; height: 54px; border-radius: 18px; font-weight: 900; font-size: 18px; background: #f5d400; border: none; box-shadow: 0 16px 28px rgba(0,0,0,.12); }
-        .order-btn:hover { background: #f3cf00 !important; }
-        .payment-row { display:flex; align-items:center; justify-content: space-between; margin-top: 10px; color:#111827; font-weight: 700; }
-
-        /* map pin (videodagi kabi markazda) */
-        .center-pin { position:absolute; left:50%; top:50%; transform: translate(-50%, -100%); z-index: 1250; pointer-events:none; font-size: 34px; filter: drop-shadow(0 8px 14px rgba(0,0,0,.35)); }
-
-        .yandex-container { height: 100vh; background: #000; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto; }
-        .map-wrapper { height: 70%; transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
-        .map-wrapper.mode-coming, .map-wrapper.mode-searching { height: 55%; }
-        
-        .top-nav { position: absolute; top: 15px; left: 15px; right: 15px; z-index: 1000; display: flex; justify-content: space-between; }
-        .search-bar-mini { background: #fff; padding: 8px 15px; border-radius: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; gap: 8px; align-items: center; font-weight: 600; }
-
-        .bottom-sheet { position: absolute; bottom: 0; left: 0; right: 0; background: #fff; border-radius: 25px 25px 0 0; padding: 15px 20px; z-index: 1100; transition: min-height 0.4s; min-height: 30%; }
-        .sheet-handle { width: 40px; height: 5px; background: #e0e0e0; border-radius: 10px; margin: 0 auto 15px; }
-
-        .address-inputs { background: #f5f5f5; border-radius: 15px; padding: 10px; }
-        .input-row { display: flex; align-items: center; gap: 12px; padding: 8px; }
-        .dot { width: 8px; height: 8px; border-radius: 50%; }
-        .dot.from { background: #1890ff; }
-        .dot.to { background: #ff4d4f; }
-        .addr-text { font-size: 15px; font-weight: 500; color: #333; }
-        .addr-input { padding: 0; font-size: 16px; font-weight: 600; }
-
-        .tariff-selector { display: flex; gap: 10px; overflow-x: auto; margin: 20px 0; padding-bottom: 5px; }
-        .tariff-item { min-width: 90px; text-align: center; padding: 12px; border-radius: 15px; border: 2px solid #f0f0f0; transition: 0.3s; }
-        .tariff-item.active { border-color: #FFD400; background: #FFFBE6; }
-        .tariff-icon { font-size: 24px; margin-bottom: 5px; }
-        .tariff-name { font-weight: 700; font-size: 13px; }
-        .tariff-price { font-size: 12px; color: #888; }
-
-        .order-btn { width: 100%; height: 55px; background: #FFD400; border: none; border-radius: 15px; font-size: 17px; font-weight: 800; color: #000; box-shadow: 0 4px 15px rgba(255,212,0,0.3); }
-        .payment-row { display: flex; justify-content: space-between; margin-top: 15px; color: #888; font-weight: 600; font-size: 13px; }
-
-        .searching-content { text-align: center; padding: 30px 0; }
-        .loading-pulse { width: 60px; height: 60px; background: #FFD400; border-radius: 50%; margin: 20px auto; animation: pulse-ring 1.5s infinite; }
-        .cancel-btn { height: 50px; border-radius: 15px; margin-top: 25px; font-weight: 700; }
-
-        .driver-card { padding: 5px 0; }
-        .driver-main { display: flex; align-items: center; gap: 15px; margin-bottom: 20px; position: relative; }
-        .driver-avatar { border: 3px solid #FFD400; }
-        .car-plate { display: block; background: #f0f0f0; padding: 2px 8px; border-radius: 5px; width: fit-content; margin: 4px 0; font-size: 15px; letter-spacing: 1px; }
-        .eta-badge { position: absolute; right: 0; top: 0; background: #000; color: #fff; padding: 5px 12px; border-radius: 12px; font-weight: 800; font-size: 12px; }
-        .action-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
-        .action-grid button { height: 45px; border-radius: 12px; font-weight: 600; font-size: 12px; }
-        .arrived-alert { margin-top: 15px; background: #f6ffed; border: 1px solid #b7eb8f; color: #52c41a; padding: 10px; border-radius: 10px; text-align: center; font-weight: 700; }
-
-        @keyframes pulse-ring { 
-          0% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(255, 212, 0, 0.7); } 
-          70% { transform: scale(1); box-shadow: 0 0 0 20px rgba(255, 212, 0, 0); } 
-          100% { transform: scale(0.8); } 
-        }
-        .user-marker-pulse { width: 16px; height: 16px; background: #1890ff; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 10px rgba(24,144,255,0.5); animation: pulse-blue 2s infinite; }
-        @keyframes pulse-blue { 0% { box-shadow: 0 0 0 0 rgba(24,144,255,0.4); } 70% { box-shadow: 0 0 0 15px rgba(24,144,255,0); } 100% { box-shadow: 0 0 0 0 rgba(24,144,255,0); } }
-        .smooth-car-marker { transition: all 1.5s linear; }
-        .leaflet-routing-container { display: none !important; }
-      
-.addr-text.placeholder { color: rgba(0,0,0,0.55); }
-.mini-info-row { display: flex; justify-content: space-between; padding: 10px 6px 6px; font-size: 13px; }
-.fav-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
-.fav-item { background: rgba(0,0,0,0.04); border-radius: 14px; padding: 12px; display: flex; gap: 10px; align-items: center; cursor: pointer; }
-.hint-row { margin-top: 10px; padding: 0 6px; }
-`}</style>
-    
-{/* DESTINATION SEARCH (videodagi "Tochka naznacheniya") */}
-<Modal
-  open={destSearchVisible}
-  title="To'xtash manzili"
-  onCancel={() => setDestSearchVisible(false)}
-  footer={null}
-  destroyOnClose
->
-  <Input
-    value={destQuery}
-    onChange={(e) => searchDestination(e.target.value)}
-    placeholder="Manzilni yozing..."
-    prefix={<SearchOutlined />}
-    autoFocus
-  />
-
-  <div style={{ marginTop: 12 }}>
-    <List
-      bordered
-      dataSource={destResults}
-      locale={{ emptyText: destQuery?.trim()?.length >= 3 ? "Topilmadi" : "Kamida 3 ta harf yozing" }}
-      renderItem={(item) => (
-        <List.Item onClick={() => chooseDestination(item)} style={{ cursor: 'pointer' }}>
-          <EnvironmentOutlined style={{ marginRight: 8 }} />
-          <div style={{ lineHeight: 1.2 }}>
-            <div style={{ fontWeight: 600 }}>{(item.display_name || '').split(',')[0]}</div>
-            <div style={{ fontSize: 12, opacity: 0.75 }}>{item.display_name}</div>
+      {/* Bottom sheet */}
+      <Drawer
+        open={drawerOpen && !selecting}
+        onClose={() => setDrawerOpen(false)}
+        placement="bottom"
+        height={380}
+        bodyStyle={{ padding: 12 }}
+        mask={false}
+        className="yg-drawer"
+        title={
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <EnvironmentOutlined />
+            <span>{bottomTitle}</span>
           </div>
-        </List.Item>
-      )}
-    />
-  </div>
-</Modal>
-
-{/* CANCEL REASON (videodagidek) */}
-<Modal
-  open={cancelReasonVisible}
-  title="Nega bekor qilyapsiz?"
-  onCancel={() => { setCancelReasonVisible(false); setCancelReason(''); }}
-  onOk={confirmCancelOrder}
-  okText="Tayyor"
-  cancelText="Yopish"
-  destroyOnClose
->
-  <List
-    dataSource={[
-      "Haydovchi uzoq",
-      "Narx qimmat",
-      "Manzil o'zgardi",
-      "Boshqa taxi topdim",
-      "Boshqa sabab"
-    ]}
-    renderItem={(r) => (
-      <List.Item
-        onClick={() => setCancelReason(r)}
-        style={{
-          cursor: 'pointer',
-          borderRadius: 8,
-          marginBottom: 6,
-          background: cancelReason === r ? 'rgba(24,144,255,0.08)' : 'transparent'
-        }}
+        }
       >
-        <span style={{ fontWeight: cancelReason === r ? 600 : 400 }}>{r}</span>
-      </List.Item>
-    )}
-  />
-  <Input.TextArea
-    value={cancelReason && !["Haydovchi uzoq","Narx qimmat","Manzil o'zgardi","Boshqa taxi topdim","Boshqa sabab"].includes(cancelReason) ? cancelReason : ''}
-    onChange={(e) => setCancelReason(e.target.value)}
-    placeholder="Izoh (ixtiyoriy)"
-    rows={3}
-    style={{ marginTop: 10 }}
-  />
-</Modal>
-</div>
-</div>
+        {/* Recent places */}
+        <div className="yg-section">
+          <div className="yg-section-title">Oldingi manzillar</div>
+          <List
+            size="small"
+            dataSource={recentPlaces}
+            locale={{ emptyText: "Hali manzillar yo‘q" }}
+            renderItem={(item) => (
+              <List.Item
+                className="yg-place"
+                onClick={() => applyPlace("dest", item)}
+                style={{ cursor: "pointer" }}
+              >
+                <Space>
+                  {item.starred ? <StarFilled style={{ color: "#FFD400" }} /> : <EnvironmentOutlined />}
+                  <span className="yg-place-text">{item.label}</span>
+                </Space>
+              </List.Item>
+            )}
+          />
+        </div>
+
+        {/* Destination search suggestions */}
+        {(destSug?.length > 0 || searchLoading) && (
+          <div className="yg-section">
+            <div className="yg-section-title">Qidiruv natijalari</div>
+            <List
+              size="small"
+              loading={searchLoading}
+              dataSource={destSug}
+              renderItem={(item) => (
+                <List.Item className="yg-place" onClick={() => applyPlace("dest", item)} style={{ cursor: "pointer" }}>
+                  <Space>
+                    <SearchOutlined />
+                    <span className="yg-place-text">{item.label}</span>
+                  </Space>
+                </List.Item>
+              )}
+            />
+          </div>
+        )}
+
+        {/* Tariffs */}
+        <div className="yg-tariffs">
+          {TARIFFS.map((t) => {
+            const active = t.id === tariff.id;
+            const pricePreview = distanceKm ? t.base + distanceKm * t.perKm : t.base;
+            return (
+              <div
+                key={t.id}
+                className={`yg-tariff ${active ? "active" : ""}`}
+                onClick={() => setTariff(t)}
+              >
+                <div className="yg-tariff-name">{t.name}</div>
+                <div className="yg-tariff-sub">
+                  <ClockCircleOutlined /> {t.eta}
+                </div>
+                <div className="yg-tariff-price">
+                  <WalletOutlined /> {fmtMoney(pricePreview)} so‘m
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Order button */}
+        <div className="yg-orderbar">
+          <div className="yg-total">
+            <div className="yg-total-label">Jami</div>
+            <div className="yg-total-value">{fmtMoney(totalPrice)} so‘m</div>
+          </div>
+          <Button
+            type="primary"
+            size="large"
+            className="yg-orderbtn"
+            disabled={!pickup.latlng || !dest.latlng}
+            onClick={handleOrder}
+          >
+            Zakaz berish
+          </Button>
+        </div>
+      </Drawer>
+
+      <style>{`
+        .yg-root { height: 100vh; width: 100%; background:#000; overflow:hidden; }
+        .yg-map { position: relative; height: 100%; width: 100%; }
+        .yg-topcard { position:absolute; left:16px; right:16px; top:14px; z-index: 500; }
+        .yg-card { border-radius: 18px; box-shadow: 0 12px 30px rgba(0,0,0,.18); }
+        .yg-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; position:relative; }
+        .yg-row:last-child { margin-bottom:0; }
+        .yg-dot { width:10px; height:10px; border-radius:50%; flex: 0 0 10px; }
+        .yg-dot.blue { background:#1677ff; }
+        .yg-dot.red { background:#ff4d4f; }
+        .yg-addr { flex:1; font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .yg-input { flex:1; border-radius: 12px; }
+        .yg-mini { border-radius: 12px; }
+        .yg-swap { position:absolute; right:8px; top:46px; }
+        .yg-swap button { border-radius: 12px; }
+
+        .yg-centerpin { position:absolute; left:50%; top:50%; transform:translate(-50%,-68%); z-index: 600; display:flex; flex-direction:column; align-items:center; gap:10px; pointer-events:none; }
+        .yg-pinlabel { background: rgba(17,17,17,.85); color:#fff; padding:6px 10px; border-radius: 12px; font-weight:600; font-size:12px; box-shadow:0 10px 24px rgba(0,0,0,.25); }
+
+        .yg-drawer .ant-drawer-content { border-top-left-radius: 22px; border-top-right-radius: 22px; }
+        .yg-drawer .ant-drawer-header { padding: 10px 12px; }
+        .yg-section { margin-bottom: 12px; }
+        .yg-section-title { font-weight:700; margin-bottom: 6px; }
+        .yg-place { border-radius: 12px; }
+        .yg-place:hover { background: rgba(0,0,0,.03); }
+        .yg-place-text { display:block; max-width: 100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+        .yg-tariffs { display:flex; gap:10px; overflow-x:auto; padding-bottom: 8px; margin-top: 8px; }
+        .yg-tariff { min-width: 150px; border:1px solid rgba(0,0,0,.08); border-radius: 16px; padding: 10px; cursor:pointer; }
+        .yg-tariff.active { border-color:#111; box-shadow:0 10px 24px rgba(0,0,0,.12); }
+        .yg-tariff-name { font-weight:800; }
+        .yg-tariff-sub { color: rgba(0,0,0,.65); font-size:12px; margin-top:4px; display:flex; gap:6px; align-items:center; }
+        .yg-tariff-price { margin-top:8px; font-weight:800; display:flex; gap:6px; align-items:center; }
+
+        .yg-orderbar { margin-top: 10px; display:flex; align-items:center; justify-content:space-between; gap: 12px; }
+        .yg-total-label { color: rgba(0,0,0,.65); font-weight:700; font-size:12px; }
+        .yg-total-value { font-weight:900; font-size:18px; }
+        .yg-orderbtn { border-radius: 18px; background:#FFD400; border-color:#FFD400; color:#111; font-weight:900; padding: 0 18px; }
+        .yg-orderbtn[disabled] { background: #f5f5f5 !important; border-color:#f5f5f5 !important; color: rgba(0,0,0,.35) !important; }
+
+        /* Leaflet tweaks */
+        .leaflet-control-container { display:none; }
+      `}</style>
+    </div>
   );
 }

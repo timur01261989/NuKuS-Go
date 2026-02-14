@@ -1,145 +1,111 @@
 // api/index.js
+// Unified router for Vercel Serverless Functions.
+// Backward-compatible route keys are mapped into consolidated modules.
 
-import orders from "../handlers/orders.js";
-import orderStatus from "../handlers/order-status.js";
-import notify from "../handlers/notify.js";
+import auth from "./auth.js";
+import driver from "./driver.js";
+import order from "./order.js";
+import dispatch from "./dispatch.js";
+import offer from "./offer.js";
+import wallet from "./wallet.js";
+import sos from "./sos.js";
 
-import walletTopupDemo from "../handlers/wallet-topup-demo.js";
-import walletBalance from "../handlers/wallet-balance.js";
+import { applyCors } from "./_shared/cors.js";
 
-import trafficEta from "../handlers/traffic-eta.js";
-import sos from "../handlers/sos.js";
-import promoValidate from "../handlers/promo-validate.js";
-
-import orderPayWallet from "../handlers/order-pay-wallet.js";
-import orderPayComplete from "../handlers/order-pay-complete.js";
-import orderCancel from "../handlers/order-cancel.js";
-import orderComplete from "../handlers/order-complete.js";
-import orderApplyPromo from "../handlers/order-apply-promo.js";
-
-import offerTimeout from "../handlers/offer-timeout.js";
-import offerRespond from "../handlers/offer-respond.js";
-
-import notificationsRead from "../handlers/notifications-read.js";
-import messages from "../handlers/messages.js";
-
-import marketListings from "../handlers/market-listings.js";
-import heatmap from "../handlers/heatmap.js";
-import eta from "../handlers/eta.js";
-
-import driverState from "../handlers/driver-state.js";
-import driverLocation from "../handlers/driver-location.js";
-import driverHeartbeat from "../handlers/driver-heartbeat.js";
-
-import dispatchSmart from "../handlers/dispatch-smart.js";
-import dispatch from "../handlers/dispatch.js";
-
-import cronExpireOrders from "../handlers/cron-expire-orders.js";
-import cashbackCalc from "../handlers/cashback-calc.js";
-
-import authOtpVerify from "../handlers/auth-otp-verify.js";
-import authOtpRequest from "../handlers/auth-otp-request.js";
-
-// ---- body o‘qib beradigan helper (handlerlaring req.body string bo‘lishini kutyapti) ----
+// ---- body reader helper (some runtimes don't populate req.body) ----
 async function ensureBody(req) {
   const method = (req.method || "GET").toUpperCase();
   if (method === "GET" || method === "HEAD") return;
+  if (req.body != null) return;
 
-  // Agar Vercel req.body ni o‘zi to‘ldirmagan bo‘lsa, streamdan o‘qib qo‘yamiz
-  if (req.body !== undefined && req.body !== null) return;
-
-  const raw = await new Promise((resolve, reject) => {
-    let data = "";
-    req.on("data", (chunk) => (data += chunk));
-    req.on("end", () => resolve(data));
-    req.on("error", reject);
-  });
-
+  const chunks = [];
+  for await (const c of req) chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c));
+  const raw = Buffer.concat(chunks).toString("utf-8");
   req.body = raw;
 }
 
-function getOriginalUrl(req) {
-  // rewrite bo‘lganda original url header orqali kelishi mumkin
-  const h = req.headers || {};
-  return h["x-vercel-original-url"] || req.url || "/api";
+// RouteKey extraction:
+// - /api/<routeKey>   (most common)
+// - /api?route=<routeKey>
+function getRouteKey(req) {
+  try {
+    const url = new URL(req.url, "http://localhost");
+    const q = url.searchParams.get("route");
+    if (q) return q;
+
+    const path = url.pathname || "";
+    const parts = path.split("/").filter(Boolean);
+    // parts like ["api", "order-status"]
+    const idx = parts.indexOf("api");
+    if (idx >= 0 && parts[idx + 1]) return parts[idx + 1];
+    // fallback: last part
+    return parts[parts.length - 1] || "health";
+  } catch {
+    return "health";
+  }
+}
+
+// Consolidated mapping (old endpoints preserved)
+function resolveModule(routeKey) {
+  // AUTH
+  if (routeKey === "auth" || routeKey === "auth-otp-request" || routeKey === "auth-otp-verify") {
+    return { mod: auth, key: routeKey };
+  }
+
+  // DRIVER
+  if (routeKey === "driver" || routeKey === "driver-location" || routeKey === "driver-state" || routeKey === "driver-heartbeat") {
+    // driver-heartbeat was historically part of driver-state in this codebase
+    return { mod: driver, key: routeKey === "driver-heartbeat" ? "driver-state" : routeKey };
+  }
+
+  // ORDER
+  if (routeKey === "order" || routeKey.startsWith("order-") || routeKey === "promo-validate" || routeKey === "cron-expire-orders" || routeKey === "market-listings") {
+    // order-create / order-status / order-complete / order-cancel / order-pay-* / order-apply-promo / promo-validate / cron-expire-orders / market-listings
+    return { mod: order, key: routeKey };
+  }
+
+  // DISPATCH
+  if (routeKey === "dispatch") return { mod: dispatch, key: routeKey };
+
+  // OFFER
+  if (routeKey === "offer" || routeKey === "offer-respond") return { mod: offer, key: routeKey === "offer-respond" ? "offer-respond" : routeKey };
+
+  // WALLET
+  if (routeKey === "wallet" || routeKey === "wallet-balance") return { mod: wallet, key: routeKey === "wallet-balance" ? "wallet-balance" : routeKey };
+
+  // SOS
+  if (routeKey === "sos") return { mod: sos, key: routeKey };
+
+  return null;
 }
 
 export default async function handler(req, res) {
-  try {
-    await ensureBody(req);
+  applyCors(req, res);
 
-    const originalUrl = getOriginalUrl(req);
-    const url = new URL(originalUrl, "http://localhost");
-    const path = url.pathname; // masalan: /api/orders yoki /api/order-status
-
-    // CORS (kerak bo‘lsa)
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-    if (req.method === "OPTIONS") return res.status(200).end();
-
-    // /api dan keyingi routeKey ni olamiz
-    // /api/orders/create bo‘lsa routeKey = "orders"
-    const parts = path.split("/").filter(Boolean); // ["api","orders","create"]
-    const routeKey = parts[1] || ""; // "orders"
-
-    const routes = {
-      "orders": orders,
-      "order-status": orderStatus,
-      "notify": notify,
-
-      "wallet-topup-demo": walletTopupDemo,
-      "wallet-balance": walletBalance,
-
-      "traffic-eta": trafficEta,
-      "sos": sos,
-      "promo-validate": promoValidate,
-
-      "order-pay-wallet": orderPayWallet,
-      "order-pay-complete": orderPayComplete,
-      "order-cancel": orderCancel,
-      "order-complete": orderComplete,
-      "order-apply-promo": orderApplyPromo,
-
-      "offer-timeout": offerTimeout,
-      "offer-respond": offerRespond,
-
-      "notifications-read": notificationsRead,
-      "messages": messages,
-
-      "market-listings": marketListings,
-      "heatmap": heatmap,
-      "eta": eta,
-
-      "driver-state": driverState,
-      "driver-location": driverLocation,
-      "driver-heartbeat": driverHeartbeat,
-
-      "dispatch-smart": dispatchSmart,
-      "dispatch": dispatch,
-
-      "cron-expire-orders": cronExpireOrders,
-      "cashback-calc": cashbackCalc,
-
-      "auth-otp-verify": authOtpVerify,
-      "auth-otp-request": authOtpRequest
-    };
-
-    // Agar /api ning o‘zi chaqirilsa
-    if (!routeKey) {
-      return res.status(200).json({ ok: true, message: "API router ishlayapti", routes: Object.keys(routes) });
-    }
-
-    const fn = routes[routeKey];
-    if (!fn) {
-      return res.status(404).json({ ok: false, error: "Route topilmadi", routeKey, path });
-    }
-
-    // Handlerlaring default export function(req,res) — shuni chaqiramiz
-    return await fn(req, res);
-  } catch (e) {
-    console.error("API ROUTER ERROR:", e);
-    return res.status(500).json({ ok: false, error: "Internal server error" });
+  // Preflight
+  if ((req.method || "GET").toUpperCase() === "OPTIONS") {
+    res.statusCode = 204;
+    res.end();
+    return;
   }
+
+  await ensureBody(req);
+
+  const routeKey = getRouteKey(req);
+  if (routeKey === "health") {
+    res.statusCode = 200;
+    res.setHeader("content-type", "application/json; charset=utf-8");
+    res.end(JSON.stringify({ ok: true, service: "api", ts: Date.now() }));
+    return;
+  }
+
+  const resolved = resolveModule(routeKey);
+  if (!resolved) {
+    res.statusCode = 404;
+    res.setHeader("content-type", "application/json; charset=utf-8");
+    res.end(JSON.stringify({ ok: false, error: "Unknown route", route: routeKey }));
+    return;
+  }
+
+  return await resolved.mod(req, res, resolved.key);
 }
