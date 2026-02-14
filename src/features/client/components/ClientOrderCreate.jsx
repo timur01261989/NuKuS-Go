@@ -282,82 +282,104 @@ const confirmCancelOrder = async () => {
         </MapContainer>
 
         <div className="top-nav">
-          <Button icon={<MenuOutlined />} shape="circle" onClick={onBack} />
-          {mode === 'main' && (
-  <div className="content-fade">
-    {/* PICKUP + DEST (videodagidek) */}
-    <div className="address-inputs">
-      <div className="input-row">
-        <div className="dot from"></div>
-        <div className="addr-text">{pickupAddr}</div>
-      </div>
-
-      <Divider style={{ margin: '8px 0' }} />
-
-      <div className="input-row highlight" onClick={openDestSearch}>
-        <div className="dot to"></div>
-        <div className="addr-text placeholder">
-          {destAddr ? destAddr : "Qayerga borasiz?"}
-        </div>
-        <SearchOutlined style={{ opacity: 0.6 }} />
-      </div>
-    </div>
-
-    {/* Videoda: dest tanlangach tarif + zakaz */}
-    {destLoc ? (
-      <>
-        <div className="mini-info-row">
-          <Space size={12}>
-            <ClockCircleOutlined />
-            <span>{estimateEtaMin ? `${estimateEtaMin} daq. atrofida` : 'Yaqin'}</span>
-          </Space>
-          <Space size={12}>
-            <SafetyOutlined />
-            <span>Xavfsiz</span>
-          </Space>
-        </div>
-
-        <div className="tariff-selector">
-          {TARIFFS.map(t => (
-            <div
-              key={t.id}
-              className={`tariff-item ${selectedTariff.id === t.id ? 'active' : ''}`}
-              onClick={() => setSelectedTariff(t)}
-            >
-              <div className="tariff-icon">🚖</div>
-              <div className="tariff-name">{t.name}</div>
-              <div className="tariff-price">{t.basePrice}</div>
+          <div className="nav-btn" onClick={onBack}>
+            <MenuOutlined />
+          </div>
+          <div className="right-stack">
+            <div className="nav-btn" onClick={() => setDestSearchVisible(true)} title="Qidirish">
+              <SearchOutlined />
             </div>
-          ))}
-        </div>
-
-        <Button className="order-btn" onClick={handleOrder}>
-          Buyurtma berish
-        </Button>
-
-        <div className="payment-row">
-          <Space><WalletOutlined /> <span>Naqd</span></Space>
-          <span>Kommentariya &gt;</span>
-        </div>
-      </>
-    ) : (
-      <>
-        <div className="fav-list">
-          <div className="fav-item" onClick={() => { setDestAddr("Uy"); openDestSearch(); }}>
-            <StarFilled style={{ color: '#fadb14' }} /> <span>Uy</span>
-          </div>
-          <div className="fav-item" onClick={() => { setDestAddr("Ish"); openDestSearch(); }}>
-            <StarFilled style={{ color: '#fadb14' }} /> <span>Ish</span>
           </div>
         </div>
 
-        <div className="hint-row">
-          <Text type="secondary">Manzilni tanlang — keyin tarif va narx chiqadi</Text>
-        </div>
-      </>
-    )}
-  </div>
-)}
+        {mode === 'main' && preStep === 'pick_dest' && (
+          <>
+            <div className="floating-address">
+              <div className="row">
+                <EnvironmentOutlined />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="label">Tocka posadki</div>
+                  <div className="value">{pickupAddr || 'Hozirgi joylashuv'}</div>
+                </div>
+              </div>
+
+              <div className="divider" />
+
+              <div className="row" style={{ cursor: 'pointer' }} onClick={openDestSearch}>
+                <SearchOutlined />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="label">Punkt naznacheniya</div>
+                  <div className="value">{destAddr ? destAddr : 'Qayerga borasiz?'}</div>
+                </div>
+                <div className="pill">Karta</div>
+              </div>
+            </div>
+
+            <div className="center-pin">📍</div>
+          </>
+        )}
+
+        {mode === 'main' && preStep === 'confirm' && (
+          <div className="bottom-sheet">
+            <div className="sheet-handle" />
+
+            <div className="sheet-row">
+              <div className="sheet-left">
+                <EnvironmentOutlined />
+                <div className="sheet-addr">
+                  <div className="title">Pickup</div>
+                  <div className="main">{pickupAddr || 'Hozirgi joylashuv'}</div>
+                </div>
+              </div>
+              <Button className="small-btn">Pod&apos;yezd</Button>
+            </div>
+
+            <Divider style={{ margin: '6px 0' }} />
+
+            <div className="sheet-row" style={{ cursor: 'pointer' }} onClick={openDestSearch}>
+              <div className="sheet-left">
+                <SearchOutlined />
+                <div className="sheet-addr">
+                  <div className="title">Destination</div>
+                  <div className="main">{destAddr || 'Manzil tanlang'}</div>
+                </div>
+              </div>
+              <Button className="small-btn">+</Button>
+            </div>
+
+            <div className="tabs">
+              <div className="tab">Navigator</div>
+              <div className="tab">Transport</div>
+              <div className="tab active">Taksi</div>
+            </div>
+
+            <div className="tariff-scroll">
+              {TARIFFS.map((t) => (
+                <div
+                  key={t.id}
+                  className={`tariff-card ${selectedTariff.id === t.id ? 'active' : ''}`}
+                  onClick={() => setSelectedTariff(t)}
+                >
+                  <div className="tariff-top">
+                    <div className="tariff-name">{t.name}</div>
+                    <div className="tariff-eta">{t.eta || '5 min'}</div>
+                  </div>
+                  <div className="tariff-price">{t.basePrice}</div>
+                </div>
+              ))}
+            </div>
+
+            <Button className="order-btn" onClick={handleOrder}>
+              Zakazat&apos;
+            </Button>
+
+            <div className="payment-row">
+              <Space><WalletOutlined /> <span>Naqd</span></Space>
+              <span>Sozlamalar</span>
+            </div>
+          </div>
+        )}
+
 
         {/* --- STEP 2: SEARCHING --- */}
         {mode === 'searching' && (
@@ -405,6 +427,46 @@ const confirmCancelOrder = async () => {
 
       {/* CSS STYLES (Videodagi effektlar uchun) */}
       <style>{`
+        .yandex-container { position: relative; height: 100vh; background: #f3f4f6; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto; }
+        .map-wrapper { height: 100%; }
+        .leaflet-container { height: 100% !important; width: 100% !important; }
+
+        .top-nav { position: absolute; top: 14px; left: 14px; right: 14px; z-index: 1200; display: flex; justify-content: space-between; pointer-events: none; }
+        .top-nav .nav-btn { pointer-events: all; width: 42px; height: 42px; border-radius: 999px; background: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.12); display:flex; align-items:center; justify-content:center; }
+        .top-nav .right-stack { display:flex; gap:10px; }
+
+        .floating-address { position: absolute; top: 70px; left: 14px; right: 14px; z-index: 1200; background: #fff; border-radius: 18px; box-shadow: 0 10px 30px rgba(0,0,0,.14); padding: 12px 14px; }
+        .floating-address .row { display:flex; align-items:center; gap:12px; }
+        .floating-address .label { font-size: 12px; color:#9aa0a6; line-height: 1; margin-bottom: 3px; }
+        .floating-address .value { font-size: 16px; font-weight: 700; color:#111827; }
+        .floating-address .divider { height: 1px; background:#eef0f2; margin: 10px 0; }
+        .pill { background:#f3f4f6; border-radius: 999px; padding: 8px 12px; font-weight: 700; color:#111827; }
+
+        .bottom-sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1300; background: #fff; border-radius: 22px 22px 0 0; box-shadow: 0 -10px 30px rgba(0,0,0,.18); padding: 10px 16px 14px; }
+        .sheet-handle { width: 44px; height: 5px; background: #e5e7eb; border-radius: 999px; margin: 4px auto 10px; }
+        .sheet-row { display:flex; align-items:center; justify-content: space-between; gap: 10px; padding: 10px 0; }
+        .sheet-left { display:flex; align-items:center; gap: 12px; min-width: 0; }
+        .sheet-addr { min-width: 0; }
+        .sheet-addr .title { font-size: 12px; color:#9aa0a6; line-height: 1; }
+        .sheet-addr .main { font-size: 18px; font-weight: 800; color:#111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .small-btn { border-radius: 999px !important; height: 36px !important; padding: 0 14px !important; font-weight: 800 !important; }
+        .tabs { display:flex; gap: 10px; align-items: center; justify-content: center; margin-top: 6px; }
+        .tabs .tab { padding: 10px 14px; border-radius: 999px; color:#6b7280; font-weight: 800; }
+        .tabs .tab.active { background:#f3f4f6; color:#111827; }
+        .tariff-scroll { display:flex; gap: 10px; overflow-x: auto; padding: 12px 0; }
+        .tariff-card { min-width: 160px; border-radius: 16px; padding: 12px; background:#fff; border: 1px solid #eef0f2; box-shadow: 0 8px 18px rgba(0,0,0,.06); cursor:pointer; }
+        .tariff-card.active { border-color:#111827; }
+        .tariff-top { display:flex; align-items:center; justify-content: space-between; }
+        .tariff-name { font-weight: 900; font-size: 16px; }
+        .tariff-eta { font-weight: 900; font-size: 14px; color:#6b7280; }
+        .tariff-price { margin-top: 8px; font-weight: 900; font-size: 22px; }
+        .order-btn { width: 100%; height: 54px; border-radius: 18px; font-weight: 900; font-size: 18px; background: #f5d400; border: none; box-shadow: 0 16px 28px rgba(0,0,0,.12); }
+        .order-btn:hover { background: #f3cf00 !important; }
+        .payment-row { display:flex; align-items:center; justify-content: space-between; margin-top: 10px; color:#111827; font-weight: 700; }
+
+        /* map pin (videodagi kabi markazda) */
+        .center-pin { position:absolute; left:50%; top:50%; transform: translate(-50%, -100%); z-index: 1250; pointer-events:none; font-size: 34px; filter: drop-shadow(0 8px 14px rgba(0,0,0,.35)); }
+
         .yandex-container { height: 100vh; background: #000; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto; }
         .map-wrapper { height: 70%; transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
         .map-wrapper.mode-coming, .map-wrapper.mode-searching { height: 55%; }
