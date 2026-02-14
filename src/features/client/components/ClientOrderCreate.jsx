@@ -111,10 +111,10 @@ async function nominatimReverse(lat, lng, signal) {
 }
 
 // OSRM yo'nalish topa olmasa ham xato bermaslik uchun:
-async function osrmRoute(from, to) {
+async function osrmRoute(from, to, signal) {
   try {
     const url = `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`;
-    const res = await fetch(url);
+    const res = await fetch(url, { signal });
     const data = await res.json();
     const r = data?.routes?.[0];
     if (r) {
@@ -227,6 +227,9 @@ export default function ClientOrderCreate() {
   const [messages, setMessages] = useState([]);
   const [msgText, setMsgText] = useState("");
   const chatScrollRef = useRef(null);
+  const osrmAbortRef = useRef(null);
+  const osrmDebounceRef = useRef(null);
+
   const mapRef = useRef(null); // ✅ Added ref
 
   const [ratingOpen, setRatingOpen] = useState(false);
@@ -341,37 +344,67 @@ export default function ClientOrderCreate() {
 
   /** Route calculation */
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      if (!pickup.latlng || !dest.latlng) {
-        setRouteCoords([]);
-        setDistanceKm(null);
-        setDurationMin(null);
-        return;
-      }
-      try {
-        const r = await osrmRoute(pickup.latlng, dest.latlng);
-        if (cancelled) return;
-        setRouteCoords(r.coords);
-        setDistanceKm(r.distanceKm);
-        setDurationMin(r.durationMin);
-      } catch (e) {
-        if (!cancelled) {
-          setRouteCoords([]);
-          try {
-            const approx = haversineKm(pickup.latlng, dest.latlng);
-            setDistanceKm(Number.isFinite(approx) ? approx : null);
-          } catch {
-            setDistanceKm(null);
-          }
-          setDurationMin(null);
+    // Debounce + Abort old OSRM request (map dragging can trigger many updates)
+    if (osrmDebounceRef.current) {
+      clearTimeout(osrmDebounceRef.current);
+      osrmDebounceRef.current = null;
+    }
+    if (osrmAbortRef.current) {
+      try { osrmAbortRef.current.abort(); } catch {}
+      osrmAbortRef.current = null;
+    }
+
+    if (!pickup.latlng || !dest.latlng) {
+      setRouteCoords([]);
+      setDistanceKm(null);
+      setDurationMin(null);
+      return;
+    }
+
+    const from = pickup.latlng;
+    const to = dest.latlng;
+
+    // show immediate fallback line while OSRM loads (prevents UI from feeling "stuck")
+    setRouteCoords([from, to]);
+
+    osrmDebounceRef.current = setTimeout(() => {
+      const ctrl = new AbortController();
+      osrmAbortRef.current = ctrl;
+
+      (async () => {
+        try {
+          const r = await osrmRoute(from, to, ctrl.signal);
+          // If aborted, ignore
+          if (ctrl.signal.aborted) return;
+
+          setRouteCoords(Array.isArray(r?.coords) ? r.coords : [from, to]);
+          setDistanceKm(Number.isFinite(r?.distanceKm) ? r.distanceKm : haversineKm(from, to));
+          setDurationMin(Number.isFinite(r?.durationMin) ? r.durationMin : (haversineKm(from, to) * 2));
+        } catch (e) {
+          // Abort is not an error for UI
+          if (ctrl.signal.aborted) return;
+
+          // Fallback: straight line + haversine
+          const approx = haversineKm(from, to);
+          setRouteCoords([from, to]);
+          setDistanceKm(Number.isFinite(approx) ? approx : null);
+          setDurationMin(Number.isFinite(approx) ? approx * 2 : null);
         }
-      }
-    })();
+      })();
+    }, 250);
+
     return () => {
-      cancelled = true;
+      if (osrmDebounceRef.current) {
+        clearTimeout(osrmDebounceRef.current);
+        osrmDebounceRef.current = null;
+      }
+      if (osrmAbortRef.current) {
+        try { osrmAbortRef.current.abort(); } catch {}
+        osrmAbortRef.current = null;
+      }
     };
   }, [pickup.latlng, dest.latlng]);
+
 
   const approxDistanceKm = useMemo(() => {
     if (!pickup.latlng || !dest.latlng) return null;
