@@ -17,17 +17,6 @@ import { supabase } from "@/lib/supabase";
 const { Text, Title } = Typography;
 
 /** ---------------- ICONS ---------------- */
-const pickupIcon = L.divIcon({
-  html: `<div class="pin-container"><div class="pin-yellow-man">🙋‍♂️</div></div>`,
-  className: "custom-div-icon", iconSize: [50, 50], iconAnchor: [25, 50],
-});
-
-const destIcon = L.divIcon({
-  html: `<div class="pin-container"><div class="pin-target">🎯</div></div>`,
-  className: "custom-div-icon", iconSize: [50, 50], iconAnchor: [25, 50],
-});
-
-// Mashina ikonkasi (Yandex-like)
 const carIcon = L.divIcon({
   html: `<div class="car-marker">🚕</div>`,
   className: "", iconSize: [30, 30],
@@ -41,6 +30,8 @@ const TARIFFS = [
 ];
 
 /** ---------------- HELPERS ---------------- */
+const fmtMoney = (n) => new Intl.NumberFormat("ru-RU").format(Math.round(n));
+
 async function nominatimReverse(lat, lng) {
   try {
     const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, {
@@ -48,7 +39,7 @@ async function nominatimReverse(lat, lng) {
     });
     const data = await res.json();
     return data?.display_name?.split(",")[0] + ", " + (data?.display_name?.split(",")[1] || "");
-  } catch { return "Noma'lum ko'cha"; }
+  } catch { return "Manzil aniqlanmoqda..."; }
 }
 
 async function osrmRoute(from, to) {
@@ -71,22 +62,25 @@ function FlyTo({ center }) {
   return null;
 }
 
-function CenterTracker({ onCenter, setIsDragging }) {
+function CenterTracker({ onCenter, setIsDragging, enabled }) {
   const map = useMap();
   useEffect(() => {
-    map.on("movestart", () => setIsDragging(true));
-    map.on("moveend", async () => {
+    if (!enabled) return;
+    const moveStart = () => setIsDragging(true);
+    const moveEnd = async () => {
       setIsDragging(false);
       const c = map.getCenter();
       onCenter([c.lat, c.lng]);
-    });
-  }, [map, onCenter, setIsDragging]);
+    };
+    map.on("movestart", moveStart);
+    map.on("moveend", moveEnd);
+    return () => { map.off("movestart", moveStart); map.off("moveend", moveEnd); };
+  }, [map, onCenter, setIsDragging, enabled]);
   return null;
 }
 
 export default function ClientOrderCreate() {
-  // Mode: 'initial', 'destSelection', 'destPinDrop', 'routePreview', 'searching', 'enRoute'
-  const [mode, setMode] = useState("initial");
+  const [mode, setMode] = useState("initial"); // initial, destSelection, destPinDrop, routePreview, searching, enRoute
   const [userLoc, setUserLoc] = useState([42.4602, 59.6166]);
   const [pickup, setPickup] = useState({ latlng: [42.4602, 59.6166], address: "Manzil aniqlanmoqda..." });
   const [dest, setDest] = useState({ latlng: null, address: "" });
@@ -95,8 +89,8 @@ export default function ClientOrderCreate() {
   const [routeCoords, setRouteCoords] = useState([]);
   const [distanceKm, setDistanceKm] = useState(0);
   const [orderId, setOrderId] = useState(null);
-  const [orderStatus, setOrderStatus] = useState(null);
   const [driver, setDriver] = useState(null);
+  const mapRef = useRef(null);
 
   // Markaziy pin manzilini yangilash
   const handleMapMove = async (latlng) => {
@@ -105,22 +99,24 @@ export default function ClientOrderCreate() {
     if (mode === "destPinDrop") setDest({ latlng, address: addr });
   };
 
-  // Buyurtma berish mantiqi
+  // Buyurtma berish
   const handleOrder = async () => {
-    if (mode === "routePreview" || mode === "initial") {
-      setMode("searching");
-      try {
-        const res = await api.post("/api/order", {
-          action: "create",
-          pickup_location: pickup.address,
-          dropoff_location: dest.address || "Manzil belgilanmagan",
-          from_lat: pickup.latlng[0], from_lng: pickup.latlng[1],
-          to_lat: dest.latlng ? dest.latlng[0] : null, to_lng: dest.latlng ? dest.latlng[1] : null,
-          price: Math.round(tariff.base + distanceKm * tariff.perKm),
-          status: "searching"
-        });
-        setOrderId(res.id);
-      } catch { message.error("Zakaz berishda xato"); setMode("routePreview"); }
+    setMode("searching");
+    try {
+      const res = await api.post("/api/order", {
+        action: "create",
+        pickup_location: pickup.address,
+        dropoff_location: dest.address || "Manzil belgilanmagan",
+        from_lat: pickup.latlng[0], from_lng: pickup.latlng[1],
+        to_lat: dest.latlng ? dest.latlng[0] : null,
+        to_lng: dest.latlng ? dest.latlng[1] : null,
+        price: Math.round(tariff.base + distanceKm * tariff.perKm),
+        status: "searching"
+      });
+      setOrderId(res.id || res.orderId);
+    } catch { 
+      message.error("Zakaz berishda xato"); 
+      setMode(dest.latlng ? "routePreview" : "initial"); 
     }
   };
 
@@ -133,47 +129,22 @@ export default function ClientOrderCreate() {
     }
   }, [pickup.latlng, dest.latlng, mode]);
 
-  // Polling (Haydovchi qabul qilishini kutish)
-  useEffect(() => {
-    if (!orderId || mode !== "searching") return;
-    const interval = setInterval(async () => {
-      const res = await api.post("/api/order", { action: "status", orderId });
-      if (res.order?.status === "accepted") {
-        setDriver(res.order.driver);
-        setOrderStatus("accepted");
-        setMode("enRoute");
-        clearInterval(interval);
-      }
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [orderId, mode]);
-
   return (
     <div className="yandex-container">
-      {/* 1. XARITA QISMI */}
       <div className="map-wrapper">
-        <MapContainer center={userLoc} zoom={16} zoomControl={false} style={{ height: "100%", width: "100%" }}>
+        <MapContainer center={userLoc} zoom={16} zoomControl={false} style={{ height: "100%", width: "100%" }} whenCreated={m => mapRef.current = m}>
           <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
           <FlyTo center={mode === "initial" ? pickup.latlng : mode === "destPinDrop" ? dest.latlng : null} />
-          
-          <CenterTracker 
-            setIsDragging={setIsDragging} 
-            onCenter={handleMapMove} 
-            enabled={mode === "initial" || mode === "destPinDrop"} 
-          />
+          <CenterTracker onCenter={handleMapMove} setIsDragging={setIsDragging} enabled={mode === "initial" || mode === "destPinDrop"} />
 
-          {/* Marshrut chizig'i (Image 5 & 7) */}
           {routeCoords.length > 0 && mode !== "initial" && (
             <Polyline positions={routeCoords} pathOptions={{ color: "#00C853", weight: 6 }} />
           )}
 
-          {/* Haydovchi mashinasi (Image 7) */}
-          {mode === "enRoute" && driver?.lat && (
-             <Marker position={[driver.lat, driver.lng]} icon={carIcon} />
-          )}
+          {mode === "enRoute" && driver?.lat && <Marker position={[driver.lat, driver.lng]} icon={carIcon} />}
         </MapContainer>
 
-        {/* Markaziy Pin Animatsiyasi (Image 1 & 4) */}
+        {/* Markaziy Pin (Image 1 & 4) */}
         {(mode === "initial" || mode === "destPinDrop") && (
           <div className={`center-pin-overlay ${isDragging ? "lifting" : ""}`}>
             <div className={mode === "initial" ? "yellow-circle-man" : "target-circle"}>
@@ -183,29 +154,29 @@ export default function ClientOrderCreate() {
           </div>
         )}
 
-        {/* Searching Animatsiyasi (Image 6) */}
+        {/* Qidiruv Animatsiyasi (Image 6) */}
         {mode === "searching" && (
           <div className="searching-animation">
             <div className="pulse-wave"></div>
             <div className="pulse-wave delayed"></div>
-            <div className="searching-man">🙋‍♂️</div>
+            <div className="searching-man">🚕</div>
           </div>
         )}
 
-        {/* Yuqori Panel (Image 1) */}
+        {/* Top Header (Image 1) */}
         {mode === "initial" && (
           <div className="top-ui">
-            <div className="address-display">
+            <Card className="address-bar-top">
                <div className="dot blue"></div>
-               <Text strong>{pickup.address}</Text>
-            </div>
+               <Text strong ellipsis>{pickup.address}</Text>
+            </Card>
           </div>
         )}
       </div>
 
-      {/* 2. DRAWER / BOTTOM SHEETS */}
-      
-      {/* MODE: INITIAL (Image 1) */}
+      {/* --- DRAWER / BOTTOM INTERFACE --- */}
+
+      {/* 1. Initial State (Image 1) */}
       {mode === "initial" && (
         <div className="bottom-panel-initial">
           <Button className="dest-btn-long" icon={<SearchOutlined />} onClick={() => setMode("destSelection")}>
@@ -213,58 +184,39 @@ export default function ClientOrderCreate() {
           </Button>
           <div className="action-row">
              <Button icon={<SwapOutlined />} className="round-btn" />
-             <Button type="primary" className="order-now-blue" onClick={handleOrder}>BUYURTMA BERISH</Button>
+             <Button type="primary" className="order-now-blue" onClick={handleOrder}>ZAKAZ BERISH</Button>
           </div>
         </div>
       )}
 
-      {/* MODE: DEST SELECTION (Image 2 & 3) */}
-      <Drawer
-        open={mode === "destSelection"}
-        placement="bottom"
-        height="100%"
-        closable={false}
-        className="dest-drawer"
-      >
+      {/* 2. Destination Search (Image 2 & 3) */}
+      <Drawer open={mode === "destSelection"} placement="bottom" height="100%" closable={false} className="dest-drawer">
         <div className="drawer-header-custom">
            <Button icon={<CloseOutlined />} type="text" onClick={() => setMode("initial")} />
            <div className="input-group">
+              <div className="input-item"><div className="dot blue"></div> <Input value={pickup.address} readOnly /></div>
               <div className="input-item">
-                <div className="dot blue"></div>
-                <Input value={pickup.address} readOnly />
-              </div>
-              <div className="input-item">
-                <div className="dot red"></div>
-                <Input 
-                  placeholder="Qayerga borasiz?" 
-                  autoFocus 
-                  suffix={<Button size="small" onClick={() => setMode("destPinDrop")}>Xarita</Button>} 
-                />
+                <div className="dot red"></div> 
+                <Input placeholder="Qayerga borasiz?" autoFocus suffix={<Button size="small" onClick={() => setMode("destPinDrop")}>Xarita</Button>} />
               </div>
            </div>
         </div>
-        <List
-          className="recent-list"
-          dataSource={seedPlaces}
-          renderItem={item => (
-            <List.Item onClick={() => { setDest({ latlng: [item.lat, item.lng], address: item.label }); setMode("routePreview"); }}>
-               <EnvironmentOutlined /> {item.label}
-            </List.Item>
-          )}
-        />
+        <List className="recent-list" dataSource={seedPlaces} renderItem={item => (
+          <List.Item onClick={() => { setDest({ latlng: [item.lat, item.lng], address: item.label }); setMode("routePreview"); }}>
+             <EnvironmentOutlined /> {item.label}
+          </List.Item>
+        )} />
       </Drawer>
 
-      {/* MODE: DEST PIN DROP (Image 4) */}
+      {/* 3. Destination Pin Drop (Image 4) */}
       {mode === "destPinDrop" && (
         <div className="dest-pin-footer">
-          <Card className="price-preview-mini">
-            <Text strong>{fmtMoney(tariff.base)} so'm</Text>
-          </Card>
+          <Card className="price-preview-mini"><Text strong>{fmtMoney(tariff.base)} so'm</Text></Card>
           <Button type="primary" block className="ready-btn" onClick={() => setMode("routePreview")}>TAYYOR</Button>
         </div>
       )}
 
-      {/* MODE: ROUTE PREVIEW (Image 5) */}
+      {/* 4. Route Preview & Tariffs (Image 5) */}
       {mode === "routePreview" && (
         <div className="route-preview-panel">
           <div className="route-details">
@@ -284,10 +236,10 @@ export default function ClientOrderCreate() {
         </div>
       )}
 
-      {/* MODE: SEARCHING (Image 6) */}
+      {/* 5. Searching (Image 6) */}
       {mode === "searching" && (
         <div className="searching-panel">
-          <Title level={4}>Yaqin-atrofda 5 dan ortiq mas...</Title>
+          <Title level={4}>Yaqin-atrofda mashina...</Title>
           <Text type="secondary">Moslarini qidiryapmiz</Text>
           <div className="search-actions">
             <Button icon={<CloseOutlined />} onClick={() => setMode("initial")}>Safarni bekor qilish</Button>
@@ -296,7 +248,7 @@ export default function ClientOrderCreate() {
         </div>
       )}
 
-      {/* MODE: EN ROUTE (Image 7 & 8) - Haydovchi kelmoqda */}
+      {/* 6. En Route / Driver Found (Image 7 & 8) */}
       {mode === "enRoute" && (
         <div className="driver-panel">
           <div className="eta-badge">~2 daq va keladi</div>
@@ -305,58 +257,46 @@ export default function ClientOrderCreate() {
                 <Title level={4} style={{margin:0}}>Haydovchi ★4.83</Title>
                 <Text>Oq Chevrolet Cobalt • <Tag color="default">95S703RA</Tag></Text>
              </div>
-             <Avatar size={64} src={driver?.photo_url} icon={<UserOutlined />} />
+             <Avatar size={64} icon={<UserOutlined />} />
           </div>
-          <div className="quick-actions">
-             <Button icon={<PhoneOutlined />}>Aloqa</Button>
-             <Button icon={<SafetyOutlined />}>Xavfsizlik</Button>
-             <Button icon={<ShareAltOutlined />}>Ulashish</Button>
-          </div>
+          <div className="quick-actions"><Button icon={<PhoneOutlined />}>Aloqa</Button><Button icon={<SafetyOutlined />}>Xavfsizlik</Button></div>
           <div className="trip-details-scroll">
              <div className="detail-item"><div className="dot blue"></div> {pickup.address}</div>
              <div className="detail-item"><div className="dot red"></div> {dest.address}</div>
-             <Button danger block type="text" className="cancel-red-btn" onClick={() => setMode("initial")}>Safarni bekor qilish</Button>
+             <Button danger block type="text" onClick={() => setMode("initial")}>Safarni bekor qilish</Button>
           </div>
         </div>
       )}
 
       <style>{`
-        .yandex-container { height: 100vh; display: flex; flex-direction: column; background: #f0f0f0; overflow: hidden; }
+        .yandex-container { height: 100vh; display: flex; flex-direction: column; overflow: hidden; background: #fff; }
         .map-wrapper { flex: 1; position: relative; }
+        .top-ui { position: absolute; top: 20px; left: 15px; right: 15px; z-index: 1000; }
+        .address-bar-top { border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); padding: 10px; display: flex; align-items: center; }
         
-        /* Markaziy Pin Animatsiyasi */
-        .center-pin-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -100%); z-index: 1000; pointer-events: none; transition: 0.2s ease; }
+        .center-pin-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -100%); z-index: 1000; pointer-events: none; transition: 0.2s; }
         .center-pin-overlay.lifting { transform: translate(-50%, -120%) scale(1.1); }
-        .yellow-circle-man { width: 50px; height: 50px; background: #FFD400; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; border: 3px solid #fff; box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
+        .yellow-circle-man { width: 50px; height: 50px; background: #FFD400; border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 24px; border: 3px solid #fff; }
         .target-circle { width: 50px; height: 50px; background: #111; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; border: 3px solid #fff; }
-        .pin-shadow { width: 10px; height: 4px; background: rgba(0,0,0,0.2); border-radius: 50%; margin: 5px auto; transition: 0.2s; }
-        .lifting .pin-shadow { transform: scale(1.5); opacity: 0.3; }
-
-        /* Searching Animatsiya */
-        .searching-animation { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1000; }
-        .pulse-wave { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 20px; height: 20px; background: rgba(255, 212, 0, 0.4); border-radius: 50%; animation: pulse 2s infinite; }
-        .pulse-wave.delayed { animation-delay: 1s; }
-        @keyframes pulse { 0% { width: 20px; height: 20px; opacity: 1; } 100% { width: 300px; height: 300px; opacity: 0; } }
-
-        /* Panellar */
-        .bottom-panel-initial { padding: 20px; background: #fff; border-radius: 20px 20px 0 0; box-shadow: 0 -5px 20px rgba(0,0,0,0.1); z-index: 1001; }
-        .dest-btn-long { width: 100%; height: 50px; border-radius: 12px; background: #f5f5f5; border: none; text-align: left; font-size: 16px; margin-bottom: 15px; }
-        .order-now-blue { flex: 1; height: 50px; border-radius: 12px; background: #1890ff; font-weight: bold; }
-        .action-row { display: flex; gap: 10px; }
-        .round-btn { height: 50px; width: 50px; border-radius: 12px; }
-
-        .route-preview-panel { position: absolute; bottom: 0; left: 0; right: 0; background: #fff; padding: 20px; border-radius: 24px 24px 0 0; z-index: 1002; }
-        .tariff-list { display: flex; gap: 10px; overflow-x: auto; margin: 15px 0; padding-bottom: 10px; }
-        .tariff-card { min-width: 100px; padding: 10px; border: 1px solid #eee; border-radius: 16px; text-align: center; }
-        .tariff-card.active { border-color: #FFD400; background: #fffdf0; }
+        .pin-shadow { width: 12px; height: 4px; background: rgba(0,0,0,0.3); border-radius: 50%; margin: 4px auto; }
         
-        .driver-panel { position: absolute; bottom: 0; left: 0; right: 0; background: #fff; padding: 20px; border-radius: 24px 24px 0 0; z-index: 1005; max-height: 80vh; overflow-y: auto; }
-        .eta-badge { background: #FFD400; padding: 5px 15px; border-radius: 20px; font-weight: bold; width: fit-content; margin-bottom: 10px; }
-        .cancel-red-btn { color: #ff4d4f; font-weight: bold; margin-top: 20px; }
+        .searching-animation { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1000; }
+        .pulse-wave { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: 2px solid #FFD400; border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { width: 40px; height: 40px; opacity: 1; } 100% { width: 300px; height: 300px; opacity: 0; } }
 
-        .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 10px; }
-        .dot.blue { background: #1890ff; }
-        .dot.red { background: #ff4d4f; }
+        .bottom-panel-initial { padding: 20px; border-top: 1px solid #eee; }
+        .dest-btn-long { width: 100%; height: 52px; border-radius: 12px; background: #f0f0f0; border: none; text-align: left; font-size: 16px; margin-bottom: 12px; }
+        .order-now-blue { flex: 1; height: 52px; border-radius: 12px; font-weight: 800; background: #1890ff !important; }
+        .action-row { display: flex; gap: 10px; }
+        .round-btn { height: 52px; width: 52px; border-radius: 12px; }
+
+        .route-preview-panel { padding: 20px; border-radius: 24px 24px 0 0; box-shadow: 0 -5px 20px rgba(0,0,0,0.1); }
+        .tariff-card { min-width: 110px; padding: 12px; border: 1px solid #eee; border-radius: 16px; text-align: center; cursor: pointer; }
+        .tariff-card.active { border-color: #FFD400; background: #fffdf0; }
+        .order-final-btn { height: 54px; border-radius: 14px; background: #FFD400 !important; color: #000; font-weight: 800; }
+
+        .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 12px; }
+        .dot.blue { background: #1890ff; } .dot.red { background: #ff4d4f; }
       `}</style>
     </div>
   );
