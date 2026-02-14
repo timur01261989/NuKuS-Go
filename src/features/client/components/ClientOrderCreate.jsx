@@ -861,9 +861,10 @@ const bottomTitle = useMemo(() => {
           {/* SEARCHING: Yandex-go'ga o'xshash yaqin mashinalar + dispatch chizig'i */}
           {uiMode === "searching" && (pickup.latlng || userLoc) && (
             <>
-              {/* pulsating circle */}
+              {/* 1. Pulsating circle (Markaziy to'lqin) */}
               <CirclePulse center={pickup.latlng || userLoc} />
 
+              {/* 2. Yaqin atrofdagi mashinalar */}
               {nearbyCars.map((c) => (
                 <Marker
                   key={c.id}
@@ -871,27 +872,33 @@ const bottomTitle = useMemo(() => {
                   icon={carIcon}
                 />
               ))}
-            </>
-          )}
+
+              {/* 3. Dispatch chizig'i (Buyurtma yuborilayotgan mashinaga chiziq tortish) */}
               {nearbyCars.length > 0 && (
                 <Polyline
                   positions={[
                     pickup.latlng || userLoc,
-                    [nearbyCars[dispatchIdx % nearbyCars.length].lat, nearbyCars[dispatchIdx % nearbyCars.length].lng],
+                    [
+                      nearbyCars[dispatchIdx % nearbyCars.length].lat, 
+                      nearbyCars[dispatchIdx % nearbyCars.length].lng
+                    ],
                   ]}
                   pathOptions={{ color: "#00C853", weight: 4, opacity: 0.9, lineCap: "round" }}
                 />
               )}
             </>
           )}
-
           )}
         
+                  {/* "MENING JOYLASHUVIM" TUGMASI */}
         <div
           style={{
             position: "absolute",
             right: 16,
-            bottom: uiMode === "main" ? 280 : 320,
+            // "uiMode" o'rniga "mode" ishlatamiz. 
+            // Agar "initial" (boshlang'ich) holatda bo'lsa pastroqda (280px), 
+            // boshqa holatlarda (masalan, marshrut ko'rishda) balandroqda (320px) turadi.
+            bottom: mode === "initial" ? 280 : 320,
             zIndex: 800,
           }}
         >
@@ -902,11 +909,14 @@ const bottomTitle = useMemo(() => {
             style={{ boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}
             onClick={() => {
               const map = mapRef.current;
-              if (map && userLoc) map.flyTo(userLoc, 16);
+              // userLoc mavjudligini tekshiramiz
+              if (map && userLoc) {
+                map.flyTo(userLoc, 16, { animate: true, duration: 1 });
+              }
             }}
           />
         </div>
-        </MapContainer>
+      </MapContainer>
 
         {selecting && (
           <div className={`yg-centerpin ${isDragging ? 'dragging' : ''}`} aria-hidden>
@@ -994,42 +1004,42 @@ const bottomTitle = useMemo(() => {
                   allowClear
                 />
                 <Button
-                  size="small"
-                  className="yg-mini"
-                  onClick={() => {
-                    setSelecting("dest");
-                    setDrawerOpen(false);
-                  }}
-                >
-                  Xaritadan
-                </Button>
-              </div>
+                    size="small"
+                    className="yg-mini"
+                    onClick={() => {
+                      setSelecting("dest");
+                      setDrawerOpen(false);
+                    }}
+                  >
+                    Xaritadan
+                  </Button>
+                </div>
 
-              <div className="yg-swap">
-                <Button icon={<SwapOutlined />} onClick={swapPoints} />
-              </div>
-            </Card>
-          </div>
-        )}
-      </div> 
-
-      {/* Bottom sheet */}
-      {!hasActiveOrder && (
-        <Drawer
-          open={drawerOpen && !selecting}
-          onClose={() => setDrawerOpen(false)}
-          placement="bottom"
-          height={380}
-          bodyStyle={{ padding: 12 }}
-          mask={false}
-          className="yg-drawer"
-          title={
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <EnvironmentOutlined />
-              <span>{bottomTitle}</span>
+                <div className="yg-swap">
+                  <Button icon={<SwapOutlined />} onClick={swapPoints} />
+                </div>
+              </Card>
             </div>
-          }
-        >
+          )}
+        </div>
+
+        {/* Bottom sheet */}
+        {!hasActiveOrder && (
+          <Drawer
+            open={drawerOpen && !selecting}
+            onClose={() => setDrawerOpen(false)}
+            placement="bottom"
+            height={380}
+            bodyStyle={{ padding: 12 }}
+            mask={false}
+            className="yg-drawer"
+            title={
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <EnvironmentOutlined />
+                <span>{bottomTitle}</span>
+              </div>
+            }
+          >
           <div className="yg-section">
             <div className="yg-section-title">Oldingi manzillar</div>
             <List
