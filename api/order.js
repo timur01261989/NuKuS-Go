@@ -324,6 +324,136 @@ async function editBookingSeats(req, res, body) {
   return json(res, 200, { ok: true });
 }
 
+
+/* ============================================================
+ * INTER-DISTRICT (Tumanlararo / shahar ichida tuman yo‘nalishi)
+ * ------------------------------------------------------------
+ * New actions:
+ * - district_offers (GET/POST): returns driver offers for fromDistrict->toDistrict
+ * - create_inter_district (POST): creates an order row in "orders" (service_type="inter_district")
+ * Notes:
+ * - Narx masofa (km) asosida hisoblanadi (keyin siz o‘zgartirasiz).
+ * - Agar DB insert xato bo‘lsa ham, server 200 qaytaradi (frontend oq ekran bo‘lmasin).
+ * ============================================================ */
+
+const DISTRICT_COORDS = {
+  "Nukus": { lat: 42.4617, lng: 59.6166 },
+  "Xo'jayli": { lat: 42.4042, lng: 59.4403 },
+  "Qo'ng'irot": { lat: 43.0520, lng: 58.8530 },
+  "Chimboy": { lat: 42.9410, lng: 59.7690 },
+  "To'rtko'l": { lat: 41.55, lng: 61.0167 },
+  "Beruniy": { lat: 41.6917, lng: 60.7520 },
+  "Amudaryo": { lat: 42.0175, lng: 60.0010 },
+};
+
+function haversineKmPoints(a, b) {
+  const R = 6371;
+  const toRad = (x) => (x * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const s1 = Math.sin(dLat / 2);
+  const s2 = Math.sin(dLng / 2);
+  const q = s1 * s1 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * s2 * s2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(q)));
+}
+
+function estimateDistrictPrice(distanceKm) {
+  const km = Math.max(0, Number(distanceKm) || 0);
+  const base = 7000;
+  const perKm = 1200;
+  const min = 15000;
+  return Math.max(min, Math.round(base + km * perKm));
+}
+
+function makeDistrictOffers({ fromDistrict, toDistrict, filters = {} }) {
+  const a = DISTRICT_COORDS[fromDistrict] || DISTRICT_COORDS["Nukus"];
+  const b = DISTRICT_COORDS[toDistrict] || DISTRICT_COORDS["Xo'jayli"];
+  const distanceKm = haversineKmPoints(a, b);
+  const durationMin = (distanceKm / 50) * 60;
+  const basePrice = estimateDistrictPrice(distanceKm);
+
+  const cars = [
+    { carModel: "Cobalt", carNumber: "95A 123 AB", ac: true, trunk: true },
+    { carModel: "Gentra", carNumber: "90B 777 BB", ac: true, trunk: false },
+    { carModel: "Nexia 3", carNumber: "01C 555 CC", ac: false, trunk: false },
+    { carModel: "Lacetti", carNumber: "85D 888 DD", ac: false, trunk: true },
+  ];
+  const names = ["Aziz", "Sardor", "Diyor", "Javohir", "Rustam", "Ibrohim"];
+
+  let offers = cars.map((c, i) => ({
+    id: `district_${i}`,
+    driverId: `district_driver_${i}`,
+    driverName: names[i % names.length],
+    rating: 4.6 + (i % 4) * 0.1,
+    carModel: c.carModel,
+    carNumber: c.carNumber,
+    ac: c.ac,
+    trunk: c.trunk,
+    price: basePrice + i * 2500,
+    etaMin: Math.max(3, Math.round(durationMin * 0.25) + i),
+    meta: { distanceKm, durationMin },
+  }));
+
+  if (filters?.ac) offers = offers.filter((o) => o.ac);
+  if (filters?.trunk) offers = offers.filter((o) => o.trunk);
+
+  return { offers, distanceKm, durationMin, priceBase: basePrice };
+}
+
+async function districtOffers(req, res, body) {
+  const fromDistrict = (req.query?.fromDistrict || body?.fromDistrict || "Nukus").toString();
+  const toDistrict = (req.query?.toDistrict || body?.toDistrict || "").toString();
+  const filters = body?.filters || {};
+  if (!toDistrict) return json(res, 400, { error: "toDistrict shart" });
+
+  const result = makeDistrictOffers({ fromDistrict, toDistrict, filters });
+  return json(res, 200, result);
+}
+
+async function createInterDistrict(req, res, body) {
+  const fromDistrict = (body?.fromDistrict || "Nukus").toString();
+  const toDistrict = (body?.toDistrict || "").toString();
+  const seats = Number(body?.seats || 1);
+  const filters = body?.filters || {};
+  if (!toDistrict) return json(res, 400, { error: "toDistrict shart" });
+
+  const result = makeDistrictOffers({ fromDistrict, toDistrict, filters });
+  const distance_km = Number(body?.distance_km || result.distanceKm);
+  const duration_min = Number(body?.duration_min || result.durationMin);
+  const price = Number(body?.price || estimateDistrictPrice(distance_km));
+
+  // Create order row (best-effort). If table/columns differ, return created=false but still 200.
+  try {
+    const { data, error } = await supabase
+      .from("orders")
+      .insert([{
+        service_type: "inter_district",
+        status: "pending",
+        from_region: body?.from_region || null,
+        to_region: body?.to_region || null,
+        from_district: fromDistrict,
+        to_district: toDistrict,
+        seats_requested: seats,
+        seats_available: 0,
+        distance_km,
+        duration_min,
+        price,
+        filters,
+        scheduled_at: new Date().toISOString(),
+      }])
+      .select("*")
+      .single();
+
+    if (error) {
+      return json(res, 200, { created: false, warning: error.message, distance_km, duration_min, price });
+    }
+    return json(res, 200, { created: true, id: data?.id, order: data });
+  } catch (e) {
+    return json(res, 200, { created: false, warning: e?.message || "insert failed", distance_km, duration_min, price });
+  }
+}
+
+
 export default async function handler(req, res) {
   if (withCors(req, res)) return;
 
@@ -334,6 +464,7 @@ export default async function handler(req, res) {
     if (req.method === "GET") {
       if (action === "list_inter_prov") return await listInterProv(req, res);
       if (action === "list_my_inter_prov_bookings") return await listMyBookings(req, res);
+      if (action === "district_offers") return await districtOffers(req, res, body);
       return json(res, 400, { error: "Noto‘g‘ri action (GET)" });
     }
 
@@ -344,6 +475,8 @@ export default async function handler(req, res) {
       if (action === "cancel_booking_request") return await cancelBooking(req, res, body);
       if (action === "request_cancel_after_accept") return await markCancelRequested(req, res, body);
       if (action === "mark_cancel_requested") return await markCancelRequested(req, res, body);
+      if (action === "district_offers") return await districtOffers(req, res, body);
+      if (action === "create_inter_district") return await createInterDistrict(req, res, body);
       return json(res, 400, { error: "Noto‘g‘ri action (POST)" });
     }
 

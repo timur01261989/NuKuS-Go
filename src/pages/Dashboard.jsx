@@ -543,7 +543,7 @@ export default function Dashboard() {
 
         {/* Content */}
         <div style={{ padding: 16 }}>
-          {renderContent()}
+           <ClientDashboard /> 
         </div>
       </div>
     </ConfigProvider>

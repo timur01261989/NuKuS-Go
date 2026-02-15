@@ -1,139 +1,151 @@
-import React, { useState, useEffect } from "react";
-import { Card, Button, Typography, Row, Col, ConfigProvider, Skeleton } from "antd";
+import React, { useState } from "react";
+import { Card, Typography, Row, Col, Button } from "antd";
 import { 
-  GlobalOutlined, EnvironmentOutlined, CarOutlined, 
-  RocketOutlined, ShopOutlined, ArrowLeftOutlined 
+  CarOutlined, 
+  RocketOutlined, 
+  EnvironmentOutlined, 
+  TruckOutlined, 
+  ShopOutlined 
 } from "@ant-design/icons";
-import { translations } from '@i18n/translations';
-import { supabase } from "../../../lib/supabase";
 
-// Xizmatlarni import qilamiz
-import ClientInterProvincial from "./ClientInterProvincial";
-import ClientInterDistrict from "./ClientInterDistrict";
-import ClientFreight from "./ClientFreight";
-import ClientDelivery from "./ClientDelivery";
-import ClientTaxi from "./ClientTaxi";
-import { AutoMarketPreview } from '../../market/components/AutoMarketPreview.jsx';
-import { AutoMarketPanel } from '../../market/components/AutoMarketPanel.jsx';
+// -------------------------------------------------------
+// 1. YANGI MODULLARNI IMPORT QILISH
+// (Fayl yo'llarini o'zingizdagi papkaga qarab to'g'rilang)
+// -------------------------------------------------------
+import ClientTaxiPage from "../../taxi/ClientTaxiPage";
+import DeliveryPage from "../../delivery/DeliveryPage";
+import ClientInterProvincial from "../../intercity/ClientInterProvincial";
+// import FreightPage from "../../freight/FreightPage"; // Agar tayyor bo'lsa oching
+import MarketEntry from "../../market/MarketEntry"; // Yoki MarketRouter
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
-export default function ClientDashboard({ onBackToMain }) {
-  const [marketOpen, setMarketOpen] = React.useState(false);
-
-  const savedLang = localStorage.getItem("appLang") || "uz_lotin";
-  const t = translations[savedLang] || translations["uz_lotin"];
-
+export default function ClientDashboard() {
+  // Bu state qaysi xizmat ochilganini bilib turadi
+  // null = Asosiy menyu (tugmalar)
+  // 'taxi' = Taksi xizmati
+  // 'delivery' = Eltib berish
   const [selectedService, setSelectedService] = useState(null);
-  const [loading, setLoading] = useState(true); // Skeleton uchun
-const renderContent = () => {
-    // ...
-    switch (currentView) {
-      
-      // ...
-      
-      case "taxi":
-        // 👇 Yangi komponentni shu yerga qo'yamiz
-        return <ClientTaxiPage onBack={() => setCurrentView("dashboard")} />;
 
-      // ...
-    }
-  };
-  // Dastlabki yuklanish effekti
-  useEffect(() => {
-    setTimeout(() => setLoading(false), 800);
-  }, []);
+  // Orqaga (Menyuga) qaytish funksiyasi
+  const goBack = () => setSelectedService(null);
 
-  // Tanlangan xizmatga o'tish
-  if (selectedService === "interProv") return <ClientInterProvincial onBack={() => setSelectedService(null)} />;
-  if (selectedService === "interDist") return <ClientInterDistrict onBack={() => setSelectedService(null)} />;
-  if (selectedService === "freight") return <ClientFreight onBack={() => setSelectedService(null)} />;
-  if (selectedService === "delivery") return <ClientDelivery onBack={() => setSelectedService(null)} />;
-  if (selectedService === "taxi") return <ClientTaxi onBack={() => setSelectedService(null)} />;
-
-  const menuItems = [
-    { key: "taxi", title: t.taxi || "Taksi", icon: <CarOutlined />, color: "#faad14", bg: "#fff7e6" },
-    { key: "interDist", title: t.interDistrict, icon: <EnvironmentOutlined />, color: "#52c41a", bg: "#f6ffed" },
-    { key: "interProv", title: t.interProvincial, icon: <GlobalOutlined />, color: "#1890ff", bg: "#e6f7ff" },
-    { key: "delivery", title: t.delivery, icon: <RocketOutlined />, color: "#722ed1", bg: "#f9f0ff" },
-    { key: "freight", title: t.freight, icon: <ShopOutlined />, color: "#fa541c", bg: "#fff2e8" },
+  // -------------------------------------------------------
+  // 2. TUGMALAR RO'YXATI
+  // -------------------------------------------------------
+  const services = [
+    { 
+      key: "taxi", 
+      title: "Taksi", 
+      icon: <CarOutlined style={{ fontSize: 40 }} />, 
+      color: "#faad14", // Sariq
+      bg: "#fffbe6" 
+    },
+    { 
+      key: "delivery", 
+      title: "Eltib berish", 
+      icon: <RocketOutlined style={{ fontSize: 40 }} />, 
+      color: "#52c41a", // Yashil
+      bg: "#f6ffed" 
+    },
+    { 
+      key: "intercity", 
+      title: "Viloyatlar aro", 
+      icon: <EnvironmentOutlined style={{ fontSize: 40 }} />, 
+      color: "#1890ff", // Ko'k
+      bg: "#e6f7ff" 
+    },
+    { 
+      key: "market", 
+      title: "Avto Bozor", 
+      icon: <ShopOutlined style={{ fontSize: 40 }} />, 
+      color: "#722ed1", // Binafsha
+      bg: "#f9f0ff" 
+    },
+    { 
+      key: "freight", 
+      title: "Yuk tashish", 
+      icon: <TruckOutlined style={{ fontSize: 40 }} />, 
+      color: "#fa541c", // Qizil
+      bg: "#fff2e8" 
+    },
   ];
 
-  // Tugma bosilganda kichrayish effekti
-  const btnTouchProps = {
-    onMouseDown: (e) => e.currentTarget.style.transform = "scale(0.96)",
-    onMouseUp: (e) => e.currentTarget.style.transform = "scale(1)",
-    onTouchStart: (e) => e.currentTarget.style.transform = "scale(0.96)",
-    onTouchEnd: (e) => e.currentTarget.style.transform = "scale(1)",
-    style: { transition: "transform 0.1s" }
-  };
-
-  return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#1890ff', borderRadius: 16 } }}>
-      <div style={{ padding: "20px", background: "#f8f9fa", minHeight: "100vh", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-
-        {/* HEADER */}
-        <div style={{ display: "flex", alignItems: "center", marginBottom: 30 }}>
-           <Button 
-             icon={<ArrowLeftOutlined />} 
-             shape="circle" 
-             size="large"
-             onClick={onBackToMain} 
-             style={{ border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', marginRight: 15 }}
-           />
-           <Title level={4} style={{ margin: 0, fontWeight: 800 }}>Nukus Go</Title>
-        </div>
-
-        <div style={{ marginBottom: 25 }}>
-           <Text type="secondary" style={{ fontSize: 16 }}>Xizmat turini tanlang</Text>
-           <Title level={2} style={{ margin: 0, fontWeight: 900 }}>Qayerga boramiz?</Title>
-        </div>
-
-        {/* LOADING SKELETON */}
-        {loading ? (
-           <Row gutter={[16, 16]}>
-              {[1, 2, 3, 4, 5].map(i => (
-                 <Col span={12} key={i}>
-                    <Card style={{ borderRadius: 24, height: 160, border: 'none' }}>
-                       <Skeleton active avatar paragraph={{ rows: 2 }} />
-                    </Card>
-                 </Col>
-              ))}
-           </Row>
-        ) : (
-          <Row gutter={[16, 16]}>
-            {menuItems.map(item => (
-              <Col span={item.key === 'taxi' ? 24 : 12} key={item.key}>
-                <Card 
-                  hoverable 
-                  onClick={() => setSelectedService(item.key)}
-                  {...btnTouchProps}
-                  style={{ 
-                    textAlign: "center", borderRadius: 24, 
-                    height: item.key === 'taxi' ? 160 : 180, 
-                    display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center",
-                    boxShadow: "0 8px 20px rgba(0,0,0,0.04)", border: 'none',
-                    ...btnTouchProps.style
-                  }}
-                >
-                  <div style={{ 
-                    fontSize: 32, color: item.color, marginBottom: 15,
-                    background: item.bg, width: 70, height: 70, borderRadius: '50%',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    boxShadow: 'inset 0 0 10px rgba(0,0,0,0.05)'
-                  }}>
-                    {item.icon}
-                  </div>
-                  <Text strong style={{ fontSize: 16 }}>{item.title}</Text>
-                </Card>
-              </Col>
-            ))}
-          </Row>
-        )}
-      {/* Avto savdo: preview list (scroll down) */}
-      <AutoMarketPreview onOpenMarket={() => setMarketOpen(true)} />
-      <AutoMarketPanel open={marketOpen} onClose={() => setMarketOpen(false)} />
+  // -------------------------------------------------------
+  // 3. TANLOVGA QARAB OYNANI O'ZGARTIRISH
+  // -------------------------------------------------------
+  if (selectedService === "taxi") {
+    return <ClientTaxiPage onBack={goBack} />;
+  }
+  if (selectedService === "delivery") {
+    return <DeliveryPage onBack={goBack} />;
+  }
+  if (selectedService === "intercity") {
+    return <ClientInterProvincial onBack={goBack} />;
+  }
+  if (selectedService === "market") {
+    return <MarketEntry onBack={goBack} />;
+  }
+  if (selectedService === "freight") {
+    // Freight tayyor bo'lmasa:
+    return (
+      <div style={{ padding: 20, textAlign: "center" }}>
+        <h2>Tez kunda...</h2>
+        <Button onClick={goBack}>Orqaga</Button>
       </div>
-    </ConfigProvider>
+    );
+  }
+
+  // -------------------------------------------------------
+  // 4. ASOSIY EKRAN (Tugmalar)
+  // -------------------------------------------------------
+  return (
+    <div style={{ padding: 16, paddingBottom: 80 }}>
+      {/* Tepadagi Header qismi Dashboard.jsx da bor, bu yerga shart emas */}
+      
+      <Row gutter={[16, 16]}>
+        {services.map((item) => (
+          <Col span={12} key={item.key}>
+            <Card
+              hoverable
+              onClick={() => setSelectedService(item.key)}
+              style={{
+                borderRadius: 24,
+                border: "none",
+                textAlign: "center",
+                height: 160,
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                alignItems: "center",
+                background: item.bg,
+                boxShadow: "0 4px 15px rgba(0,0,0,0.05)"
+              }}
+            >
+              <div 
+                style={{ 
+                  color: item.color, 
+                  marginBottom: 12,
+                  background: "#fff",
+                  borderRadius: "50%",
+                  width: 70,
+                  height: 70,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 4px 10px rgba(0,0,0,0.05)"
+                }}
+              >
+                {item.icon}
+              </div>
+              <Text strong style={{ fontSize: 16 }}>{item.title}</Text>
+            </Card>
+          </Col>
+        ))}
+      </Row>
+
+      {/* Agar Avto Bozor "preview" qismi kerak bo'lsa, shu yerga qo'shasiz */}
+      {/* <AutoMarketPreview /> */}
+    </div>
   );
 }
