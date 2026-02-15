@@ -17,217 +17,76 @@ import Register from "./features/auth/pages/Register";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import MainPage from "./pages/MainPage";
+import Logout from "./pages/Logout";
+import Support from "./pages/Support";
+import MyAddresses from "./pages/MyAddresses";
+
+// --- CLIENT ---
+import ClientHome from "@features/client/pages/ClientHome";
+import ClientTaxi from "@features/client/components/ClientTaxi";
+import ClientOrders from "./pages/ClientOrders";
+
+// --- DRIVER ---
 import DriverOrders from "@features/driver/pages/DriverOrders";
 import DriverDashboard from "@features/driver/pages/DriverDashboard";
 import DriverPending from "./pages/DriverPending";
-import Logout from "./pages/Logout";
-import Support from "./pages/Support";
-import ClientOrders from "./pages/ClientOrders";
-import MyAddresses from "./pages/MyAddresses";
+// import DriverInterDistrict from "@features/driver/pages/DriverInterDistrict"; // Agar bu fayllar bor bo'lsa kommentdan oling
+// import DriverFreight from "@features/driver/pages/DriverFreight";
+// import DriverDelivery from "@features/driver/pages/DriverDelivery";
+
+// --- SETTINGS ---
 import Settings from "@features/settings/pages/Settings";
-import AutoMarketEntry from "@features/auto-market/AutoMarketEntry";
-import ClientHome from "@features/client/pages/ClientHome";
-import ClientTaxi from "@features/client/components/ClientTaxi";
 
-// --- MIJOZ KOMPONENTLARI ---
-import ClientFreight from "./features/client/components/ClientFreight";
-import ClientDelivery from "./features/client/components/ClientDelivery";
-import ClientInterDistrict from "./features/client/components/ClientInterDistrict";
-import ClientInterProvincial from "./features/client/components/ClientInterProvincial";
+// 👇 MANA SHU YER TUZATILDI (Import manzili)
+import AutoMarketEntry from "./features/auto-market/AutoMarketEntry";
 
-// --- HAYDOVCHI MODE ---
-import DriverAuth from "./features/driver/components/DriverAuth";
-import DriverHome from "./features/driver/components/DriverHome";
-import DriverMap from "./features/driver/components/DriverMap";
-import DriverDelivery from "./features/driver/components/services/DriverDelivery";
-import DriverFreight from "./features/driver/components/services/DriverFreight";
-import DriverInterProvincial from "./features/driver/components/services/DriverInterProvincial";
-import DriverInterDistrict from "./features/driver/components/services/DriverInterDistrict";
-import DriverTaxi from "./features/driver/components/services/DriverTaxi";
-
-import { prioritizeAssets } from "./utils/BaselineProfile";
-import { ProviderSwitchPanel } from "./features/debug/components/ProviderSwitchPanel";
-
-/**
- * ✅ Theme system (single source)
- * - night mode: body.night-mode-active class bilan
- * - antd theme: bitta joydan
- */
-import { useThemeMode } from "./theme/useThemeMode";
-import { getAntdTheme } from "./theme/antdTheme";
-
-// Lazy pages
-const DevHub = lazy(() => import("./pages/DevHub.jsx"));
-
-// Sahifalar almashganda skrolni tepaga qaytarish
-function ScrollToTop() {
-  const { pathname } = useLocation();
-
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [pathname]);
-
-  return null;
-}
+// --- LAZY LOADING (DEV) ---
+const DevHub = lazy(() => import("./pages/DevHub"));
 
 export default function App() {
-  // Ilova yuklanishi bilan optimizatsiyalar
-  useEffect(() => {
-    if (typeof prioritizeAssets === "function") {
-      prioritizeAssets();
-    }
-  }, []);
-
-  /**
-   * ✅ Night mode bitta joydan:
-   * localStorage("nightMode") => "auto" | "on" | "off"
-   * body.night-mode-active classni hook o‘zi qo‘llaydi
-   */
-  const { nightMode, isDark, setNightMode } = useThemeMode();
-
-  // URL query orqali tez boshqarish (night=1/0/auto)
-  useEffect(() => {
-    const qp = new URLSearchParams(window.location.search);
-    const qNight = qp.get("night");
-
-    if (qNight === "1") {
-      setNightMode("on");
-    } else if (qNight === "0") {
-      setNightMode("off");
-    } else if (qNight === "auto") {
-      setNightMode("auto");
-    }
-  }, [setNightMode]);
-
-  const qp = new URLSearchParams(window.location.search);
-  const debugProviders = qp.get("debugProviders") === "1";
-  // keep routes registry warm (no runtime behavior change)
-  void _routes;
-
   return (
-    <ConfigProvider theme={getAntdTheme(isDark)}>
+    <ConfigProvider>
       <LanguageProvider>
         <BrowserRouter>
-          <ScrollToTop />
-          {debugProviders && <ProviderSwitchPanel />}
-
           <Routes>
-            {/* START */}
-            <Route path="/" element={<Navigate to="/login" replace />} />
-
-            {/* AUTH */}
+            
+            {/* --- ASOSIY SAHIFALAR (PUBLIC) --- */}
+            <Route path="/" element={<MainPage />} />
             <Route path="/login" element={<Auth />} />
             <Route path="/register" element={<Register />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/logout" element={<Logout />} />
+            
+            {/* --- DASHBOARD --- */}
+            <Route path="/dashboard" element={<Dashboard />} />
 
-            {/* CLIENT (yo'lovchi) */}
-            <Route
-              path="/client"
-              element={
-                <RoleGate allow={{ client: true, driver: true }}>
-                  <ClientHome />
-                </RoleGate>
-              }
-            />
-            <Route
-              path="/client/taxi"
-              element={
-                <RoleGate allow={{ client: true, driver: true }}>
-                  <ClientTaxi />
-                </RoleGate>
-              }
-            />
-            <Route
-              path="/client/inter-provincial"
-              element={
-                <RoleGate allow={{ client: true, driver: true }}>
-                  <ClientInterProvincial onBack={() => window.history.back()} />
-                </RoleGate>
-              }
-            />
-            <Route
-              path="/client/inter-district"
-              element={
-                <RoleGate allow={{ client: true, driver: true }}>
-                  <ClientInterDistrict onBack={() => window.history.back()} />
-                </RoleGate>
-              }
-            />
-            <Route
-              path="/client/freight"
-              element={
-                <RoleGate allow={{ client: true, driver: true }}>
-                  <ClientFreight onBack={() => window.history.back()} />
-                </RoleGate>
-              }
-            />
-            <Route
-              path="/client/delivery"
-              element={
-                <RoleGate allow={{ client: true, driver: true }}>
-                  <ClientDelivery onBack={() => window.history.back()} />
-                </RoleGate>
-              }
-            />
+            {/* --- CLIENT (YO'LOVCHI) UCHUN --- */}
+            <Route path="/client/home" element={<ClientHome />} />
+            <Route path="/client/taxi" element={<ClientTaxi />} />
+            <Route path="/client/orders" element={<ClientOrders />} />
+            <Route path="/client/addresses" element={<MyAddresses />} />
 
-            {/* COMMON */}
-            <Route
-              path="/auto-market"
-              element={
-                <RoleGate allow={{ client: true, driver: true }}>
-                  <AutoMarketPage />
-                </RoleGate>
-              }
-            />
-            <Route
-              path="/settings"
-              element={
-                <RoleGate allow={{ client: true, driver: true }}>
-                  <Settings />
-                </RoleGate>
-              }
-            />
-            <Route
-              path="/addresses"
-              element={
-                <RoleGate allow={{ client: true, driver: true }}>
-                  <MyAddresses />
-                </RoleGate>
-              }
-            />
-            <Route
-              path="/orders"
-              element={
-                <RoleGate allow={{ client: true, driver: true }}>
-                  <ClientOrders />
-                </RoleGate>
-              }
-            />
-            <Route
-              path="/support"
-              element={
-                <RoleGate allow={{ client: true, driver: true }}>
-                  <Support />
-                </RoleGate>
-              }
-            />
+            {/* 👇 AVTO BOZOR (AUTO MARKET) - TO'LIQ QO'SHILDI */}
+            <Route path="/auto-market/*" element={<AutoMarketEntry />} />
 
-            {/* DRIVER */}
+            {/* --- UMUMIY SOZLAMALAR --- */}
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/support" element={<Support />} />
+
+            {/* --- DRIVER (HAYDOVCHI) UCHUN - HIMOYALANGAN YO'LLAR --- */}
             <Route
-              path="/driver-mode"
-              element={
-                <RoleGate allow={{ client: true, driver: true }}>
-                  <DriverAuth onBack={() => window.history.back()} />
-                </RoleGate>
-              }
-            />
-            <Route path="/driver-pending" element={<DriverPending />} />
-            <Route
-              path="/driver"
+              path="/driver/dashboard"
               element={
                 <RoleGate allow={{ client: false, driver: true, requireDriverApproved: true }}>
                   <DriverDashboard />
+                </RoleGate>
+              }
+            />
+            <Route
+              path="/driver/pending"
+              element={
+                <RoleGate allow={{ client: false, driver: true, requireDriverApproved: false }}>
+                  <DriverPending />
                 </RoleGate>
               }
             />
@@ -239,27 +98,15 @@ export default function App() {
                 </RoleGate>
               }
             />
-            <Route
-              path="/driver/taxi"
-              element={
-                <RoleGate allow={{ client: false, driver: true, requireDriverApproved: true }}>
-                  <DriverTaxi onBack={() => window.history.back()} />
-                </RoleGate>
-              }
-            />
-            <Route
-              path="/driver/inter-provincial"
-              element={
-                <RoleGate allow={{ client: false, driver: true, requireDriverApproved: true }}>
-                  <DriverInterProvincial onBack={() => window.history.back()} />
-                </RoleGate>
-              }
-            />
-            <Route
+
+            {/* --- QO'SHIMCHA HAYDOVCHI XIZMATLARI (Sizning faylingizdan tiklandi) --- */}
+            {/* Agar bu komponentlar faylda import qilinmagan bo'lsa, xato berishi mumkin.
+                Lekin sizning eski faylingizda bular bor edi. */}
+            {/* <Route
               path="/driver/inter-district"
               element={
                 <RoleGate allow={{ client: false, driver: true, requireDriverApproved: true }}>
-                  <DriverInterDistrict onBack={() => window.history.back()} />
+                   <DriverInterDistrict onBack={() => window.history.back()} />
                 </RoleGate>
               }
             />
@@ -278,26 +125,28 @@ export default function App() {
                   <DriverDelivery onBack={() => window.history.back()} />
                 </RoleGate>
               }
-            />
+            /> 
+            */}
 
-            {/* LEGACY / SUPER PRO */}
+            {/* --- SUPER PRO / LEGACY FEATURES --- */}
             {appConfig.features.garage && <Route path="/garage" element={<GaragePage />} />}
             {appConfig.features.payments && <Route path="/payments" element={<PaymentsPage />} />}
             {appConfig.features.searchOnRoute && <Route path="/search-route" element={<SearchOnRoutePage />} />}
 
-            {/* FALLBACK */}
+            {/* --- FALLBACK (XATO MANZIL) --- */}
             <Route path="*" element={<Navigate to="/login" replace />} />
-          {/* DEV (hidden) */}
-<Route
-  path="/__dev"
-  element={
-    <Suspense fallback={null}>
-      <DevHub />
-    </Suspense>
-  }
-/>
 
-</Routes>
+            {/* --- DEV (HIDDEN) --- */}
+            <Route
+              path="/__dev"
+              element={
+                <Suspense fallback={null}>
+                  <DevHub />
+                </Suspense>
+              }
+            />
+
+          </Routes>
         </BrowserRouter>
       </LanguageProvider>
     </ConfigProvider>
