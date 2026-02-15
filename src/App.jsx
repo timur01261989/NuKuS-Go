@@ -47,17 +47,16 @@ import DriverTaxi from "./features/driver/components/services/DriverTaxi";
 
 import { prioritizeAssets } from "./utils/BaselineProfile";
 import { ProviderSwitchPanel } from "./features/debug/components/ProviderSwitchPanel";
+import { useThemeMode } from "./theme/useThemeMode";
+import { getAntdTheme } from "./theme/antdTheme";
+
+const DevHub = lazy(() => import("./pages/DevHub.jsx"));
 
 /**
  * ✅ Theme system (single source)
  * - night mode: body.night-mode-active class bilan
  * - antd theme: bitta joydan
  */
-import { useThemeMode } from "./theme/useThemeMode";
-import { getAntdTheme } from "./theme/antdTheme";
-
-// Lazy pages
-const DevHub = lazy(() => import("./pages/DevHub.jsx"));
 
 // Sahifalar almashganda skrolni tepaga qaytarish
 function ScrollToTop() {
