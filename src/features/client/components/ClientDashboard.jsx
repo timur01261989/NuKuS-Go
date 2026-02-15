@@ -12,11 +12,11 @@ import {
 // 1. YANGI MODULLARNI IMPORT QILISH
 // (Fayl yo'llarini o'zingizdagi papkaga qarab to'g'rilang)
 // -------------------------------------------------------
-import ClientTaxiPage from "../../taxi/ClientTaxiPage";
-import DeliveryPage from "../../delivery/DeliveryPage";
-import ClientInterProvincial from "../../intercity/ClientInterProvincial";
-// import FreightPage from "../../freight/FreightPage"; // Agar tayyor bo'lsa oching
-import MarketEntry from "../../market/MarketEntry"; // Yoki MarketRouter
+import ClientTaxiPage from "./taxi/ClientTaxiPage";
+import DeliveryPage from "./delivery/DeliveryPage";
+import ClientInterProvincial from "./intercity/ClientInterProvincial";
+// import FreightPage from "./freight/FreightPage"; // Agar tayyor bo'lsa oching
+import MarketEntry from "../auto-market/AutoMarketEntry"; // Yoki MarketRouter
 
 const { Text } = Typography;
 
