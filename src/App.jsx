@@ -1,4 +1,4 @@
-import React, { useEffect, Suspense } from "react";
+import React, { useEffect, Suspense, lazy } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { ConfigProvider } from "antd";
 import { LanguageProvider } from "@shared/i18n/LanguageContext";
@@ -46,9 +46,6 @@ import DriverInterDistrict from "./features/driver/components/services/DriverInt
 import DriverTaxi from "./features/driver/components/services/DriverTaxi";
 
 import { prioritizeAssets } from "./utils/BaselineProfile";
-import { lazy } from "react";
-const DevHub = lazy(() => import("./pages/DevHub.jsx"));
-
 import { ProviderSwitchPanel } from "./features/debug/components/ProviderSwitchPanel";
 
 /**
@@ -58,6 +55,9 @@ import { ProviderSwitchPanel } from "./features/debug/components/ProviderSwitchP
  */
 import { useThemeMode } from "./theme/useThemeMode";
 import { getAntdTheme } from "./theme/antdTheme";
+
+// Lazy pages
+const DevHub = lazy(() => import("./pages/DevHub.jsx"));
 
 // Sahifalar almashganda skrolni tepaga qaytarish
 function ScrollToTop() {
