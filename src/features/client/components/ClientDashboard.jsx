@@ -26,7 +26,19 @@ export default function ClientDashboard({ onBackToMain }) {
 
   const [selectedService, setSelectedService] = useState(null);
   const [loading, setLoading] = useState(true); // Skeleton uchun
+const renderContent = () => {
+    // ...
+    switch (currentView) {
+      
+      // ...
+      
+      case "taxi":
+        // 👇 Yangi komponentni shu yerga qo'yamiz
+        return <ClientTaxiPage onBack={() => setCurrentView("dashboard")} />;
 
+      // ...
+    }
+  };
   // Dastlabki yuklanish effekti
   useEffect(() => {
     setTimeout(() => setLoading(false), 800);
