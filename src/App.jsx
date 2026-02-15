@@ -25,7 +25,7 @@ import Support from "./pages/Support";
 import ClientOrders from "./pages/ClientOrders";
 import MyAddresses from "./pages/MyAddresses";
 import Settings from "@features/settings/pages/Settings";
-import AutoMarketPage from "@features/market/pages/AutoMarketPage";
+import AutoMarketEntry from "@features/auto-market/AutoMarketEntry";
 import ClientHome from "@features/client/pages/ClientHome";
 import ClientTaxi from "@features/client/components/ClientTaxi";
 
@@ -47,16 +47,17 @@ import DriverTaxi from "./features/driver/components/services/DriverTaxi";
 
 import { prioritizeAssets } from "./utils/BaselineProfile";
 import { ProviderSwitchPanel } from "./features/debug/components/ProviderSwitchPanel";
-import { useThemeMode } from "./theme/useThemeMode";
-import { getAntdTheme } from "./theme/antdTheme";
-
-const DevHub = lazy(() => import("./pages/DevHub.jsx"));
 
 /**
  * ✅ Theme system (single source)
  * - night mode: body.night-mode-active class bilan
  * - antd theme: bitta joydan
  */
+import { useThemeMode } from "./theme/useThemeMode";
+import { getAntdTheme } from "./theme/antdTheme";
+
+// Lazy pages
+const DevHub = lazy(() => import("./pages/DevHub.jsx"));
 
 // Sahifalar almashganda skrolni tepaga qaytarish
 function ScrollToTop() {
