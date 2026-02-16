@@ -1,28 +1,55 @@
 import React from "react";
-import { Card, Input } from "antd";
-import { useCreateAd } from "../../../context/CreateAdContext";
+import { CITIES } from "../../../services/staticData";
 
-export default function Step5_Contact() {
-  const { ad, patch } = useCreateAd();
-  const seller = ad.seller || {};
+export default function Step5_Contact({ draft, setDraft }) {
   return (
-    <Card style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 14 }}>
-      <div style={{ fontWeight: 900, color: "#0f172a" }}>Kontakt</div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
-        <div>
-          <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700, marginBottom: 6 }}>Ism</div>
-          <Input value={seller.name} onChange={(e)=>patch({ seller: { ...seller, name: e.target.value } })} placeholder="Sotuvchi ismi" />
-        </div>
-        <div>
-          <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700, marginBottom: 6 }}>Telefon</div>
-          <Input value={seller.phone} onChange={(e)=>patch({ seller: { ...seller, phone: e.target.value } })} placeholder="+998..." />
-        </div>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div>
+        <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Telefon</div>
+        <input
+          value={draft.phone || ""}
+          onChange={(e) => setDraft({ phone: e.target.value })}
+          placeholder="+998 90 123 45 67"
+          style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid rgba(0,0,0,0.15)" }}
+        />
       </div>
 
-      <div style={{ marginTop: 12, fontSize: 12, color: "#64748b" }}>
-        Eslatma: Telefon raqamini to'g'ri kiriting — xaridorlar siz bilan bog'lanadi.
+      <div>
+        <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Shahar</div>
+        <select
+          value={draft.location?.city || ""}
+          onChange={(e) => setDraft({ location: { ...(draft.location || {}), city: e.target.value } })}
+          style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid rgba(0,0,0,0.15)" }}
+        >
+          <option value="">Tanlang…</option>
+          {CITIES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
       </div>
-    </Card>
+
+      <div style={{ gridColumn: "1 / -1" }}>
+        <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Manzil koordinatalari (ixtiyoriy)</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <input
+            type="number"
+            value={draft.location?.lat ?? ""}
+            onChange={(e) => setDraft({ location: { ...(draft.location || {}), lat: Number(e.target.value) } })}
+            placeholder="lat"
+            style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid rgba(0,0,0,0.15)" }}
+          />
+          <input
+            type="number"
+            value={draft.location?.lng ?? ""}
+            onChange={(e) => setDraft({ location: { ...(draft.location || {}), lng: Number(e.target.value) } })}
+            placeholder="lng"
+            style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid rgba(0,0,0,0.15)" }}
+          />
+        </div>
+        <div style={{ marginTop: 6, fontSize: 12, opacity: 0.65 }}>Keyin xarita qo‘shilsa, shu joy avtomatik to‘ladi.</div>
+      </div>
+    </div>
   );
 }

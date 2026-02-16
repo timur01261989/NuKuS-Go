@@ -1,37 +1,31 @@
-import React, { useEffect, useState } from "react";
-import { HeartFilled, HeartOutlined } from "@ant-design/icons";
-import { Button } from "antd";
-import { getFavorites, toggleFavorite } from "../../services/marketApi";
+import React from "react";
+import { useMarketStore } from "../../stores/marketStore";
 
-export default function FavoriteButton({ adId, size = "middle", onChanged }) {
-  const [fav, setFav] = useState(false);
-  useEffect(() => {
-    (async () => {
-      const set = await getFavorites();
-      setFav(set.has(String(adId)));
-    })();
-  }, [adId]);
-
-  const onClick = async (e) => {
-    e?.stopPropagation?.();
-    const list = await toggleFavorite(adId);
-    const isFav = list.includes(String(adId));
-    setFav(isFav);
-    onChanged?.(isFav);
-  };
+export default function FavoriteButton({ adId }) {
+  const { favorites, toggleFavorite } = useMarketStore();
+  const active = Boolean(favorites?.[adId]);
 
   return (
-    <Button
-      size={size}
-      shape="circle"
-      onClick={onClick}
-      aria-label="Sevimli"
-      style={{
-        border: "none",
-        background: "rgba(255,255,255,.92)",
-        boxShadow: "0 10px 26px rgba(0,0,0,.18)"
+    <button
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleFavorite(adId);
       }}
-      icon={fav ? <HeartFilled style={{ color: "#ef4444" }} /> : <HeartOutlined />}
-    />
+      aria-label="favorite"
+      style={{
+        width: 38,
+        height: 38,
+        borderRadius: 999,
+        border: "none",
+        background: active ? "#ef4444" : "rgba(255,255,255,0.9)",
+        color: active ? "#fff" : "#111827",
+        fontSize: 18,
+        cursor: "pointer",
+        boxShadow: "0 8px 20px rgba(0,0,0,0.18)",
+      }}
+    >
+      {active ? "♥" : "♡"}
+    </button>
   );
 }

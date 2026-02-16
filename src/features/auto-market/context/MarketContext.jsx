@@ -1,67 +1,97 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useContext, useCallback, useEffect, useMemo, useState } from "react";
+import { useMarketStore } from "../stores/marketStore";
+import { listCars, getCarById, createCarAd, listMyAds } from "../services/marketApi";
 
-const MarketContext = createContext(null);
-const LS_KEY = "auto_market_filters_v1";
+/**
+ * 📊 MarketContext.jsx (Modulning "Miyasi")
+ *
+ * Vazifalari:
+ * - Supabase/API'dan mashinalarni yuklash (feed, details, my ads)
+ * - Filtrlash/sortlash holatini store orqali boshqarish
+ * - Global state: loading/error + cars list + pagination
+ */
 
-const defaultFilters = {
-  q: "",
-  city: "",
-  brand: "",
-  model: "",
-  yearFrom: "",
-  yearTo: "",
-  minPrice: "",
-  maxPrice: "",
-  kredit: false,
-  exchange: false,
-  sort: "recent",
-
-  nearMe: false,
-  radiusKm: 10,
-  center: null,
-};
-
-function safeParse(raw, fallback) {
-  try { const v = JSON.parse(raw); return v && typeof v === "object" ? v : fallback; } catch { return fallback; }
-}
+const MarketCtx = createContext(null);
 
 export function MarketProvider({ children }) {
-  const [filters, setFilters] = useState(defaultFilters);
+  const { filters, setFilters } = useMarketStore();
 
-  useEffect(() => {
+  const [cars, setCars] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const raw = localStorage.getItem(LS_KEY);
-      if (raw) setFilters((p) => ({ ...p, ...safeParse(raw, {}) }));
-    } catch {}
+      const res = await listCars({ filters, page: 1 });
+      setCars(res.items || []);
+      setHasMore(Boolean(res.hasMore));
+      setPage(1);
+    } catch (e) {
+      setError(e);
+    } finally {
+      setLoading(false);
+    }
+  }, [filters]);
+
+  const loadMore = useCallback(async () => {
+    if (loading || !hasMore) return;
+    const next = page + 1;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await listCars({ filters, page: next });
+      setCars((prev) => [...prev, ...(res.items || [])]);
+      setHasMore(Boolean(res.hasMore));
+      setPage(next);
+    } catch (e) {
+      setError(e);
+    } finally {
+      setLoading(false);
+    }
+  }, [filters, page, hasMore, loading]);
+
+  const fetchDetails = useCallback(async (id) => {
+    return await getCarById(id);
+  }, []);
+
+  const submitAd = useCallback(async (draft) => {
+    return await createCarAd(draft);
+  }, []);
+
+  const fetchMyAds = useCallback(async () => {
+    return await listMyAds();
   }, []);
 
   useEffect(() => {
-    try { localStorage.setItem(LS_KEY, JSON.stringify(filters)); } catch {}
-  }, [filters]);
+    refresh();
+  }, [refresh]);
 
-  // center for nearMe
-  useEffect(() => {
-    if (filters.center) return;
-    if (!("geolocation" in navigator)) return;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => setFilters((p) => ({ ...p, center: p.center || { lat: pos.coords.latitude, lng: pos.coords.longitude } })),
-      () => {},
-      { enableHighAccuracy: true, timeout: 7000, maximumAge: 60_000 }
-    );
-  }, [filters.center]);
+  const value = useMemo(
+    () => ({
+      cars,
+      loading,
+      error,
+      hasMore,
+      filters,
+      setFilters,
+      refresh,
+      loadMore,
+      fetchDetails,
+      submitAd,
+      fetchMyAds,
+    }),
+    [cars, loading, error, hasMore, filters, setFilters, refresh, loadMore, fetchDetails, submitAd, fetchMyAds]
+  );
 
-  const value = useMemo(() => ({
-    filters,
-    setFilters,
-    patchFilters: (patch) => setFilters((p) => ({ ...p, ...patch })),
-    resetFilters: () => setFilters(defaultFilters),
-  }), [filters]);
-
-  return <MarketContext.Provider value={value}>{children}</MarketContext.Provider>;
+  return <MarketCtx.Provider value={value}>{children}</MarketCtx.Provider>;
 }
 
 export function useMarket() {
-  const ctx = useContext(MarketContext);
-  if (!ctx) throw new Error("useMarket must be used inside MarketProvider");
+  const ctx = useContext(MarketCtx);
+  if (!ctx) throw new Error("useMarket must be used within MarketProvider");
   return ctx;
 }

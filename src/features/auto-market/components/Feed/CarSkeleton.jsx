@@ -1,106 +1,28 @@
 import React from "react";
 
-/**
- * CarSkeleton
- * Feed sahifada yuklanayotganda kartochka skeletoni.
- *
- * Props:
- *  - variant: "vertical" | "horizontal"
- *  - count: nechta skeleton chiqsin
- */
-export default function CarSkeleton({ variant = "vertical", count = 6 }) {
-  const items = Array.from({ length: Math.max(1, count) });
-
+export default function CarSkeleton({ count = 6 }) {
+  const items = Array.from({ length: count });
   return (
-    <div style={{ display: "grid", gap: 12 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
       {items.map((_, i) => (
-        <div
-          key={i}
-          style={{
-            borderRadius: 16,
-            background: "#0f172a0a",
-            border: "1px solid rgba(15,23,42,0.08)",
-            overflow: "hidden",
-            boxShadow: "0 8px 24px rgba(15,23,42,0.06)",
-          }}
-        >
-          {/* Image block */}
+        <div key={i} style={{ background: "#fff", borderRadius: 16, padding: 12, border: "1px solid rgba(0,0,0,0.06)" }}>
           <div
             style={{
-              height: variant === "horizontal" ? 140 : 200,
-              background:
-                "linear-gradient(90deg, rgba(15,23,42,0.06) 25%, rgba(15,23,42,0.12) 37%, rgba(15,23,42,0.06) 63%)",
-              backgroundSize: "400% 100%",
-              animation: "am-skeleton 1.2s ease-in-out infinite",
+              height: 150,
+              borderRadius: 12,
+              background: "linear-gradient(90deg,#f1f5f9,#e2e8f0,#f1f5f9)",
+              backgroundSize: "200% 100%",
+              animation: "shimmer 1.2s infinite",
             }}
           />
-
-          {/* Text blocks */}
-          <div style={{ padding: 14, display: "grid", gap: 10 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-              <div
-                style={{
-                  height: 14,
-                  width: "55%",
-                  borderRadius: 10,
-                  background:
-                    "linear-gradient(90deg, rgba(15,23,42,0.06) 25%, rgba(15,23,42,0.12) 37%, rgba(15,23,42,0.06) 63%)",
-                  backgroundSize: "400% 100%",
-                  animation: "am-skeleton 1.2s ease-in-out infinite",
-                }}
-              />
-              <div
-                style={{
-                  height: 14,
-                  width: 90,
-                  borderRadius: 10,
-                  background:
-                    "linear-gradient(90deg, rgba(15,23,42,0.06) 25%, rgba(15,23,42,0.12) 37%, rgba(15,23,42,0.06) 63%)",
-                  backgroundSize: "400% 100%",
-                  animation: "am-skeleton 1.2s ease-in-out infinite",
-                }}
-              />
-            </div>
-
-            <div style={{ display: "flex", gap: 10 }}>
-              {[1, 2, 3].map((k) => (
-                <div
-                  key={k}
-                  style={{
-                    height: 26,
-                    width: 86,
-                    borderRadius: 999,
-                    background:
-                      "linear-gradient(90deg, rgba(15,23,42,0.06) 25%, rgba(15,23,42,0.12) 37%, rgba(15,23,42,0.06) 63%)",
-                    backgroundSize: "400% 100%",
-                    animation: "am-skeleton 1.2s ease-in-out infinite",
-                  }}
-                />
-              ))}
-            </div>
-
-            <div
-              style={{
-                height: 12,
-                width: "70%",
-                borderRadius: 10,
-                background:
-                  "linear-gradient(90deg, rgba(15,23,42,0.06) 25%, rgba(15,23,42,0.12) 37%, rgba(15,23,42,0.06) 63%)",
-                backgroundSize: "400% 100%",
-                animation: "am-skeleton 1.2s ease-in-out infinite",
-              }}
-            />
-          </div>
-
-          {/* Local keyframes once */}
-          {i === 0 && (
-            <style>{`
-              @keyframes am-skeleton {
-                0% { background-position: 100% 0; }
-                100% { background-position: 0 0; }
-              }
-            `}</style>
-          )}
+          <div style={{ height: 14, marginTop: 10, width: "75%", borderRadius: 10, background: "#e2e8f0" }} />
+          <div style={{ height: 14, marginTop: 8, width: "40%", borderRadius: 10, background: "#e2e8f0" }} />
+          <style>{`
+            @keyframes shimmer {
+              0% { background-position: 200% 0; }
+              100% { background-position: -200% 0; }
+            }
+          `}</style>
         </div>
       ))}
     </div>

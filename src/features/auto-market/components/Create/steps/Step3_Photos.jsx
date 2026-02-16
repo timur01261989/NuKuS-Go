@@ -1,65 +1,71 @@
 import React, { useRef } from "react";
-import { Card, Button, Image, message } from "antd";
-import { UploadOutlined, DeleteOutlined } from "@ant-design/icons";
-import { useCreateAd } from "../../../context/CreateAdContext";
-import useUploadImages from "../../../hooks/useUploadImages";
+import { compressImage } from "../../../utils/imageUtils";
 
-export default function Step3_Photos() {
-  const { ad, patch } = useCreateAd();
-  const { upload, uploading } = useUploadImages();
+export default function Step3_Photos({ draft, setDraft }) {
   const inputRef = useRef(null);
 
-  const onPick = async (e) => {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
-    try {
-      const uploaded = await upload(files);
-      const urls = uploaded.map(x => x.url);
-      patch({ images: [...(ad.images || []), ...urls].slice(0, 10) });
-    } catch (err) {
-      message.error("Rasm yuklashda xatolik");
-    } finally {
-      e.target.value = "";
+  const addPhotos = async (files) => {
+    const list = Array.from(files || []);
+    const compressed = [];
+    for (const f of list) {
+      try {
+        const cf = await compressImage(f, { maxSizeMB: 1.2, maxWidthOrHeight: 1600 });
+        compressed.push({ file: cf, preview: URL.createObjectURL(cf) });
+      } catch (e) {
+        compressed.push({ file: f, preview: URL.createObjectURL(f) });
+      }
     }
+    setDraft({ photos: [...(draft.photos || []), ...compressed] });
   };
 
-  const remove = (idx) => {
-    patch({ images: (ad.images || []).filter((_, i) => i !== idx) });
+  const removeAt = (i) => {
+    const next = (draft.photos || []).slice();
+    next.splice(i, 1);
+    setDraft({ photos: next });
   };
 
   return (
-    <Card style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 14 }}>
-      <div style={{ fontWeight: 900, color: "#0f172a" }}>Rasmlar</div>
-      <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
-        Kamida 1 ta, maksimal 10 ta rasm.
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <div style={{ fontWeight: 900 }}>Rasmlar</div>
+        <button
+          onClick={() => inputRef.current?.click()}
+          style={{ border: "1px solid rgba(0,0,0,0.12)", background: "#fff", padding: "8px 10px", borderRadius: 10, fontWeight: 800 }}
+        >
+          + Qo'shish
+        </button>
       </div>
 
-      <input ref={inputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={onPick} />
+      <input ref={inputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={(e) => addPhotos(e.target.files)} />
 
-      <Button
-        icon={<UploadOutlined />}
-        type="primary"
-        loading={uploading}
-        onClick={() => inputRef.current?.click()}
-        style={{ marginTop: 12, borderRadius: 14, background: "#0ea5e9", border: "none" }}
-      >
-        Rasm tanlash
-      </Button>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginTop: 14 }}>
-        {(ad.images || []).map((src, idx) => (
-          <div key={idx} style={{ position: "relative", borderRadius: 14, overflow: "hidden", border: "1px solid #e2e8f0" }}>
-            <Image src={src} alt="" preview={false} style={{ width: "100%", height: 120, objectFit: "cover" }} />
-            <Button
-              icon={<DeleteOutlined />}
-              shape="circle"
-              size="small"
-              onClick={() => remove(idx)}
-              style={{ position: "absolute", right: 8, top: 8, border: "none", background: "rgba(255,255,255,.92)" }}
-            />
-          </div>
-        ))}
-      </div>
-    </Card>
+      {(draft.photos || []).length === 0 ? (
+        <div style={{ opacity: 0.7 }}>Kamida 1 ta rasm yuklang</div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+          {(draft.photos || []).map((p, idx) => (
+            <div key={idx} style={{ position: "relative", borderRadius: 12, overflow: "hidden", border: "1px solid rgba(0,0,0,0.08)" }}>
+              <img src={p.preview || p.url} alt="" style={{ width: "100%", height: 120, objectFit: "cover" }} />
+              <button
+                onClick={() => removeAt(idx)}
+                style={{
+                  position: "absolute",
+                  top: 6,
+                  right: 6,
+                  width: 28,
+                  height: 28,
+                  borderRadius: 999,
+                  border: "none",
+                  background: "rgba(0,0,0,0.6)",
+                  color: "#fff",
+                  cursor: "pointer",
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

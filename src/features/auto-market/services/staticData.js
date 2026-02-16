@@ -1,27 +1,31 @@
-export const CITIES = [
-  "Nukus","Toshkent","Samarqand","Buxoro","Andijon","Urganch","Qarshi","Farg'ona","Namangan"
-];
-
 export const BRANDS = [
-  { id: 1, name: "Chevrolet", logo: "GM" },
-  { id: 2, name: "KIA", logo: "KIA" },
-  { id: 3, name: "Hyundai", logo: "H" },
-  { id: 4, name: "Toyota", logo: "T" },
-  { id: 5, name: "Mercedes", logo: "MB" },
-  { id: 6, name: "BMW", logo: "BMW" },
+  { id: 1, name: "Chevrolet" },
+  { id: 2, name: "KIA" },
+  { id: 3, name: "Hyundai" },
+  { id: 4, name: "BMW" },
 ];
 
 export const MODELS_BY_BRAND = {
-  Chevrolet: ["Cobalt", "Gentra", "Nexia 3", "Spark", "Damas", "Lacetti", "Malibu"],
-  KIA: ["K5", "K3", "Sportage", "Sorento", "Rio"],
-  Hyundai: ["Elantra", "Sonata", "Tucson", "Santa Fe"],
-  Toyota: ["Camry", "Corolla", "RAV4", "Land Cruiser"],
-  Mercedes: ["E-Class", "C-Class", "S-Class", "GLC"],
-  BMW: ["3 Series", "5 Series", "X5", "X3"],
+  1: [
+    { id: 11, name: "Gentra" },
+    { id: 12, name: "Cobalt" },
+    { id: 13, name: "Nexia" },
+  ],
+  2: [
+    { id: 21, name: "K5" },
+    { id: 22, name: "Sportage" },
+  ],
+  3: [
+    { id: 31, name: "Elantra" },
+    { id: 32, name: "Sonata" },
+  ],
+  4: [
+    { id: 41, name: "X5" },
+    { id: 42, name: "M3" },
+  ],
 };
 
-export const FUELS = ["Benzin", "Gaz-Metan", "Gaz-Propan", "Dizel", "Gibrid", "Elektro"];
+export const COLORS = ["Oq", "Qora", "Kulrang", "Ko'k", "Qizil", "Sariq"];
+export const FUELS = ["Benzin", "Gaz-Metan", "Elektro"];
 export const TRANSMISSIONS = ["Avtomat", "Mexanika"];
-export const COLORS = ["Oq","Qora","Kulrang","Ko'k","Qizil","Yashil","Sariq","Bej"];
-export const BODY_TYPES = ["Sedan","Hatchback","SUV","Coupe","Pickup","Minivan","Universal"];
-export const DRIVE_TYPES = ["Oldi (FWD)","Orqa (RWD)","4x4 (AWD)"];
+export const CITIES = ["Nukus", "Toshkent", "Samarqand", "Buxoro", "Urganch"];

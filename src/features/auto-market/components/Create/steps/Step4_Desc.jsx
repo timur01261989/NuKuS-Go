@@ -1,49 +1,41 @@
 import React from "react";
-import { Card, Input, InputNumber, Select } from "antd";
-import { useCreateAd } from "../../../context/CreateAdContext";
 
-export default function Step4_Desc() {
-  const { ad, patch } = useCreateAd();
+export default function Step4_Desc({ draft, setDraft }) {
   return (
-    <Card style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 14 }}>
-      <div style={{ fontWeight: 900, color: "#0f172a" }}>Narx va tavsif</div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 140px", gap: 10, marginTop: 12 }}>
-        <div>
-          <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700, marginBottom: 6 }}>Narx</div>
-          <InputNumber
-            value={ad.price ? Number(ad.price) : null}
-            onChange={(v)=>patch({ price: v })}
-            style={{ width: "100%" }}
-            min={0}
-            placeholder="Masalan: 65000000"
-          />
-        </div>
-        <div>
-          <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700, marginBottom: 6 }}>Valyuta</div>
-          <Select
-            value={ad.currency}
-            onChange={(v)=>patch({ currency: v })}
-            options={[{value:"UZS",label:"UZS"},{value:"USD",label:"USD"}]}
-            style={{ width: "100%" }}
-          />
-        </div>
-      </div>
-
-      <div style={{ marginTop: 12 }}>
-        <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700, marginBottom: 6 }}>Sarlavha</div>
-        <Input value={ad.title} onChange={(e)=>patch({ title: e.target.value })} placeholder="Masalan: Gentra 2020, ideal holat" />
-      </div>
-
-      <div style={{ marginTop: 12 }}>
-        <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700, marginBottom: 6 }}>Tavsif</div>
-        <Input.TextArea
-          value={ad.description}
-          onChange={(e)=>patch({ description: e.target.value })}
-          rows={5}
-          placeholder="Holati, komplektatsiya, hujjatlar..."
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div>
+        <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Narx</div>
+        <input
+          type="number"
+          value={draft.price || ""}
+          onChange={(e) => setDraft({ price: Number(e.target.value) })}
+          placeholder="145000000"
+          style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid rgba(0,0,0,0.15)" }}
         />
       </div>
-    </Card>
+      <div>
+        <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Valyuta</div>
+        <select
+          value={draft.currency || "UZS"}
+          onChange={(e) => setDraft({ currency: e.target.value })}
+          style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid rgba(0,0,0,0.15)" }}
+        >
+          <option value="UZS">UZS</option>
+          <option value="USD">USD</option>
+        </select>
+      </div>
+
+      <div style={{ gridColumn: "1 / -1" }}>
+        <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Tavsif</div>
+        <textarea
+          value={draft.desc || ""}
+          onChange={(e) => setDraft({ desc: e.target.value })}
+          placeholder="Mashina holati, variantlar, muammolar bo'lsa yozing..."
+          rows={6}
+          style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid rgba(0,0,0,0.15)", resize: "vertical" }}
+        />
+        <div style={{ marginTop: 6, fontSize: 12, opacity: 0.65 }}>Tavsiya: kamida 10 ta belgi.</div>
+      </div>
+    </div>
   );
 }

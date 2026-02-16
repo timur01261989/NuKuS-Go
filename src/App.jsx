@@ -23,7 +23,7 @@ import MyAddresses from "./pages/MyAddresses";
 
 // --- CLIENT ---
 import ClientHome from "@features/client/pages/ClientHome";
-import ClientTaxi from "@features/client/components/ClientTaxi";
+import ClientTaxi from "@features/client/taxi/ClientTaxiPage";
 import ClientOrders from "./pages/ClientOrders";
 
 // --- DRIVER ---

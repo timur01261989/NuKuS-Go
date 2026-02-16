@@ -1,33 +1,29 @@
 import React from "react";
-import { Button, Badge } from "antd";
-import { useNavigate } from "react-router-dom";
-import { useCompare } from "../../context/CompareContext";
-import { SwapOutlined } from "@ant-design/icons";
+import { Link } from "react-router-dom";
+import { useMarketStore } from "../../stores/marketStore";
 
 export default function CompareFloatBtn() {
-  const { ids } = useCompare();
-  const nav = useNavigate();
-  if (!ids.length) return null;
+  const { compare } = useMarketStore();
+  if (!compare.length) return null;
 
   return (
-    <div style={{ position: "fixed", right: 16, bottom: 92, zIndex: 1000 }}>
-      <Badge count={ids.length} offset={[-4, 4]}>
-        <Button
-          type="primary"
-          icon={<SwapOutlined />}
-          onClick={() => nav("/auto-market/compare")}
-          style={{
-            borderRadius: 999,
-            height: 44,
-            padding: "0 16px",
-            boxShadow: "0 16px 40px rgba(2,6,23,.18)",
-            background: "linear-gradient(135deg,#2563eb,#22c55e)",
-            border: "none"
-          }}
-        >
-          Solishtirish
-        </Button>
-      </Badge>
-    </div>
+    <Link to="/auto-market/compare" style={{ textDecoration: "none" }}>
+      <div
+        style={{
+          position: "fixed",
+          right: 16,
+          bottom: 16,
+          background: "#1677ff",
+          color: "#fff",
+          borderRadius: 999,
+          padding: "12px 14px",
+          fontWeight: 900,
+          boxShadow: "0 12px 30px rgba(0,0,0,0.25)",
+          zIndex: 999,
+        }}
+      >
+        ⚖️ Solishtirish ({compare.length})
+      </div>
+    </Link>
   );
 }

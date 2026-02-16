@@ -1,115 +1,149 @@
 import React, { useMemo, useState } from "react";
-import { Button, Modal, message } from "antd";
-import { useNavigate } from "react-router-dom";
-import { useCreateAd } from "../../context/CreateAdContext";
+import { useMarketStore } from "../../stores/marketStore";
+import { useMarket } from "../../context/MarketContext";
+
 import Step1_Brand from "./steps/Step1_Brand";
 import Step2_Specs from "./steps/Step2_Specs";
 import Step3_Photos from "./steps/Step3_Photos";
 import Step4_Desc from "./steps/Step4_Desc";
 import Step5_Contact from "./steps/Step5_Contact";
 import PreviewModal from "./PreviewModal";
-import { createCarAd } from "../../services/marketApi";
 
-const titles = ["Marka/Model", "Parametrlar", "Rasmlar", "Narx & Tavsif", "Kontakt"];
+/**
+ * 🪄 CreateAdWizard.jsx (E'lon berish "Sehrgari")
+ *
+ * - Step-by-step wizard
+ * - Draft: Zustand persist orqali saqlanadi (Orqaga bosganda o'chmaydi)
+ * - Validatsiya: muhim maydonlar to'ldirilmasa submit qilmaydi
+ */
+
+const STEPS = [
+  { key: "brand", title: "Marka/Model", Comp: Step1_Brand },
+  { key: "specs", title: "Xususiyatlar", Comp: Step2_Specs },
+  { key: "photos", title: "Rasmlar", Comp: Step3_Photos },
+  { key: "desc", title: "Narx/Tavsif", Comp: Step4_Desc },
+  { key: "contact", title: "Kontakt/Manzil", Comp: Step5_Contact },
+];
 
 export default function CreateAdWizard() {
-  const nav = useNavigate();
-  const { step, setStep, ad, reset } = useCreateAd();
-  const [preview, setPreview] = useState(false);
+  const { draft, setDraft, resetDraft } = useMarketStore();
+  const { submitAd } = useMarket();
 
-  const Step = useMemo(() => {
-    switch (step) {
-      case 0: return <Step1_Brand />;
-      case 1: return <Step2_Specs />;
-      case 2: return <Step3_Photos />;
-      case 3: return <Step4_Desc />;
-      case 4: return <Step5_Contact />;
-      default: return <Step1_Brand />;
-    }
-  }, [step]);
+  const [step, setStep] = useState(0);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const current = STEPS[step];
 
-  const canBack = step > 0;
-  const canNext = step < 4;
-
-  const validateStep = () => {
-    if (step === 0) {
-      if (!ad.brand) return message.error("Marka tanlang");
-      if (!ad.model) return message.error("Model tanlang");
-    }
-    if (step === 1) {
-      if (!ad.year) return message.error("Yil kiriting");
-      if (!ad.mileage && ad.mileage !== 0) return message.error("Probeg kiriting");
-      if (!ad.fuel_type) return message.error("Yoqilg'i turini tanlang");
-      if (!ad.transmission) return message.error("Uzatma turini tanlang");
-    }
-    if (step === 2) {
-      if (!ad.images?.length) return message.error("Kamida 1 ta rasm yuklang");
-    }
-    if (step === 3) {
-      if (!ad.price) return message.error("Narx kiriting");
-      if (!ad.title?.trim()) return message.error("Sarlavha kiriting");
-    }
-    if (step === 4) {
-      if (!ad.seller?.phone?.trim()) return message.error("Telefon raqam kiriting");
-      if (!ad.city) return message.error("Shahar tanlang");
-    }
+  const canNext = useMemo(() => {
+    if (current.key === "brand") return !!draft.brandId && !!draft.modelId;
+    if (current.key === "specs") return !!draft.year && (draft.mileage === 0 || !!draft.mileage) && !!draft.fuel && !!draft.transmission;
+    if (current.key === "photos") return (draft.photos || []).length >= 1;
+    if (current.key === "desc") return !!draft.price && String(draft.desc || "").trim().length >= 10;
+    if (current.key === "contact") return String(draft.phone || "").replace(/\D/g, "").length >= 9 && !!draft.location?.city;
     return true;
+  }, [current.key, draft]);
+
+  const goNext = () => {
+    if (!canNext) return;
+    setStep((s) => Math.min(s + 1, STEPS.length - 1));
   };
 
-  const onNext = () => {
-    if (!validateStep()) return;
-    if (canNext) setStep(step + 1);
+  const goBack = () => {
+    setStep((s) => Math.max(s - 1, 0));
   };
 
-  const onBack = () => {
-    if (canBack) setStep(step - 1);
-  };
-
-  const onSubmit = async () => {
-    if (!validateStep()) return;
-    const hide = message.loading("E'lon joylanmoqda...", 0);
+  const handleSubmit = async () => {
+    if (!canNext) return;
+    setSubmitting(true);
     try {
-      const created = await createCarAd(ad);
-      message.success("E'lon joylandi");
-      reset();
-      nav(`/auto-market/ad/${created.id}`);
+      await submitAd(draft);
+      resetDraft();
+      setStep(0);
+      alert("E'lon muvaffaqiyatli joylandi ✅");
     } catch (e) {
-      message.error(e?.message || "Xatolik");
+      // eslint-disable-next-line no-console
+      console.error("create ad error", e);
+      alert("E'lon joylashda xatolik: " + (e?.message || "Server bilan aloqa yo'q"));
     } finally {
-      hide();
+      setSubmitting(false);
     }
   };
+
+  const StepComp = current.Comp;
 
   return (
-    <div style={{ padding: 14 }}>
-      <div style={{ fontWeight: 900, fontSize: 18, color: "#0f172a" }}>E'lon berish</div>
-      <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
-        {titles[step]} • {step + 1}/{titles.length}
+    <div style={{ padding: 16, maxWidth: 820, margin: "0 auto" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ fontSize: 18, fontWeight: 900 }}>
+          E'lon berish — {current.title} ({step + 1}/{STEPS.length})
+        </div>
+        <button
+          onClick={() => setPreviewOpen(true)}
+          style={{ border: "1px solid rgba(0,0,0,0.12)", background: "#fff", borderRadius: 10, padding: "8px 10px", fontWeight: 800 }}
+        >
+          Preview
+        </button>
       </div>
 
-      <div style={{ marginTop: 14 }}>{Step}</div>
+      <div style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 16, padding: 14 }}>
+        <StepComp draft={draft} setDraft={setDraft} />
+      </div>
 
-      <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-        <Button onClick={onBack} disabled={!canBack} style={{ borderRadius: 14, flex: 1 }}>
+      <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+        <button
+          onClick={goBack}
+          disabled={step === 0 || submitting}
+          style={{
+            border: "1px solid rgba(0,0,0,0.12)",
+            background: "#fff",
+            borderRadius: 12,
+            padding: "10px 12px",
+            fontWeight: 900,
+            cursor: step === 0 ? "not-allowed" : "pointer",
+            opacity: step === 0 ? 0.5 : 1,
+          }}
+        >
           Orqaga
-        </Button>
-        {step < 4 ? (
-          <Button type="primary" onClick={onNext} style={{ borderRadius: 14, flex: 1, background: "#2563eb", border: "none" }}>
+        </button>
+
+        {step < STEPS.length - 1 ? (
+          <button
+            onClick={goNext}
+            disabled={!canNext || submitting}
+            style={{
+              marginLeft: "auto",
+              border: "none",
+              background: canNext ? "#1677ff" : "#9fbff5",
+              color: "#fff",
+              borderRadius: 12,
+              padding: "10px 14px",
+              fontWeight: 900,
+              cursor: canNext ? "pointer" : "not-allowed",
+            }}
+          >
             Keyingi
-          </Button>
+          </button>
         ) : (
-          <>
-            <Button onClick={() => setPreview(true)} style={{ borderRadius: 14, flex: 1 }}>
-              Ko'rish
-            </Button>
-            <Button type="primary" onClick={onSubmit} style={{ borderRadius: 14, flex: 1, background: "#22c55e", border: "none" }}>
-              Joylash
-            </Button>
-          </>
+          <button
+            onClick={handleSubmit}
+            disabled={!canNext || submitting}
+            style={{
+              marginLeft: "auto",
+              border: "none",
+              background: canNext ? "#22c55e" : "#a7f3d0",
+              color: "#0b3d1c",
+              borderRadius: 12,
+              padding: "10px 14px",
+              fontWeight: 900,
+              cursor: canNext ? "pointer" : "not-allowed",
+            }}
+          >
+            {submitting ? "Yuborilmoqda..." : "E'lonni joylash"}
+          </button>
         )}
       </div>
 
-      <PreviewModal open={preview} onClose={() => setPreview(false)} ad={ad} />
+      <PreviewModal open={previewOpen} onClose={() => setPreviewOpen(false)} draft={draft} />
     </div>
   );
 }

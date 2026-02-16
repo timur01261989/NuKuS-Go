@@ -1,46 +1,47 @@
-import React, { useMemo } from "react";
-import { Card, Select } from "antd";
-import { useCreateAd } from "../../../context/CreateAdContext";
+import React from "react";
 import { BRANDS, MODELS_BY_BRAND } from "../../../services/staticData";
 
-export default function Step1_Brand() {
-  const { ad, patch } = useCreateAd();
-
-  const brandOptions = useMemo(() => BRANDS.map(b => ({ value: b.name, label: b.name })), []);
-  const modelOptions = useMemo(() => (MODELS_BY_BRAND[ad.brand] || []).map(m => ({ value: m, label: m })), [ad.brand]);
+export default function Step1_Brand({ draft, setDraft }) {
+  const models = draft.brandId ? (MODELS_BY_BRAND[draft.brandId] || []) : [];
 
   return (
-    <Card style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 14 }}>
-      <div style={{ fontWeight: 900, color: "#0f172a" }}>Marka va model</div>
+    <div>
+      <div style={{ fontWeight: 900, marginBottom: 10 }}>Marka va modelni tanlang</div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <div>
-          <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700, marginBottom: 6 }}>Marka</div>
-          <Select
-            value={ad.brand || undefined}
-            placeholder="Tanlang"
-            options={brandOptions}
-            onChange={(v) => patch({ brand: v, model: "" })}
-            style={{ width: "100%" }}
-          />
+          <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Marka</div>
+          <select
+            value={draft.brandId || ""}
+            onChange={(e) => setDraft({ brandId: Number(e.target.value), modelId: null })}
+            style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid rgba(0,0,0,0.15)" }}
+          >
+            <option value="">Tanlang…</option>
+            {BRANDS.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div>
-          <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700, marginBottom: 6 }}>Model</div>
-          <Select
-            value={ad.model || undefined}
-            placeholder={ad.brand ? "Model tanlang" : "Avval marka"}
-            options={modelOptions}
-            onChange={(v) => patch({ model: v })}
-            style={{ width: "100%" }}
-            disabled={!ad.brand}
-          />
+          <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Model</div>
+          <select
+            value={draft.modelId || ""}
+            onChange={(e) => setDraft({ modelId: Number(e.target.value) })}
+            disabled={!draft.brandId}
+            style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid rgba(0,0,0,0.15)" }}
+          >
+            <option value="">Tanlang…</option>
+            {models.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
-
-      <div style={{ marginTop: 12, fontSize: 12, color: "#64748b" }}>
-        Maslahat: Mashina nomini to'g'ri tanlang — qidiruvda tez chiqadi.
-      </div>
-    </Card>
+    </div>
   );
 }

@@ -19,10 +19,10 @@ import { translations } from "@i18n/translations";
 
 // --- KOMPONENTLAR ---
 import DriverAuth from "../features/driver/components/DriverAuth";
-import ClientInterProvincial from "../features/client/components/ClientInterProvincial";
-import ClientInterDistrict from "../features/client/components/ClientInterDistrict";
-import ClientFreight from "../features/client/components/ClientFreight";
-import ClientDelivery from "../features/client/components/ClientDelivery";
+import ClientInterProvincial from "../features/client/intercity/ClientIntercityPage";
+import ClientInterDistrict from "../features/client/interDistrict/ClientInterDistrictPage";
+import ClientFreight from "../features/client/freight/ClientFreightPage";
+import ClientDelivery from "../features/client/delivery/DeliveryPage";
 import ClientOrderCreate from "../features/client/components/ClientOrderCreate";
 
 // --- RASMLAR ---

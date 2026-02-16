@@ -1,47 +1,27 @@
-import React, { useEffect, useState } from "react";
-import { Button, Spin } from "antd";
-import { ArrowLeftOutlined } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
-import { listFavoriteCars } from "../services/marketApi";
-import CarCardHorizontal from "../components/Feed/CarCardHorizontal";
+import React, { useMemo } from "react";
+import { useMarketStore } from "../stores/marketStore";
 import { useMarket } from "../context/MarketContext";
+import CarCardVertical from "../components/Feed/CarCardVertical";
 
 export default function FavoritesPage() {
-  const nav = useNavigate();
-  const { filters } = useMarket();
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const { favorites } = useMarketStore();
+  const { cars } = useMarket();
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const res = await listFavoriteCars(filters);
-      setItems(res);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { load(); }, [filters.q, filters.brand, filters.model, filters.city]);
+  const favIds = useMemo(() => Object.keys(favorites).filter((k) => favorites[k]), [favorites]);
+  const favCars = useMemo(() => cars.filter((c) => favIds.includes(String(c.id))), [cars, favIds]);
 
   return (
-    <div style={{ padding: 14, paddingBottom: 80 }}>
-      <div style={{ display:"flex", gap: 10, alignItems:"center", marginBottom: 12 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={()=>nav(-1)} style={{ borderRadius: 14 }} />
-        <div style={{ fontWeight: 950, fontSize: 18, color:"#0f172a" }}>Sevimlilar</div>
-      </div>
-
-      {loading ? <div style={{ display:"flex", justifyContent:"center", padding: 30 }}><Spin /></div> : null}
-
-      <div style={{ display:"grid", gap: 10 }}>
-        {items.map(ad => (
-          <CarCardHorizontal key={ad.id} ad={ad} onClick={()=>nav(`/auto-market/ad/${ad.id}`)} />
-        ))}
-      </div>
-
-      {!loading && !items.length ? (
-        <div style={{ marginTop: 20, color:"#64748b", fontWeight: 800 }}>Hozircha sevimlilar yo'q.</div>
-      ) : null}
+    <div style={{ padding: 16, maxWidth: 980, margin: "0 auto" }}>
+      <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 12 }}>Sevimlilar ❤️</div>
+      {favCars.length === 0 ? (
+        <div style={{ opacity: 0.7 }}>Hozircha sevimlilar yo‘q</div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+          {favCars.map((c) => (
+            <CarCardVertical key={c.id} car={c} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

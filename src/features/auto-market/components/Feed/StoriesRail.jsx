@@ -1,61 +1,27 @@
-import React, { useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { Carousel } from "antd";
-import { listCars } from "../../services/marketApi";
-import PriceTag from "../Common/PriceTag";
+import React from "react";
+import { Link } from "react-router-dom";
 import StatusBadge from "../Common/StatusBadge";
 
-export default function StoriesRail() {
-  const nav = useNavigate();
-  const [items, setItems] = React.useState([]);
-
-  React.useEffect(() => {
-    (async () => {
-      const res = await listCars({ sort: "recent" }, { page: 1, pageSize: 24 });
-      setItems(res.items.filter(x => x.is_top).slice(0, 8));
-    })();
-  }, []);
-
+export default function StoriesRail({ items = [] }) {
   if (!items.length) return null;
-
   return (
-    <div style={{ padding: "12px 14px 0" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
-        <div style={{ fontSize: 14, fontWeight: 900, color: "#0f172a" }}>Tezkor e'lonlar</div>
-        <div style={{ fontSize: 12, color: "#64748b" }}>TOP</div>
-      </div>
-
-      <Carousel dots={false} slidesToShow={1} draggable>
-        {items.map((ad) => (
-          <div key={ad.id}>
-            <div
-              onClick={() => nav(`/auto-market/ad/${ad.id}`)}
-              style={{
-                position: "relative",
-                height: 180,
-                borderRadius: 18,
-                overflow: "hidden",
-                cursor: "pointer",
-                boxShadow: "0 16px 40px rgba(2,6,23,.18)"
-              }}
-            >
-              <img src={ad.images?.[0]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg,rgba(0,0,0,.05),rgba(0,0,0,.65))" }} />
-              <div style={{ position: "absolute", left: 12, top: 12, display: "flex", gap: 8, alignItems: "center" }}>
-                <StatusBadge type="TOP" />
-                {ad.kredit ? <StatusBadge type="CREDIT" /> : null}
-              </div>
-              <div style={{ position: "absolute", left: 12, bottom: 12, right: 12, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-                <div style={{ color: "#fff" }}>
-                  <div style={{ fontWeight: 900, fontSize: 16 }}>{ad.brand} {ad.model}</div>
-                  <div style={{ fontSize: 12, opacity: .85 }}>{ad.year} • {ad.city}</div>
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ fontWeight: 900, marginBottom: 8 }}>Tezkor e'lonlar</div>
+      <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 6 }}>
+        {items.slice(0, 12).map((c) => (
+          <Link key={c.id} to={`/auto-market/details/${c.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+            <div style={{ width: 140, borderRadius: 16, overflow: "hidden", border: "1px solid rgba(0,0,0,0.08)", background: "#fff" }}>
+              <div style={{ position: "relative" }}>
+                <img src={(c.images || [])[0]} alt="" style={{ width: "100%", height: 90, objectFit: "cover" }} />
+                <div style={{ position: "absolute", top: 8, left: 8 }}>
+                  <StatusBadge status="top" />
                 </div>
-                <PriceTag price={ad.price} currency={ad.currency} />
               </div>
+              <div style={{ padding: 8, fontSize: 12, fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.title}</div>
             </div>
-          </div>
+          </Link>
         ))}
-      </Carousel>
+      </div>
     </div>
   );
 }
