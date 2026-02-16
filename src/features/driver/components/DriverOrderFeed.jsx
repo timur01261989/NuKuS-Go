@@ -28,11 +28,11 @@ import {
 } from "@ant-design/icons";
 
 // Xizmatlar (Services)
-import DriverTaxi from "./services/DriverTaxi"; // Yoki DriverMap
-import DriverInterDistrict from "./services/DriverInterDistrict";
-import DriverInterProvincial from "./services/DriverInterProvincial";
-import DriverFreight from "./services/DriverFreight";
-import DriverDelivery from "./services/DriverDelivery";
+import DriverTaxi from "./city-taxi/CityTaxiPage; // Yoki DriverMap
+import DriverInterDistrict from "./inter-district/InterDistrictPage";
+import InterProvincialPage from "./inter-provincial/InterProvincialPage";
+import DriverFreight from "./freight/FreightPage";
+import DriverDelivery from "./delivery-integration/DriverDelivery";
 
 import DriverProfile from "./DriverProfile";
 import api from "@/utils/apiHelper"; // API ulash
