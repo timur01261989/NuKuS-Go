@@ -1,5 +1,4 @@
-import { useState } from "react";
-import React, { useCallback, useEffect, useMemo, useRef, } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Avatar,
   Button,
@@ -66,7 +65,6 @@ const MAX_KM = 50;
 
 const tileDay = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
 const tileNight = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
-const [searchLoading, setSearchLoading] = useState(false);
 
 /** --- icons --- */
 const pickupIcon = L.divIcon({
@@ -1047,6 +1045,16 @@ export default function ClientTaxiPage() {
       </div>
     </div>
   );
+
+  // TaxiSearchSheet komponenti bitta list ko'rinishida qabul qiladi.
+  // Bizda esa pickup/destination uchun alohida natijalar bor.
+  // Qaysi input to'ldirilgan bo'lsa, o'sha natijani ko'rsatamiz.
+  const searchLoading = searchBusy;
+  const searchResults = useMemo(() => {
+    const qDest = (destSearchText || "").trim();
+    if (qDest) return destResults;
+    return pickupResults;
+  }, [destSearchText, destResults, pickupResults]);
 
   const SearchDrawer = (
     <TaxiSearchSheet

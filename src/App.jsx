@@ -28,6 +28,10 @@ const DriverPending = lazy(() => import("./pages/DriverPending"));
 // --- CLIENT ---
 const ClientHome = lazy(() => import("@features/client/pages/ClientHome"));
 const ClientTaxi = lazy(() => import("@features/client/taxi/ClientTaxiPage"));
+const ClientIntercity = lazy(() => import("@features/client/intercity/ClientIntercityPage"));
+const ClientInterDistrict = lazy(() => import("@features/client/interDistrict/ClientInterDistrictPage"));
+const ClientFreight = lazy(() => import("@features/client/freight/ClientFreightPage"));
+const ClientDelivery = lazy(() => import("@features/client/delivery/DeliveryPage"));
 
 // --- DRIVER ---
 const DriverOrders = lazy(() => import("@features/driver/pages/DriverOrders"));
@@ -69,7 +73,8 @@ export default function App() {
 
               {/* --- CLIENT --- */}
 
-              <Route path="/client" element={<Navigate to="/client/home" replace />} />              <Route
+	              <Route path="/client" element={<Navigate to="/client/home" replace />} />
+	              <Route
                 path="/client/home"
                 element={
                   <RoleGate allow={{ client: true, driver: false }}>
@@ -85,6 +90,38 @@ export default function App() {
                   </RoleGate>
                 }
               />
+	              <Route
+	                path="/client/inter-provincial"
+	                element={
+	                  <RoleGate allow={{ client: true, driver: false }}>
+	                    <ClientIntercity />
+	                  </RoleGate>
+	                }
+	              />
+	              <Route
+	                path="/client/inter-district"
+	                element={
+	                  <RoleGate allow={{ client: true, driver: false }}>
+	                    <ClientInterDistrict />
+	                  </RoleGate>
+	                }
+	              />
+	              <Route
+	                path="/client/freight"
+	                element={
+	                  <RoleGate allow={{ client: true, driver: false }}>
+	                    <ClientFreight />
+	                  </RoleGate>
+	                }
+	              />
+	              <Route
+	                path="/client/delivery"
+	                element={
+	                  <RoleGate allow={{ client: true, driver: false }}>
+	                    <ClientDelivery />
+	                  </RoleGate>
+	                }
+	              />
               <Route
                 path="/client/orders"
                 element={
@@ -110,6 +147,9 @@ export default function App() {
               <Route path="/support" element={<Support />} />
 
               {/* --- DRIVER (PROTECTED) --- */}
+	              <Route path="/driver" element={<Navigate to="/driver/dashboard" replace />} />
+	              {/* eski menyuda /driver/home ishlatilgan */}
+	              <Route path="/driver/home" element={<Navigate to="/driver/dashboard" replace />} />
               <Route
                 path="/driver/dashboard"
                 element={

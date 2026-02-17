@@ -1,21 +1,45 @@
 import React from "react";
 
 /**
- * status: top | new | sold | credit | archived
+ * StatusBadge
+ * status: "top" | "new" | "sold" | "credit" | "archived"
+ *
+ * - Ranglar bir xil bo'lib qolmasin deb, har bir status uchun alohida palitra.
  */
-const MAP = {
-  top: { label: "TOP", bg: "#111827", fg: "#fbbf24" },
-  new: { label: "Yangi", bg: "#e0f2fe", fg: "#0369a1" },
-  sold: { label: "Sotildi", bg: "#fee2e2", fg: "#991b1b" },
-  credit: { label: "Kreditga", bg: "#fef9c3", fg: "#854d0e" },
-  archived: { label: "Arxiv", bg: "#f1f5f9", fg: "#334155" },
+const STYLES = {
+  top: { bg: "#7c3aed", fg: "#ffffff", label: "TOP" },         // purple
+  new: { bg: "#16a34a", fg: "#ffffff", label: "Yangi" },       // green
+  sold: { bg: "#ef4444", fg: "#ffffff", label: "Sotildi" },    // red
+  credit: { bg: "#0ea5e9", fg: "#ffffff", label: "Kreditga" }, // sky
+  archived: { bg: "#334155", fg: "#ffffff", label: "Arxiv" },  // slate
 };
 
-export default function StatusBadge({ status = "new" }) {
-  const s = MAP[status] || MAP.new;
+export default function StatusBadge({ status, text }) {
+  if (!status && !text) return null;
+  const key = (status || "").toLowerCase();
+  const s = STYLES[key] || { bg: "#111827", fg: "#ffffff", label: status || "" };
+
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", padding: "4px 10px", borderRadius: 999, fontSize: 12, fontWeight: 900, background: s.bg, color: s.fg }}>
-      {s.label}
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "6px 10px",
+        borderRadius: 999,
+        background: s.bg,
+        color: s.fg,
+        fontSize: 12,
+        fontWeight: 800,
+        letterSpacing: 0.3,
+        boxShadow: "0 10px 22px rgba(0,0,0,0.12)",
+        lineHeight: 1,
+        userSelect: "none",
+        whiteSpace: "nowrap",
+      }}
+      title={text || s.label}
+    >
+      {text || s.label}
     </span>
   );
 }

@@ -1,61 +1,75 @@
-import React, { useMemo } from "react";
-import { useMarket } from "../context/MarketContext";
-import { useMarketStore } from "../stores/marketStore";
-import CarSkeleton from "../components/Feed/CarSkeleton";
-import CarCardVertical from "../components/Feed/CarCardVertical";
+import React, { useState } from "react";
+import { Button, Input, Spin } from "antd";
+import { PlusOutlined, FilterOutlined } from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
 import StoriesRail from "../components/Feed/StoriesRail";
+import SmartFilterBar from "../components/Feed/SmartFilterBar";
+import CarCardVertical from "../components/Feed/CarCardVertical";
 import CompareFloatBtn from "../components/Feed/CompareFloatBtn";
+import SortDropdown from "../components/Feed/SortDropdown";
+import FullFilterDrawer from "../components/Filters/FullFilterDrawer";
+import useCarList from "../hooks/useCarList";
+import { useMarket } from "../context/MarketContext";
 
 export default function FeedPage() {
-  const { cars, loading, error, loadMore, hasMore } = useMarket();
-  const { filters, setFilters } = useMarketStore();
-
-  const topCars = useMemo(() => cars.filter((c) => c.is_top || c.status === "top"), [cars]);
+  const nav = useNavigate();
+  const [drawer, setDrawer] = useState(false);
+  const { filters, patchFilters } = useMarket();
+  const { items, loading, error, page, pageCount, go } = useCarList(filters, { pageSize: 12 });
 
   return (
-    <div style={{ padding: 16, maxWidth: 980, margin: "0 auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <div style={{ fontSize: 20, fontWeight: 900 }}>Avto Bozor</div>
-        <input
-          value={filters.q || ""}
-          onChange={(e) => setFilters({ q: e.target.value })}
-          placeholder="Qidirish..."
-          style={{ width: 280, padding: 10, borderRadius: 12, border: "1px solid rgba(0,0,0,0.14)" }}
-        />
+    <div style={{ paddingBottom: 90 }}>
+      <div style={{ position:"sticky", top:0, zIndex: 50, background:"#ffffffcc", backdropFilter:"blur(10px)", borderBottom:"1px solid #e2e8f0" }}>
+        <div style={{ padding: "12px 14px", display:"flex", gap: 10, alignItems:"center" }}>
+          <div style={{ fontWeight: 950, fontSize: 18, color:"#0f172a" }}>Auto Market</div>
+          <div style={{ marginLeft:"auto", display:"flex", gap: 8 }}>
+            <Button icon={<PlusOutlined />} type="primary" style={{ borderRadius: 12, background:"#22c55e", border:"none" }} onClick={()=>nav("/auto-market/create")}>
+              E'lon berish
+            </Button>
+          </div>
+        </div>
+
+        <div style={{ padding: "0 14px 12px", display:"flex", gap: 10, alignItems:"center" }}>
+          <Input
+            value={filters.q}
+            onChange={(e)=>patchFilters({ q: e.target.value })}
+            placeholder="Qidirish: Cobalt, Gentra..."
+            style={{ borderRadius: 14 }}
+          />
+          <Button icon={<FilterOutlined />} onClick={()=>setDrawer(true)} style={{ borderRadius: 14 }} />
+          <SortDropdown />
+        </div>
       </div>
 
-      <StoriesRail items={topCars} />
+      <StoriesRail />
+      <SmartFilterBar />
 
-      {error ? (
-        <div style={{ padding: 14, background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 14 }}>
-          <div style={{ fontWeight: 900, marginBottom: 6 }}>Xatolik</div>
-          <div style={{ opacity: 0.75 }}>{String(error.message || error)}</div>
-        </div>
-      ) : loading && cars.length === 0 ? (
-        <CarSkeleton count={6} />
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
-          {cars.map((c) => (
-            <CarCardVertical key={c.id} car={c} />
-          ))}
-        </div>
-      )}
-
-      <div style={{ textAlign: "center", marginTop: 14 }}>
-        {hasMore ? (
-          <button
-            onClick={loadMore}
-            disabled={loading}
-            style={{ border: "none", background: "#111827", color: "#fff", padding: "10px 14px", borderRadius: 12, fontWeight: 900, cursor: "pointer" }}
-          >
-            {loading ? "Yuklanmoqda..." : "Yana ko'rsatish"}
-          </button>
+      <div style={{ padding: "12px 14px" }}>
+        {loading ? (
+          <div style={{ display:"flex", justifyContent:"center", padding: 30 }}><Spin /></div>
+        ) : error ? (
+          <div style={{ color:"#ef4444", fontWeight: 800 }}>{error}</div>
         ) : (
-          <div style={{ opacity: 0.7 }}>Boshqa e'lon yo'q</div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
+            {items.map((ad) => (
+              <CarCardVertical
+                key={ad.id}
+                ad={ad}
+                onClick={() => nav(`/auto-market/ad/${ad.id}`)}
+              />
+            ))}
+          </div>
         )}
+
+        <div style={{ display:"flex", gap: 10, justifyContent:"center", marginTop: 18 }}>
+          <Button disabled={page<=1} onClick={()=>go(page-1)} style={{ borderRadius: 12 }}>Oldingi</Button>
+          <div style={{ alignSelf:"center", fontWeight: 800, color:"#64748b" }}>{page}/{pageCount}</div>
+          <Button disabled={page>=pageCount} onClick={()=>go(page+1)} style={{ borderRadius: 12 }}>Keyingi</Button>
+        </div>
       </div>
 
       <CompareFloatBtn />
+      <FullFilterDrawer open={drawer} onClose={()=>setDrawer(false)} />
     </div>
   );
 }

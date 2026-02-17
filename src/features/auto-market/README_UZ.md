@@ -1,38 +1,39 @@
-# AUTO MARKET MODUL (PRO) — O'zbekcha README
+# Auto Market moduli (src/features/auto-market)
 
-Bu papka `src/features/auto-market/` ichiga qo'yiladi. Modul faqat **Avto savdo** uchun moslangan.
+Bu modul Universal Market'dan *faqat AVTO savdo* uchun ajratib qayta qurildi.
+Arxitektura keyin kengaytirishga qulay: servislar bitta joyda, contextlar ajratilgan, UI komponentlar lego kabi.
 
-## 1) AutoMarketEntry.jsx (Modulning darvozasi)
-- `/auto-market/*` ichidagi routingni boshqaradi
-- Sahifalar lazy load bo'ladi (tez ochiladi)
-- `RequireAuth` bilan `create` va `my-ads` sahifalariga kirishda login tekshiradi
-- ErrorBoundary bilan modul ichidagi xatolar butun ilovani qulatmaydi
+## Router
+- `AutoMarketEntry.jsx` — modul kirish nuqtasi.
+  Routerga shunday ulanadi:
+  ```jsx
+  <Route path="/auto-market/*" element={<AutoMarketEntry />} />
+  ```
 
-## 2) context/MarketContext.jsx (Modulning miyasi)
-- Mashinalar ro'yxatini yuklaydi (listCars)
-- Pagination (`loadMore`) ni boshqaradi
-- Details (getCarById) va Create (createCarAd) ni services orqali chaqiradi
-- Filtrlar Zustand store orqali saqlanadi
+## Contextlar
+- `context/MarketContext.jsx` — filterlar va ularning localStorage persist holati.
+- `context/CreateAdContext.jsx` — e'lon berish wizard draft (orqaga qaytsa ham o'chmaydi).
+- `context/CompareContext.jsx` — solishtirish ro'yxati (max 4 ta), localStorage bilan.
 
-## 3) stores/marketStore.js (Zustand global state)
-- Til: lang
-- Filterlar: filters
-- Favorites: favorites
-- Compare: compare
-- Recently viewed: recently
-- Create ad draft: draft
-> Hammasi localStorage'da persist bo'ladi (internet uzilsa ham o'chmaydi)
+## Services
+- `services/marketApi.js` — hozircha mock-first (localStorage seed). Keyin Supabase/Backend ulash oson.
+- `services/staticData.js` — brand/model/fuel/cities va boshqalar.
+- `services/priceUtils.js` — narx formatlash va valyuta konvert (demo).
 
-## 4) components/Create/CreateAdWizard.jsx
-- Step-by-step wizard
-- Har stepda minimal validatsiya
-- Draft localStorage'da saqlanadi (Zustand persist)
-- PreviewModal orqali e'lon ko'rinishi oldindan ko'riladi
+## Hooks
+- `hooks/useCarList.js` — listing pagination + loading/error.
+- `hooks/useCarDetails.js` — bitta e'lon + price history.
+- `hooks/useUploadImages.js` — demo uploader (local URL). Keyin storagega o'tkazasiz.
+- `hooks/useRecentlyViewed.js` — ko'rilganlar tarixi (localStorage).
 
-## 5) services/marketApi.js
-- Hozircha MOCK (offline ishlashi uchun)
-- Keyin Supabase ulash uchun shu faylni almashtirasiz:
-  - listCars
-  - getCarById
-  - createCarAd
-  - listMyAds
+## Pages
+- `pages/FeedPage.jsx` — bosh sahifa (stories + smart filter + grid).
+- `pages/DetailsPage.jsx` — detail (gallery, specs, VIN, history, seller).
+- `pages/FavoritesPage.jsx` — sevimlilar.
+- `pages/MyAdsPage.jsx` — mening e'lonlarim.
+- `pages/ComparePage.jsx` — solishtirish.
+
+## Kengaytirish uchun tayyor joylar
+- Chat realtime: DetailsPage ichida `SellerProfile.onChat` hozir placeholder. Supabase realtime ulab qo'yish mumkin.
+- Nearby search: MarketContext filterlarda `nearMe/radiusKm/center` bor.
+- Stories: `is_top=true` e'lonlar StoriesRail'da chiqadi.

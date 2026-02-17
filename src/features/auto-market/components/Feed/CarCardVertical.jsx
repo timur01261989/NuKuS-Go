@@ -1,35 +1,46 @@
 import React from "react";
-import { Link } from "react-router-dom";
 import PriceTag from "../Common/PriceTag";
-import StatusBadge from "../Common/StatusBadge";
 import FavoriteButton from "../Common/FavoriteButton";
-import { useMarketStore } from "../../stores/marketStore";
+import StatusBadge from "../Common/StatusBadge";
 
-export default function CarCardVertical({ car }) {
-  const { addToCompare } = useMarketStore();
+export default function CarCardVertical({ ad, onClick }) {
+  const badge = ad.is_top ? "TOP" : null;
   return (
-    <div style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 16, overflow: "hidden" }}>
-      <div style={{ position: "relative" }}>
-        <Link to={`/auto-market/details/${car.id}`}>
-          <img src={(car.images || [])[0]} alt="" style={{ width: "100%", height: 180, objectFit: "cover", display: "block" }} />
-        </Link>
-        <div style={{ position: "absolute", top: 10, left: 10 }}>{car.is_top ? <StatusBadge status="top" /> : <StatusBadge status="new" />}</div>
-        <div style={{ position: "absolute", top: 10, right: 10 }}>
-          <FavoriteButton adId={String(car.id)} />
+    <div
+      onClick={onClick}
+      style={{
+        background: "#fff",
+        border: "1px solid #e2e8f0",
+        borderRadius: 18,
+        overflow: "hidden",
+        cursor: "pointer",
+        boxShadow: "0 10px 30px rgba(2,6,23,.06)"
+      }}
+    >
+      <div style={{ position: "relative", height: 170 }}>
+        <img src={ad.images?.[0]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        <div style={{ position: "absolute", left: 10, top: 10, display: "flex", gap: 8 }}>
+          {badge ? <StatusBadge type={badge} /> : null}
+          {ad.kredit ? <StatusBadge type="CREDIT" /> : null}
+          {ad.exchange ? <StatusBadge type="EXCHANGE" /> : null}
+        </div>
+        <div style={{ position: "absolute", right: 10, top: 10 }}>
+          <FavoriteButton adId={ad.id} />
+        </div>
+        <div style={{ position: "absolute", left: 10, bottom: 10 }}>
+          <PriceTag price={ad.price} currency={ad.currency} />
         </div>
       </div>
+
       <div style={{ padding: 12 }}>
-        <div style={{ fontWeight: 900, marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{car.title}</div>
-        <PriceTag price={car.price} currency={car.currency} />
-        <div style={{ marginTop: 8, fontSize: 12, opacity: 0.8 }}>
-          {car.year} • {car.mileage} km • {car.fuel} • {car.transmission}
+        <div style={{ fontWeight: 900, color: "#0f172a", fontSize: 14, lineHeight: 1.1 }}>
+          {ad.brand} {ad.model}
         </div>
-        <button
-          onClick={() => addToCompare(car)}
-          style={{ marginTop: 10, width: "100%", border: "none", background: "#111827", color: "#fff", padding: "10px 12px", borderRadius: 12, fontWeight: 900, cursor: "pointer" }}
-        >
-          Solishtirish
-        </button>
+        <div style={{ marginTop: 6, fontSize: 12, color: "#64748b", display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <span>{ad.year}</span>
+          <span>{ad.mileage?.toLocaleString?.("uz-UZ") || ad.mileage} km</span>
+          <span>{ad.city}</span>
+        </div>
       </div>
     </div>
   );
