@@ -1,13 +1,19 @@
 import { createClient } from "@supabase/supabase-js";
 
-// 1. Kalitlarni olish
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// 2. Tekshirish (Xatolarni oldini olish uchun)
+// DIAGNOSTIKA: Konsolga tekshiruv natijasini chiqaramiz
+console.log("--- SUPABASE TEKSHIRUVI ---");
+console.log("URL:", supabaseUrl ? "✅ URL Mavjud" : "❌ URL YO'Q (Undefined)");
+console.log("Key:", supabaseAnonKey ? "✅ Kalit Mavjud" : "❌ Kalit YO'Q (Undefined)");
+
+// Agar kalitlar yo'q bo'lsa, xabar beramiz
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error("Diqqat! Supabase kalitlari topilmadi. .env faylini yoki Vercel sozlamalarini tekshiring.");
+  console.error("DIQQAT! Supabase kalitlari topilmadi. .env fayl yoki Vercel sozlamalarini tekshiring.");
 }
 
-// 3. Klientni yaratish
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(
+  supabaseUrl || "https://placeholder.supabase.co", // Xatolik bo'lmasligi uchun vaqtincha
+  supabaseAnonKey || "placeholder-key"
+);
