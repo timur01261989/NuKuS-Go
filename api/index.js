@@ -12,12 +12,59 @@ import offerHandler from "./offer.js";
 import walletHandler from "./wallet.js";
 import sosHandler from "./sos.js";
 
+function getRouteKey(path) {
+  // path is already without leading /api/
+  const parts = String(path || "").split("/").filter(Boolean); // ["driver","state"]
+  const base = parts[0] || "";
+  const sub = parts[1] || "";
+
+  if (base === "driver") {
+    // Back-compat endpoints supported:
+    // /api/driver/state, /api/driver/location, /api/driver/heartbeat
+    // Also accept older names: /api/driver-state etc via base matching below
+    const map = {
+      "": "driver",
+      "location": "driver-location",
+      "state": "driver-state",
+      "heartbeat": "driver-heartbeat",
+    };
+    return map[sub] || "driver";
+  }
+
+  if (base === "dispatch") {
+    // /api/dispatch, /api/dispatch/smart, /api/dispatch/eta, /api/dispatch/traffic, /api/dispatch/heatmap
+    const map = {
+      "": "dispatch",
+      "smart": "dispatch-smart",
+      "eta": "eta",
+      "traffic": "traffic-eta",
+      "heatmap": "heatmap",
+    };
+    return map[sub] || "dispatch";
+  }
+
+  if (base === "order") return "order";
+  if (base === "auth") return "auth";
+  if (base === "offer") return "offer";
+  if (base === "wallet") return "wallet";
+  if (base === "sos") return "sos";
+
+  // Older flat paths still used by frontend in a few places:
+  if (base === "driver-state") return "driver-state";
+  if (base === "driver-location") return "driver-location";
+  if (base === "driver-heartbeat") return "driver-heartbeat";
+
+  return "";
+}
+
 export default async function handler(req, res) {
   try {
     const url = new URL(req.url, "http://localhost");
     const path = url.pathname.replace(/^\/api\/?/, "");
 
-    // normalize
+    // routeKey for subroutes (used by dispatch/driver modules)
+    req.routeKey = getRouteKey(path);
+
     if (path.startsWith("order")) {
       return await orderHandler(req, res);
     }
@@ -26,8 +73,8 @@ export default async function handler(req, res) {
       return await authHandler(req, res);
     }
 
-    if (path.startsWith("driver")) {
-      return await driverHandler(req, res);
+    if (path.startsWith("driver") || path.startsWith("driver-")) {
+      return await driverHandler(req, res, req.routeKey || "driver");
     }
 
     if (path.startsWith("dispatch")) {

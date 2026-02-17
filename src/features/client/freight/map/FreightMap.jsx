@@ -33,28 +33,20 @@ function CenterTracker({ enabled, onCenter, setIsDragging }) {
   return null;
 }
 
-ffunction FlyTo({ target, zoom = 16 }) {
+function FlyTo({ target, zoom = 16 }) {
   const map = useMap();
-
   useEffect(() => {
-    // Target mavjudligini va koordinatalar (lat, lng) borligini tekshiramiz
-    if (target && Array.isArray(target) && target.length === 2) {
-      map.flyTo(target, zoom, {
-        animate: true,
-        duration: 1.5 // Animatsiya silliq chiqishi uchun davomiylik qo'shildi
-      });
-    }
+    if (!target) return;
+    map.flyTo(target, zoom);
   }, [target, zoom, map]);
-
   return null;
 }
 
-const pinSvg = () => (
-  <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="32" cy="32" r="20" fill="#FFD400"/>
-    <path d="M36 19c-4 0-7 3-7 7v10l-2 2v3h14v-3l-2-2V26c0-4-3-7-7-7z" fill="#111"/>
-  </svg>
-);
+const pinSvg = () => \`
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="32" cy="32" r="20" fill="#FFD400"/>
+  <path d="M36 19c-4 0-7 3-7 7v10l-2 2v3h14v-3l-2-2V26c0-4-3-7-7-7z" fill="#111"/>
+</svg>\`;
 
 export default function FreightMap() {
   const { pickup, setPickup, dropoff, setDropoff, setDistanceKm, setDurationMin } = useFreight();

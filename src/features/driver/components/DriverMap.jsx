@@ -14,6 +14,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 import api from "@/utils/apiHelper";
+import { supabase } from "@/lib/supabase";
 import { playAliceVoice } from "@/utils/AudioPlayer"; // Ovozli yordamchi
 
 const { Text, Title } = Typography;
@@ -123,9 +124,14 @@ export default function DriverMap() {
     const interval = setInterval(async () => {
       try {
         const [lat, lng] = lastLocRef.current;
+        const { data: ses } = await supabase.auth.getSession();
+        const driver_user_id = ses?.session?.user?.id;
+        if (!driver_user_id) return;
         const res = await api.post("/api/dispatch", {
           action: "driver_ping",
-          lat, lng,
+          driver_user_id,
+          lat,
+          lng,
           status: "searching"
         });
 

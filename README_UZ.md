@@ -1,345 +1,826 @@
-# NuKuS-Go loyihasi (UZ) — Fayllar vazifasi
+# README_UZ
 
-Quyida loyiha ichidagi asosiy papkalar va fayllar nima vazifa bajarishi qisqacha yozilgan.
+Bu paket ichida NuKuS-Go loyihasining modullari bor. Maqsad: importlar to'g'ri ishlashi, modullar bir-biriga bog'lanishi va keyinchalik kengaytirishga qulay bo'lishi.
 
-## 1) Muhim o‘zgarishlar (import fix)
-
-- ✅ src/App.jsx: ClientTaxi import yo‘li to‘g‘rilandi (@features/client/taxi/ClientTaxiPage).
-- ✅ src/features/client/components/ClientDashboard.jsx: xizmat sahifalari import yo‘llari (taxi/delivery/intercity/freight/auto-market) to‘g‘rilandi.
-- ✅ src/pages/Dashboard.jsx: Client xizmatlar importlari mavjud sahifalarga moslab to‘g‘rilandi (interDistrict/freight/delivery/intercity).
-- ✅ src/features/client/components/ClientDashboard.jsx: MarketEntry import yo‘li ../../auto-market/AutoMarketEntry qilib to‘g‘rilandi.
-
-## 2) Tuzilma va fayllar
+## Fayllar ro'yxati (har biri nimaga xizmat qiladi)
 
 
-### src/
+### `/`
+- `README.md` — Appning umumiy fayli.
+- `README_AUTO_MARKET_INTEGRATION_UZ.md` — Appning umumiy fayli.
+- `README_PRODUCTION_DEPLOY.md` — Appning umumiy fayli.
+- `README_UZ.md` — Appning umumiy fayli.
 
-- `src/App.css` — Stil (CSS).
-- `src/App.jsx` — Asosiy router: barcha sahifalar va role gate.
-- `src/app/routes.jsx` — Router konfiguratsiya / route ro‘yxati.
-- `src/assets/lottie/logo_yandex_animation_ru_dark.json` — Konfiguratsiya / statik data.
-- `src/assets/lottie/lottie_default_confetti.json` — Konfiguratsiya / statik data.
-- `src/assets/lottie/placeholder_banner_animation.json` — Konfiguratsiya / statik data.
-- `src/assets/lottie/radar_animation.json` — Konfiguratsiya / statik data.
-- `src/assets/lottie/radar_animation_dark.json` — Konfiguratsiya / statik data.
-- `src/assets/lottie/sad_dog_dark.json` — Konfiguratsiya / statik data.
-- `src/assets/lottie/sad_dog_light.json` — Konfiguratsiya / statik data.
-- `src/assets/lottie/sdk_gas_lottie_connect2insert.json` — Konfiguratsiya / statik data.
-- `src/assets/lottie/sdk_gas_lottie_connection.json` — Konfiguratsiya / statik data.
-- `src/assets/lottie/sdk_gas_lottie_fueling_infinite.json` — Konfiguratsiya / statik data.
-- `src/assets/lottie/sdk_gas_lottie_insert2fuel.json` — Konfiguratsiya / statik data.
-- `src/assets/lottie/sdk_gas_lottie_pay2connect.json` — Konfiguratsiya / statik data.
-- `src/assets/lottie/sdk_gas_lottie_payment.json` — Konfiguratsiya / statik data.
-- `src/assets/lottie/sdk_gas_lottie_payment_intro.json` — Konfiguratsiya / statik data.
-- `src/assets/lottie/selfie_cool_dog_dark.json` — Konfiguratsiya / statik data.
-- `src/assets/lottie/selfie_cool_dog_light.json` — Konfiguratsiya / statik data.
-- `src/assets/lottie/shopping_dog_dark.json` — Konfiguratsiya / statik data.
-- `src/assets/lottie/shopping_dog_light.json` — Konfiguratsiya / statik data.
-- `src/assets/map-styles/dark_map_style.json` — Konfiguratsiya / statik data.
-- `src/assets/map-styles/light_map_style.json` — Konfiguratsiya / statik data.
-- `src/components/HdrTaxiMapShell.jsx` — UI komponent (qayta ishlatiladi).
-- `src/config/env.js` — Fayl.
-- `src/features/auth/pages/Auth.jsx` — Sahifa (page) komponenti.
-- `src/features/auth/pages/Register.jsx` — Sahifa (page) komponenti.
-- `src/features/auto-market/AutoMarketEntry.jsx` — Fayl.
-- `src/features/auto-market/README_UZ.md` — Fayl.
-- `src/features/auto-market/components/Common/CarLogo.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/auto-market/components/Common/FavoriteButton.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/auto-market/components/Common/PriceTag.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/auto-market/components/Common/StatusBadge.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/auto-market/components/Create/CreateAdWizard.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/auto-market/components/Create/PreviewModal.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/auto-market/components/Create/steps/Step1_Brand.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/auto-market/components/Create/steps/Step2_Specs.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/auto-market/components/Create/steps/Step3_Photos.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/auto-market/components/Create/steps/Step4_Desc.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/auto-market/components/Create/steps/Step5_Contact.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/auto-market/components/Details/ComfortOptions.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/auto-market/components/Details/GallerySlider.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/auto-market/components/Details/MainSpecsGrid.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/auto-market/components/Details/PriceHistoryGraph.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/auto-market/components/Details/SafetyTipsCard.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/auto-market/components/Details/SellerProfile.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/auto-market/components/Details/VinCheckBlock.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/auto-market/components/Feed/CarCardHorizontal.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/auto-market/components/Feed/CarCardVertical.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/auto-market/components/Feed/CarSkeleton.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/auto-market/components/Feed/CompareFloatBtn.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/auto-market/components/Feed/SmartFilterBar.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/auto-market/components/Feed/SortDropdown.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/auto-market/components/Feed/StoriesRail.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/auto-market/components/Filters/FullFilterDrawer.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/auto-market/context/CompareContext.jsx` — Context: global state va provider.
-- `src/features/auto-market/context/CreateAdContext.jsx` — Context: global state va provider.
-- `src/features/auto-market/context/MarketContext.jsx` — Context: global state va provider.
-- `src/features/auto-market/hooks/useCarDetails.js` — Custom hook: qayta ishlatiladigan mantiq.
-- `src/features/auto-market/hooks/useCarList.js` — Custom hook: qayta ishlatiladigan mantiq.
-- `src/features/auto-market/hooks/useRecentlyViewed.js` — Custom hook: qayta ishlatiladigan mantiq.
-- `src/features/auto-market/hooks/useUploadImages.js` — Custom hook: qayta ishlatiladigan mantiq.
-- `src/features/auto-market/pages/ComparePage.jsx` — Sahifa (page) komponenti.
-- `src/features/auto-market/pages/DetailsPage.jsx` — Sahifa (page) komponenti.
-- `src/features/auto-market/pages/FavoritesPage.jsx` — Sahifa (page) komponenti.
-- `src/features/auto-market/pages/FeedPage.jsx` — Sahifa (page) komponenti.
-- `src/features/auto-market/pages/MyAdsPage.jsx` — Sahifa (page) komponenti.
-- `src/features/auto-market/services/marketApi.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/features/auto-market/services/priceUtils.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/features/auto-market/services/staticData.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/features/auto-market/utils/imageUtils.js` — Util/helper funksiyalar.
-- `src/features/auto-market/utils/locales/en.js` — Util/helper funksiyalar.
-- `src/features/auto-market/utils/locales/index.js` — Util/helper funksiyalar.
-- `src/features/auto-market/utils/locales/qq.js` — Util/helper funksiyalar.
-- `src/features/auto-market/utils/locales/ru.js` — Util/helper funksiyalar.
-- `src/features/auto-market/utils/locales/uz.js` — Util/helper funksiyalar.
-- `src/features/chat/ChatModule.jsx` — Fayl.
-- `src/features/chat/components/ChatComponent.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/components/AddressAutocomplete.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/components/ClientDashboard.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/components/ClientMap.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/components/ClientOrderCreate.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/components/PaymentStatus.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/components/TripHistory.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/delivery/DeliveryPage.jsx` — Fayl.
-- `src/features/client/delivery/README.md` — Fayl.
-- `src/features/client/delivery/components/Active/CourierInfoCard.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/delivery/components/Active/PinCodeDisplay.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/delivery/components/Active/StatusTimeline.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/delivery/components/Options/CommentInput.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/delivery/components/Options/DoorToDoorToggle.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/delivery/components/Options/WhoPaysSwitch.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/delivery/components/Setup/ParcelTypeChips.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/delivery/components/Setup/PhotoUploader.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/delivery/components/Setup/ReceiverForm.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/delivery/components/Setup/SenderForm.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/delivery/components/Setup/WeightSelector.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/delivery/hooks/useContacts.js` — Custom hook: qayta ishlatiladigan mantiq.
-- `src/features/client/delivery/hooks/useDeliveryPrice.js` — Custom hook: qayta ishlatiladigan mantiq.
-- `src/features/client/delivery/hooks/useDeliveryState.js` — Custom hook: qayta ishlatiladigan mantiq.
-- `src/features/client/delivery/map/CourierMarker.jsx` — Fayl.
-- `src/features/client/delivery/map/DeliveryMap.jsx` — Fayl.
-- `src/features/client/delivery/map/RoutePolyline.jsx` — Fayl.
-- `src/features/client/delivery/services/deliveryApi.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/features/client/delivery/services/delivery_backend_example.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/features/client/freight/ClientFreightPage.jsx` — Fayl.
-- `src/features/client/freight/README.md` — Fayl.
-- `src/features/client/freight/components/Details/CargoForm.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/freight/components/Details/CargoPhotoUpload.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/freight/components/Details/LoadersCounter.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/freight/components/Order/ActiveFreightPanel.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/freight/components/Order/PriceEstimator.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/freight/components/Selection/TruckCard.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/freight/components/Selection/TruckSelector.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/freight/context/FreightContext.jsx` — Context: global state va provider.
-- `src/features/client/freight/map/FreightMap.jsx` — Fayl.
-- `src/features/client/freight/map/useFreightRoute.js` — Custom hook: qayta ishlatiladigan mantiq.
-- `src/features/client/freight/services/freightApi.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/features/client/freight/services/truckData.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/features/client/interDistrict/ClientInterDistrictPage.jsx` — Fayl.
-- `src/features/client/interDistrict/README.md` — Fayl.
-- `src/features/client/interDistrict/components/Drivers/DriverOfferCard.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/interDistrict/components/Drivers/FilterBar.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/interDistrict/components/Header/DistrictHeader.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/interDistrict/components/Seats/CarSeatSchema.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/interDistrict/components/Seats/SeatLegend.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/interDistrict/components/Selection/DepartureTime.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/interDistrict/components/Selection/DistrictList.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/interDistrict/context/DistrictContext.jsx` — Context: global state va provider.
-- `src/features/client/interDistrict/map/DistrictMap.jsx` — Fayl.
-- `src/features/client/interDistrict/map/useDistrictRoute.js` — Custom hook: qayta ishlatiladigan mantiq.
-- `src/features/client/interDistrict/services/districtApi.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/features/client/interDistrict/services/districtData.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/features/client/intercity/ClientIntercityPage.jsx` — Fayl.
-- `src/features/client/intercity/README.md` — Fayl.
-- `src/features/client/intercity/components/Drivers/DriverCard.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/intercity/components/Drivers/DriverOfferList.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/intercity/components/Filters/DatePickerSheet.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/intercity/components/Filters/PassengerCount.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/intercity/components/Header/RouteHeader.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/intercity/components/Seats/Legend.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/intercity/components/Seats/SeatSelector.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/intercity/context/IntercityContext.jsx` — Context: global state va provider.
-- `src/features/client/intercity/map/IntercityMap.jsx` — Fayl.
-- `src/features/client/intercity/map/useRoutePolyline.js` — Custom hook: qayta ishlatiladigan mantiq.
-- `src/features/client/intercity/services/intercityApi.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/features/client/pages/ClientHome.jsx` — Sahifa (page) komponenti.
-- `src/features/client/taxi/ActiveRidePanel.jsx` — Fayl.
-- `src/features/client/taxi/ClientTaxiPage.jsx` — Fayl.
-- `src/features/client/taxi/DestinationPicker.jsx` — Fayl.
-- `src/features/client/taxi/README.md` — Fayl.
-- `src/features/client/taxi/SearchingDrivers.jsx` — Fayl.
-- `src/features/client/taxi/TaxiBottomSheet.jsx` — Fayl.
-- `src/features/client/taxi/TaxiMap.jsx` — Fayl.
-- `src/features/client/taxi/TaxiSearchSheet.jsx` — Fayl.
-- `src/features/client/taxi/components/AddressItem.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/taxi/components/CenterPin.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/taxi/components/DriverCard.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/taxi/components/ETAWidget.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/taxi/components/LocateButton.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/taxi/components/TariffSelector.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/taxi/components/VehicleMarker.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/client/taxi/features/EntrancePicker.js` — Fayl.
-- `src/features/client/taxi/features/MultiStopManager.js` — Fayl.
-- `src/features/client/taxi/features/PrivacyCall.js` — Fayl.
-- `src/features/client/taxi/features/ShareRide.js` — Fayl.
-- `src/features/client/taxi/map/useBearing.js` — Custom hook: qayta ishlatiladigan mantiq.
-- `src/features/client/taxi/map/useCarAnimation.js` — Custom hook: qayta ishlatiladigan mantiq.
-- `src/features/client/taxi/map/useMapController.js` — Custom hook: qayta ishlatiladigan mantiq.
-- `src/features/client/taxi/map/useRoute.js` — Custom hook: qayta ishlatiladigan mantiq.
-- `src/features/client/taxi/services/driverTracker.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/features/client/taxi/services/geoService.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/features/client/taxi/services/taxiApi.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/features/client/taxi/styles/darkMode.css` — Stil (CSS).
-- `src/features/client/taxi/styles/taxi.css` — Stil (CSS).
-- `src/features/debug/components/ProviderSwitchPanel.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/driver/components/ActivityChart.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/driver/components/DriverAuth.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/driver/components/DriverHome.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/driver/components/DriverMap.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/driver/components/DriverMarker.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/driver/components/DriverOrderFeed.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/driver/components/DriverProfile.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/driver/components/DriverRegister.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/driver/components/DriverServiceSelect.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/driver/components/DriverVerification.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/driver/components/DriverWallet.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/driver/components/Leaderboard.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/driver/components/NewOrderModal.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/driver/components/driverData.js` — UI komponent (qayta ishlatiladi).
-- `src/features/driver/components/services/DriverDelivery.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/driver/components/services/DriverFreight.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/driver/components/services/DriverInterDistrict.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/driver/components/services/DriverInterProvincial.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/driver/components/services/DriverTaxi.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/driver/components/services/driverSearchService.js` — UI komponent (qayta ishlatiladi).
-- `src/features/driver/components/services/locationService.js` — UI komponent (qayta ishlatiladi).
-- `src/features/driver/components/services/orderService.js` — UI komponent (qayta ishlatiladi).
-- `src/features/driver/hooks/useDriverRadarSearch.js` — Custom hook: qayta ishlatiladigan mantiq.
-- `src/features/driver/hooks/useRealtimeDrivers.js` — Custom hook: qayta ishlatiladigan mantiq.
-- `src/features/driver/pages/DriverDashboard.jsx` — Sahifa (page) komponenti.
-- `src/features/driver/pages/DriverOrders.jsx` — Sahifa (page) komponenti.
-- `src/features/garage/GarageModule.jsx` — Fayl.
-- `src/features/location/hooks/useGeolocation.js` — Custom hook: qayta ishlatiladigan mantiq.
-- `src/features/location/hooks/useReverseGeocode.js` — Custom hook: qayta ishlatiladigan mantiq.
-- `src/features/map/components/CenterPin.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/map/components/MapCenterPicker.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/map/components/MapView.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/map/components/RouteLine.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/map/components/SearchRadar.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/map/components/TargetMarker.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/map/components/UserMarker.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/payments/PaymentsModule.jsx` — Fayl.
-- `src/features/ride/components/RideDrawer.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/ride/hooks/useRoutePricing.js` — Custom hook: qayta ishlatiladigan mantiq.
-- `src/features/searchOnRoute/SearchOnRouteModule.jsx` — Fayl.
-- `src/features/settings/pages/Settings.jsx` — Sahifa (page) komponenti.
-- `src/features/shared/components/RatingModal.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/shared/components/RideHistory.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/taxi/components/OrderRealtimeDebug.jsx` — UI komponent (qayta ishlatiladi).
-- `src/features/ui/components/RatingCelebration.jsx` — UI komponent (qayta ishlatiladi).
-- `src/hooks/useDriverLocationRealtime.js` — Custom hook: qayta ishlatiladigan mantiq.
-- `src/hooks/useDriverLocationSmoothed.js` — Custom hook: qayta ishlatiladigan mantiq.
-- `src/hooks/useGeoLocation.js` — Custom hook: qayta ishlatiladigan mantiq.
-- `src/hooks/useOrderRealtime.js` — Custom hook: qayta ishlatiladigan mantiq.
-- `src/i18n/translations.js` — Fayl.
-- `src/index.css` — Stil (CSS).
-- `src/lib/supabase.js` — Fayl.
-- `src/main.jsx` — React ilova entry: root render, router/providerlarni ulash.
-- `src/pages/ClientOrders.jsx` — Sahifa (page) komponenti.
-- `src/pages/Dashboard.jsx` — Sahifa (page) komponenti.
-- `src/pages/DevHub.jsx` — Sahifa (page) komponenti.
-- `src/pages/DriverPending.jsx` — Sahifa (page) komponenti.
-- `src/pages/Logout.jsx` — Sahifa (page) komponenti.
-- `src/pages/MainPage.jsx` — Sahifa (page) komponenti.
-- `src/pages/MyAddresses.jsx` — Sahifa (page) komponenti.
-- `src/pages/ResetPassword.jsx` — Sahifa (page) komponenti.
-- `src/pages/SuperPro/GaragePage.jsx` — Sahifa (page) komponenti.
-- `src/pages/SuperPro/PaymentsPage.jsx` — Sahifa (page) komponenti.
-- `src/pages/SuperPro/SearchOnRoutePage.jsx` — Sahifa (page) komponenti.
-- `src/pages/Support.jsx` — Sahifa (page) komponenti.
-- `src/providers/route/googleRoute.js` — Fayl.
-- `src/providers/route/index.js` — Fayl.
-- `src/providers/route/osrmRoute.js` — Fayl.
-- `src/providers/route/yandexRoute.js` — Fayl.
-- `src/providers/traffic/index.js` — Fayl.
-- `src/services/authSupabase.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/services/chatApi.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/services/chatRealtime.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/services/checkoutApi.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/services/fcmService.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/services/heatmapApi.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/services/marketMetaService.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/services/marketService.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/services/marketStorage.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/services/notifications.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/services/notificationsRealtime.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/services/orderEnrichment.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/services/orderModel.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/services/ordersApi.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/services/ordersRealtime.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/services/poiService.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/services/pricingService.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/services/promoApi.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/services/providerConfig.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/services/soundService.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/services/supabaseClient.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/services/telemetryService.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/services/voiceService.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/services/walletApi.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/shared/assets/lottie/error.json` — Konfiguratsiya / statik data.
-- `src/shared/assets/lottie/loading.json` — Konfiguratsiya / statik data.
-- `src/shared/assets/lottie/success.json` — Konfiguratsiya / statik data.
-- `src/shared/components/LottieView.jsx` — UI komponent (qayta ishlatiladi).
-- `src/shared/config/appConfig.js` — Fayl.
-- `src/shared/config/configService.js` — Fayl.
-- `src/shared/config/defaults.js` — Fayl.
-- `src/shared/config/defaults_osm.js` — Fayl.
-- `src/shared/config/runtimeConfig.js` — Fayl.
-- `src/shared/i18n/LanguageContext.jsx` — Context: global state va provider.
-- `src/shared/i18n/useLanguage.js` — Custom hook: qayta ishlatiladigan mantiq.
-- `src/shared/prefs/useAppPrefs.js` — Custom hook: qayta ishlatiladigan mantiq.
-- `src/shared/routes/RoleGate.jsx` — Fayl.
-- `src/shared/styles/fonts.css` — Stil (CSS).
-- `src/shared/ui/Button.jsx` — Fayl.
-- `src/shared/ui/Card.jsx` — Fayl.
-- `src/shared/ui/Modal.jsx` — Fayl.
-- `src/shared/ui/index.js` — Fayl.
-- `src/shared/utils/iconRegistry.js` — Util/helper funksiyalar.
-- `src/shared/utils/locationOptions.js` — Util/helper funksiyalar.
-- `src/shared/utils/mapStyle.js` — Util/helper funksiyalar.
-- `src/shared/utils/memo.js` — Util/helper funksiyalar.
-- `src/shared/utils/routingOptions.js` — Util/helper funksiyalar.
-- `src/styles/animations.css` — Stil (CSS).
-- `src/styles/hdr-taxi.css` — Stil (CSS).
-- `src/theme/antdTheme.js` — Fayl.
-- `src/theme/theme-overrides.css` — Stil (CSS).
-- `src/theme/tokens.css` — Stil (CSS).
-- `src/theme/useThemeMode.js` — Custom hook: qayta ishlatiladigan mantiq.
-- `src/utils/AudioPlayer.js` — Util/helper funksiyalar.
-- `src/utils/BaselineProfile.js` — Util/helper funksiyalar.
-- `src/utils/NukusPlaces.js` — Util/helper funksiyalar.
-- `src/utils/apiHelper.js` — Service/API layer: server bilan aloqa (fetch/supabase).
-- `src/utils/audioHelper.js` — Util/helper funksiyalar.
-- `src/utils/geo.js` — Util/helper funksiyalar.
-- `src/utils/imageUtils.js` — Util/helper funksiyalar.
-- `src/utils/locationSmoothing.js` — Util/helper funksiyalar.
-- `src/utils/mapStyles.json` — Util/helper funksiyalar.
-- `src/utils/navigatorSync.js` — Util/helper funksiyalar.
+### `api/_shared/`
+- `cors.js` — Appning umumiy fayli.
+- `geo.js` — Appning umumiy fayli.
+- `supabase.js` — Appning umumiy fayli.
 
-### api/
+### `api/`
+- `auth.js` — Appning umumiy fayli.
+- `dispatch.js` — Appning umumiy fayli.
+- `driver.js` — Appning umumiy fayli.
+- `index.js` — Appning umumiy fayli.
+- `offer.js` — Appning umumiy fayli.
+- `order.js` — Appning umumiy fayli.
+- `sos.js` — Appning umumiy fayli.
+- `wallet.js` — Appning umumiy fayli.
 
-- `api/_shared/cors.js` — API shared util: cors/geo/supabase ulanish va umumiy helperlar.
-- `api/_shared/geo.js` — API shared util: cors/geo/supabase ulanish va umumiy helperlar.
-- `api/_shared/supabase.js` — API shared util: cors/geo/supabase ulanish va umumiy helperlar.
-- `api/auth.js` — Auth: SMS/OTP, login/verify endpointlari.
-- `api/dispatch.js` — Dispatch: haydovchi qidirish / taqsimlash logikasi.
-- `api/driver.js` — Haydovchi: location/state/status update endpointlari.
-- `api/index.js` — API server kirish nuqtasi (router / handler dispatcher).
-- `api/offer.js` — Offer: haydovchi javobi (accept/decline) logikasi.
-- `api/order.js` — Buyurtma (order): create/status/active/cancel/complete va boshqa actionlar.
-- `api/sos.js` — SOS/Xavfsizlik endpointlari.
-- `api/wallet.js` — Wallet/balans: to‘lovlar va balans endpointlari.
+### `/`
+- `capacitor.config.json` — Appning umumiy fayli.
+- `eslint.config.js` — Appning umumiy fayli.
+- `package-lock.json` — Appning umumiy fayli.
+- `package.json` — Appning umumiy fayli.
+- `postcss.config.js` — Appning umumiy fayli.
 
-### Root konfiguratsiyalar
+### `public/`
+- `AssetManifest.json` — Appning umumiy fayli.
 
-- `capacitor.config.json` — Konfiguratsiya / statik data.
-- `package.json` — Konfiguratsiya / statik data.
-- `vite.config.js` — Fayl.
+### `public/assets/audio/ru_alice/`
+- `durations.json` — Appning umumiy fayli.
+
+### `public/config/`
+- `location.json` — Appning umumiy fayli.
+- `market.json` — Appning umumiy fayli.
+- `market_ad_states.json` — Appning umumiy fayli.
+- `market_listings.json` — Appning umumiy fayli.
+- `market_params.json` — Appning umumiy fayli.
+- `market_remote_config.json` — Appning umumiy fayli.
+- `market_tiles.json` — Appning umumiy fayli.
+- `poi.json` — Appning umumiy fayli.
+- `routing.json` — Appning umumiy fayli.
+- `sounds.json` — Appning umumiy fayli.
+- `tariffs.json` — Appning umumiy fayli.
+- `tileserver.json` — Appning umumiy fayli.
+- `ui.json` — Appning umumiy fayli.
+- `voice.json` — Appning umumiy fayli.
+
+### `public/map/`
+- `style.json` — Appning umumiy fayli.
+
+### `public/`
+- `sw.js` — Appning umumiy fayli.
+
+### `src/`
+- `App.css` — Appning umumiy fayli.
+- `App.jsx` — Appning umumiy fayli.
+
+### `src/app/`
+- `routes.jsx` — Appning umumiy fayli.
+
+### `src/assets/lottie/`
+- `logo_yandex_animation_ru_dark.json` — Appning umumiy fayli.
+- `lottie_default_confetti.json` — Appning umumiy fayli.
+- `placeholder_banner_animation.json` — Appning umumiy fayli.
+- `radar_animation.json` — Appning umumiy fayli.
+- `radar_animation_dark.json` — Appning umumiy fayli.
+- `sad_dog_dark.json` — Appning umumiy fayli.
+- `sad_dog_light.json` — Appning umumiy fayli.
+- `sdk_gas_lottie_connect2insert.json` — Appning umumiy fayli.
+- `sdk_gas_lottie_connection.json` — Appning umumiy fayli.
+- `sdk_gas_lottie_fueling_infinite.json` — Appning umumiy fayli.
+- `sdk_gas_lottie_insert2fuel.json` — Appning umumiy fayli.
+- `sdk_gas_lottie_pay2connect.json` — Appning umumiy fayli.
+- `sdk_gas_lottie_payment.json` — Appning umumiy fayli.
+- `sdk_gas_lottie_payment_intro.json` — Appning umumiy fayli.
+- `selfie_cool_dog_dark.json` — Appning umumiy fayli.
+- `selfie_cool_dog_light.json` — Appning umumiy fayli.
+- `shopping_dog_dark.json` — Appning umumiy fayli.
+- `shopping_dog_light.json` — Appning umumiy fayli.
+
+### `src/assets/map-styles/`
+- `dark_map_style.json` — Appning umumiy fayli.
+- `light_map_style.json` — Appning umumiy fayli.
+
+### `src/components/`
+- `HdrTaxiMapShell.jsx` — Appning umumiy fayli.
+
+### `src/config/`
+- `env.js` — Appning umumiy fayli.
+
+### `src/features/auth/pages/`
+- `Auth.jsx` — Ilovaning sahifalari.
+- `Register.jsx` — Ilovaning sahifalari.
+
+### `src/features/auto-market/`
+- `AutoMarketEntry.jsx` — Avto Market modulining kirish nuqtasi (router/entry).
+- `README_UZ.md` — Avto Market komponenti.
+
+### `src/features/auto-market/components/Common/`
+- `ErrorBoundary.jsx` — Umumiy UI: narx badge, status, favorite va h.k.
+- `FavoriteButton.jsx` — Umumiy UI: narx badge, status, favorite va h.k.
+- `PriceTag.jsx` — Umumiy UI: narx badge, status, favorite va h.k.
+- `StatusBadge.jsx` — Umumiy UI: narx badge, status, favorite va h.k.
+
+### `src/features/auto-market/components/Create/`
+- `CreateAdWizard.jsx` — E'lon yaratish (wizard/steps/preview).
+- `PreviewModal.jsx` — E'lon yaratish (wizard/steps/preview).
+
+### `src/features/auto-market/components/Create/steps/`
+- `Step1_Brand.jsx` — E'lon yaratish (wizard/steps/preview).
+- `Step2_Specs.jsx` — E'lon yaratish (wizard/steps/preview).
+- `Step3_Photos.jsx` — E'lon yaratish (wizard/steps/preview).
+- `Step4_Desc.jsx` — E'lon yaratish (wizard/steps/preview).
+- `Step5_Contact.jsx` — E'lon yaratish (wizard/steps/preview).
+
+### `src/features/auto-market/components/Feed/`
+- `CarCardVertical.jsx` — Feed UI: stories, filter bar, card, sort, skeleton.
+- `CarSkeleton.jsx` — Feed UI: stories, filter bar, card, sort, skeleton.
+- `CompareFloatBtn.jsx` — Feed UI: stories, filter bar, card, sort, skeleton.
+- `StoriesRail.jsx` — Feed UI: stories, filter bar, card, sort, skeleton.
+
+### `src/features/auto-market/context/`
+- `MarketContext.jsx` — Avto Market global holati (filterlar, e'lonlar, til va h.k.).
+
+### `src/features/auto-market/pages/`
+- `ComparePage.jsx` — Avto Market sahifasi (Feed/Details/Create/Favorites/MyAds/Compare).
+- `CreatePage.jsx` — Avto Market sahifasi (Feed/Details/Create/Favorites/MyAds/Compare).
+- `DetailsPage.jsx` — Avto Market sahifasi (Feed/Details/Create/Favorites/MyAds/Compare).
+- `FavoritesPage.jsx` — Avto Market sahifasi (Feed/Details/Create/Favorites/MyAds/Compare).
+- `FeedPage.jsx` — Avto Market sahifasi (Feed/Details/Create/Favorites/MyAds/Compare).
+- `MyAdsPage.jsx` — Avto Market sahifasi (Feed/Details/Create/Favorites/MyAds/Compare).
+
+### `src/features/auto-market/services/`
+- `marketApi.js` — Avto Market server/API va statik ma'lumotlar.
+- `priceUtils.js` — Avto Market server/API va statik ma'lumotlar.
+- `staticData.js` — Avto Market server/API va statik ma'lumotlar.
+
+### `src/features/auto-market/stores/`
+- `marketStore.js` — Avto Market komponenti.
+
+### `src/features/auto-market/utils/`
+- `imageUtils.js` — Avto Market util (image compress, locale, format).
+
+### `src/features/auto-market__backup/`
+- `AutoMarketEntry.jsx` — Appning umumiy fayli.
+- `README_UZ.md` — Appning umumiy fayli.
+
+### `src/features/auto-market__backup/components/Common/`
+- `CarLogo.jsx` — Appning umumiy fayli.
+- `FavoriteButton.jsx` — Appning umumiy fayli.
+- `PriceTag.jsx` — Appning umumiy fayli.
+- `StatusBadge.jsx` — Appning umumiy fayli.
+
+### `src/features/auto-market__backup/components/Create/`
+- `CreateAdWizard.jsx` — Appning umumiy fayli.
+- `PreviewModal.jsx` — Appning umumiy fayli.
+
+### `src/features/auto-market__backup/components/Create/steps/`
+- `Step1_Brand.jsx` — Appning umumiy fayli.
+- `Step2_Specs.jsx` — Appning umumiy fayli.
+- `Step3_Photos.jsx` — Appning umumiy fayli.
+- `Step4_Desc.jsx` — Appning umumiy fayli.
+- `Step5_Contact.jsx` — Appning umumiy fayli.
+
+### `src/features/auto-market__backup/components/Details/`
+- `ComfortOptions.jsx` — Appning umumiy fayli.
+- `GallerySlider.jsx` — Appning umumiy fayli.
+- `MainSpecsGrid.jsx` — Appning umumiy fayli.
+- `PriceHistoryGraph.jsx` — Appning umumiy fayli.
+- `SafetyTipsCard.jsx` — Appning umumiy fayli.
+- `SellerProfile.jsx` — Appning umumiy fayli.
+- `VinCheckBlock.jsx` — Appning umumiy fayli.
+
+### `src/features/auto-market__backup/components/Feed/`
+- `CarCardHorizontal.jsx` — Appning umumiy fayli.
+- `CarCardVertical.jsx` — Appning umumiy fayli.
+- `CarSkeleton.jsx` — Appning umumiy fayli.
+- `CompareFloatBtn.jsx` — Appning umumiy fayli.
+- `SmartFilterBar.jsx` — Appning umumiy fayli.
+- `SortDropdown.jsx` — Appning umumiy fayli.
+- `StoriesRail.jsx` — Appning umumiy fayli.
+
+### `src/features/auto-market__backup/components/Filters/`
+- `FullFilterDrawer.jsx` — Appning umumiy fayli.
+
+### `src/features/auto-market__backup/context/`
+- `CompareContext.jsx` — Appning umumiy fayli.
+- `CreateAdContext.jsx` — Appning umumiy fayli.
+- `MarketContext.jsx` — Appning umumiy fayli.
+
+### `src/features/auto-market__backup/hooks/`
+- `useCarDetails.js` — Appning umumiy fayli.
+- `useCarList.js` — Appning umumiy fayli.
+- `useRecentlyViewed.js` — Appning umumiy fayli.
+- `useUploadImages.js` — Appning umumiy fayli.
+
+### `src/features/auto-market__backup/pages/`
+- `ComparePage.jsx` — Ilovaning sahifalari.
+- `DetailsPage.jsx` — Ilovaning sahifalari.
+- `FavoritesPage.jsx` — Ilovaning sahifalari.
+- `FeedPage.jsx` — Ilovaning sahifalari.
+- `MyAdsPage.jsx` — Ilovaning sahifalari.
+
+### `src/features/auto-market__backup/services/`
+- `marketApi.js` — Appning umumiy fayli.
+- `priceUtils.js` — Appning umumiy fayli.
+- `staticData.js` — Appning umumiy fayli.
+
+### `src/features/auto-market__backup/utils/`
+- `imageUtils.js` — Umumiy util/helperlar.
+
+### `src/features/auto-market__backup/utils/locales/`
+- `en.js` — Umumiy util/helperlar.
+- `index.js` — Umumiy util/helperlar.
+- `qq.js` — Umumiy util/helperlar.
+- `ru.js` — Umumiy util/helperlar.
+- `uz.js` — Umumiy util/helperlar.
+
+### `src/features/chat/`
+- `ChatModule.jsx` — Appning umumiy fayli.
+
+### `src/features/chat/components/`
+- `ChatComponent.jsx` — Appning umumiy fayli.
+
+### `src/features/client/components/`
+- `AddressAutocomplete.jsx` — Mijoz (client) komponenti/moduli.
+- `ClientDashboard.jsx` — Mijoz (client) komponenti/moduli.
+- `ClientMap.jsx` — Mijoz (client) komponenti/moduli.
+- `ClientOrderCreate.jsx` — Mijoz (client) komponenti/moduli.
+- `PaymentStatus.jsx` — Mijoz (client) komponenti/moduli.
+- `TripHistory.jsx` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/delivery/`
+- `DeliveryPage.jsx` — Mijoz (client) komponenti/moduli.
+- `README.md` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/delivery/components/Active/`
+- `CourierInfoCard.jsx` — Mijoz (client) komponenti/moduli.
+- `PinCodeDisplay.jsx` — Mijoz (client) komponenti/moduli.
+- `StatusTimeline.jsx` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/delivery/components/Options/`
+- `CommentInput.jsx` — Mijoz (client) komponenti/moduli.
+- `DoorToDoorToggle.jsx` — Mijoz (client) komponenti/moduli.
+- `WhoPaysSwitch.jsx` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/delivery/components/Setup/`
+- `ParcelTypeChips.jsx` — Mijoz (client) komponenti/moduli.
+- `PhotoUploader.jsx` — Mijoz (client) komponenti/moduli.
+- `ReceiverForm.jsx` — Mijoz (client) komponenti/moduli.
+- `SenderForm.jsx` — Mijoz (client) komponenti/moduli.
+- `WeightSelector.jsx` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/delivery/hooks/`
+- `useContacts.js` — Mijoz (client) komponenti/moduli.
+- `useDeliveryPrice.js` — Mijoz (client) komponenti/moduli.
+- `useDeliveryState.js` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/delivery/map/`
+- `CourierMarker.jsx` — Mijoz (client) komponenti/moduli.
+- `DeliveryMap.jsx` — Mijoz (client) komponenti/moduli.
+- `RoutePolyline.jsx` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/delivery/services/`
+- `deliveryApi.js` — Mijoz (client) komponenti/moduli.
+- `delivery_backend_example.js` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/freight/`
+- `ClientFreightPage.jsx` — Mijoz (client) komponenti/moduli.
+- `README.md` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/freight/components/Details/`
+- `CargoForm.jsx` — Mijoz (client) komponenti/moduli.
+- `CargoPhotoUpload.jsx` — Mijoz (client) komponenti/moduli.
+- `LoadersCounter.jsx` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/freight/components/Order/`
+- `ActiveFreightPanel.jsx` — Mijoz (client) komponenti/moduli.
+- `PriceEstimator.jsx` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/freight/components/Selection/`
+- `TruckCard.jsx` — Mijoz (client) komponenti/moduli.
+- `TruckSelector.jsx` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/freight/context/`
+- `FreightContext.jsx` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/freight/map/`
+- `FreightMap.jsx` — Mijoz (client) komponenti/moduli.
+- `useFreightRoute.js` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/freight/services/`
+- `freightApi.js` — Mijoz (client) komponenti/moduli.
+- `truckData.js` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/interDistrict/`
+- `ClientInterDistrictPage.jsx` — Mijoz (client) komponenti/moduli.
+- `README.md` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/interDistrict/components/Drivers/`
+- `DriverOfferCard.jsx` — Mijoz (client) komponenti/moduli.
+- `FilterBar.jsx` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/interDistrict/components/Header/`
+- `DistrictHeader.jsx` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/interDistrict/components/Seats/`
+- `CarSeatSchema.jsx` — Mijoz (client) komponenti/moduli.
+- `SeatLegend.jsx` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/interDistrict/components/Selection/`
+- `DepartureTime.jsx` — Mijoz (client) komponenti/moduli.
+- `DistrictList.jsx` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/interDistrict/context/`
+- `DistrictContext.jsx` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/interDistrict/map/`
+- `DistrictMap.jsx` — Mijoz (client) komponenti/moduli.
+- `useDistrictRoute.js` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/interDistrict/services/`
+- `districtApi.js` — Mijoz (client) komponenti/moduli.
+- `districtData.js` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/intercity/`
+- `ClientIntercityPage.jsx` — Mijoz (client) komponenti/moduli.
+- `README.md` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/intercity/components/Drivers/`
+- `DriverCard.jsx` — Mijoz (client) komponenti/moduli.
+- `DriverOfferList.jsx` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/intercity/components/Filters/`
+- `DatePickerSheet.jsx` — Mijoz (client) komponenti/moduli.
+- `PassengerCount.jsx` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/intercity/components/Header/`
+- `RouteHeader.jsx` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/intercity/components/Seats/`
+- `Legend.jsx` — Mijoz (client) komponenti/moduli.
+- `SeatSelector.jsx` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/intercity/context/`
+- `IntercityContext.jsx` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/intercity/map/`
+- `IntercityMap.jsx` — Mijoz (client) komponenti/moduli.
+- `useRoutePolyline.js` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/intercity/services/`
+- `intercityApi.js` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/pages/`
+- `ClientHome.jsx` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/taxi/`
+- `ActiveRidePanel.jsx` — Mijoz (client) komponenti/moduli.
+- `ClientTaxiPage.jsx` — Mijoz (client) komponenti/moduli.
+- `DestinationPicker.jsx` — Mijoz (client) komponenti/moduli.
+- `README.md` — Mijoz (client) komponenti/moduli.
+- `SearchingDrivers.jsx` — Mijoz (client) komponenti/moduli.
+- `TaxiBottomSheet.jsx` — Mijoz (client) komponenti/moduli.
+- `TaxiMap.jsx` — Mijoz (client) komponenti/moduli.
+- `TaxiSearchSheet.jsx` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/taxi/components/`
+- `AddressItem.jsx` — Mijoz (client) komponenti/moduli.
+- `CenterPin.jsx` — Mijoz (client) komponenti/moduli.
+- `DriverCard.jsx` — Mijoz (client) komponenti/moduli.
+- `ETAWidget.jsx` — Mijoz (client) komponenti/moduli.
+- `LocateButton.jsx` — Mijoz (client) komponenti/moduli.
+- `TariffSelector.jsx` — Mijoz (client) komponenti/moduli.
+- `VehicleMarker.jsx` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/taxi/features/`
+- `EntrancePicker.js` — Mijoz (client) komponenti/moduli.
+- `MultiStopManager.js` — Mijoz (client) komponenti/moduli.
+- `PrivacyCall.js` — Mijoz (client) komponenti/moduli.
+- `ShareRide.js` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/taxi/map/`
+- `useBearing.js` — Mijoz (client) komponenti/moduli.
+- `useCarAnimation.js` — Mijoz (client) komponenti/moduli.
+- `useMapController.js` — Mijoz (client) komponenti/moduli.
+- `useRoute.js` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/taxi/services/`
+- `driverTracker.js` — Mijoz (client) komponenti/moduli.
+- `geoService.js` — Mijoz (client) komponenti/moduli.
+- `taxiApi.js` — Mijoz (client) komponenti/moduli.
+
+### `src/features/client/taxi/styles/`
+- `darkMode.css` — Mijoz (client) komponenti/moduli.
+- `taxi.css` — Mijoz (client) komponenti/moduli.
+
+### `src/features/debug/components/`
+- `ProviderSwitchPanel.jsx` — Appning umumiy fayli.
+
+### `src/features/driver/city-taxi/`
+- `CityTaxiPage.jsx` — Haydovchi — shahar taksi moduli.
+- `CityTaxiPageInner.jsx` — Haydovchi — shahar taksi moduli.
+- `README_UZ.md` — Haydovchi — shahar taksi moduli.
+
+### `src/features/driver/city-taxi/components/map/`
+- `MapMarkers.jsx` — Haydovchi — shahar taksi moduli.
+- `TaxiMap.jsx` — Haydovchi — shahar taksi moduli.
+
+### `src/features/driver/city-taxi/components/modals/`
+- `IncomingOrderModal.jsx` — Haydovchi — shahar taksi moduli.
+
+### `src/features/driver/city-taxi/components/panels/`
+- `BottomActionPanel.jsx` — Haydovchi — shahar taksi moduli.
+- `TopStatusPanel.jsx` — Haydovchi — shahar taksi moduli.
+
+### `src/features/driver/city-taxi/components/widgets/`
+- `OrderInfoCard.jsx` — Haydovchi — shahar taksi moduli.
+- `Taximeter.jsx` — Haydovchi — shahar taksi moduli.
+
+### `src/features/driver/city-taxi/context/`
+- `TaxiProvider.jsx` — Haydovchi — shahar taksi moduli.
+- `taxiReducer.js` — Haydovchi — shahar taksi moduli.
+
+### `src/features/driver/city-taxi/hooks/`
+- `useDriverLocation.js` — Haydovchi — shahar taksi moduli.
+- `useEarnings.js` — Haydovchi — shahar taksi moduli.
+- `useOrderActions.js` — Haydovchi — shahar taksi moduli.
+- `useTaxiSocket.js` — Haydovchi — shahar taksi moduli.
+
+### `src/features/driver/city-taxi/`
+- `index.js` — Haydovchi — shahar taksi moduli.
+
+### `src/features/driver/city-taxi/services/`
+- `cityTaxiApi.js` — Haydovchi — shahar taksi moduli.
+
+### `src/features/driver/city-taxi/utils/`
+- `geo.js` — Haydovchi — shahar taksi moduli.
+- `voice.js` — Haydovchi — shahar taksi moduli.
+
+### `src/features/driver/components/`
+- `ActivityChart.jsx` — Haydovchi komponenti/hook/service.
+- `DriverAuth.jsx` — Haydovchi komponenti/hook/service.
+- `DriverHome.jsx` — Haydovchi komponenti/hook/service.
+- `DriverMap.jsx` — Haydovchi komponenti/hook/service.
+- `DriverMarker.jsx` — Haydovchi komponenti/hook/service.
+- `DriverOrderFeed.jsx` — Haydovchi komponenti/hook/service.
+- `DriverProfile.jsx` — Haydovchi komponenti/hook/service.
+- `DriverRegister.jsx` — Haydovchi komponenti/hook/service.
+- `DriverServiceSelect.jsx` — Haydovchi komponenti/hook/service.
+- `DriverVerification.jsx` — Haydovchi komponenti/hook/service.
+- `DriverWallet.jsx` — Haydovchi komponenti/hook/service.
+- `Leaderboard.jsx` — Haydovchi komponenti/hook/service.
+- `NewOrderModal.jsx` — Haydovchi komponenti/hook/service.
+- `driverData.js` — Haydovchi komponenti/hook/service.
+
+### `src/features/driver/components/services/`
+- `DriverDelivery.jsx` — Bridge wrapper: eski importlarni buzmaslik uchun re-export.
+- `DriverFreight.jsx` — Bridge wrapper: eski importlarni buzmaslik uchun re-export.
+- `DriverInterDistrict.jsx` — Bridge wrapper: eski importlarni buzmaslik uchun re-export.
+- `DriverInterProvincial.jsx` — Bridge wrapper: eski importlarni buzmaslik uchun re-export.
+- `DriverTaxi.jsx` — Bridge wrapper: eski importlarni buzmaslik uchun re-export.
+- `driverSearchService.js` — Bridge wrapper: eski importlarni buzmaslik uchun re-export.
+- `locationService.js` — Bridge wrapper: eski importlarni buzmaslik uchun re-export.
+- `orderService.js` — Bridge wrapper: eski importlarni buzmaslik uchun re-export.
+
+### `src/features/driver/delivery-integration/`
+- `README_UZ.md` — Haydovchi uchun posilka/yuk integratsiyasi (feed, matching, socket).
+
+### `src/features/driver/delivery-integration/actions/`
+- `AcceptParcelModal.jsx` — Haydovchi uchun posilka/yuk integratsiyasi (feed, matching, socket).
+- `DropoffCodeInput.jsx` — Haydovchi uchun posilka/yuk integratsiyasi (feed, matching, socket).
+- `QuickPickupFlow.jsx` — Haydovchi uchun posilka/yuk integratsiyasi (feed, matching, socket).
+
+### `src/features/driver/delivery-integration/context/`
+- `IntegrationContext.jsx` — Haydovchi uchun posilka/yuk integratsiyasi (feed, matching, socket).
+- `matchingReducer.js` — Haydovchi uchun posilka/yuk integratsiyasi (feed, matching, socket).
+
+### `src/features/driver/delivery-integration/controls/`
+- `CapacitySelector.jsx` — Haydovchi uchun posilka/yuk integratsiyasi (feed, matching, socket).
+- `DeliveryModeToggle.jsx` — Haydovchi uchun posilka/yuk integratsiyasi (feed, matching, socket).
+- `RouteFilter.jsx` — Haydovchi uchun posilka/yuk integratsiyasi (feed, matching, socket).
+
+### `src/features/driver/delivery-integration/feed/`
+- `EmptyState.jsx` — Haydovchi uchun posilka/yuk integratsiyasi (feed, matching, socket).
+- `FeedHeader.jsx` — Haydovchi uchun posilka/yuk integratsiyasi (feed, matching, socket).
+- `UnifiedParcelFeed.jsx` — Haydovchi uchun posilka/yuk integratsiyasi (feed, matching, socket).
+
+### `src/features/driver/delivery-integration/hooks/`
+- `useEarningsAddon.js` — Haydovchi uchun posilka/yuk integratsiyasi (feed, matching, socket).
+- `useParcelSocket.js` — Haydovchi uchun posilka/yuk integratsiyasi (feed, matching, socket).
+- `useRouteMatching.js` — Haydovchi uchun posilka/yuk integratsiyasi (feed, matching, socket).
+
+### `src/features/driver/delivery-integration/`
+- `index.js` — Haydovchi uchun posilka/yuk integratsiyasi (feed, matching, socket).
+
+### `src/features/driver/delivery-integration/services/`
+- `integrationApi.js` — Haydovchi uchun posilka/yuk integratsiyasi (feed, matching, socket).
+
+### `src/features/driver/delivery-integration/widgets/`
+- `MapParcelMarker.jsx` — Haydovchi uchun posilka/yuk integratsiyasi (feed, matching, socket).
+- `ParcelCardLarge.jsx` — Haydovchi uchun posilka/yuk integratsiyasi (feed, matching, socket).
+- `ParcelCardSmall.jsx` — Haydovchi uchun posilka/yuk integratsiyasi (feed, matching, socket).
+
+### `src/features/driver/freight/`
+- `FreightPage.jsx` — Haydovchi — yuk (freight) moduli.
+- `README_UZ.md` — Haydovchi — yuk (freight) moduli.
+
+### `src/features/driver/freight/components/modals/`
+- `HeavyLoadAlert.jsx` — Haydovchi — yuk (freight) moduli.
+- `WeighStationInfo.jsx` — Haydovchi — yuk (freight) moduli.
+
+### `src/features/driver/freight/components/modes/bulk-materials/`
+- `MaterialSelector.jsx` — Haydovchi — yuk (freight) moduli.
+- `QuarryLocator.jsx` — Haydovchi — yuk (freight) moduli.
+- `VolumePriceInput.jsx` — Haydovchi — yuk (freight) moduli.
+
+### `src/features/driver/freight/components/modes/city-logistics/`
+- `HourlyRateSetup.jsx` — Haydovchi — yuk (freight) moduli.
+- `MoverOption.jsx` — Haydovchi — yuk (freight) moduli.
+- `QuickOrderMap.jsx` — Haydovchi — yuk (freight) moduli.
+
+### `src/features/driver/freight/components/modes/long-haul/`
+- `ReturnTripSetup.jsx` — Haydovchi — yuk (freight) moduli.
+- `RouteBidBoard.jsx` — Haydovchi — yuk (freight) moduli.
+- `TruckLoadVisual.jsx` — Haydovchi — yuk (freight) moduli.
+
+### `src/features/driver/freight/components/shared/`
+- `PhotoGallery.jsx` — Haydovchi — yuk (freight) moduli.
+- `UnifiedOrdersFeed.jsx` — Haydovchi — yuk (freight) moduli.
+- `VehiclePassport.jsx` — Haydovchi — yuk (freight) moduli.
+
+### `src/features/driver/freight/context/`
+- `FreightContext.jsx` — Haydovchi — yuk (freight) moduli.
+- `freightReducer.js` — Haydovchi — yuk (freight) moduli.
+
+### `src/features/driver/freight/hooks/`
+- `useFreightSocket.js` — Haydovchi — yuk (freight) moduli.
+- `useMaterialCalculator.js` — Haydovchi — yuk (freight) moduli.
+- `useTruckFilter.js` — Haydovchi — yuk (freight) moduli.
+
+### `src/features/driver/freight/`
+- `index.js` — Haydovchi — yuk (freight) moduli.
+
+### `src/features/driver/freight/services/`
+- `freightApi.js` — Haydovchi — yuk (freight) moduli.
+
+### `src/features/driver/hooks/`
+- `useDriverRadarSearch.js` — Haydovchi komponenti/hook/service.
+- `useRealtimeDrivers.js` — Haydovchi komponenti/hook/service.
+
+### `src/features/driver/inter-district/`
+- `InterDistrictPage.jsx` — Haydovchi — tumanlararo moduli.
+- `README_UZ.md` — Haydovchi — tumanlararo moduli.
+
+### `src/features/driver/inter-district/components/modes/premium/`
+- `ClientLocatorMap.jsx` — Haydovchi — tumanlararo moduli.
+- `DoorToDoorNav.jsx` — Haydovchi — tumanlararo moduli.
+- `DynamicPriceCard.jsx` — Haydovchi — tumanlararo moduli.
+
+### `src/features/driver/inter-district/components/modes/standard/`
+- `FixedRouteCard.jsx` — Haydovchi — tumanlararo moduli.
+- `PassengerListSimple.jsx` — Haydovchi — tumanlararo moduli.
+- `PitakQueueBoard.jsx` — Haydovchi — tumanlararo moduli.
+
+### `src/features/driver/inter-district/components/parcel/`
+- `ParcelEntryModal.jsx` — Haydovchi — tumanlararo moduli.
+
+### `src/features/driver/inter-district/components/shared/`
+- `CarSeatVisualizer.jsx` — Haydovchi — tumanlararo moduli.
+- `ModeSwitchToggle.jsx` — Haydovchi — tumanlararo moduli.
+- `TripEarnings.jsx` — Haydovchi — tumanlararo moduli.
+
+### `src/features/driver/inter-district/context/`
+- `DistrictContext.jsx` — Haydovchi — tumanlararo moduli.
+- `pricingReducer.js` — Haydovchi — tumanlararo moduli.
+
+### `src/features/driver/inter-district/hooks/`
+- `usePitakLogic.js` — Haydovchi — tumanlararo moduli.
+- `usePremiumSocket.js` — Haydovchi — tumanlararo moduli.
+
+### `src/features/driver/inter-district/services/`
+- `districtApi.js` — Haydovchi — tumanlararo moduli.
+- `districtData.js` — Haydovchi — tumanlararo moduli.
+- `osrm.js` — Haydovchi — tumanlararo moduli.
+- `supabaseClient.js` — Haydovchi — tumanlararo moduli.
+
+### `src/features/driver/inter-district/styles/`
+- `theme.css` — Haydovchi — tumanlararo moduli.
+
+### `src/features/driver/inter-provincial/`
+- `InterProvincialPage.jsx` — Haydovchi — viloyatlararo moduli.
+- `README_UZ.md` — Haydovchi — viloyatlararo moduli.
+
+### `src/features/driver/inter-provincial/components/active/`
+- `NavigationLauncher.jsx` — Haydovchi — viloyatlararo moduli.
+- `SafetyCheck.jsx` — Haydovchi — viloyatlararo moduli.
+- `SmartRoutePanel.jsx` — Haydovchi — viloyatlararo moduli.
+
+### `src/features/driver/inter-provincial/components/controls/`
+- `TripStatusPanel.jsx` — Haydovchi — viloyatlararo moduli.
+
+### `src/features/driver/inter-provincial/components/management/`
+- `ParcelLogModal.jsx` — Haydovchi — viloyatlararo moduli.
+- `PassengerManifest.jsx` — Haydovchi — viloyatlararo moduli.
+- `SeatRequestModal.jsx` — Haydovchi — viloyatlararo moduli.
+
+### `src/features/driver/inter-provincial/components/setup/`
+- `CarAmenitiesSelector.jsx` — Haydovchi — viloyatlararo moduli.
+- `DateTimePicker.jsx` — Haydovchi — viloyatlararo moduli.
+- `RouteBuilder.jsx` — Haydovchi — viloyatlararo moduli.
+- `VisualSeatSelector.jsx` — Haydovchi — viloyatlararo moduli.
+
+### `src/features/driver/inter-provincial/components/stats/`
+- `TripEarnings.jsx` — Haydovchi — viloyatlararo moduli.
+
+### `src/features/driver/inter-provincial/context/`
+- `TripContext.jsx` — Haydovchi — viloyatlararo moduli.
+- `tripReducer.js` — Haydovchi — viloyatlararo moduli.
+
+### `src/features/driver/inter-provincial/hooks/`
+- `useLocationFeatures.js` — Haydovchi — viloyatlararo moduli.
+- `useSmartSort.js` — Haydovchi — viloyatlararo moduli.
+- `useTripSocket.js` — Haydovchi — viloyatlararo moduli.
+
+### `src/features/driver/inter-provincial/services/`
+- `interProvincialApi.js` — Haydovchi — viloyatlararo moduli.
+- `osrm.js` — Haydovchi — viloyatlararo moduli.
+- `telegramShare.js` — Haydovchi — viloyatlararo moduli.
+
+### `src/features/driver/inter-provincial/utils/`
+- `geo.js` — Haydovchi — viloyatlararo moduli.
+
+### `src/features/driver/pages/`
+- `DriverDashboard.jsx` — Haydovchi komponenti/hook/service.
+- `DriverOrders.jsx` — Haydovchi komponenti/hook/service.
+
+### `src/features/garage/`
+- `GarageModule.jsx` — Appning umumiy fayli.
+
+### `src/features/location/hooks/`
+- `useGeolocation.js` — Appning umumiy fayli.
+- `useReverseGeocode.js` — Appning umumiy fayli.
+
+### `src/features/map/components/`
+- `CenterPin.jsx` — Appning umumiy fayli.
+- `MapCenterPicker.jsx` — Appning umumiy fayli.
+- `MapView.jsx` — Appning umumiy fayli.
+- `RouteLine.jsx` — Appning umumiy fayli.
+- `SearchRadar.jsx` — Appning umumiy fayli.
+- `TargetMarker.jsx` — Appning umumiy fayli.
+- `UserMarker.jsx` — Appning umumiy fayli.
+
+### `src/features/payments/`
+- `PaymentsModule.jsx` — Appning umumiy fayli.
+
+### `src/features/ride/components/`
+- `RideDrawer.jsx` — Appning umumiy fayli.
+
+### `src/features/ride/hooks/`
+- `useRoutePricing.js` — Appning umumiy fayli.
+
+### `src/features/searchOnRoute/`
+- `SearchOnRouteModule.jsx` — Appning umumiy fayli.
+
+### `src/features/settings/pages/`
+- `Settings.jsx` — Ilovaning sahifalari.
+
+### `src/features/shared/components/`
+- `RatingModal.jsx` — Appning umumiy fayli.
+- `RideHistory.jsx` — Appning umumiy fayli.
+
+### `src/features/taxi/components/`
+- `OrderRealtimeDebug.jsx` — Appning umumiy fayli.
+
+### `src/features/ui/components/`
+- `RatingCelebration.jsx` — Appning umumiy fayli.
+
+### `src/hooks/`
+- `useDriverLocationRealtime.js` — Appning umumiy fayli.
+- `useDriverLocationSmoothed.js` — Appning umumiy fayli.
+- `useGeoLocation.js` — Appning umumiy fayli.
+- `useOrderRealtime.js` — Appning umumiy fayli.
+
+### `src/i18n/`
+- `translations.js` — Appning umumiy fayli.
+
+### `src/`
+- `index.css` — Appning umumiy fayli.
+
+### `src/lib/`
+- `supabase.js` — Tashqi servis konfiguratsiyasi (masalan Supabase client).
+
+### `src/`
+- `main.jsx` — Appning umumiy fayli.
+
+### `src/pages/`
+- `ClientOrders.jsx` — Ilovaning sahifalari.
+- `Dashboard.jsx` — Ilovaning sahifalari.
+- `DevHub.jsx` — Ilovaning sahifalari.
+- `DriverPending.jsx` — Ilovaning sahifalari.
+- `Logout.jsx` — Ilovaning sahifalari.
+- `MainPage.jsx` — Ilovaning sahifalari.
+- `MyAddresses.jsx` — Ilovaning sahifalari.
+- `ResetPassword.jsx` — Ilovaning sahifalari.
+
+### `src/pages/SuperPro/`
+- `GaragePage.jsx` — Ilovaning sahifalari.
+- `PaymentsPage.jsx` — Ilovaning sahifalari.
+- `SearchOnRoutePage.jsx` — Ilovaning sahifalari.
+
+### `src/pages/`
+- `Support.jsx` — Ilovaning sahifalari.
+
+### `src/providers/route/`
+- `googleRoute.js` — App providerlari (theme/auth/route wrapper va h.k.).
+- `index.js` — App providerlari (theme/auth/route wrapper va h.k.).
+- `osrmRoute.js` — App providerlari (theme/auth/route wrapper va h.k.).
+- `yandexRoute.js` — App providerlari (theme/auth/route wrapper va h.k.).
+
+### `src/providers/traffic/`
+- `index.js` — App providerlari (theme/auth/route wrapper va h.k.).
+
+### `src/services/`
+- `authSupabase.js` — Appning umumiy fayli.
+- `chatApi.js` — Appning umumiy fayli.
+- `chatRealtime.js` — Appning umumiy fayli.
+- `checkoutApi.js` — Appning umumiy fayli.
+- `fcmService.js` — Appning umumiy fayli.
+- `heatmapApi.js` — Appning umumiy fayli.
+- `marketMetaService.js` — Appning umumiy fayli.
+- `marketService.js` — Appning umumiy fayli.
+- `marketStorage.js` — Appning umumiy fayli.
+- `notifications.js` — Appning umumiy fayli.
+- `notificationsRealtime.js` — Appning umumiy fayli.
+- `orderEnrichment.js` — Appning umumiy fayli.
+- `orderModel.js` — Appning umumiy fayli.
+- `ordersApi.js` — Appning umumiy fayli.
+- `ordersRealtime.js` — Appning umumiy fayli.
+- `poiService.js` — Appning umumiy fayli.
+- `pricingService.js` — Appning umumiy fayli.
+- `promoApi.js` — Appning umumiy fayli.
+- `providerConfig.js` — Appning umumiy fayli.
+- `soundService.js` — Appning umumiy fayli.
+- `supabaseClient.js` — Appning umumiy fayli.
+- `telemetryService.js` — Appning umumiy fayli.
+- `voiceService.js` — Appning umumiy fayli.
+- `walletApi.js` — Appning umumiy fayli.
+
+### `src/shared/assets/lottie/`
+- `error.json` — Appning umumiy fayli.
+- `loading.json` — Appning umumiy fayli.
+- `success.json` — Appning umumiy fayli.
+
+### `src/shared/components/`
+- `LottieView.jsx` — Appning umumiy fayli.
+
+### `src/shared/config/`
+- `appConfig.js` — Appning umumiy fayli.
+- `configService.js` — Appning umumiy fayli.
+- `defaults.js` — Appning umumiy fayli.
+- `defaults_osm.js` — Appning umumiy fayli.
+- `runtimeConfig.js` — Appning umumiy fayli.
+
+### `src/shared/i18n/`
+- `LanguageContext.jsx` — Appning umumiy fayli.
+- `useLanguage.js` — Appning umumiy fayli.
+
+### `src/shared/prefs/`
+- `useAppPrefs.js` — Appning umumiy fayli.
+
+### `src/shared/routes/`
+- `RoleGate.jsx` — Appning umumiy fayli.
+
+### `src/shared/styles/`
+- `fonts.css` — Appning umumiy fayli.
+
+### `src/shared/ui/`
+- `Button.jsx` — Appning umumiy fayli.
+- `Card.jsx` — Appning umumiy fayli.
+- `Modal.jsx` — Appning umumiy fayli.
+- `index.js` — Appning umumiy fayli.
+
+### `src/shared/utils/`
+- `iconRegistry.js` — Umumiy util/helperlar.
+- `locationOptions.js` — Umumiy util/helperlar.
+- `mapStyle.js` — Umumiy util/helperlar.
+- `memo.js` — Umumiy util/helperlar.
+- `routingOptions.js` — Umumiy util/helperlar.
+
+### `src/styles/`
+- `animations.css` — Appning umumiy fayli.
+- `hdr-taxi.css` — Appning umumiy fayli.
+
+### `src/theme/`
+- `antdTheme.js` — Appning umumiy fayli.
+- `theme-overrides.css` — Appning umumiy fayli.
+- `tokens.css` — Appning umumiy fayli.
+- `useThemeMode.js` — Appning umumiy fayli.
+
+### `src/utils/`
+- `AudioPlayer.js` — Umumiy util/helperlar.
+- `BaselineProfile.js` — Umumiy util/helperlar.
+- `NukusPlaces.js` — Umumiy util/helperlar.
+- `apiHelper.js` — Umumiy util/helperlar.
+- `audioHelper.js` — Umumiy util/helperlar.
+- `geo.js` — Umumiy util/helperlar.
+- `imageUtils.js` — Umumiy util/helperlar.
+- `locationSmoothing.js` — Umumiy util/helperlar.
+- `mapStyles.json` — Umumiy util/helperlar.
+- `navigatorSync.js` — Umumiy util/helperlar.
+
+### `/`
+- `tailwind.config.js` — Appning umumiy fayli.
+- `vercel.json` — Appning umumiy fayli.
+- `vite.config.js` — Appning umumiy fayli.
