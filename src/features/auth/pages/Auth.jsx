@@ -69,7 +69,7 @@ export default function Auth() {
       if (error) throw error;
 
       message.success(t?.greeting || "Xush kelibsiz!");
-      navigate("/client");
+      navigate("/client/home", { replace: true });
     } catch {
       message.error("Telefon raqam yoki parol noto'g'ri!");
     } finally {

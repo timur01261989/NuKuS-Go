@@ -65,7 +65,7 @@ export default function App() {
               <Route path="/logout" element={<Logout />} />
 
               {/* --- DASHBOARD --- */}
-              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Navigate to="/client/home" replace />} />
 
               {/* --- CLIENT --- */}
 

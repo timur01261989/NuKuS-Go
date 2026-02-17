@@ -90,7 +90,7 @@ export default function Register() {
         if (profileError) throw profileError;
 
         message.success("Muvaffaqiyatli ro'yxatdan o'tdingiz!");
-        navigate("/dashboard");
+        navigate("/client/home", { replace: true });
       }
     } catch (err) {
       message.error("Xatolik: " + err.message);
@@ -114,7 +114,7 @@ export default function Register() {
 
           {/* HEADER QISMI (Yango uslubida) */}
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 25 }}>
-             <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/')} type="text" shape="circle" />
+             <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/login')} type="text" shape="circle" />
              <Title level={4} className="yango-title" style={{ margin: '0 0 0 10px' }}>Ro'yxatdan o'tish</Title>
           </div>
 
