@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, } from "react";
 import {
   Avatar,
   Button,
@@ -65,6 +66,7 @@ const MAX_KM = 50;
 
 const tileDay = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
 const tileNight = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+const [searchLoading, setSearchLoading] = useState(false);
 
 /** --- icons --- */
 const pickupIcon = L.divIcon({
