@@ -68,7 +68,8 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
           .from("profiles")
           .select("role")
           .eq("id", session.user.id)
-          .maybeSingle();
+          .maybeSingle()
+         );
 
         if (!profileErr && profile && profile.role) {
           profileExists = true;
