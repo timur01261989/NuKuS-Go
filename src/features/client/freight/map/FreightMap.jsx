@@ -33,6 +33,7 @@ function CenterTracker({ enabled, onCenter, setIsDragging }) {
   return null;
 }
 
+// 1. FlyTo funksiyasini to'g'ri varianti
 function FlyTo({ target, zoom = 16 }) {
   const map = useMap();
   useEffect(() => {
@@ -42,11 +43,13 @@ function FlyTo({ target, zoom = 16 }) {
   return null;
 }
 
-const pinSvg = () => \`
-<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="32" cy="32" r="20" fill="#FFD400"/>
-  <path d="M36 19c-4 0-7 3-7 7v10l-2 2v3h14v-3l-2-2V26c0-4-3-7-7-7z" fill="#111"/>
-</svg>\`;
+// 2. pinSvg o'zgaruvchisini to'g'ri varianti
+const pinSvg = () => (
+  <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="32" cy="32" r="20" fill="#FFD400"/>
+    <path d="M36 19c-4 0-7 3-7 7v10l-2 2v3h14v-3l-2-2V26c0-4-3-7-7-7z" fill="#111"/>
+  </svg>
+);
 
 export default function FreightMap() {
   const { pickup, setPickup, dropoff, setDropoff, setDistanceKm, setDurationMin } = useFreight();
