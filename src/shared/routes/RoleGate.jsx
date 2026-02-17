@@ -64,11 +64,13 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         let profileExists = false;
 
         // profiles bo‘lmasligi yoki RLS bloklashi mumkin
-        const { data: profile, error: profileErr } = await withTimeout(supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", session.user.id)
-          .maybeSingle();
+        const { data: profile, error: profileErr } = await withTimeout(
+          supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", session.user.id)
+            .maybeSingle()
+        );
 
         if (!profileErr && profile && profile.role) {
           profileExists = true;
@@ -81,11 +83,13 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
 
         // driver approval: drivers table'dan tekshiramiz (schema bilan mos)
         if (role === "driver") {
-          const { data: drv, error: drvErr } = await withTimeout(supabase
-            .from("drivers")
-            .select("approved")
-            .eq("user_id", session.user.id)
-            .maybeSingle();
+          const { data: drv, error: drvErr } = await withTimeout(
+            supabase
+              .from("drivers")
+              .select("approved")
+              .eq("user_id", session.user.id)
+              .maybeSingle()
+          );
 
           if (!drvErr && typeof drv?.approved === "boolean") {
             approved = drv.approved;
