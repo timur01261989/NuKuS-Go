@@ -33,7 +33,7 @@ export default function RootRedirect() {
         const userId = s.session.user.id;
 
         // default role
-        let role = "client";
+        let role = null;
 
         const { data: profile, error: profileErr } = await supabase
           .from("profiles")
@@ -42,6 +42,13 @@ export default function RootRedirect() {
           .maybeSingle();
 
         if (!profileErr && profile?.role) role = profile.role;
+
+        if (!role) {
+          setTo("/login");
+          if (!mounted) return;
+          setLoading(false);
+          return;
+        }
 
         if (role === "driver") {
           // check approval if drivers table exists

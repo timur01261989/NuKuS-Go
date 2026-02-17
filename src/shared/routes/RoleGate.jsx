@@ -34,7 +34,13 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         setLoading(true);
         setReason(null);
 
-        const { data: s, error: sessionErr } = await supabase.auth.getSession();
+        const withTimeout = (p, ms = 8000) =>
+          Promise.race([
+            p,
+            new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms)),
+          ]);
+
+        const { data: s, error: sessionErr } = await withTimeout(supabase.auth.getSession());
         if (sessionErr) {
           if (!mounted) return;
           setOk(false);
@@ -53,28 +59,29 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         }
 
         // defaults
-        let role = "client";
-        let approved = true;
-        let profileExists = true;
+        let role = null;
+        let approved = false;
+        let profileExists = false;
 
         // profiles bo‘lmasligi yoki RLS bloklashi mumkin
-        const { data: profile, error: profileErr } = await supabase
+        const { data: profile, error: profileErr } = await withTimeout(supabase
           .from("profiles")
           .select("role")
           .eq("id", session.user.id)
-          // ✅ profil bo‘lmasa error qilmaydi
           .maybeSingle();
 
-        if (profileErr || !profile) {
-          // RLS yoki boshqa sabab: profilni o‘qiy olmadi / yo‘q
-          profileExists = false;
-        } else if (profile?.role) {
+        if (!profileErr && profile && profile.role) {
+          profileExists = true;
           role = profile.role;
+        } else {
+          // profil yo‘q yoki o‘qib bo‘lmadi: bu holatda access bermaymiz
+          profileExists = false;
+          role = null;
         }
 
         // driver approval: drivers table'dan tekshiramiz (schema bilan mos)
         if (role === "driver") {
-          const { data: drv, error: drvErr } = await supabase
+          const { data: drv, error: drvErr } = await withTimeout(supabase
             .from("drivers")
             .select("approved")
             .eq("user_id", session.user.id)
@@ -86,6 +93,14 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         }
 // access decision
         const a = allow || {};
+
+        if (!role) {
+          if (!mounted) return;
+          setOk(false);
+          setReason("no-profile");
+          setLoading(false);
+          return;
+        }
         let allowed = false;
 
         if (role === "client") {
@@ -124,7 +139,7 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
       } catch (e) {
         if (!mounted) return;
         setOk(false);
-        setReason("error");
+        setReason(e?.message === "timeout" ? "timeout" : "error");
         setLoading(false);
       }
     };

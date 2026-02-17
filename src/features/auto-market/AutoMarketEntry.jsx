@@ -1,8 +1,9 @@
-import React, { lazy, Suspense, useMemo } from "react";
+import React, { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 
 import { MarketProvider } from "./context/MarketContext";
 import ErrorBoundary from "./components/Common/ErrorBoundary";
+import { supabase } from "@lib/supabase";
 import { useMarketStore } from "./stores/marketStore";
 
 /**
@@ -28,20 +29,45 @@ const CreatePage = lazy(() => import("./pages/CreatePage"));
  * - localStorage'da "access_token" yoki "sb-access-token" bo'lsa -> authed deb olamiz
  * Eslatma: Sizning loyihangizda AuthContext bo'lsa, shu joyni osongina almashtirasiz.
  */
-function useIsAuthed() {
-  const token =
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("sb-access-token") ||
-    localStorage.getItem("supabase.auth.token");
-  return !!token;
-}
-
 function RequireAuth({ children }) {
-  const authed = useIsAuthed();
   const location = useLocation();
+  const [checking, setChecking] = useState(true);
+  const [authed, setAuthed] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+
+    const run = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (!alive) return;
+        if (error) {
+          setAuthed(false);
+        } else {
+          setAuthed(!!data?.session);
+        }
+      } catch {
+        if (!alive) return;
+        setAuthed(false);
+      } finally {
+        if (!alive) return;
+        setChecking(false);
+      }
+    };
+
+    run();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  if (checking) return <LoadingScreen />;
+
   if (!authed) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
+
   return children;
 }
 

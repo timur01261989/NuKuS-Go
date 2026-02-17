@@ -61,6 +61,7 @@ export default function TaxiMap({
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 0 }}>
       <MapContainer
+        key={`client-taxi-${center?.[0] ?? 0}-${center?.[1] ?? 0}`}
         center={center}
         zoom={15}
         style={{ width: "100%", height: "100%" }}
