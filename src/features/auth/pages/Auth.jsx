@@ -38,7 +38,7 @@ export default function Auth() {
     const checkSession = async () => {
       if (!supabase?.auth) return;
       const { data } = await supabase.auth.getSession();
-      if (data?.session) navigate("/client");
+      if (data?.session) navigate("/client/home");
     };
     checkSession();
   }, [navigate]);

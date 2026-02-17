@@ -60,23 +60,31 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         // profiles bo‘lmasligi yoki RLS bloklashi mumkin
         const { data: profile, error: profileErr } = await supabase
           .from("profiles")
-          .select("role, driver_approved")
+          .select("role")
           .eq("id", session.user.id)
           // ✅ profil bo‘lmasa error qilmaydi
           .maybeSingle();
 
-        if (profileErr) {
-          // RLS yoki boshqa sabab: profilni o‘qiy olmadi
-          // fallback: client deb qoladi, lekin driver route bo‘lsa bu muammo bo‘lishi mumkin
+        if (profileErr || !profile) {
+          // RLS yoki boshqa sabab: profilni o‘qiy olmadi / yo‘q
           profileExists = false;
-        } else if (!profile) {
-          profileExists = false;
-        } else {
-          if (profile?.role) role = profile.role;
-          if (typeof profile?.driver_approved === "boolean") approved = profile.driver_approved;
+        } else if (profile?.role) {
+          role = profile.role;
         }
 
-        // access decision
+        // driver approval: drivers table'dan tekshiramiz (schema bilan mos)
+        if (role === "driver") {
+          const { data: drv, error: drvErr } = await supabase
+            .from("drivers")
+            .select("approved")
+            .eq("user_id", session.user.id)
+            .maybeSingle();
+
+          if (!drvErr && typeof drv?.approved === "boolean") {
+            approved = drv.approved;
+          }
+        }
+// access decision
         const a = allow || {};
         let allowed = false;
 
@@ -140,13 +148,13 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
   if (!ok) {
     // driver approved bo‘lmasa pendingga
     if (reason === "driver-not-approved") {
-      return <Navigate to="/driver-pending" replace />;
+      return <Navigate to="/driver/pending" replace />;
     }
 
     // profil yo‘q bo‘lsa, driver roli set qilinmagan bo‘lishi mumkin:
     // xohlasangiz driver-mode (ro‘yxatdan o‘tish / rol tanlash)ga yuboring
     if (reason === "no-profile") {
-      return <Navigate to="/driver-mode" replace />;
+      return <Navigate to={redirectTo} replace state={{ from: location.pathname, reason: "no-profile" }} />;
     }
 
     // login redirect (oldingi pathni state’da olib boramiz)

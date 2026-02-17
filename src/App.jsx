@@ -18,6 +18,7 @@ const Register = lazy(() => import("./features/auth/pages/Register"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const MainPage = lazy(() => import("./pages/MainPage"));
+const RootRedirect = lazy(() => import("./pages/RootRedirect"));
 const Logout = lazy(() => import("./pages/Logout"));
 const Support = lazy(() => import("./pages/Support"));
 const MyAddresses = lazy(() => import("./pages/MyAddresses"));
@@ -57,7 +58,7 @@ export default function App() {
           <Suspense fallback={<PageLoader />}>
             <Routes>
               {/* --- PUBLIC --- */}
-              <Route path="/" element={<MainPage />} />
+              <Route path="/" element={<RootRedirect />} />
               <Route path="/login" element={<Auth />} />
               <Route path="/register" element={<Register />} />
               <Route path="/reset-password" element={<ResetPassword />} />
@@ -67,10 +68,39 @@ export default function App() {
               <Route path="/dashboard" element={<Dashboard />} />
 
               {/* --- CLIENT --- */}
-              <Route path="/client/home" element={<ClientHome />} />
-              <Route path="/client/taxi" element={<ClientTaxi />} />
-              <Route path="/client/orders" element={<ClientOrders />} />
-              <Route path="/client/addresses" element={<MyAddresses />} />
+
+              <Route path="/client" element={<Navigate to="/client/home" replace />} />              <Route
+                path="/client/home"
+                element={
+                  <RoleGate allow={{ client: true, driver: false }}>
+                    <ClientHome />
+                  </RoleGate>
+                }
+              />
+              <Route
+                path="/client/taxi"
+                element={
+                  <RoleGate allow={{ client: true, driver: false }}>
+                    <ClientTaxi />
+                  </RoleGate>
+                }
+              />
+              <Route
+                path="/client/orders"
+                element={
+                  <RoleGate allow={{ client: true, driver: false }}>
+                    <ClientOrders />
+                  </RoleGate>
+                }
+              />
+              <Route
+                path="/client/addresses"
+                element={
+                  <RoleGate allow={{ client: true, driver: false }}>
+                    <MyAddresses />
+                  </RoleGate>
+                }
+              />
 
               {/* --- AUTO MARKET --- */}
               <Route path="/auto-market/*" element={<AutoMarketEntry />} />
