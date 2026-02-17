@@ -114,11 +114,13 @@ export default function FreightMap() {
         )}
       </MapContainer>
 
-      {selecting && (
-        <div className={\`fr-centerpin \${isDragging ? "dragging" : ""}\`} aria-hidden>
-          <div style={{ width: 70, height: 80 }} dangerouslySetInnerHTML={{ __html: pinSvg() }} />
-          <div className="fr-pinlabel">{selecting === "pickup" ? "Yuklash joyi" : "Tushirish joyi"}</div>
-        </div>
+     // 118-qatorni mana bunday o'zgartiring:
+<div className={`fr-centerpin ${isDragging ? "dragging" : ""}`} aria-hidden>
+   <div style={{ width: 70, height: 80 }} dangerouslySetInnerHTML={{ __html: pinSvg() }} />
+   <div className="fr-pinlabel">
+     {selecting === "pickup" ? "Yuklash joyi" : "Tushirish joyi"}
+   </div>
+</div>
       )}
 
       <div style={{ position: "absolute", right: 12, top: 12, zIndex: 800 }}>
