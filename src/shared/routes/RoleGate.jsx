@@ -117,33 +117,49 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
           return finish(false, profileErr ? "profile-error" : "no-profile");
         }
 
-        // 3) driver approved
+        // 3) driver approved / registration
         let approved = false;
+        let driverRowExists = false;
         if (role === "driver") {
           const { data: drv, error: drvErr } = await withTimeout(
             supabase.from("drivers").select("approved").eq("user_id", userId).maybeSingle()
           );
-          if (!drvErr && typeof drv?.approved === "boolean") approved = drv.approved;
+          if (!drvErr && drv) {
+            driverRowExists = true;
+            if (typeof drv.approved === "boolean") approved = drv.approved;
+          }
         }
 
         // 4) allow decision
         let allowed = false;
 
         if (role === "client") {
+          // client route OK only if explicitly allowed
           allowed = !!a.client;
+
+          // If user is a CLIENT but trying to access DRIVER-only route,
+          // we should send them to driver registration (not login).
+          if (!allowed && !!a.driver && !a.client) {
+            return finish(false, "not-driver");
+          }
         } else if (role === "driver") {
           if (!a.driver) {
-            allowed = false;
-            setReason("driver-not-allowed");
-          } else if (a.requireDriverApproved && !approved) {
-            allowed = false;
-            return finish(false, "driver-not-approved");
-          } else {
-            allowed = true;
+            return finish(false, "driver-not-allowed");
           }
+
+          // If drivers row doesn't exist, user hasn't registered as driver yet
+          if (!driverRowExists) {
+            return finish(false, "driver-not-registered");
+          }
+
+          if (a.requireDriverApproved && !approved) {
+            return finish(false, "driver-not-approved");
+          }
+
+          allowed = true;
         }
 
-        // extra info
+// extra info
         if (!profileExists && a.driver && !allowed) {
           // driver flow bo'lishi mumkin, lekin profil yo'q — admin/trigger muammo
           setReason((r) => r || "no-profile");
@@ -171,14 +187,19 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
   }
 
   if (!ok) {
+    // Driver flows
     if (reason === "driver-not-approved") {
       return <Navigate to="/driver/pending" replace />;
     }
+    if (reason === "driver-not-registered" || reason === "not-driver") {
+      return <Navigate to="/driver/register" replace />;
+    }
 
-    // profile yo'q yoki RLS/DB muammo bo'lsa — login emas, register flow ham bo'lishi mumkin.
-    // Lekin hozircha xavfsiz: login sahifasiga qaytaramiz va reason uzatamiz.
+    // Default: go back to login
     return <Navigate to={redirectTo} replace state={{ from: location.pathname, reason }} />;
   }
+
+
 
   return <>{children}</>;
 }

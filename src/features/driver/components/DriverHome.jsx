@@ -34,6 +34,7 @@ import DriverInterDistrict from "./services/DriverInterDistrict";
 import DriverInterProvincial from "./services/DriverInterProvincial";
 import DriverFreight from "./services/DriverFreight";
 import DriverDelivery from "./services/DriverDelivery";
+import DriverMarket from "./services/DriverMarket";
 
 import DriverProfile from "./DriverProfile";
 
@@ -41,6 +42,16 @@ import { supabase } from "../../../lib/supabase";
 import { startTracking } from "./services/locationService";
 
 const { Title, Text } = Typography;
+
+// Local SVG icons (public/icons/services)
+const serviceIcon = (name) => (
+  <img
+    src={`/icons/services/${name}.svg`}
+    alt={name}
+    style={{ width: 26, height: 26, objectFit: "contain" }}
+  />
+);
+
 
 export default function DriverHome({ onLogout }) {
   const navigate = useNavigate();
@@ -378,6 +389,7 @@ export default function DriverHome({ onLogout }) {
     if (selectedService === "interProv") return <DriverInterProvincial onBack={backToMenu} />;
     if (selectedService === "freight") return <DriverFreight onBack={backToMenu} />;
     if (selectedService === "delivery") return <DriverDelivery onBack={backToMenu} />;
+    if (selectedService === "market") return <DriverMarket onBack={backToMenu} />;
     return null;
   }, [selectedService]);
 
@@ -726,6 +738,46 @@ export default function DriverHome({ onLogout }) {
                     <div style={{ fontWeight: "bold", fontSize: 15 }}>Eltish xizmati</div>
                 </Card>
                 </Col>
+
+                <Col span={12}>
+                <Card
+                    hoverable
+                    onClick={() => selectService("market")}
+                    style={{
+                    borderRadius: 20,
+                    textAlign: "center",
+                    height: "100%",
+                    cursor: "pointer",
+                    transition: "transform 0.1s",
+                    border:
+                        selectedService === "market"
+                        ? "1px solid rgba(82,196,26,0.45)"
+                        : "1px solid var(--card-border)",
+                    background: "var(--card-bg)",
+                    boxShadow:
+                        selectedService === "market"
+                        ? "0 12px 26px rgba(0,0,0,0.18)"
+                        : "var(--shadow-soft)",
+                    position: "relative",
+                    overflow: "hidden",
+                    }}
+                    bodyStyle={{ padding: 22 }}
+                >
+                    {selectedService === "market" && (
+                    <div style={{ position: "absolute", top: 14, right: 14 }}>
+                    <Tag color="green" style={{ borderRadius: 999, fontWeight: 700 }}>
+                        TANLANDI
+                    </Tag>
+                    </div>
+                    )}
+                    <div style={{ marginBottom: 15 }}>{serviceIcon("Market")}</div>
+                    <div style={{ fontWeight: "bold", fontSize: 15 }}>Market</div>
+                    <div style={{ color: "var(--muted)", fontSize: 12, marginTop: 6 }}>
+                      Do'kon buyurtmalari
+                    </div>
+                </Card>
+                </Col>
+
             </Row>
 
             {/* SUPER PRO */}

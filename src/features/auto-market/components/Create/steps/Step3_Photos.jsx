@@ -3,16 +3,22 @@ import { Card, Button, Image, message } from "antd";
 import { UploadOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useCreateAd } from "../../../context/CreateAdContext";
 import useUploadImages from "../../../hooks/useUploadImages";
+import { useAiPipeline } from "../../../hooks/ai/useAiPipeline";
+import AiPipelineStatus from "../../modules/CreateAd/AiPipelineStatus";
 
 export default function Step3_Photos() {
   const { ad, patch } = useCreateAd();
   const { upload, uploading } = useUploadImages();
+  const { startPipeline } = useAiPipeline();
   const inputRef = useRef(null);
 
   const onPick = async (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     try {
+      // Optimistic UI: start AI pipeline immediately (runs in background)
+      startPipeline({ images: files, meta: { source: "createAdPhotos" } }).catch(() => {});
+
       const uploaded = await upload(files);
       const urls = uploaded.map(x => x.url);
       patch({ images: [...(ad.images || []), ...urls].slice(0, 10) });
@@ -45,6 +51,8 @@ export default function Step3_Photos() {
       >
         Rasm tanlash
       </Button>
+
+      <AiPipelineStatus />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginTop: 14 }}>
         {(ad.images || []).map((src, idx) => (
