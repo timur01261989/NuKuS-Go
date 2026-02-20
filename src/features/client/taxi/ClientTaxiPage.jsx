@@ -622,6 +622,10 @@ export default function ClientTaxiPage() {
     }
   }, [dest.latlng, pickup.latlng, userLoc]);
 
+  /** backward-compat: TaxiSearchSheet expects openDestMapSelect */
+  const openDestMapSelect = openDestMapEdit;
+
+
   /** add stop (waypoint) */
   const addStopFromCenter = useCallback(() => {
     if (!centerLatLng) return;
