@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+
+
   Avatar,
   Button,
   Divider,
@@ -32,7 +34,6 @@ import {
   MessageOutlined,
   StarFilled,
   UserOutlined,
-  MenuOutlined, // Menu icon qo'shildi
 } from "@ant-design/icons";
 import { MapContainer, Polyline, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
@@ -50,6 +51,22 @@ import { nominatimReverse as _nominatimReverse } from "../shared/geo/nominatim";
 async function nominatimReverse(lat, lng, signal) {
   return _nominatimReverse(lat, lng, { signal });
 }
+
+/**
+ * CLIENT TAXI (Yandex-Go like flow)
+ *
+ * Screens / flow:
+ *  - "main": pickup selection by map center pin (yellow man icon), shows "Qaerga borasiz?" and "Buyurtma berish" (destination optional)
+ *  - "search": destination search drawer, two fields: pickup and destination; pickup can be changed via map button
+ *  - "dest_map": destination selection by map center pin; shows price bubble; bottom sheet auto-hides on dragging, shows when stop; has "Tayyor"
+ *  - "route": route preview (A->B + optional waypoints), tariffs, "Buyurtma berish"
+ *  - "searching": dispatch/searching nearby cars; show waves, cars, cancel
+ *  - "coming": driver accepted; show real-time driver marker + ETA + details + actions
+ *
+ * Notes:
+ *  - Distance > 50km: block dispatch/ordering (as requested)
+ *  - Destination optional: user can order without selecting destination
+ */
 
 const { Text } = Typography;
 
@@ -104,7 +121,10 @@ function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
 }
 
+
+
 async function nominatimSearch(q, signal) {
+  // countrycodes=uz natijalarni faqat O'zbekiston bilan cheklaydi
   const url = `https://nominatim.openstreetmap.org/search?format=json&limit=7&addressdetails=1&q=${encodeURIComponent(
     q
   )}&countrycodes=uz`;
@@ -123,6 +143,7 @@ async function nominatimSearch(q, signal) {
   }
 }
 
+// OSRM yo'nalish topa olmasa ham xato bermaslik uchun:
 async function osrmRouteMulti(points /* [[lat,lng], ...] */) {
   if (!points || points.length < 2) return null;
   try {
@@ -145,12 +166,13 @@ async function osrmRouteMulti(points /* [[lat,lng], ...] */) {
   } catch (e) {
     console.warn("OSRM yo'nalish chizishda xatolik:", e);
   }
+  // Fallback: Agar yo'nalish chizib bo'lmasa, to'g'ri chiziq chizamiz
   const from = points[0];
   const to = points[points.length - 1];
   return {
     coords: [from, to],
     distanceKm: haversineKm(from, to),
-    durationMin: haversineKm(from, to) * 2,
+    durationMin: haversineKm(from, to) * 2, // Taxminiy vaqt
   };
 }
 
@@ -188,6 +210,59 @@ function useDebouncedReverse(when, latlng, delay = 350) {
   return addr;
 }
 
+/** --- Map helpers --- */
+function CenterWatcher({ onCenterChange, onMoveStart, onMoveEnd }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map) return;
+
+    const fire = () => {
+      const c = map.getCenter();
+      onCenterChange?.([c.lat, c.lng], map.getZoom());
+    };
+
+    const ms = () => onMoveStart?.();
+    const me = () => {
+      onMoveEnd?.();
+      fire();
+    };
+
+    map.on("movestart", ms);
+    map.on("moveend", me);
+    map.on("zoomend", me);
+
+    // initial
+    fire();
+
+    return () => {
+      map.off("movestart", ms);
+      map.off("moveend", me);
+      map.off("zoomend", me);
+    };
+  }, [map, onCenterChange, onMoveStart, onMoveEnd]);
+
+  return null;
+}
+
+function LocateMeButton({ mapRef, userLoc, bottom = 240 }) {
+  return (
+    <div style={{ position: "absolute", right: 16, bottom, zIndex: 800 }}>
+      <Button
+        shape="circle"
+        size="large"
+        icon={<AimOutlined style={{ fontSize: 22 }} />}
+        style={{ boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}
+        onClick={() => {
+          const map = mapRef.current;
+          if (map && userLoc) map.flyTo(userLoc, 16, { duration: 0.6 });
+        }}
+      />
+    </div>
+  );
+}
+
+/** --- local saved addresses --- */
 function loadSavedPlaces() {
   try {
     const raw = localStorage.getItem("client_saved_places");
@@ -205,11 +280,12 @@ function savePlace(place) {
   return next;
 }
 
+/** --- speech ("Alisa") --- */
 function speak(text) {
   try {
     if (!("speechSynthesis" in window)) return;
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = "ru-RU";
+    u.lang = "ru-RU"; // closest to "Alisa"-like on many Android/Chrome setups
     u.rate = 1;
     u.pitch = 1;
     window.speechSynthesis.cancel();
@@ -217,7 +293,7 @@ function speak(text) {
   } catch {}
 }
 
-/** --- MAIN COMPONENT --- */
+/** --- main component --- */
 export default function ClientTaxiPage() {
   const mapRef = useRef(null);
 
@@ -237,7 +313,7 @@ export default function ClientTaxiPage() {
   const [waypoints, setWaypoints] = useState([]); // [{latlng,address}]
   const [addStopOpen, setAddStopOpen] = useState(false);
 
-  // map center tracking
+  // map center tracking for pickup/dest map screens
   const [centerLatLng, setCenterLatLng] = useState(null);
   const [isDraggingMap, setIsDraggingMap] = useState(false);
 
@@ -248,6 +324,48 @@ export default function ClientTaxiPage() {
   const [pickupResults, setPickupResults] = useState([]);
   const [destResults, setDestResults] = useState([]);
   const [searchBusy, setSearchBusy] = useState(false);
+
+  // suggestions -> pickup/destination setters (used by TaxiSearchSheet)
+  const setPickupFromSuggestion = useCallback(
+    (item) => {
+      if (!item) return;
+      const lat = item.lat ?? item.latitude ?? item?.location?.lat;
+      const lng = item.lng ?? item.lon ?? item.longitude ?? item?.location?.lng;
+      const address = item.address ?? item.title ?? item.name ?? "";
+      if (lat != null && lng != null) {
+        setPickup((p) => ({ ...p, latlng: [Number(lat), Number(lng)], address: address || p.address }));
+      } else {
+        setPickup((p) => ({ ...p, address: address || p.address }));
+      }
+      setPickupSearchText(address);
+      setSearchOpen(false);
+      // If destination already chosen, go to route preview
+      if (dest?.latlng) setStep("route");
+    },
+    [dest?.latlng]
+  );
+
+  const setDestFromSuggestion = useCallback(
+    (item) => {
+      if (!item) return;
+      const lat = item.lat ?? item.latitude ?? item?.location?.lat;
+      const lng = item.lng ?? item.lon ?? item.longitude ?? item?.location?.lng;
+      const address = item.address ?? item.title ?? item.name ?? "";
+      if (lat != null && lng != null) {
+        setDest((d) => ({ ...d, latlng: [Number(lat), Number(lng)], address: address || d.address }));
+      } else {
+        setDest((d) => ({ ...d, address: address || d.address }));
+      }
+      setDestSearchText(address);
+      setSearchOpen(false);
+      // If pickup already chosen, go to route preview
+      if (pickup?.latlng) setStep("route");
+    },
+    [pickup?.latlng]
+  );
+
+  // saved places
+  const [savedPlaces, setSavedPlaces] = useState([]);
 
   // route preview
   const [route, setRoute] = useState(null); // {coords, distanceKm, durationMin}
@@ -264,7 +382,7 @@ export default function ClientTaxiPage() {
   // order / driver
   const [orderId, setOrderId] = useState(null);
   const [orderStatus, setOrderStatus] = useState(null);
-  const [assignedDriver, setAssignedDriver] = useState(null); 
+  const [assignedDriver, setAssignedDriver] = useState(null); // {first_name, car_model, plate, avatar_url, lat, lng, bearing, rating}
   const [etaMin, setEtaMin] = useState(null);
 
   // actions / modals
@@ -283,34 +401,37 @@ export default function ClientTaxiPage() {
   });
   const [comment, setComment] = useState("");
   const [scheduleOpen, setScheduleOpen] = useState(false);
-  const [scheduledTime, setScheduledTime] = useState(null); 
+  const [scheduledTime, setScheduledTime] = useState(null); // ISO string or null
 
   // shortcuts (Uy/Ish)
-  const [shortcuts, setShortcuts] = useState({ home: null, work: null }); 
-  const [savedPlaces, setSavedPlaces] = useState([]);
+  const [shortcuts, setShortcuts] = useState({ home: null, work: null }); // {label,lat,lng}
 
-  // live cars around
-  const [nearCars, setNearCars] = useState([]); 
-  const [dispatchLine, setDispatchLine] = useState(null); 
+
+  // live cars around when searching
+  const [nearCars, setNearCars] = useState([]); // [{id,lat,lng,bearing}]
+  const [dispatchLine, setDispatchLine] = useState(null); // [[lat,lng],[lat,lng]]
   const [dispatchIdx, setDispatchIdx] = useState(0);
 
-  // address strings (debounced)
+  // address strings (debounced reverse-geocode)
   const pickupAddrFromCenter = useDebouncedReverse(step === "main" || step === "search", centerLatLng, 300);
   const destAddrFromCenter = useDebouncedReverse(step === "dest_map", centerLatLng, 300);
-
-  // Update pickup address from map center
+  // Update pickup address from map center while selecting pickup (main/search)
   useEffect(() => {
     if ((step === "main" || step === "search") && pickupAddrFromCenter) {
       setPickup((p) => ({ ...p, address: pickupAddrFromCenter, latlng: centerLatLng }));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pickupAddrFromCenter, step]);
 
-  // Update destination address from center
+  // Update destination address from center while selecting destination on map
   useEffect(() => {
     if (step === "dest_map" && destAddrFromCenter) {
       setDest((d) => ({ ...d, address: destAddrFromCenter, latlng: centerLatLng }));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [destAddrFromCenter, step]);
+
+
 
   /** get user location */
   useEffect(() => {
@@ -327,11 +448,7 @@ export default function ClientTaxiPage() {
       if (!mounted) return;
       const ll = [pos.coords.latitude, pos.coords.longitude];
       setUserLoc(ll);
-      // Agar pickup hali belgilanmagan bo'lsa
-      setPickup((p) => {
-          if (!p.latlng) return { ...p, latlng: ll };
-          return p;
-      });
+      setPickup((p) => ({ ...p, latlng: ll }));
     };
     const fail = () => {
       // fallback Nukus center
@@ -355,11 +472,14 @@ export default function ClientTaxiPage() {
     };
   }, []);
 
-  /** keep pickup address synced from center pin in main/search */
+  /** keep pickup address synced from center pin in main/search (when user drags map) */
   useEffect(() => {
     if (!(step === "main" || step === "search")) return;
     if (!centerLatLng) return;
+
+    // only update while in main/search; user can override via search list, but map move should update pickup
     setPickup((p) => ({ ...p, latlng: centerLatLng, address: pickupAddrFromCenter || p.address }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pickupAddrFromCenter]);
 
   /** keep dest address synced from center pin in dest_map */
@@ -367,9 +487,10 @@ export default function ClientTaxiPage() {
     if (step !== "dest_map") return;
     if (!centerLatLng) return;
     setDest((d) => ({ ...d, latlng: centerLatLng, address: destAddrFromCenter || d.address }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [destAddrFromCenter]);
 
-  /** compute route */
+  /** compute route when we have pickup + dest + waypoints and step route */
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
@@ -401,12 +522,13 @@ export default function ClientTaxiPage() {
     return Math.round(p);
   }, [distanceKm, tariff]);
 
-  /** search drawer: fetch results (debounced) */
+  /** search drawer: fetch results (debounced + abortable) */
   const pickupAbortRef = useRef(null);
   const destAbortRef = useRef(null);
 
   useEffect(() => {
     if (!searchOpen) return;
+
     const t = setTimeout(async () => {
       const q = pickupSearchText.trim();
       if (!q) {
@@ -421,11 +543,13 @@ export default function ClientTaxiPage() {
       setPickupResults(res);
       setSearchBusy(false);
     }, 250);
+
     return () => clearTimeout(t);
   }, [pickupSearchText, searchOpen]);
 
   useEffect(() => {
     if (!searchOpen) return;
+
     const t = setTimeout(async () => {
       const q = destSearchText.trim();
       if (!q) {
@@ -440,14 +564,11 @@ export default function ClientTaxiPage() {
       setDestResults(res);
       setSearchBusy(false);
     }, 250);
+
     return () => clearTimeout(t);
   }, [destSearchText, searchOpen]);
 
-  // Handlers
-  const openShareRide = useCallback(() => {
-    setShareOpen(true);
-  }, []);
-
+  /** open destination search */
   const openDestinationSearch = useCallback(() => {
     setSearchOpen(true);
     setStep("search");
@@ -455,51 +576,45 @@ export default function ClientTaxiPage() {
     setDestSearchText(dest.address || "");
   }, [pickup.address, dest.address]);
 
-  const setPickupFromSuggestion = useCallback(
+  /** select pickup from search */
+  const choosePickup = useCallback(
     (item) => {
       if (!item) return;
-      const lat = item.lat ?? item.latitude ?? item?.location?.lat;
-      const lng = item.lng ?? item.lon ?? item.longitude ?? item?.location?.lng;
-      const address = item.address ?? item.title ?? item.name ?? "";
-      if (lat != null && lng != null) {
-        setPickup((p) => ({ ...p, latlng: [Number(lat), Number(lng)], address: address || p.address }));
-      } else {
-        setPickup((p) => ({ ...p, address: address || p.address }));
-      }
-      setPickupSearchText(address);
+      setPickup({ latlng: [item.lat, item.lng], address: item.label, entrance: "" });
+      const map = mapRef.current;
+      if (map) map.flyTo([item.lat, item.lng], 16, { duration: 0.6 });
       setSearchOpen(false);
-      if (dest?.latlng) setStep("route");
+      setStep("main");
     },
-    [dest?.latlng]
+    []
   );
 
-  const setDestFromSuggestion = useCallback(
+  /** select destination from search -> go route (or dest_map if user wants map) */
+  const chooseDestination = useCallback(
     (item) => {
       if (!item) return;
-      const lat = item.lat ?? item.latitude ?? item?.location?.lat;
-      const lng = item.lng ?? item.lon ?? item.longitude ?? item?.location?.lng;
-      const address = item.address ?? item.title ?? item.name ?? "";
-      if (lat != null && lng != null) {
-        setDest((d) => ({ ...d, latlng: [Number(lat), Number(lng)], address: address || d.address }));
-      } else {
-        setDest((d) => ({ ...d, address: address || d.address }));
-      }
-      setDestSearchText(address);
+      setDest({ latlng: [item.lat, item.lng], address: item.label });
+      // save to "my addresses"
+      setSavedPlaces(savePlace({ id: String(item.id || Date.now()), title: item.label, lat: item.lat, lng: item.lng, type: "recent" }));
       setSearchOpen(false);
-      if (pickup?.latlng) setStep("route");
+      setStep("route");
     },
-    [pickup?.latlng]
+    []
   );
 
+  /** open pickup map edit (for "Yo'lovchini olish" field) */
   const openPickupMapEdit = useCallback(() => {
     setStep("main");
     setSearchOpen(false);
+    // center pin already pickup; user drags to adjust
     message.info("Xaritani siljitib yo'lovchini olish nuqtasini o'zgartiring");
   }, []);
 
+  /** open dest map edit */
   const openDestMapEdit = useCallback(() => {
     setStep("dest_map");
     setSearchOpen(false);
+    // fly to destination or pickup
     const map = mapRef.current;
     if (map) {
       const c = dest.latlng || pickup.latlng || userLoc;
@@ -507,8 +622,17 @@ export default function ClientTaxiPage() {
     }
   }, [dest.latlng, pickup.latlng, userLoc]);
 
+  /** backward-compat: TaxiSearchSheet expects openDestMapSelect */
   const openDestMapSelect = openDestMapEdit;
 
+  /** open share ride modal (backward-compat) */
+  const openShareRide = useCallback(() => {
+    setShareOpen(true);
+  }, []);
+
+
+
+  /** add stop (waypoint) */
   const addStopFromCenter = useCallback(() => {
     if (!centerLatLng) return;
     const addr = step === "dest_map" ? (destAddrFromCenter || "") : (pickupAddrFromCenter || "");
@@ -518,11 +642,14 @@ export default function ClientTaxiPage() {
     message.success("Oraliq bekat qo'shildi");
   }, [centerLatLng, step, destAddrFromCenter, pickupAddrFromCenter]);
 
+  /** order create (destination optional) */
   const handleOrderCreate = useCallback(async () => {
     if (!pickup.latlng) {
       message.error("Yo'lovchini olish nuqtasi aniqlanmadi");
       return;
     }
+
+    // distance check only if destination exists
     if (dest.latlng) {
       const d = distanceKm || haversineKm(pickup.latlng, dest.latlng);
       if (d > MAX_KM) {
@@ -558,12 +685,14 @@ export default function ClientTaxiPage() {
         scheduled_time: scheduledTime,
       };
 
+      // Backend mismatch safety: try a few actions
       const actions = ["create", "create_taxi", "create_city", "new"];
       let res = null;
       let lastErr = null;
 
       for (const action of actions) {
         try {
+          // eslint-disable-next-line no-await-in-loop
           res = await api.post("/api/order", { action, ...payloadBase });
           if (res?.data || res?.id || res?.orderId) break;
         } catch (e) {
@@ -586,8 +715,9 @@ export default function ClientTaxiPage() {
     } finally {
       hide();
     }
-  }, [pickup, dest, tariff, totalPrice, distanceKm, waypoints, orderFor, otherPhone, wishes, comment, scheduledTime]);
+  }, [pickup, dest, tariff, totalPrice, distanceKm, waypoints]);
 
+  /** cancel order */
   const handleCancel = useCallback(async () => {
     if (!orderId) {
       setStep("main");
@@ -612,24 +742,7 @@ export default function ClientTaxiPage() {
     }
   }, [orderId]);
 
-  const handlePickSaved = useCallback(
-    (p) => {
-      if (!p) return;
-      setDest({ latlng: [Number(p.lat), Number(p.lng)], address: p.label || p.name || "" });
-      setStep("route");
-    },
-    []
-  );
-
-  const updateEntrance = useCallback((val) => {
-    setPickup((p) => ({ ...p, entrance: val }));
-  }, []);
-
-  const changeDestination = useCallback(() => {
-    setStep("dest_map");
-  }, []);
-
-  /** polling active order */
+  /** polling active order on reload */
   useEffect(() => {
     let mounted = true;
     const run = async () => {
@@ -670,8 +783,10 @@ export default function ClientTaxiPage() {
     };
   }, []);
 
+  /** polling order status + driver info */
   useEffect(() => {
     if (!orderId) return;
+
     let timer = null;
     let alive = true;
 
@@ -701,15 +816,21 @@ export default function ClientTaxiPage() {
             phone: drv.phone || "",
           });
         }
+
+        // ETA calc
         if (assignedDriver?.lat && assignedDriver?.lng && pickup.latlng) {
           const d = haversineKm([assignedDriver.lat, assignedDriver.lng], pickup.latlng);
           setEtaMin(Math.max(1, Math.round(d * 3)));
         }
-      } catch (e) {}
+      } catch (e) {
+        // ignore
+      }
     };
 
     tick();
     const nextInterval = () => {
+      // Polling interval strategy to avoid heating the phone
+      // searching: 2s, driver found: 3.5s, trip: 8s
       if (step === "searching" || orderStatus === "searching") return 2000;
       if (orderStatus === "accepted" || orderStatus === "coming" || orderStatus === "arrived") return 3500;
       if (orderStatus === "ontrip" || orderStatus === "in_trip") return 8000;
@@ -723,20 +844,26 @@ export default function ClientTaxiPage() {
       if (stopped) return;
       timer = setTimeout(loop, nextInterval());
     };
+
     loop();
+
     return () => {
       alive = false;
       stopped = true;
       if (timer) clearTimeout(timer);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId, pickup.latlng?.[0], pickup.latlng?.[1], orderStatus, step]);
 
-  /** searching state: simulate nearby cars */
+  /** searching state: simulate nearby cars + dispatch cycling (visual only, backend dispatch can be added later) */
   useEffect(() => {
     if (step !== "searching") return;
     if (!pickup.latlng) return;
+
+    // create fake cars around pickup if backend not returning
     const baseLat = pickup.latlng[0];
     const baseLng = pickup.latlng[1];
+
     const cars = Array.from({ length: 6 }).map((_, i) => {
       const ang = (i / 6) * Math.PI * 2;
       const r = 0.006 + Math.random() * 0.01;
@@ -747,12 +874,15 @@ export default function ClientTaxiPage() {
         bearing: Math.random() * 360,
       };
     });
+
     setNearCars(cars);
     setDispatchIdx(0);
+
     let t = null;
     t = setInterval(() => {
       setDispatchIdx((x) => (x + 1) % cars.length);
     }, 1800);
+
     return () => {
       if (t) clearInterval(t);
     };
@@ -767,7 +897,7 @@ export default function ClientTaxiPage() {
     setDispatchLine([[c.lat, c.lng], pickup.latlng]);
   }, [step, dispatchIdx, nearCars, pickup.latlng]);
 
-  /** fly to driver */
+  /** fly to driver when coming */
   useEffect(() => {
     if (step !== "coming") return;
     const map = mapRef.current;
@@ -788,12 +918,583 @@ export default function ClientTaxiPage() {
     }
   }, [orderId]);
 
+  /** UI: bottom sheet auto-hide while dragging (dest_map) */
   const showSheet = useMemo(() => {
     if (step === "dest_map") return !isDraggingMap;
     return true;
   }, [step, isDraggingMap]);
 
-  // --- STYLES ---
+  /** open "my addresses" selection (from main screen) */
+  const handlePickSaved = useCallback(
+    (p) => {
+      if (!p) return;
+      setDest({ latlng: [Number(p.lat), Number(p.lng)], address: p.label || p.name || "" });
+      setStep("route");
+    },
+    []
+  );
+
+  /** create/update podyezd */
+  const updateEntrance = useCallback((val) => {
+    setPickup((p) => ({ ...p, entrance: val }));
+  }, []);
+
+  /** final route screen: allow "Belgilangan nuqta -> o'zgartirish" */
+  const changeDestination = useCallback(() => {
+    setStep("dest_map");
+  }, []);
+
+  const headerRight = (
+    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+      <Switch
+        checked={darkMode}
+        onChange={(v) => setDarkMode(v)}
+        checkedChildren="🌙"
+        unCheckedChildren="☀️"
+      />
+    </div>
+  );
+
+  /** map tile URL */
+  const mapTile = darkMode ? tileNight : tileDay;
+
+  /** render header */
+  const Header = (
+    <div className="yg-header">
+      <Button
+        shape="circle"
+        icon={<ArrowLeftOutlined />}
+        onClick={() => {
+          if (step === "search") {
+            setSearchOpen(false);
+            setStep("main");
+            return;
+          }
+          if (step === "dest_map") {
+            setStep("search");
+            setSearchOpen(true);
+            return;
+          }
+          if (step === "route") {
+            setStep("main");
+            return;
+          }
+          if (step === "searching" || step === "coming") {
+            // do nothing (user can cancel)
+            return;
+          }
+        }}
+      />
+      <div style={{ flex: 1 }} />
+      {headerRight}
+    </div>
+  );
+
+  /** --- main UI pieces --- */
+
+  const PickupSummaryRow = (
+    <div className="yg-field">
+      <div className="yg-field-icon">
+        <EnvironmentOutlined />
+      </div>
+      <div className="yg-field-body">
+        <div className="yg-field-label">Yo‘lovchini olish nuqtasi</div>
+        <div className="yg-field-value">{pickup.address || "Manzilingiz aniqlanmoqda..."}</div>
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <Button size="small" className="yg-chip" onClick={openPickupMapEdit}>
+          Xarita
+        </Button>
+        <Button size="small" className="yg-chip" onClick={() => setPodyezdOpen(true)}>
+          Podyezd
+        </Button>
+      </div>
+    </div>
+  );
+
+  const DestSummaryRow = (
+    <div className="yg-field">
+      <div className="yg-field-icon">
+        <FlagOutlined />
+      </div>
+      <div className="yg-field-body">
+        <div className="yg-field-label">Yakuniy manzil</div>
+        <div className="yg-field-value">{dest.address || "Qaerga borasiz?"}</div>
+      </div>
+      <Button size="small" className="yg-chip" onClick={openDestinationSearch}>
+        {dest.address ? "O'zgartirish" : "Qidirish"}
+      </Button>
+    </div>
+  );
+
+  /** --- bottom sheets --- */
+
+  const MainSheet = (
+    <div className="yg-sheet">
+      <div className="yg-sheet-title">
+        <div className="yg-logo" />
+        <div style={{ fontSize: 30, fontWeight: 800 }}>Taksi</div>
+      </div>
+
+      <Button className="yg-long" onClick={openDestinationSearch}>
+        Qaerga borasiz?
+        <span className="yg-long-right">›</span>
+      </Button>
+
+      {/* Current pickup address line (requested) */}
+      <div style={{ marginTop: 12 }}>
+        {PickupSummaryRow}
+      </div>
+
+      {/* My saved addresses */}
+      <div style={{ marginTop: 10 }}>
+        <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Mening manzillarim</div>
+        {savedPlaces.length === 0 ? (
+          <div style={{ fontSize: 12, opacity: 0.55, padding: "8px 0" }}>Hozircha saqlangan manzil yo‘q</div>
+        ) : (
+          <div className="yg-saved">
+            {savedPlaces.slice(0, 4).map((p) => (
+              <button key={p.id || p.place_id || `${p.lat},${p.lng}`} className="yg-saved-item" onClick={() => handlePickSaved(p)}>
+                <div className="yg-saved-ic">📍</div>
+                <div className="yg-saved-txt">
+                  <div className="yg-saved-title">{p.name || p.title || 'Manzil'}</div>
+                  <div className="yg-saved-sub">{p.label || ''}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Buyurtma berish without destination */}
+      <div className="yg-bottom-row">
+        <Button className="yg-blue" type="primary" onClick={handleOrderCreate}>
+          Buyurtma berish
+        </Button>
+        <Button className="yg-round" icon={<CarOutlined />} onClick={() => message.info("Tarif sozlamalari tez kunda")} />
+      </div>
+    </div>
+  );
+
+  // TaxiSearchSheet komponenti bitta list ko'rinishida qabul qiladi.
+  // Bizda esa pickup/destination uchun alohida natijalar bor.
+  // Qaysi input to'ldirilgan bo'lsa, o'sha natijani ko'rsatamiz.
+  const searchLoading = searchBusy;
+  const searchResults = useMemo(() => {
+    const qDest = (destSearchText || "").trim();
+    if (qDest) return destResults;
+    return pickupResults;
+  }, [destSearchText, destResults, pickupResults]);
+
+  const SearchDrawer = (
+    <TaxiSearchSheet
+      pickupAddress={pickup.address}
+      searchOpen={searchOpen}
+      setSearchOpen={setSearchOpen}
+      setStep={setStep}
+      pickupSearchText={pickupSearchText}
+      setPickupSearchText={setPickupSearchText}
+      destSearchText={destSearchText}
+      setDestSearchText={setDestSearchText}
+      searchLoading={searchLoading}
+      searchResults={searchResults}
+      savedPlaces={savedPlaces}
+      setDestFromSuggestion={setDestFromSuggestion}
+      setPickupFromSuggestion={setPickupFromSuggestion}
+      openPickupMapEdit={openPickupMapEdit}
+      openDestMapSelect={openDestMapSelect}
+      openShareRide={openShareRide}
+    />
+  );
+
+  const DestMapSheet = (
+    <DestinationPicker
+      showSheet={showSheet}
+      dest={dest}
+      pickup={pickup}
+      totalPrice={totalPrice}
+      money={money}
+      haversineKm={haversineKm}
+      MAX_KM={MAX_KM}
+      message={message}
+      onConfirm={() => {
+        setStep("route");
+        setSearchOpen(false);
+      }}
+    />
+  );
+
+  const RouteSheet = (
+    <div className="yg-sheet">
+      <div className="yg-route-top">
+        <div className="yg-route-row">
+          <div className="yg-field-icon"><EnvironmentOutlined /></div>
+          <div className="yg-route-txt">
+            <div className="yg-field-label">Ketish nuqtasi</div>
+            <div className="yg-field-value">{pickup.address || "—"}</div>
+          </div>
+          <Button size="small" className="yg-chip" onClick={openDestinationSearch}>
+            {dest.address ? "Podyezd" : "Xarita"}
+          </Button>
+        </div>
+
+        <div className="yg-route-row">
+          <div className="yg-field-icon"><FlagOutlined /></div>
+          <div className="yg-route-txt">
+            <div className="yg-field-label">Borish nuqtasi</div>
+            <div className="yg-field-value">{dest.address || "Belgilanmagan"}</div>
+          </div>
+          <Button size="small" className="yg-chip" onClick={changeDestination}>
+            O‘zgartirish
+          </Button>
+        </div>
+
+        {/* waypoints */}
+        <div style={{ marginTop: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ fontSize: 12, opacity: 0.7 }}>Oraliq bekatlar</div>
+            <Button
+              size="small"
+              icon={<PlusOutlined />}
+              className="yg-chip"
+              onClick={() => setAddStopOpen(true)}
+              disabled={waypoints.length >= 3}
+            >
+              +
+            </Button>
+          </div>
+          {waypoints.length === 0 ? (
+            <div style={{ fontSize: 12, opacity: 0.55, marginTop: 4 }}>Hozircha yo‘q</div>
+          ) : (
+            <div style={{ marginTop: 6 }}>
+              {waypoints.map((w, idx) => (
+                <div key={idx} className="yg-stop">
+                  <div className="yg-stop-dot" />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 650 }}>Bekat {idx + 1}</div>
+                    <div className="yg-stop-addr">{w.address || "—"}</div>
+                  </div>
+                  <Button
+                    size="small"
+                    icon={<CloseOutlined />}
+                    className="yg-chip"
+                    onClick={() => setWaypoints((arr) => arr.filter((_, i) => i !== idx))}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <Divider style={{ margin: "12px 0" }} />
+
+        {/* tabs */}
+        <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 10 }}>
+          <div style={{ fontSize: 12, opacity: 0.7 }}>Navigator</div>
+          <div style={{ fontSize: 12, opacity: 0.7 }}>Transport</div>
+          <div className="yg-tab">Taksi va Yetkazish</div>
+        </div>
+
+        <div className="yg-tariffs">
+          {tariffs.map((t) => (
+            <button
+              key={t.id}
+              className={"yg-tariff " + (tariff.id === t.id ? "active" : "")}
+              onClick={() => setTariff(t)}
+            >
+              <div style={{ fontSize: 11, opacity: 0.7 }}>{Math.max(1, Math.round(durationMin))} daq</div>
+              <div style={{ fontWeight: 800, marginTop: 2 }}>{t.title}</div>
+              <div style={{ fontWeight: 800, marginTop: 2 }}>{money((t.base + (distanceKm || 0) * t.perKm) * t.mult)}</div>
+            </button>
+          ))}
+        </div>
+
+        
+        {/* Kim uchun buyurtma? */}
+        <div style={{ marginTop: 14, background: "rgba(255,255,255,0.85)", borderRadius: 14, padding: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <div style={{ fontWeight: 800 }}>Kim uchun buyurtma?</div>
+            <Segmented
+              size="small"
+              value={orderFor}
+              options={[
+                { label: "O‘zimga", value: "self" },
+                { label: "Boshqaga", value: "other" },
+              ]}
+              onChange={(v) => setOrderFor(v)}
+            />
+          </div>
+          {orderFor === "other" && (
+            <Input
+              prefix={<PhoneOutlined />}
+              value={otherPhone}
+              onChange={(e) => setOtherPhone(e.target.value)}
+              placeholder="U odamning telefon raqami"
+            />
+          )}
+
+          <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+            <Button
+              icon={<SettingOutlined />}
+              onClick={() => setWishesOpen(true)}
+              style={{ flex: 1, borderRadius: 12 }}
+            >
+              Istaklar
+            </Button>
+            <Button
+              icon={<ClockCircleOutlined />}
+              onClick={() => setScheduleOpen(true)}
+              style={{ flex: 1, borderRadius: 12 }}
+            >
+              Rejalash
+            </Button>
+          </div>
+
+          {(comment || wishes.ac || wishes.trunk || wishes.childSeat || wishes.smoking === "yes" || scheduledTime) && (
+            <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>
+              {scheduledTime ? <>🕒 {new Date(scheduledTime).toLocaleString()}</> : null}
+              {comment ? <div style={{ marginTop: 4 }}>📒 {comment}</div> : null}
+            </div>
+          )}
+        </div>
+
+        <div className="yg-bottom-row" style={{ marginTop: 14 }}>
+          <Button className="yg-yellow" type="primary" onClick={handleOrderCreate}>
+            Buyurtma berish
+          </Button>
+          <Button className="yg-round" icon={<ShareAltOutlined />} onClick={() => setShareOpen(true)} />
+        </div>
+      </div>
+    </div>
+  );
+
+  const SearchingSheet = (
+    <div className="yg-sheet">
+      <div style={{ fontSize: 22, fontWeight: 900 }}>Yaqin-atrofda mos...</div>
+      <div style={{ opacity: 0.7, marginTop: 2 }}>Moslarini qidiryapmiz</div>
+
+      <div className="yg-bottom-row" style={{ marginTop: 14 }}>
+        <Button className="yg-gray" icon={<CloseOutlined />} onClick={handleCancel}>
+          Safarni bekor qilish
+        </Button>
+        <Button className="yg-gray" onClick={() => message.info("Tafsilotlar keyin qo'shiladi")}>
+          Tafsilotlar
+        </Button>
+      </div>
+    </div>
+  );
+
+  const ComingSheet = (
+    <div className="yg-sheet">
+      <div style={{ fontSize: 26, fontWeight: 900 }}>
+        {etaMin ? `~${etaMin} daq va keladi` : "Haydovchi yo'lda"}
+      </div>
+
+      <div className="yg-driver-card">
+        <div className="yg-driver-top">
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ fontSize: 16, fontWeight: 900 }}>
+              Haydovchi <span style={{ marginLeft: 6 }}><StarFilled style={{ color: "#faad14" }} /> {assignedDriver?.rating?.toFixed?.(2) || "4.80"}</span>
+            </div>
+          </div>
+          <div style={{ opacity: 0.75 }}>{assignedDriver?.car_model || "Oq Chevrolet"}</div>
+        </div>
+
+        <div className="yg-plate-row">
+          <div className="yg-plate">{assignedDriver?.plate || "—"}</div>
+          <Avatar size={44} src={assignedDriver?.avatar_url} icon={<UserOutlined />} />
+        </div>
+
+        <div className="yg-actions">
+          <Button className="yg-act">Aloqa</Button>
+          <Button className="yg-act">Xavfsizlik</Button>
+          <Button className="yg-act">Ulashish</Button>
+        </div>
+      </div>
+
+      <div className="yg-field" style={{ marginTop: 10 }}>
+        <div className="yg-field-icon"><EnvironmentOutlined /></div>
+        <div className="yg-field-body">
+          <div className="yg-field-label">Mijozni olish</div>
+          <div className="yg-field-value">{pickup.address || "—"}</div>
+        </div>
+        <Button size="small" className="yg-chip" onClick={() => setShareOpen(true)}>Ulashish</Button>
+      </div>
+
+      <Divider style={{ margin: "12px 0" }} />
+
+      <div className="yg-cancel-link" onClick={handleCancel}>
+        Safarni bekor qilish
+      </div>
+    </div>
+  );
+
+  /** map overlays */
+  const CenterPinOverlay = (
+    <div className={"yg-center-pin " + (isDraggingMap ? "lift" : "")}>
+      {/* empty: actual pin marker is placed by a real leaflet Marker at centerLatLng */}
+    </div>
+  );
+
+  /** add-stop modal */
+  const AddStopModal = (
+    <Modal
+      open={addStopOpen}
+      onCancel={() => setAddStopOpen(false)}
+      onOk={addStopFromCenter}
+      okText="Hozirgi joydan qo'shish"
+      cancelText="Bekor"
+      title="Oraliq bekat qo'shish"
+    >
+      <div style={{ opacity: 0.75, marginBottom: 10 }}>
+        Xaritani kerakli joyga olib boring, so‘ng "Hozirgi joydan qo‘shish"ni bosing.
+      </div>
+      <div className="yg-small-box">{(step === "dest_map" ? destAddrFromCenter : pickupAddrFromCenter) || "Manzil aniqlanmoqda..."}</div>
+    </Modal>
+  );
+
+  /** podyezd modal */
+  const PodyezdModal = (
+    <Modal
+      open={podyezdOpen}
+      onCancel={() => setPodyezdOpen(false)}
+      onOk={() => setPodyezdOpen(false)}
+      okText="Saqlash"
+      cancelText="Bekor"
+      title="Podyezd (kirish joyi)"
+    >
+      <Input
+        value={pickup.entrance}
+        onChange={(e) => updateEntrance(e.target.value)}
+        placeholder="Masalan: 2"
+        maxLength={8}
+      />
+      <div style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>
+        Podyezd haydovchiga aniq eshik tagiga kelish uchun ko‘rsatiladi.
+      </div>
+    </Modal>
+  );
+
+  
+  /** wishes (pozhelaniya) modal */
+  const WishesModal = (
+    <Modal
+      open={wishesOpen}
+      onCancel={() => setWishesOpen(false)}
+      onOk={() => setWishesOpen(false)}
+      okText="Tayyor"
+      cancelText="Bekor"
+      title="Istaklar (Pozhelaniya)"
+    >
+      <div style={{ display: "grid", gap: 10 }}>
+        <Checkbox checked={!!wishes.ac} onChange={(e) => setWishes((w) => ({ ...w, ac: e.target.checked }))}>
+          ❄️ Konditsioner kerak
+        </Checkbox>
+        <Checkbox checked={!!wishes.trunk} onChange={(e) => setWishes((w) => ({ ...w, trunk: e.target.checked }))}>
+          🧳 Yukxona (bagaj) bo‘sh bo‘lsin
+        </Checkbox>
+        <Checkbox
+          checked={!!wishes.childSeat}
+          onChange={(e) => setWishes((w) => ({ ...w, childSeat: e.target.checked }))}
+        >
+          👶 Bolalar o‘rindig‘i (kreslo)
+        </Checkbox>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 140, opacity: 0.75 }}>🚬 Chekish</div>
+          <Segmented
+            options={[
+              { label: "Mumkin emas", value: "no" },
+              { label: "Mumkin", value: "yes" },
+            ]}
+            value={wishes.smoking}
+            onChange={(v) => setWishes((w) => ({ ...w, smoking: v }))}
+          />
+        </div>
+        <div>
+          <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>📒 Izoh</div>
+          <Input.TextArea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="Masalan: Podyezd orqada, shlagbaum kodi: 1234..."
+            autoSize={{ minRows: 3, maxRows: 6 }}
+          />
+        </div>
+      </div>
+    </Modal>
+  );
+
+  /** schedule modal */
+  const ScheduleModal = (
+    <Modal
+      open={scheduleOpen}
+      onCancel={() => setScheduleOpen(false)}
+      onOk={() => setScheduleOpen(false)}
+      okText="Tayyor"
+      cancelText="Bekor"
+      title="Oldindan buyurtma (Zaplanirovat)"
+    >
+      <div style={{ display: "grid", gap: 10 }}>
+        <Segmented
+          options={[
+            { label: "Hozir", value: "now" },
+            { label: "Vaqtni tanlash", value: "pick" },
+          ]}
+          value={scheduledTime ? "pick" : "now"}
+          onChange={(v) => {
+            if (v === "now") setScheduledTime(null);
+            if (v === "pick" && !scheduledTime) setScheduledTime(new Date(Date.now() + 15 * 60 * 1000).toISOString());
+          }}
+        />
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <ClockCircleOutlined />
+          <Input
+            type="datetime-local"
+            value={scheduledTime ? new Date(scheduledTime).toISOString().slice(0, 16) : ""}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (!v) return setScheduledTime(null);
+              try {
+                setScheduledTime(new Date(v).toISOString());
+              } catch {
+                setScheduledTime(null);
+              }
+            }}
+          />
+        </div>
+        <div style={{ fontSize: 12, opacity: 0.7 }}>
+          Agar vaqt tanlansa, serverga <b>scheduled_time</b> sifatida yuboriladi.
+        </div>
+      </div>
+    </Modal>
+  );
+
+/** share modal */
+  const ShareModal = (
+    <Modal open={shareOpen} onCancel={() => setShareOpen(false)} footer={null} title="Buyurtmani ulashish">
+      <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>
+        Havolani do‘stingizga yuboring. U sizning holatingizni ko‘ra oladi.
+      </div>
+      <Input value={shareLink} readOnly />
+      <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+        <Button
+          type="primary"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(shareLink);
+              message.success("Nusxa olindi");
+            } catch {
+              message.info("Nusxa olish uchun brauzer ruxsat bermadi");
+            }
+          }}
+        >
+          Nusxa olish
+        </Button>
+        <Button onClick={() => setShareOpen(false)}>Yopish</Button>
+      </div>
+    </Modal>
+  );
+
+  /** CSS injection */
   const Styles = (
     <style>{`
       .yg-header{
@@ -876,8 +1577,10 @@ export default function ClientTaxiPage() {
       .yg-actions{ display:flex; gap: 10px; margin-top: 12px; }
       .yg-act{ flex:1; height: 48px; border-radius: 16px; border:none; background:#f2f2f2; font-weight:800; }
       .yg-cancel-link{ color:#ff4d4f; font-weight:900; text-align:center; padding: 8px 0 2px; cursor:pointer; }
+      /* center pin overlay animation */
       .yg-center-pin{ position:absolute; left:50%; top:50%; transform: translate(-50%,-100%); z-index: 900; pointer-events:none; }
       .yg-center-pin.lift{ transform: translate(-50%,-110%); transition: .12s ease; }
+      /* pin visuals */
       .yg-pin-wrap, .yg-dest-wrap{ display:flex; flex-direction:column; align-items:center; }
       .yg-pin-yellow{
         width: 44px; height: 44px; border-radius: 18px;
@@ -895,6 +1598,7 @@ export default function ClientTaxiPage() {
       .yg-pin-dot{ width: 14px; height: 14px; border-radius: 50%; border: 3px solid #fff; background: #111; margin-top: -6px; box-shadow: 0 6px 14px rgba(0,0,0,.22); }
       .yg-pin-dot.red{ background:#ff4d4f; }
       .yg-small-box{ background:#f2f2f2; border-radius: 14px; padding: 12px; }
+      /* searching waves */
       .yg-wave{
         position:absolute; left:50%; top:50%;
         width: 18px; height: 18px;
@@ -911,6 +1615,7 @@ export default function ClientTaxiPage() {
         0%{ opacity:.8; transform: translate(-50%,-50%) scale(1); }
         100%{ opacity:0; transform: translate(-50%,-50%) scale(7); }
       }
+      /* vehicle label */
       .yg-vehicle-icon .yg-car-label{
         position:absolute;
         left:50%; top: -28px;
@@ -926,350 +1631,7 @@ export default function ClientTaxiPage() {
     `}</style>
   );
 
-  // --- UI COMPONENTS ---
-
-  const Header = (
-    <div className="yg-header">
-      <Button
-        shape="circle"
-        icon={<ArrowLeftOutlined />}
-        onClick={() => {
-          if (step === "search") {
-            setSearchOpen(false);
-            setStep("main");
-            return;
-          }
-          if (step === "dest_map") {
-            setStep("search");
-            setSearchOpen(true);
-            return;
-          }
-          if (step === "route") {
-            setStep("main");
-            return;
-          }
-          if (step === "searching" || step === "coming") {
-            return;
-          }
-        }}
-      />
-      <div style={{ flex: 1 }} />
-      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-        <Switch
-          checked={darkMode}
-          onChange={(v) => setDarkMode(v)}
-          checkedChildren="🌙"
-          unCheckedChildren="☀️"
-        />
-      </div>
-    </div>
-  );
-
-  const PickupSummaryRow = (
-    <div className="yg-field">
-      <div className="yg-field-icon">
-        <EnvironmentOutlined />
-      </div>
-      <div className="yg-field-body">
-        <div className="yg-field-label">Yo‘lovchini olish nuqtasi</div>
-        <div className="yg-field-value">{pickup.address || "Manzilingiz aniqlanmoqda..."}</div>
-      </div>
-      <div style={{ display: "flex", gap: 8 }}>
-        <Button size="small" className="yg-chip" onClick={openPickupMapEdit}>
-          Xarita
-        </Button>
-        <Button size="small" className="yg-chip" onClick={() => setPodyezdOpen(true)}>
-          Podyezd
-        </Button>
-      </div>
-    </div>
-  );
-
-  const DestSummaryRow = (
-    <div className="yg-field">
-      <div className="yg-field-icon">
-        <FlagOutlined />
-      </div>
-      <div className="yg-field-body">
-        <div className="yg-field-label">Yakuniy manzil</div>
-        <div className="yg-field-value">{dest.address || "Qaerga borasiz?"}</div>
-      </div>
-      <Button size="small" className="yg-chip" onClick={openDestinationSearch}>
-        {dest.address ? "O'zgartirish" : "Qidirish"}
-      </Button>
-    </div>
-  );
-
-  const MainSheet = (
-    <div className="yg-sheet">
-      <div className="yg-sheet-title">
-        <div className="yg-logo" />
-        <div style={{ fontSize: 30, fontWeight: 800 }}>Taksi</div>
-      </div>
-      <Button className="yg-long" onClick={openDestinationSearch}>
-        Qaerga borasiz?
-        <span className="yg-long-right">›</span>
-      </Button>
-      <div style={{ marginTop: 12 }}>
-        {PickupSummaryRow}
-      </div>
-      <div style={{ marginTop: 10 }}>
-        <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Mening manzillarim</div>
-        {savedPlaces.length === 0 ? (
-          <div style={{ fontSize: 12, opacity: 0.55, padding: "8px 0" }}>Hozircha saqlangan manzil yo‘q</div>
-        ) : (
-          <div className="yg-saved">
-            {savedPlaces.slice(0, 4).map((p) => (
-              <button key={p.id || p.place_id || `${p.lat},${p.lng}`} className="yg-saved-item" onClick={() => handlePickSaved(p)}>
-                <div className="yg-saved-ic">📍</div>
-                <div className="yg-saved-txt">
-                  <div className="yg-saved-title">{p.name || p.title || 'Manzil'}</div>
-                  <div className="yg-saved-sub">{p.label || ''}</div>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-      <div className="yg-bottom-row">
-        <Button className="yg-blue" type="primary" onClick={handleOrderCreate}>
-          Buyurtma berish
-        </Button>
-        <Button className="yg-round" icon={<CarOutlined />} onClick={() => message.info("Tarif sozlamalari tez kunda")} />
-      </div>
-    </div>
-  );
-
-  const searchLoading = searchBusy;
-  const searchResults = useMemo(() => {
-    const qDest = (destSearchText || "").trim();
-    if (qDest) return destResults;
-    return pickupResults;
-  }, [destSearchText, destResults, pickupResults]);
-
-  const SearchDrawer = (
-    <TaxiSearchSheet
-      pickupAddress={pickup.address}
-      searchOpen={searchOpen}
-      setSearchOpen={setSearchOpen}
-      setStep={setStep}
-      pickupSearchText={pickupSearchText}
-      setPickupSearchText={setPickupSearchText}
-      destSearchText={destSearchText}
-      setDestSearchText={setDestSearchText}
-      searchLoading={searchLoading}
-      searchResults={searchResults}
-      savedPlaces={savedPlaces}
-      setDestFromSuggestion={setDestFromSuggestion}
-      setPickupFromSuggestion={setPickupFromSuggestion}
-      openPickupMapEdit={openPickupMapEdit}
-      openDestMapSelect={openDestMapSelect}
-      openShareRide={openShareRide}
-    />
-  );
-
-  const DestMapSheet = (
-    <DestinationPicker
-      showSheet={showSheet}
-      dest={dest}
-      pickup={pickup}
-      totalPrice={totalPrice}
-      money={money}
-      haversineKm={haversineKm}
-      MAX_KM={MAX_KM}
-      message={message}
-      onConfirm={() => {
-        setStep("route");
-        setSearchOpen(false);
-      }}
-    />
-  );
-
-  const RouteSheet = (
-    <div className="yg-sheet">
-      <div className="yg-route-top">
-        <div className="yg-route-row">
-          <div className="yg-field-icon"><EnvironmentOutlined /></div>
-          <div className="yg-route-txt">
-            <div className="yg-field-label">Ketish nuqtasi</div>
-            <div className="yg-field-value">{pickup.address || "—"}</div>
-          </div>
-          <Button size="small" className="yg-chip" onClick={openDestinationSearch}>
-            {dest.address ? "Podyezd" : "Xarita"}
-          </Button>
-        </div>
-        <div className="yg-route-row">
-          <div className="yg-field-icon"><FlagOutlined /></div>
-          <div className="yg-route-txt">
-            <div className="yg-field-label">Borish nuqtasi</div>
-            <div className="yg-field-value">{dest.address || "Belgilanmagan"}</div>
-          </div>
-          <Button size="small" className="yg-chip" onClick={changeDestination}>
-            O‘zgartirish
-          </Button>
-        </div>
-        <div style={{ marginTop: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ fontSize: 12, opacity: 0.7 }}>Oraliq bekatlar</div>
-            <Button
-              size="small"
-              icon={<PlusOutlined />}
-              className="yg-chip"
-              onClick={() => setAddStopOpen(true)}
-              disabled={waypoints.length >= 3}
-            >
-              +
-            </Button>
-          </div>
-          {waypoints.length === 0 ? (
-            <div style={{ fontSize: 12, opacity: 0.55, marginTop: 4 }}>Hozircha yo‘q</div>
-          ) : (
-            <div style={{ marginTop: 6 }}>
-              {waypoints.map((w, idx) => (
-                <div key={idx} className="yg-stop">
-                  <div className="yg-stop-dot" />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 650 }}>Bekat {idx + 1}</div>
-                    <div className="yg-stop-addr">{w.address || "—"}</div>
-                  </div>
-                  <Button
-                    size="small"
-                    icon={<CloseOutlined />}
-                    className="yg-chip"
-                    onClick={() => setWaypoints((arr) => arr.filter((_, i) => i !== idx))}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        <Divider style={{ margin: "12px 0" }} />
-        <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 10 }}>
-          <div style={{ fontSize: 12, opacity: 0.7 }}>Navigator</div>
-          <div style={{ fontSize: 12, opacity: 0.7 }}>Transport</div>
-          <div className="yg-tab">Taksi va Yetkazish</div>
-        </div>
-        <div className="yg-tariffs">
-          {tariffs.map((t) => (
-            <button
-              key={t.id}
-              className={"yg-tariff " + (tariff.id === t.id ? "active" : "")}
-              onClick={() => setTariff(t)}
-            >
-              <div style={{ fontSize: 11, opacity: 0.7 }}>{Math.max(1, Math.round(durationMin))} daq</div>
-              <div style={{ fontWeight: 800, marginTop: 2 }}>{t.title}</div>
-              <div style={{ fontWeight: 800, marginTop: 2 }}>{money((t.base + (distanceKm || 0) * t.perKm) * t.mult)}</div>
-            </button>
-          ))}
-        </div>
-        <div style={{ marginTop: 14, background: "rgba(255,255,255,0.85)", borderRadius: 14, padding: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-            <div style={{ fontWeight: 800 }}>Kim uchun buyurtma?</div>
-            <Segmented
-              size="small"
-              value={orderFor}
-              options={[
-                { label: "O‘zimga", value: "self" },
-                { label: "Boshqaga", value: "other" },
-              ]}
-              onChange={(v) => setOrderFor(v)}
-            />
-          </div>
-          {orderFor === "other" && (
-            <Input
-              prefix={<PhoneOutlined />}
-              value={otherPhone}
-              onChange={(e) => setOtherPhone(e.target.value)}
-              placeholder="U odamning telefon raqami"
-            />
-          )}
-          <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-            <Button
-              icon={<SettingOutlined />}
-              onClick={() => setWishesOpen(true)}
-              style={{ flex: 1, borderRadius: 12 }}
-            >
-              Istaklar
-            </Button>
-            <Button
-              icon={<ClockCircleOutlined />}
-              onClick={() => setScheduleOpen(true)}
-              style={{ flex: 1, borderRadius: 12 }}
-            >
-              Rejalash
-            </Button>
-          </div>
-          {(comment || wishes.ac || wishes.trunk || wishes.childSeat || wishes.smoking === "yes" || scheduledTime) && (
-            <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>
-              {scheduledTime ? <>🕒 {new Date(scheduledTime).toLocaleString()}</> : null}
-              {comment ? <div style={{ marginTop: 4 }}>📒 {comment}</div> : null}
-            </div>
-          )}
-        </div>
-        <div className="yg-bottom-row" style={{ marginTop: 14 }}>
-          <Button className="yg-yellow" type="primary" onClick={handleOrderCreate}>
-            Buyurtma berish
-          </Button>
-          <Button className="yg-round" icon={<ShareAltOutlined />} onClick={() => setShareOpen(true)} />
-        </div>
-      </div>
-    </div>
-  );
-
-  const SearchingSheet = (
-    <div className="yg-sheet">
-      <div style={{ fontSize: 22, fontWeight: 900 }}>Yaqin-atrofda mos...</div>
-      <div style={{ opacity: 0.7, marginTop: 2 }}>Moslarini qidiryapmiz</div>
-      <div className="yg-bottom-row" style={{ marginTop: 14 }}>
-        <Button className="yg-gray" icon={<CloseOutlined />} onClick={handleCancel}>
-          Safarni bekor qilish
-        </Button>
-        <Button className="yg-gray" onClick={() => message.info("Tafsilotlar keyin qo'shiladi")}>
-          Tafsilotlar
-        </Button>
-      </div>
-    </div>
-  );
-
-  const ComingSheet = (
-    <div className="yg-sheet">
-      <div style={{ fontSize: 26, fontWeight: 900 }}>
-        {etaMin ? `~${etaMin} daq va keladi` : "Haydovchi yo'lda"}
-      </div>
-      <div className="yg-driver-card">
-        <div className="yg-driver-top">
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ fontSize: 16, fontWeight: 900 }}>
-              Haydovchi <span style={{ marginLeft: 6 }}><StarFilled style={{ color: "#faad14" }} /> {assignedDriver?.rating?.toFixed?.(2) || "4.80"}</span>
-            </div>
-          </div>
-          <div style={{ opacity: 0.75 }}>{assignedDriver?.car_model || "Oq Chevrolet"}</div>
-        </div>
-        <div className="yg-plate-row">
-          <div className="yg-plate">{assignedDriver?.plate || "—"}</div>
-          <Avatar size={44} src={assignedDriver?.avatar_url} icon={<UserOutlined />} />
-        </div>
-        <div className="yg-actions">
-          <Button className="yg-act">Aloqa</Button>
-          <Button className="yg-act">Xavfsizlik</Button>
-          <Button className="yg-act">Ulashish</Button>
-        </div>
-      </div>
-      <div className="yg-field" style={{ marginTop: 10 }}>
-        <div className="yg-field-icon"><EnvironmentOutlined /></div>
-        <div className="yg-field-body">
-          <div className="yg-field-label">Mijozni olish</div>
-          <div className="yg-field-value">{pickup.address || "—"}</div>
-        </div>
-        <Button size="small" className="yg-chip" onClick={() => setShareOpen(true)}>Ulashish</Button>
-      </div>
-      <Divider style={{ margin: "12px 0" }} />
-      <div className="yg-cancel-link" onClick={handleCancel}>
-        Safarni bekor qilish
-      </div>
-    </div>
-  );
-
+  /** center pin overlay (fixed in screen center, lifts on drag) */
   const CenterPin = useMemo(() => {
     const isPickup = step === "main" || step === "search";
     const isDest = step === "dest_map";
@@ -1285,11 +1647,13 @@ export default function ClientTaxiPage() {
     );
   }, [step, isDraggingMap]);
 
+  /** route polyline */
   const RouteLine = useMemo(() => {
     if (!route?.coords || route.coords.length < 2) return null;
     return <Polyline positions={route.coords} pathOptions={{ weight: 6, opacity: 0.9 }} />;
   }, [route]);
 
+  /** searching visual: cars + line */
   const SearchingOverlay = step === "searching" ? (
     <>
       <div className="yg-wave" />
@@ -1309,6 +1673,7 @@ export default function ClientTaxiPage() {
     </>
   ) : null;
 
+  /** driver overlay in coming */
   const DriverOverlay = step === "coming" && assignedDriver?.lat && assignedDriver?.lng ? (
     <>
       <VehicleMarker
@@ -1340,8 +1705,7 @@ export default function ClientTaxiPage() {
     return 240;
   }, [step]);
 
-  const mapTile = darkMode ? tileNight : tileDay;
-
+  /** map content */
   const MapUI = (
     <TaxiMap
       mapRef={mapRef}
@@ -1358,158 +1722,6 @@ export default function ClientTaxiPage() {
       driverOverlay={DriverOverlay}
       centerPin={CenterPin}
     />
-  );
-
-  const AddStopModal = (
-    <Modal
-      open={addStopOpen}
-      onCancel={() => setAddStopOpen(false)}
-      onOk={addStopFromCenter}
-      okText="Hozirgi joydan qo'shish"
-      cancelText="Bekor"
-      title="Oraliq bekat qo'shish"
-    >
-      <div style={{ opacity: 0.75, marginBottom: 10 }}>
-        Xaritani kerakli joyga olib boring, so‘ng "Hozirgi joydan qo‘shish"ni bosing.
-      </div>
-      <div className="yg-small-box">{(step === "dest_map" ? destAddrFromCenter : pickupAddrFromCenter) || "Manzil aniqlanmoqda..."}</div>
-    </Modal>
-  );
-
-  const PodyezdModal = (
-    <Modal
-      open={podyezdOpen}
-      onCancel={() => setPodyezdOpen(false)}
-      onOk={() => setPodyezdOpen(false)}
-      okText="Saqlash"
-      cancelText="Bekor"
-      title="Podyezd (kirish joyi)"
-    >
-      <Input
-        value={pickup.entrance}
-        onChange={(e) => updateEntrance(e.target.value)}
-        placeholder="Masalan: 2"
-        maxLength={8}
-      />
-      <div style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>
-        Podyezd haydovchiga aniq eshik tagiga kelish uchun ko‘rsatiladi.
-      </div>
-    </Modal>
-  );
-
-  const WishesModal = (
-    <Modal
-      open={wishesOpen}
-      onCancel={() => setWishesOpen(false)}
-      onOk={() => setWishesOpen(false)}
-      okText="Tayyor"
-      cancelText="Bekor"
-      title="Istaklar (Pozhelaniya)"
-    >
-      <div style={{ display: "grid", gap: 10 }}>
-        <Checkbox checked={!!wishes.ac} onChange={(e) => setWishes((w) => ({ ...w, ac: e.target.checked }))}>
-          ❄️ Konditsioner kerak
-        </Checkbox>
-        <Checkbox checked={!!wishes.trunk} onChange={(e) => setWishes((w) => ({ ...w, trunk: e.target.checked }))}>
-          🧳 Yukxona (bagaj) bo‘sh bo‘lsin
-        </Checkbox>
-        <Checkbox
-          checked={!!wishes.childSeat}
-          onChange={(e) => setWishes((w) => ({ ...w, childSeat: e.target.checked }))}
-        >
-          👶 Bolalar o‘rindig‘i (kreslo)
-        </Checkbox>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 140, opacity: 0.75 }}>🚬 Chekish</div>
-          <Segmented
-            options={[
-              { label: "Mumkin emas", value: "no" },
-              { label: "Mumkin", value: "yes" },
-            ]}
-            value={wishes.smoking}
-            onChange={(v) => setWishes((w) => ({ ...w, smoking: v }))}
-          />
-        </div>
-        <div>
-          <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>📒 Izoh</div>
-          <Input.TextArea
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="Masalan: Podyezd orqada, shlagbaum kodi: 1234..."
-            autoSize={{ minRows: 3, maxRows: 6 }}
-          />
-        </div>
-      </div>
-    </Modal>
-  );
-
-  const ScheduleModal = (
-    <Modal
-      open={scheduleOpen}
-      onCancel={() => setScheduleOpen(false)}
-      onOk={() => setScheduleOpen(false)}
-      okText="Tayyor"
-      cancelText="Bekor"
-      title="Oldindan buyurtma (Zaplanirovat)"
-    >
-      <div style={{ display: "grid", gap: 10 }}>
-        <Segmented
-          options={[
-            { label: "Hozir", value: "now" },
-            { label: "Vaqtni tanlash", value: "pick" },
-          ]}
-          value={scheduledTime ? "pick" : "now"}
-          onChange={(v) => {
-            if (v === "now") setScheduledTime(null);
-            if (v === "pick" && !scheduledTime) setScheduledTime(new Date(Date.now() + 15 * 60 * 1000).toISOString());
-          }}
-        />
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <ClockCircleOutlined />
-          <Input
-            type="datetime-local"
-            value={scheduledTime ? new Date(scheduledTime).toISOString().slice(0, 16) : ""}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (!v) return setScheduledTime(null);
-              try {
-                setScheduledTime(new Date(v).toISOString());
-              } catch {
-                setScheduledTime(null);
-              }
-            }}
-          />
-        </div>
-        <div style={{ fontSize: 12, opacity: 0.7 }}>
-          Agar vaqt tanlansa, serverga <b>scheduled_time</b> sifatida yuboriladi.
-        </div>
-      </div>
-    </Modal>
-  );
-
-  const ShareModal = (
-    <Modal open={shareOpen} onCancel={() => setShareOpen(false)} footer={null} title="Buyurtmani ulashish">
-      <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>
-        Havolani do‘stingizga yuboring. U sizning holatingizni ko‘ra oladi.
-      </div>
-      <Input value={shareLink} readOnly />
-      <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-        <Button
-          type="primary"
-          onClick={async () => {
-            try {
-              await navigator.clipboard.writeText(shareLink);
-              message.success("Nusxa olindi");
-            } catch {
-              message.info("Nusxa olish uchun brauzer ruxsat bermadi");
-            }
-          }}
-        >
-          Nusxa olish
-        </Button>
-        <Button onClick={() => setShareOpen(false)}>Yopish</Button>
-      </div>
-    </Modal>
   );
 
   return (
