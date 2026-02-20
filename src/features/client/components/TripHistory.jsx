@@ -88,3 +88,5 @@ export default function TripHistory({ onBack }) {
     </div>
   );
 }
+import { haversineKm } from "../shared/geo/haversine";
+import { nominatimReverse as _nominatimReverse } from "../shared/geo/nominatim";

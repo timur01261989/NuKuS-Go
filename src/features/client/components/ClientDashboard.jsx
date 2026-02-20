@@ -7,6 +7,9 @@ import {
   TruckOutlined, 
   ShopOutlined 
 } from "@ant-design/icons";
+import { haversineKm } from "../shared/geo/haversine";
+import { nominatimReverse as _nominatimReverse } from "../shared/geo/nominatim";
+
 
 // -------------------------------------------------------
 // 1. YANGI MODULLARNI IMPORT QILISH

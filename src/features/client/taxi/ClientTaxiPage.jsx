@@ -1,12 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-import { haversineKm } from "../shared/geo/haversine";
-import { nominatimReverse as _nominatimReverse } from "../shared/geo/nominatim";
 
-// Backward-compatible signature (lat, lng, signal)
-async function nominatimReverse(lat, lng, signal) {
-  return _nominatimReverse(lat, lng, { signal });
-}
 
   Avatar,
   Button,
@@ -50,6 +44,13 @@ import VehicleMarker from "./components/VehicleMarker";
 import TaxiMap from "./TaxiMap";
 import TaxiSearchSheet from "./TaxiSearchSheet";
 import DestinationPicker from "./DestinationPicker";
+import { haversineKm } from "../shared/geo/haversine";
+import { nominatimReverse as _nominatimReverse } from "../shared/geo/nominatim";
+
+// Backward-compatible signature (lat, lng, signal)
+async function nominatimReverse(lat, lng, signal) {
+  return _nominatimReverse(lat, lng, { signal });
+}
 
 /**
  * CLIENT TAXI (Yandex-Go like flow)

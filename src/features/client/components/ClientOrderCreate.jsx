@@ -1,12 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { haversineKm } from "../shared/geo/haversine";
 import { osrmRoute } from "../shared/geo/osrm";
+import { haversineKm } from "../shared/geo/haversine";
 import { nominatimReverse as _nominatimReverse } from "../shared/geo/nominatim";
-
-// Backward-compatible signature (lat, lng, signal)
-async function nominatimReverse(lat, lng, signal) {
-  return _nominatimReverse(lat, lng, { signal });
-}
 
 
 // UI components ONLY from antd
@@ -46,6 +41,12 @@ import "leaflet/dist/leaflet.css";
 import api from "@/utils/apiHelper";
 import { supabase } from "@/lib/supabase";
 import { playAliceVoice } from "@/utils/AudioPlayer";
+
+// Backward-compatible signature (lat, lng, signal)
+async function nominatimReverse(lat, lng, signal) {
+  return _nominatimReverse(lat, lng, { signal });
+}
+
 
 const { Text, Title } = Typography;
 
