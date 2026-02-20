@@ -1056,7 +1056,49 @@ export default function ClientTaxiPage() {
     return pickupResults;
   }, [destSearchText, destResults, pickupResults]);
 
-  const SearchDrawer = (
+  
+  // Suggestion pick handlers (fix: previously undefined => runtime crash)
+  const setPickupFromSuggestion = useCallback((item) => {
+    if (!item) return;
+    const lat = Number(item.lat);
+    const lng = Number(item.lng);
+    const label = item.label || item.name || "";
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      setPickup((p) => ({ ...p, latlng: [lat, lng], address: label || p.address }));
+      // Move map center to picked point if map is ready
+      try {
+        const map = mapRef.current;
+        map?.setView?.([lat, lng], map?.getZoom?.() || 16, { animate: true });
+      } catch {}
+    }
+    setPickupSearchText(label);
+    // Keep search drawer open; user will usually pick destination next
+    setStep("search");
+    setSearchOpen(true);
+  }, []);
+
+  const setDestFromSuggestion = useCallback((item) => {
+    if (!item) return;
+    const lat = Number(item.lat);
+    const lng = Number(item.lng);
+    const label = item.label || item.name || "";
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      setDest({ latlng: [lat, lng], address: label });
+      try {
+        // Optional: auto-center map to destination when chosen
+        const map = mapRef.current;
+        // don't force zoom change too much
+        map?.panTo?.([lat, lng], { animate: true });
+      } catch {}
+    } else {
+      // If no coords, still set address text
+      setDest((d) => ({ ...d, address: label || d.address }));
+    }
+    setDestSearchText(label);
+    setSearchOpen(false);
+    setStep("route"); // triggers route calculation effect
+  }, []);
+const SearchDrawer = (
     <TaxiSearchSheet
       pickupAddress={pickup.address}
       searchOpen={searchOpen}
