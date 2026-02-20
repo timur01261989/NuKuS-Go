@@ -1,8 +1,11 @@
 import { json, badRequest, serverError } from './_shared/cors.js';
-import { getSupabaseAdmin } from './_shared/supabase.js';
+import { getSupabase } from './_shared/supabase.js';
 
 function hasSupabaseEnv() {
-  return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const anon = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+  const service = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+  return !!(url && (service || anon));
 }
 
 export async function sos_handler(req, res) {
@@ -10,7 +13,7 @@ export async function sos_handler(req, res) {
     if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Method not allowed' });
     if (!hasSupabaseEnv()) return json(res, 200, { ok:true, demo:true });
 
-    const sb = getSupabaseAdmin();
+    const sb = getSupabase(req, { admin: true });
     const body = typeof req.body === 'string' ? JSON.parse(req.body||'{}') : (req.body||{});
 
     const user_id = String(body.user_id||'').trim();

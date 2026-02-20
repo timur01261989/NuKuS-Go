@@ -11,9 +11,10 @@ import { supabase } from "@lib/supabase";
  *  - requireDriverApproved: true/false
  *
  * IMPORTANT:
- *  - Do NOT rely only on profiles.role for driver access.
- *    In this project the real source of truth for "driver" is the `drivers` table.
- *    Otherwise driver users get redirected back to client forever.
+ *  This app historically stored "role" in profiles, but in real life
+ *  the truth for driver access is "drivers" table row existence.
+ *  If drivers row exists => treat user as driver for driver routes,
+ *  even if profiles.role is still "client" (common bug causing redirect to /client/home).
  */
 export default function RoleGate({ children, allow, redirectTo = "/login" }) {
   const location = useLocation();
@@ -31,7 +32,7 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
     });
   }, [allow]);
 
-  const withTimeout = (promise, ms = 8000) =>
+  const withTimeout = (promise, ms = 10000) =>
     Promise.race([
       promise,
       new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms)),
@@ -52,6 +53,8 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         setLoading(true);
         setReason(null);
 
+        const a = allow || {};
+
         // 1) session
         const { data: s, error: sessionErr } = await withTimeout(supabase.auth.getSession());
         if (sessionErr) return finish(false, "session-error");
@@ -60,30 +63,45 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         if (!session) return finish(false, "no-session");
 
         const userId = session.user.id;
-        const a = allow || {};
 
-        // 2) Try read profiles.role (nice to have, but not mandatory for driver)
-        let role = null;
+        // 2) profile role (best-effort)
+        let profileRole = null;
         let profileExists = false;
 
-        const readProfile = async () => {
-          const { data: profile, error: profileErr } = await withTimeout(
-            supabase.from("profiles").select("role").eq("id", userId).maybeSingle()
+        const { data: profile, error: profileErr } = await withTimeout(
+          supabase.from("profiles").select("role").eq("id", userId).maybeSingle()
+        );
+
+        if (!profileErr && profile?.role) {
+          profileExists = true;
+          profileRole = profile.role;
+        }
+
+        // 3) driver row (source of truth for driver access)
+        let driverRow = null;
+        let driverRowExists = false;
+        let approved = false;
+
+        // Only hit drivers table when it matters (driver routes OR mixed allow)
+        if (a.driver) {
+          const { data: drv, error: drvErr } = await withTimeout(
+            supabase.from("drivers").select("approved,status,user_id").eq("user_id", userId).maybeSingle()
           );
-          if (!profileErr && profile?.role) {
-            profileExists = true;
-            role = profile.role;
-            return { profile, profileErr: null };
+
+          if (!drvErr && drv) {
+            driverRow = drv;
+            driverRowExists = true;
+            if (typeof drv.approved === "boolean") approved = drv.approved;
+            // if approved is NULL but status looks active/approved, treat as approved=false and let status decide below
           }
-          profileExists = false;
-          role = null;
-          return { profile: null, profileErr };
-        };
+        }
 
-        const { profileErr } = await readProfile();
+        // 4) Derive effective role
+        // If drivers row exists => effective role is driver (even if profile says client)
+        const effectiveRole = driverRowExists ? "driver" : profileRole;
 
-        // 2.1) If accessing CLIENT-only route and profile missing, try to create CLIENT profile
-        if (!role && a.client && !a.driver) {
+        // 5) Auto-create client profile if accessing client-only route and profile missing
+        if (!effectiveRole && a.client && !a.driver) {
           try {
             await withTimeout(
               supabase
@@ -101,78 +119,58 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
           } catch {
             // ignore
           }
-          await readProfile();
-        }
 
-        // 3) Driver table is source of truth
-        // We query drivers row whenever driver access is involved OR role is missing.
-        let driverRow = null;
-        let driverRowExists = false;
-        let approved = false;
-
-        const shouldCheckDriver =
-          !!a.driver || role === "driver" || (!role && (a.driver || a.client));
-
-        if (shouldCheckDriver) {
-          const { data: drv, error: drvErr } = await withTimeout(
-            supabase.from("drivers").select("approved,status").eq("user_id", userId).maybeSingle()
+          const { data: p2 } = await withTimeout(
+            supabase.from("profiles").select("role").eq("id", userId).maybeSingle()
           );
-
-          if (!drvErr && drv) {
-            driverRow = drv;
-            driverRowExists = true;
-
-            // approved flag OR status
-            if (typeof drv.approved === "boolean") approved = drv.approved;
-            const st = String(drv.status || "").toLowerCase();
-            if (!approved && (st === "active" || st === "approved")) approved = true;
-          }
+          if (p2?.role) profileRole = p2.role;
         }
 
-        // If profile role is missing but driver row exists, treat as DRIVER.
-        if (!role && driverRowExists) role = "driver";
+        // 6) Decide allow
+        if (effectiveRole === "client") {
+          if (!!a.client) return finish(true, null);
 
-        // If role says "client" but driver row exists and route needs driver -> treat as driver.
-        if (role === "client" && driverRowExists && a.driver && !a.client) {
-          role = "driver";
+          // Client trying to access driver-only route
+          if (!!a.driver && !a.client) return finish(false, "not-driver");
+
+          return finish(false, "not-allowed");
         }
 
-        // 4) decisions
-        if (a.driver && !a.client) {
-          // DRIVER-only route
+        if (effectiveRole === "driver") {
+          if (!a.driver) return finish(false, "driver-not-allowed");
+
           if (!driverRowExists) return finish(false, "driver-not-registered");
-          if (a.requireDriverApproved && !approved) return finish(false, "driver-not-approved");
+
+          // approval gating (driver dashboard/orders)
+          if (a.requireDriverApproved) {
+            // if approved column is missing/NULL, fallback to status string
+            const status = String(driverRow?.status || "").trim().toLowerCase();
+            const isApprovedByStatus = ["active", "approved", "ok", "enabled"].includes(status);
+            const effectiveApproved = approved || isApprovedByStatus;
+
+            if (!effectiveApproved) return finish(false, "driver-not-approved");
+          }
+
           return finish(true, null);
         }
 
-        if (a.client && !a.driver) {
-          // CLIENT-only route
-          if (role === "client") return finish(true, null);
+        // No role at all
+        // For driver routes: send to register. For others: login.
+        if (a.driver && !a.client) return finish(false, "driver-not-registered");
 
-          // if driver is trying to open client-only route, allow only if client allowed (it is),
-          // but many apps prefer redirect driver to dashboard. We'll keep behavior strict:
-          return finish(false, "driver-on-client-route");
-        }
-
-        // Mixed route (client: true, driver: true) e.g. /driver/register
-        if (a.client && a.driver) {
-          // any logged-in user can access
-          return finish(true, null);
-        }
-
-        // fallback: if nothing allowed, deny
         if (!profileExists && profileErr) return finish(false, "profile-error");
-        return finish(false, "not-allowed");
+        return finish(false, "no-profile");
       } catch (e) {
         return finish(false, e?.message === "timeout" ? "timeout" : "error");
       }
     };
 
     run();
+
     return () => {
       mounted = false;
     };
-  }, [allowKey]);
+  }, [allowKey, location.pathname]);
 
   if (loading) {
     return (
@@ -184,9 +182,8 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
 
   if (!ok) {
     if (reason === "driver-not-approved") return <Navigate to="/driver/pending" replace />;
-    if (reason === "driver-not-registered") return <Navigate to="/driver/register" replace />;
+    if (reason === "driver-not-registered" || reason === "not-driver") return <Navigate to="/driver/register" replace />;
 
-    // Default
     return <Navigate to={redirectTo} replace state={{ from: location.pathname, reason }} />;
   }
 

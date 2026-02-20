@@ -200,21 +200,16 @@ export default function DriverRegister({ onRegisterSuccess }) {
       const { error } = await supabase.from("drivers").insert([payload]);
       if (error) throw error;
 
-      message.success("Arizangiz qabul qilindi!");
-      // Best-effort: set profiles.role = "driver" so old screens that rely on profiles.role work too.
+      // ✅ Ensure profile role becomes "driver" (prevents redirect back to client)
       try {
-        const { data: u } = await supabase.auth.getUser();
-        const uid = u?.user?.id;
-        if (uid) {
-          await supabase.from("profiles").upsert(
-            { id: uid, role: "driver", updated_at: new Date().toISOString() },
-            { onConflict: "id" }
-          );
-        }
-      } catch {
-        // ignore (RLS may block). RoleGate/RootRedirect do not depend on this.
+        await supabase
+          .from("profiles")
+          .upsert({ id: user.id, role: "driver", phone: phoneFull, updated_at: new Date().toISOString() }, { onConflict: "id" });
+      } catch (e) {
+        // ignore (RLS might block), RoleGate/RootRedirect still uses drivers table as source of truth
       }
 
+      message.success("Arizangiz qabul qilindi!");
       if (onRegisterSuccess) onRegisterSuccess();
 
       // optional: form reset

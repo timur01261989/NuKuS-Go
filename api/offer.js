@@ -1,10 +1,14 @@
 import { json, badRequest, serverError, nowIso } from './_shared/cors.js';
-import { getSupabaseAdmin } from './_shared/supabase.js';
+import { getSupabase } from './_shared/supabase.js';
 
 function hasSupabaseEnv() {
-  return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const anon = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+  const service = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+  return !!(url && (service || anon));
 }
 
+// --- OFFERS ---
 export async function offer_respond_handler(req, res) {
   try {
     if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Method not allowed' });
@@ -17,12 +21,13 @@ export async function offer_respond_handler(req, res) {
     if (!order_id) return badRequest(res, 'order_id kerak');
     if (!driver_user_id) return badRequest(res, 'driver_user_id kerak');
     if (!['accept','reject'].includes(action)) return badRequest(res, 'action accept|reject');
-    if (!hasSupabaseEnv()) return json(res, 200, { ok:true, demo:true });
+    if (!hasSupabaseEnv()) return json(res, 500, { ok:false, error:'Supabase env yo‘q' });
 
-    const sb = getSupabaseAdmin();
+    const sb = getSupabase(req, { admin: true });
     const status = action === 'accept' ? 'accepted' : 'rejected';
 
-    const { data: off, error: oe } = await sb.from('order_offers')
+    const { data: off, error: oe } = await sb
+      .from('order_offers')
       .update({ status, responded_at: nowIso() })
       .eq('order_id', order_id)
       .eq('driver_user_id', driver_user_id)
@@ -31,8 +36,9 @@ export async function offer_respond_handler(req, res) {
     if (oe) throw oe;
 
     if (action === 'accept') {
-      const { data: od, error: uerr } = await sb.from('orders')
-        .update({ driver_user_id, status:'accepted', accepted_at: nowIso() })
+      const { data: od, error: uerr } = await sb
+        .from('orders')
+        .update({ driver_user_id, status: 'accepted', accepted_at: nowIso() })
         .eq('id', order_id)
         .select('id,status,driver_user_id')
         .single();
@@ -46,54 +52,43 @@ export async function offer_respond_handler(req, res) {
   }
 }
 
-import { json, serverError, nowIso } from './_shared/cors.js';
-import { getSupabaseAdmin } from './_shared/supabase.js';
-
-function hasSupabaseEnv() {
-  return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
-}
-
 /**
  * GET /api/offer-timeout
  * Marks order_offers where status='sent' and expires_at < now() as 'timeout'.
- * (Run from cron)
  */
 export async function offer_timeout_handler(req, res) {
   try {
-    if (!hasSupabaseEnv()) return json(res, 200, { ok:true, demo:true, updated:0 });
+    if (req.method !== 'GET') return json(res, 405, { ok:false, error:'Method not allowed' });
+    if (!hasSupabaseEnv()) return json(res, 500, { ok:false, error:'Supabase env yo‘q' });
 
-    const sb = getSupabaseAdmin();
+    const sb = getSupabase(req, { admin: true });
     const now = new Date().toISOString();
 
-    const { data, error } = await sb.from('order_offers')
+    const { data, error } = await sb
+      .from('order_offers')
       .update({ status:'timeout', responded_at: nowIso() })
       .eq('status', 'sent')
       .lt('expires_at', now)
       .select('id');
 
     if (error) throw error;
-    return json(res, 200, { ok:true, updated: (data||[]).length });
+    return json(res, 200, { ok:true, updated: (data || []).length });
   } catch (e) {
     return serverError(res, e);
   }
 }
 
-import { json, badRequest, serverError } from './_shared/cors.js';
-import { getSupabaseAdmin } from './_shared/supabase.js';
-
-function hasSupabaseEnv() {
-  return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
-}
-
+// --- MESSAGES ---
 export async function messages_handler(req, res) {
   try {
-    if (!hasSupabaseEnv()) return json(res, 200, { ok:true, demo:true, items: [] });
-    const sb = getSupabaseAdmin();
+    if (!hasSupabaseEnv()) return json(res, 500, { ok:false, error:'Supabase env yo‘q' });
+    const sb = getSupabase(req, { admin: true });
 
     if (req.method === 'GET') {
       const order_id = String(req.query?.order_id||'').trim();
       if (!order_id) return badRequest(res, 'order_id kerak');
-      const { data, error } = await sb.from('messages')
+      const { data, error } = await sb
+        .from('messages')
         .select('id,order_id,sender_user_id,body,created_at')
         .eq('order_id', order_id)
         .order('created_at', { ascending: true })
@@ -111,7 +106,8 @@ export async function messages_handler(req, res) {
       if (!sender_user_id) return badRequest(res, 'sender_user_id kerak');
       if (!msg) return badRequest(res, 'body bo‘sh');
 
-      const { data, error } = await sb.from('messages')
+      const { data, error } = await sb
+        .from('messages')
         .insert([{ order_id, sender_user_id, body: msg }])
         .select('id,order_id,sender_user_id,body,created_at')
         .single();
@@ -125,10 +121,7 @@ export async function messages_handler(req, res) {
   }
 }
 
-import { json, badRequest, serverError } from './_shared/cors.js';
-import { getSupabaseAdmin } from './_shared/supabase.js';
-function hasSupabaseEnv(){ return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY); }
-
+// --- NOTIFICATIONS ---
 export async function notifications_read_handler(req, res) {
   try {
     if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Method not allowed' });
@@ -137,18 +130,22 @@ export async function notifications_read_handler(req, res) {
     const user_id = String(body.user_id||'').trim();
     if (!id) return badRequest(res, 'id kerak');
     if (!user_id) return badRequest(res, 'user_id kerak');
-    if (!hasSupabaseEnv()) return json(res, 200, { ok:true, demo:true });
+    if (!hasSupabaseEnv()) return json(res, 500, { ok:false, error:'Supabase env yo‘q' });
 
-    const sb = getSupabaseAdmin();
-    const { data, error } = await sb.from('notifications').update({ is_read:true }).eq('id', id).eq('user_id', user_id).select('*').single();
+    const sb = getSupabase(req, { admin: true });
+    const { data, error } = await sb
+      .from('notifications')
+      .update({ is_read:true })
+      .eq('id', id)
+      .eq('user_id', user_id)
+      .select('*')
+      .single();
     if (error) throw error;
     return json(res, 200, { ok:true, notification: data });
-  } catch (e) { return serverError(res, e); }
+  } catch (e) {
+    return serverError(res, e);
+  }
 }
-
-import { json, badRequest, serverError } from './_shared/cors.js';
-import { getSupabaseAdmin } from './_shared/supabase.js';
-function hasSupabaseEnv(){ return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY); }
 
 export async function notify_handler(req, res) {
   try {
@@ -156,23 +153,30 @@ export async function notify_handler(req, res) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body||'{}') : (req.body||{});
     const user_id = String(body.user_id||'').trim();
     if (!user_id) return badRequest(res, 'user_id kerak');
-    if (!hasSupabaseEnv()) return json(res, 200, { ok:true, demo:true });
+    if (!hasSupabaseEnv()) return json(res, 500, { ok:false, error:'Supabase env yo‘q' });
 
-    const sb = getSupabaseAdmin();
-    const { data, error } = await sb.from('notifications').insert([{
-      user_id,
-      type: body.type || 'system',
-      title: body.title || null,
-      body: body.body || null,
-      data: body.data || null,
-    }]).select('*').single();
+    const sb = getSupabase(req, { admin: true });
+    const { data, error } = await sb
+      .from('notifications')
+      .insert([
+        {
+          user_id,
+          type: body.type || 'system',
+          title: body.title || null,
+          body: body.body || null,
+          data: body.data || null,
+        },
+      ])
+      .select('*')
+      .single();
     if (error) throw error;
     return json(res, 201, { ok:true, notification: data });
-  } catch (e) { return serverError(res, e); }
+  } catch (e) {
+    return serverError(res, e);
+  }
 }
 
 export default async function handler(req, res) {
-  // req.routeKey is set by api/index.js; fallback to query param or path
   const rk = req.routeKey || (req.query && req.query.routeKey) || '';
   switch (rk) {
     case 'offer':
@@ -186,7 +190,6 @@ export default async function handler(req, res) {
     case 'notify':
       return await notify_handler(req, res);
     default:
-      // If this module is used directly (without index router), run the first handler.
       return await offer_respond_handler(req, res);
   }
 }

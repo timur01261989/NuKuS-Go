@@ -5,15 +5,14 @@ import { supabase } from "@lib/supabase";
 
 /**
  * RootRedirect:
- *  - If no session => /login
- *  - If session => decide by DRIVER row first (source of truth):
- *      if drivers row exists:
- *         approved => /driver/dashboard
- *         not approved => /driver/pending
- *      else => /client/home
+ *  - No session => /login
+ *  - Session => decide route.
  *
- * Why: profiles.role is often missing or still "client" even for real drivers.
- * Relying on profiles.role creates an endless redirect back to client.
+ * IMPORTANT:
+ *  Driver access MUST be based on "drivers" table row existence.
+ *  Relying only on profiles.role causes a common bug:
+ *    user registered as driver but profiles.role is still "client"
+ *    => redirect to /client/home (wrong).
  */
 export default function RootRedirect() {
   const [loading, setLoading] = useState(true);
@@ -22,39 +21,61 @@ export default function RootRedirect() {
   useEffect(() => {
     let mounted = true;
 
-    const done = (path) => {
-      if (!mounted) return;
-      setTo(path);
-      setLoading(false);
-    };
-
     const run = async () => {
       try {
         const { data: s, error: sessionErr } = await supabase.auth.getSession();
-        if (sessionErr || !s?.session) return done("/login");
+        if (sessionErr || !s?.session) {
+          if (!mounted) return;
+          setTo("/login");
+          setLoading(false);
+          return;
+        }
 
         const userId = s.session.user.id;
 
-        // 1) Check drivers row first
+        // 1) If drivers row exists => driver flow (even if profiles.role says client)
         const { data: drv, error: drvErr } = await supabase
           .from("drivers")
-          .select("approved,status")
+          .select("approved,status,user_id")
           .eq("user_id", userId)
           .maybeSingle();
 
         if (!drvErr && drv) {
-          let approved = true;
-          if (typeof drv.approved === "boolean") approved = drv.approved;
-          const st = String(drv.status || "").toLowerCase();
-          if (!approved && (st === "active" || st === "approved")) approved = true;
+          const approvedBool = typeof drv.approved === "boolean" ? drv.approved : false;
+          const status = String(drv.status || "").trim().toLowerCase();
+          const approvedByStatus = ["active", "approved", "ok", "enabled"].includes(status);
+          const effectiveApproved = approvedBool || approvedByStatus;
 
-          return done(approved ? "/driver/dashboard" : "/driver/pending");
+          setTo(effectiveApproved ? "/driver/dashboard" : "/driver/pending");
+          if (!mounted) return;
+          setLoading(false);
+          return;
         }
 
-        // 2) Fallback to client
-        return done("/client/home");
+        // 2) Fallback to profile role
+        const { data: profile, error: profileErr } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", userId)
+          .maybeSingle();
+
+        const role = !profileErr ? profile?.role : null;
+
+        if (role === "driver") {
+          // If profile says driver but no drivers row, send to register to avoid loops
+          setTo("/driver/register");
+        } else if (role === "client") {
+          setTo("/client/home");
+        } else {
+          setTo("/login");
+        }
+
+        if (!mounted) return;
+        setLoading(false);
       } catch {
-        return done("/login");
+        if (!mounted) return;
+        setTo("/login");
+        setLoading(false);
       }
     };
 
