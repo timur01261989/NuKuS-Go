@@ -200,6 +200,15 @@ export default function DriverRegister({ onRegisterSuccess }) {
       const { error } = await supabase.from("drivers").insert([payload]);
       if (error) throw error;
 
+      // ✅ Ensure profile role becomes "driver" (prevents redirect back to client)
+      try {
+        await supabase
+          .from("profiles")
+          .upsert({ id: user.id, role: "driver", phone: phoneFull, updated_at: new Date().toISOString() }, { onConflict: "id" });
+      } catch (e) {
+        // ignore (RLS might block), RoleGate/RootRedirect still uses drivers table as source of truth
+      }
+
       message.success("Arizangiz qabul qilindi!");
       if (onRegisterSuccess) onRegisterSuccess();
 
