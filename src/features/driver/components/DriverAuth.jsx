@@ -47,7 +47,7 @@ export default function DriverAuth({ onBack }) {
       if (!user) {
         // Agar login qilmagan bo'lsa, bosh sahifaga otib yuboramiz
         if (onBack) onBack();
-        else navigate("/");
+        else navigate("/login");
         return;
       }
 
