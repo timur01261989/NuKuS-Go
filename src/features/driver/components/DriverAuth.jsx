@@ -54,11 +54,11 @@ export default function DriverAuth({ onBack }) {
       // 2. Bazadan haydovchini qidiramiz
       const { data, error } = await supabase
         .from("drivers")
-        .select("status")
-        .eq("id", user.id)
-        .single();
+        .select("status, approved, user_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-      if (error && error.code !== "PGRST116") {
+      if (error) {
         console.error("Baza xatosi:", error);
         message.error("Tizimda xatolik yuz berdi");
       }

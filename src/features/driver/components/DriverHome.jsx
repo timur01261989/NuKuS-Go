@@ -199,7 +199,7 @@ export default function DriverHome({ onLogout }) {
             is_online: next,
             last_seen_at: new Date().toISOString(),
           })
-          .eq("id", user.id);
+          .eq("user_id", user.id);
 
       if (error) throw error;
 

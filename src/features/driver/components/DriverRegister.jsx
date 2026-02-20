@@ -177,7 +177,7 @@ export default function DriverRegister({ onRegisterSuccess }) {
 
       // 4) Bazaga yozish
       const payload = {
-        id: user.id,
+        user_id: user.id,
 
         first_name: values.first_name,
         last_name: values.last_name,
