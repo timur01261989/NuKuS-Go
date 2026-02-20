@@ -469,6 +469,26 @@ async function createInterDistrict(req, res, body) {
  *   won't break the client flow during rollout.
  * ============================================================ */
 
+
+function getAuthUid(req) {
+  try {
+    const auth = req.headers?.authorization || req.headers?.Authorization;
+    if (!auth || typeof auth !== "string") return null;
+    const m = auth.match(/Bearer\s+(.+)/i);
+    if (!m) return null;
+    const token = m[1].trim();
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const payloadB64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const pad = "=".repeat((4 - (payloadB64.length % 4)) % 4);
+    const payloadJson = Buffer.from(payloadB64 + pad, "base64").toString("utf8");
+    const payload = JSON.parse(payloadJson);
+    return payload.sub || payload.user_id || payload.uid || null;
+  } catch {
+    return null;
+  }
+}
+
 function numOrNull(v) {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
@@ -523,7 +543,8 @@ function resolvePickupDropoff(body) {
 }
 
 async function createTaxiOrder(req, res, body) {
-  const client_id = (body.client_id || body.passenger_id || body.user_id || body.clientId || "").toString();
+  const client_id =
+    (body.client_id || body.passenger_id || body.user_id || body.clientId || getAuthUid(req) || "").toString();
   if (!client_id) return json(res, 400, { error: "client_id (yoki passenger_id) shart" });
 
   const { pickup, dropoff } = resolvePickupDropoff(body);
