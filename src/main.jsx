@@ -2,75 +2,72 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import api from "./utils/apiHelper";
+import { supabase } from "./lib/supabase";
 
 // ✅ Ant Design CSS (v5) — SHART
 import "antd/dist/reset.css";
 
 // ✅ Theme system (single source)
-// 1) tokens: ranglar + shriftlar + night-mode variablelar
 import "./theme/tokens.css";
-// 2) minimal overrides: premium black cards default (AntD ichida text yo'qolmasin)
 import "./theme/theme-overrides.css";
 
-// ✅ Tailwind + minimal reset (endi bu faylda rang/theme bo'lmaydi)
+// ✅ Tailwind + minimal reset
 import "./index.css";
 
 // Leaflet
 import "leaflet/dist/leaflet.css";
 
 // ------------------------------
-// Auth token helpers (Supabase-friendly)
+// Safe helpers (window/localStorage bo'lmagan joylarda yiqilmasin)
 // ------------------------------
-function getSupabaseAccessTokenFromStorage() {
-  // Supabase token localStorage'da: sb-<project-ref>-auth-token
-  for (const key of Object.keys(localStorage)) {
-    if (key.startsWith("sb-") && key.endsWith("-auth-token")) {
-      const raw = localStorage.getItem(key);
-      if (!raw) continue;
-      try {
-        const parsed = JSON.parse(raw);
+const isBrowser = typeof window !== "undefined";
 
-        // Supabase versionlariga qarab turli shape bo'lishi mumkin
-        return (
-          parsed?.access_token ||
-          parsed?.currentSession?.access_token ||
-          parsed?.session?.access_token ||
-          ""
-        );
-      } catch {
-        // ignore parse errors
-      }
-    }
+async function getSupabaseAccessToken() {
+  if (!isBrowser) return "";
+  try {
+    const { data } = await supabase.auth.getSession();
+    return data?.session?.access_token || "";
+  } catch {
+    return "";
   }
-  return "";
+}
+
+async function getSupabaseRefreshToken() {
+  if (!isBrowser) return "";
+  try {
+    const { data } = await supabase.auth.getSession();
+    return data?.session?.refresh_token || "";
+  } catch {
+    return "";
+  }
 }
 
 // ------------------------------
 // API helper global config (1 marta)
 // ------------------------------
 api.configure({
-  // Har requestda tokenni qayta topamiz (token refresh bo'lsa ham yangilanadi)
-  getAccessToken: () => {
-    // Agar sen boshqa auth ham ishlatsang, shu yerdan qo'shib ketasan:
-    // const legacy = localStorage.getItem("token") || "";
-    // if (legacy) return legacy;
+  // ✅ apiHelper.js async token'ni qo'llaydi (await qiladi)
+  getAccessToken: getSupabaseAccessToken,
+  getRefreshToken: getSupabaseRefreshToken,
 
-    return getSupabaseAccessTokenFromStorage();
-  },
+  onAuthFail: async () => {
+    // Token yaroqsiz bo'lsa: sessionni tozalaymiz va login'ga qaytamiz
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // ignore
+    }
 
-  // apiHelper ichida "hooks: { onAuthFail }" yo'q — to'g'ridan-to'g'ri onAuthFail ishlaydi
-  onAuthFail: () => {
-    // Token yaroqsiz bo'lsa tozalaymiz va login ga qaytaramiz
-    // (Supabase token ham shu yerda ketadi)
-    localStorage.clear();
-    if (window.location.pathname !== "/login") window.location.href = "/login";
+    if (isBrowser && window.location.pathname !== "/login") {
+      window.location.href = "/login";
+    }
   },
 });
 
 // ------------------------------
 // PWA / Service Worker (1 marta)
 // ------------------------------
-if ("serviceWorker" in navigator) {
+if (isBrowser && "serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register("/sw.js");
@@ -84,16 +81,13 @@ if ("serviceWorker" in navigator) {
         if (!installing) return;
 
         installing.addEventListener("statechange", () => {
-          // "installed" bo'lganda eski controller bo'lsa - demak update bor
           if (installing.state === "installed" && navigator.serviceWorker.controller) {
-            // skipWaiting so'raymiz (sw.js ichida message handler bo'lishi kerak)
             registration.waiting?.postMessage({ type: "SKIP_WAITING" });
           }
         });
       });
 
       navigator.serviceWorker.addEventListener("controllerchange", () => {
-        // Yangi SW control olganda 1 marta reload
         window.location.reload();
       });
 

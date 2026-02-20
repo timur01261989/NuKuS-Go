@@ -17,5 +17,7 @@ export const supabase = createClient(supabaseUrl || "", supabaseAnonKey || "", {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
+    // SSR/build paytida localStorage bo'lmaydi — shuning uchun himoya
+    storage: typeof window !== "undefined" ? window.localStorage : undefined,
   },
 });

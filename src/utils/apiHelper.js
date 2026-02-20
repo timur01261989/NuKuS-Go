@@ -204,10 +204,7 @@ const api = {
     if (!headers.has("Accept")) headers.set("Accept", "application/json, text/plain, */*");
 
     // Auth
-    const token =
-      typeof this._cfg.getAccessToken === "function"
-        ? await this._cfg.getAccessToken()
-        : null;
+    const token = typeof this._cfg.getAccessToken === "function" ? this._cfg.getAccessToken() : null;
     if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
 
     let body = undefined;
@@ -372,7 +369,7 @@ const api = {
               typeof this._cfg.getRefreshToken === "function"
             ) {
               try {
-                const refreshToken = await this._cfg.getRefreshToken();
+                const refreshToken = this._cfg.getRefreshToken();
                 if (!refreshToken) throw new Error("No refresh token");
 
                 const refreshed = await this._cfg.refreshAccessToken({ refreshToken });
