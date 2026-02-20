@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
+import ErrorBoundary from "./shared/components/ErrorBoundary.jsx";
 import api from "./utils/apiHelper";
 
 // ✅ Ant Design CSS (v5) — SHART
@@ -77,6 +78,8 @@ if ("serviceWorker" in navigator) {
 // --- RENDERING ---
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </React.StrictMode>
 );
