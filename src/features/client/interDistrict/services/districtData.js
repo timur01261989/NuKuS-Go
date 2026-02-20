@@ -12,6 +12,10 @@
 
 import { haversineKm } from "../../shared/geo/haversine";
 
+// Backward-compat: some modules import { haversineKm } from this file.
+// Keep the named export to avoid breaking existing imports.
+export { haversineKm };
+
 export const DISTRICTS = [
   // Karakalpakstan (approx coords)
   { id: "nukus", name: "Nukus", lat: 42.4617, lng: 59.6166 },
