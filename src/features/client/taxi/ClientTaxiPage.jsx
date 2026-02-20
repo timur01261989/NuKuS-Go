@@ -344,6 +344,45 @@ export default function ClientTaxiPage() {
   const [destResults, setDestResults] = useState([]);
   const [searchBusy, setSearchBusy] = useState(false);
 
+  // suggestions -> pickup/destination setters (used by TaxiSearchSheet)
+  const setPickupFromSuggestion = useCallback(
+    (item) => {
+      if (!item) return;
+      const lat = item.lat ?? item.latitude ?? item?.location?.lat;
+      const lng = item.lng ?? item.lon ?? item.longitude ?? item?.location?.lng;
+      const address = item.address ?? item.title ?? item.name ?? "";
+      if (lat != null && lng != null) {
+        setPickup((p) => ({ ...p, latlng: [Number(lat), Number(lng)], address: address || p.address }));
+      } else {
+        setPickup((p) => ({ ...p, address: address || p.address }));
+      }
+      setPickupSearchText(address);
+      setSearchOpen(false);
+      // If destination already chosen, go to route preview
+      if (dest?.latlng) setStep("route");
+    },
+    [dest?.latlng]
+  );
+
+  const setDestFromSuggestion = useCallback(
+    (item) => {
+      if (!item) return;
+      const lat = item.lat ?? item.latitude ?? item?.location?.lat;
+      const lng = item.lng ?? item.lon ?? item.longitude ?? item?.location?.lng;
+      const address = item.address ?? item.title ?? item.name ?? "";
+      if (lat != null && lng != null) {
+        setDest((d) => ({ ...d, latlng: [Number(lat), Number(lng)], address: address || d.address }));
+      } else {
+        setDest((d) => ({ ...d, address: address || d.address }));
+      }
+      setDestSearchText(address);
+      setSearchOpen(false);
+      // If pickup already chosen, go to route preview
+      if (pickup?.latlng) setStep("route");
+    },
+    [pickup?.latlng]
+  );
+
   // saved places
   const [savedPlaces, setSavedPlaces] = useState([]);
 
@@ -601,39 +640,6 @@ export default function ClientTaxiPage() {
       if (c) map.flyTo(c, 16, { duration: 0.6 });
     }
   }, [dest.latlng, pickup.latlng, userLoc]);
-
-  /**
-   * SearchSheet expects these callbacks.
-   * Old builds were passing undefined names which crashed production.
-   */
-  const setPickupFromSuggestion = useCallback(
-    (item) => {
-      if (!item) return;
-      // keep search sheet open so user can still pick destination
-      setPickup({ latlng: [item.lat, item.lng], address: item.label || "", entrance: "" });
-      setPickupSearchText(item.label || "");
-      const map = mapRef.current;
-      if (map && item?.lat != null && item?.lng != null) map.flyTo([item.lat, item.lng], 16, { duration: 0.6 });
-      setSearchOpen(true);
-      setStep("search");
-    },
-    []
-  );
-
-  const setDestFromSuggestion = useCallback(
-    (item) => {
-      // destination selection should proceed to route as before
-      chooseDestination(item);
-    },
-    [chooseDestination]
-  );
-
-  // "Xaritadan tanlash" for destination from the search sheet
-  const openDestMapSelect = useCallback(() => {
-    openDestMapEdit();
-  }, [openDestMapEdit]);
-
-
 
   /** add stop (waypoint) */
   const addStopFromCenter = useCallback(() => {
