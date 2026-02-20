@@ -57,7 +57,7 @@ export default function DriverVerification({ userId, onFinish }) {
       const updateData = {};
       updateData[`${type}_url`] = urlData.publicUrl;
 
-      await supabase.from('drivers').update(updateData).eq('id', userId);
+      await supabase.from('drivers').update(updateData).eq('user_id', userId);
 
       message.success("Hujjat yuklandi!");
       setStep(prev => prev + 1);
