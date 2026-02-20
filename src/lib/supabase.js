@@ -11,9 +11,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
       "Check your .env (Vite requires VITE_ prefix) and restart the dev server."
   );
 }
-if (typeof window !== "undefined") {
-  window.supabase = supabase;
-}
 
 export const supabase = createClient(supabaseUrl || "", supabaseAnonKey || "", {
   auth: {
@@ -24,3 +21,8 @@ export const supabase = createClient(supabaseUrl || "", supabaseAnonKey || "", {
     storage: typeof window !== "undefined" ? window.localStorage : undefined,
   },
 });
+
+// Debug uchun (ixtiyoriy): console'da tekshirish oson bo'ladi
+if (typeof window !== "undefined") {
+  window.supabase = supabase;
+}
