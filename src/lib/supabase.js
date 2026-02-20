@@ -11,6 +11,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
       "Check your .env (Vite requires VITE_ prefix) and restart the dev server."
   );
 }
+if (typeof window !== "undefined") {
+  window.supabase = supabase;
+}
 
 export const supabase = createClient(supabaseUrl || "", supabaseAnonKey || "", {
   auth: {
