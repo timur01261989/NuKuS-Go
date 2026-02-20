@@ -46,26 +46,28 @@ function readTokenFromSupabaseStorage() {
 // API helper global config (1 marta)
 // ------------------------------
 api.configure({
-  // 1) Avval localStorage token (agar sen qo'lda login qilgan bo'lsang)
-  // 2) Bo'lmasa Supabase storage token
-  getAccessToken: () => readTokenFromLocalStorage() || readTokenFromSupabaseStorage(),
-
-  setAccessToken: (t) => localStorage.setItem("token", t || ""),
-  getRefreshToken: () => localStorage.getItem("refresh_token") || "",
-  setRefreshToken: (t) => localStorage.setItem("refresh_token", t || ""),
-
-  // ❗ apiHelper.js da "hooks: { onAuthFail }" degan narsa YO'Q.
-  // To'g'risi: onAuthFail ni bevosita shu yerga berasan.
-  onAuthFail: () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("refresh_token");
-
-    // Supabase tokenni ham tozalash (ixtiyoriy)
-    const ref = import.meta.env.VITE_SUPABASE_PROJECT_REF;
-    if (ref) localStorage.removeItem(`sb-${ref}-auth-token`);
-
-    if (window.location.pathname !== "/login") window.location.href = "/login";
+  getAccessToken: () => {
+    // Supabase localStorage ichidan avtomatik topadi
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith("sb-") && key.endsWith("-auth-token")) {
+        try {
+          const raw = JSON.parse(localStorage.getItem(key));
+          return (
+            raw?.access_token ||
+            raw?.currentSession?.access_token ||
+            raw?.session?.access_token ||
+            ""
+          );
+        } catch {}
+      }
+    }
+    return "";
   },
+
+  onAuthFail: () => {
+    localStorage.clear();
+    window.location.href = "/login";
+  }
 });
 
 // ------------------------------
