@@ -1,4 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { haversineKm } from "../shared/geo/haversine";
+import { osrmRoute } from "../shared/geo/osrm";
+import { nominatimReverse as _nominatimReverse } from "../shared/geo/nominatim";
+
+// Backward-compatible signature (lat, lng, signal)
+async function nominatimReverse(lat, lng, signal) {
+  return _nominatimReverse(lat, lng, { signal });
+}
+
 
 // UI components ONLY from antd
 import {
@@ -61,54 +70,9 @@ function fmtMoney(n) {
   return new Intl.NumberFormat("ru-RU").format(Math.round(n));
 }
 
-function haversineKm(a, b) {
-  const R = 6371;
-  const dLat = ((b[0] - a[0]) * Math.PI) / 180;
-  const dLng = ((b[1] - a[1]) * Math.PI) / 180;
-  const lat1 = (a[0] * Math.PI) / 180;
-  const lat2 = (b[0] * Math.PI) / 180;
-  const s1 = Math.sin(dLat / 2);
-  const s2 = Math.sin(dLng / 2);
-  const h = s1 * s1 + Math.cos(lat1) * Math.cos(lat2) * s2 * s2;
-  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
-}
 
 // OSRM yo'nalish topa olmasa ham xato bermaslik uchun:
-async function osrmRoute(from, to) {
-  try {
-    const url = `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`;
-    const res = await fetch(url);
-    const data = await res.json();
-    const r = data?.routes?.[0];
-    if (r) {
-      return {
-        coords: r.geometry.coordinates.map(([lng, lat]) => [lat, lng]),
-        distanceKm: (r.distance || 0) / 1000,
-        durationMin: (r.duration || 0) / 60,
-      };
-    }
-  } catch (e) {
-    console.warn("OSRM yo'nalish chizishda xatolik:", e);
-  }
-  // Fallback: Agar yo'nalish chizib bo'lmasa, to'g'ri chiziq chizamiz
-  return {
-    coords: [from, to],
-    distanceKm: haversineKm(from, to),
-    durationMin: haversineKm(from, to) * 2, // Taxminiy vaqt
-  };
-}
 
-async function nominatimReverse(lat, lng, signal) {
-  const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
-  try {
-    const res = await fetch(url, { signal, headers: { "Accept-Language": "uz,ru,en" } });
-    const data = await res.json();
-    return data?.display_name || null;
-  } catch (e) {
-    if (e?.name === "AbortError") return null;
-    return null;
-  }
-}
 
 async function nominatimSearch(q, signal) {
   // countrycodes=uz natijalarni faqat O'zbekiston bilan cheklaydi

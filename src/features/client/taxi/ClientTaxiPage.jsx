@@ -1,5 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+import { haversineKm } from "../shared/geo/haversine";
+import { nominatimReverse as _nominatimReverse } from "../shared/geo/nominatim";
+
+// Backward-compatible signature (lat, lng, signal)
+async function nominatimReverse(lat, lng, signal) {
+  return _nominatimReverse(lat, lng, { signal });
+}
+
   Avatar,
   Button,
   Divider,
@@ -112,35 +120,7 @@ function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
 }
 
-function haversineKm(a, b) {
-  const R = 6371;
-  const toRad = (x) => (x * Math.PI) / 180;
-  const dLat = toRad(b[0] - a[0]);
-  const dLng = toRad(b[1] - a[1]);
-  const la1 = toRad(a[0]);
-  const la2 = toRad(b[0]);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
 
-async function nominatimReverse(lat, lng, signal) {
-  const url = `https://nominatim.openstreetmap.org/reverse?format=json&zoom=18&addressdetails=1&lat=${encodeURIComponent(
-    lat
-  )}&lon=${encodeURIComponent(lng)}&accept-language=uz,ru,en`;
-  try {
-    const res = await fetch(url, {
-      signal,
-      headers: { "Accept-Language": "uz,ru,en" },
-    });
-    const data = await res.json();
-    return data?.display_name || "";
-  } catch (e) {
-    if (e?.name === "AbortError") return "";
-    return "";
-  }
-}
 
 async function nominatimSearch(q, signal) {
   // countrycodes=uz natijalarni faqat O'zbekiston bilan cheklaydi

@@ -10,6 +10,8 @@
  * - estimateDistrictPrice() formulasini o‘zgartirasiz.
  */
 
+import { haversineKm } from "../../shared/geo/haversine";
+
 export const DISTRICTS = [
   // Karakalpakstan (approx coords)
   { id: "nukus", name: "Nukus", lat: 42.4617, lng: 59.6166 },
@@ -25,18 +27,6 @@ export function findDistrictByName(name) {
   return DISTRICTS.find((d) => d.name.toLowerCase() === String(name || "").toLowerCase()) || null;
 }
 
-export function haversineKm(a, b) {
-  const R = 6371;
-  const toRad = (x) => (x * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const s1 = Math.sin(dLat / 2);
-  const s2 = Math.sin(dLng / 2);
-  const q =
-    s1 * s1 +
-    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * s2 * s2;
-  return 2 * R * Math.asin(Math.min(1, Math.sqrt(q)));
-}
 
 /**
  * Narx modeli:
