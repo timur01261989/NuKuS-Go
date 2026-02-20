@@ -1,8 +1,15 @@
 // api/driver.js
 // Driver endpoints: location, state, heartbeat (presence)
 
-import { getSupabase } from './_shared/supabase.js';
-import { json, badRequest, serverError, nowIso, hit } from './_shared/cors.js';
+import { getSupabaseAdmin } from './_shared/supabase.js';
+import { json, badRequest, serverError, nowIso, store, hit } from './_shared/cors.js';
+
+function hasSupabaseEnv() {
+  return !!(
+    process.env.SUPABASE_URL &&
+    (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY)
+  );
+}
 
 /**
  * POST /api/driver/location  (or /api/driver-location)
@@ -25,27 +32,31 @@ export async function driver_location_handler(req, res) {
     if (!driver_user_id) return badRequest(res, 'driver_user_id kerak');
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return badRequest(res, 'lat/lng noto‘g‘ri');
 
-    // Prefer service role if present, otherwise ANON + forwarded JWT (RLS)
-    const sb = getSupabase(req, { admin: true });
-
-    const { data, error } = await sb
-      .from('driver_locations')
-      .upsert([
-        {
+    if (hasSupabaseEnv()) {
+      const sb = getSupabaseAdmin();
+      const { data, error } = await sb
+        .from('driver_locations')
+        .upsert([{
           order_id,
           driver_user_id,
           lat,
           lng,
           bearing,
           speed,
-          updated_at: nowIso(),
-        },
-      ], { onConflict: 'order_id,driver_user_id' })
-      .select('order_id,driver_user_id,lat,lng,bearing,speed,updated_at')
-      .single();
+          updated_at: nowIso()
+        }], { onConflict: 'order_id,driver_user_id' })
+        .select('order_id,driver_user_id,lat,lng,bearing,speed,updated_at')
+        .single();
+      if (error) throw error;
+      return json(res, 200, { ok:true, location: data });
+    }
 
-    if (error) throw error;
-    return json(res, 200, { ok:true, location: data });
+    // demo fallback (memory)
+    const db = store();
+    const key = `${order_id}:${driver_user_id}`;
+    db.driver_locations = db.driver_locations || {};
+    db.driver_locations[key] = { order_id, driver_user_id, lat, lng, bearing, speed, updated_at: nowIso() };
+    return json(res, 200, { ok:true, location: db.driver_locations[key], demo:true });
   } catch (e) {
     return serverError(res, e);
   }
@@ -73,22 +84,25 @@ export async function driver_state_handler(req, res) {
 
     const is_online = state !== 'offline';
 
-    const sb = getSupabase(req, { admin: true });
-
-    const { data, error } = await sb
-      .from('driver_presence')
-      .upsert([
-        {
+    if (hasSupabaseEnv()) {
+      const sb = getSupabaseAdmin();
+      const { data, error } = await sb
+        .from('driver_presence')
+        .upsert([{
           driver_user_id,
           is_online,
-          updated_at: nowIso(),
-        },
-      ], { onConflict: 'driver_user_id' })
-      .select('*')
-      .single();
+          updated_at: nowIso()
+        }], { onConflict: 'driver_user_id' })
+        .select('*')
+        .single();
+      if (error) throw error;
+      return json(res, 200, { ok:true, presence: data, state });
+    }
 
-    if (error) throw error;
-    return json(res, 200, { ok:true, presence: data, state });
+    const db = store();
+    db.driver_presence = db.driver_presence || {};
+    db.driver_presence[driver_user_id] = { driver_user_id, is_online, updated_at: nowIso() };
+    return json(res, 200, { ok:true, presence: db.driver_presence[driver_user_id], state, demo:true });
   } catch (e) {
     return serverError(res, e);
   }
@@ -115,25 +129,28 @@ export async function driver_heartbeat_handler(req, res) {
     // rate limit
     if (!hit(`hb:${driver_user_id}`, 900)) return json(res, 200, { ok:true, skipped:true });
 
-    const sb = getSupabase(req, { admin: true });
-
-    const { data, error } = await sb
-      .from('driver_presence')
-      .upsert([
-        {
+    if (hasSupabaseEnv()) {
+      const sb = getSupabaseAdmin();
+      const { data, error } = await sb
+        .from('driver_presence')
+        .upsert([{
           driver_user_id,
           is_online,
           lat,
           lng,
           bearing,
-          updated_at: nowIso(),
-        },
-      ], { onConflict: 'driver_user_id' })
-      .select('*')
-      .single();
+          updated_at: nowIso()
+        }], { onConflict: 'driver_user_id' })
+        .select('*')
+        .single();
+      if (error) throw error;
+      return json(res, 200, { ok:true, presence: data });
+    }
 
-    if (error) throw error;
-    return json(res, 200, { ok:true, presence: data });
+    const db = store();
+    db.driver_presence = db.driver_presence || {};
+    db.driver_presence[driver_user_id] = { driver_user_id, is_online, lat, lng, bearing, updated_at: nowIso() };
+    return json(res, 200, { ok:true, presence: db.driver_presence[driver_user_id], demo:true });
   } catch (e) {
     return serverError(res, e);
   }

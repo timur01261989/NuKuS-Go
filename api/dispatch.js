@@ -1,12 +1,9 @@
 import { json, badRequest, serverError, nowIso } from './_shared/cors.js';
-import { getSupabase } from './_shared/supabase.js';
+import { getSupabaseAdmin } from './_shared/supabase.js';
 import { haversineKm } from './_shared/geo.js';
 
 function hasSupabaseEnv() {
-  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const anon = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-  const service = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
-  return !!(url && (service || anon));
+  return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
 async function resolvePickup(sb, order_id, pickupFromBody) {
@@ -52,7 +49,7 @@ export async function driver_ping_handler(req, res) {
       return json(res, 200, { ok:true, demo:true });
     }
 
-    const sb = getSupabase(req, { admin: true });
+    const sb = getSupabaseAdmin();
 
     // update presence
     const { error: pe } = await sb
@@ -123,7 +120,7 @@ export async function dispatch_handler(req, res) {
       return json(res, 200, { ok:true, demo:true, offered:0 });
     }
 
-    const sb = getSupabase(req, { admin: true });
+    const sb = getSupabaseAdmin();
     const pickup = await resolvePickup(sb, order_id, body.pickup);
     if (!pickup) return badRequest(res, 'pickup lat/lng kerak (body.pickup yoki orders.pickup)');
 
@@ -179,7 +176,7 @@ export async function dispatch_smart_handler(req, res) {
     if (!order_id) return badRequest(res, 'order_id kerak');
     if (!hasSupabaseEnv()) return json(res, 200, { ok:true, demo:true, offered:0 });
 
-    const sb = getSupabase(req, { admin: true });
+    const sb = getSupabaseAdmin();
     const pickup = await resolvePickup(sb, order_id, body.pickup);
     if (!pickup) return badRequest(res, 'pickup lat/lng kerak (body.pickup yoki orders.pickup)');
 
@@ -252,7 +249,7 @@ export async function traffic_eta_handler(req, res) {
 
     if (!hasSupabaseEnv()) return json(res, 200, { ok:true, provider:'DEMO', multiplier:1.0, eta_seconds: Math.round(base_eta_seconds) });
 
-    const sb = getSupabase(req, { admin: true });
+    const sb = getSupabaseAdmin();
     const { data: zones, error } = await sb.from('traffic_zones')
       .select('center_lat,center_lng,radius_km,multiplier')
       .eq('is_active', true)
@@ -285,7 +282,7 @@ export async function heatmap_handler(req, res) {
 
     if (!hasSupabaseEnv()) return json(res, 200, { ok:true, demo:true, items: [] });
 
-    const sb = getSupabase(req, { admin: true });
+    const sb = getSupabaseAdmin();
     const since = new Date(Date.now() - minutes*60*1000).toISOString();
     const { data, error } = await sb.from('orders').select('id,created_at,pickup').gte('created_at', since).limit(5000);
     if (error) throw error;
