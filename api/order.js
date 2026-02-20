@@ -454,6 +454,194 @@ async function createInterDistrict(req, res, body) {
 }
 
 
+
+/* ============================================================
+ * TAXI / CITY TAXI
+ * ------------------------------------------------------------
+ * New actions (POST):
+ * - create / create_taxi / create_city / new : create taxi order (in "orders")
+ * - cancel_taxi / cancel_order : cancel taxi order
+ * - get_taxi / get_order : get taxi order by id
+ * - active_taxi : get active taxi order for client_id (best-effort)
+ *
+ * Notes:
+ * - We keep a "best-effort" insertion strategy so DB column differences
+ *   won't break the client flow during rollout.
+ * ============================================================ */
+
+function numOrNull(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function pickLatLng(obj) {
+  if (!obj) return null;
+  const lat = numOrNull(obj.lat ?? obj.latitude ?? obj.pickup_lat ?? obj.from_lat);
+  const lng = numOrNull(obj.lng ?? obj.lon ?? obj.longitude ?? obj.pickup_lng ?? obj.from_lng);
+  if (lat == null || lng == null) return null;
+  return { lat, lng };
+}
+
+function buildPoint({ lat, lng, address, extra }) {
+  if (lat == null || lng == null) return null;
+  const p = { lat, lng };
+  if (address) p.address = address;
+  if (extra && typeof extra === "object") Object.assign(p, extra);
+  return p;
+}
+
+function resolvePickupDropoff(body) {
+  // Accept multiple payload shapes without changing frontend behavior.
+  const pickupObj = body.pickup || body.from || body.pickup_point || null;
+  const dropoffObj = body.dropoff || body.to || body.dropoff_point || null;
+
+  const pLL =
+    pickLatLng(pickupObj) ||
+    pickLatLng({ lat: body.pickup_lat, lng: body.pickup_lng }) ||
+    pickLatLng({ lat: body.from_lat, lng: body.from_lng });
+
+  const dLL =
+    pickLatLng(dropoffObj) ||
+    pickLatLng({ lat: body.dropoff_lat, lng: body.dropoff_lng }) ||
+    pickLatLng({ lat: body.to_lat, lng: body.to_lng });
+
+  const pickup = buildPoint({
+    lat: pLL?.lat,
+    lng: pLL?.lng,
+    address: body.pickup_address || pickupObj?.address || pickupObj?.label || null,
+    extra: pickupObj && typeof pickupObj === "object" ? pickupObj : null,
+  });
+
+  const dropoff = buildPoint({
+    lat: dLL?.lat,
+    lng: dLL?.lng,
+    address: body.dropoff_address || dropoffObj?.address || dropoffObj?.label || null,
+    extra: dropoffObj && typeof dropoffObj === "object" ? dropoffObj : null,
+  });
+
+  return { pickup, dropoff };
+}
+
+async function createTaxiOrder(req, res, body) {
+  const client_id = (body.client_id || body.passenger_id || body.user_id || body.clientId || "").toString();
+  if (!client_id) return json(res, 400, { error: "client_id (yoki passenger_id) shart" });
+
+  const { pickup, dropoff } = resolvePickupDropoff(body);
+  if (!pickup) return json(res, 400, { error: "pickup koordinata shart" });
+
+  const route = body.route || body.polyline || body.routeInfo || null;
+  const notes = body.notes || body.note || body.comment || null;
+
+  const price_estimate =
+    numOrNull(body.price_estimate ?? body.priceEstimate ?? body.price) ??
+    null;
+
+  const currency = (body.currency || "UZS").toString();
+
+  // Preferred schema (based on your "orders" table snapshot):
+  const baseInsert = {
+    client_id,
+    driver_id: body.driver_id || body.driverId || null,
+    status: body.status || "created",
+    pickup,
+    dropoff: dropoff || null,
+    route: route || null,
+    notes,
+    price_estimate,
+    currency,
+    requested_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  // Some projects also have service_type in the same table; keep it if present.
+  const withServiceType = { ...baseInsert, service_type: body.service_type || "taxi" };
+
+  // Best-effort: try with service_type first, then without.
+  let inserted = null;
+  let lastErr = null;
+
+  for (const payload of [withServiceType, baseInsert]) {
+    const { data, error } = await supabase
+      .from("orders")
+      .insert([payload])
+      .select("*")
+      .single();
+
+    if (!error && data) {
+      inserted = data;
+      break;
+    }
+    lastErr = error;
+  }
+
+  if (!inserted) {
+    return json(res, 200, {
+      created: false,
+      warning: lastErr?.message || "insert failed",
+      hint: "orders table ustunlari mos kelmayapti yoki RLS bloklayapti",
+    });
+  }
+
+  return json(res, 200, { created: true, order: inserted, id: inserted.id });
+}
+
+async function cancelTaxiOrder(req, res, body) {
+  const id = (body.id || body.order_id || body.orderId || "").toString();
+  if (!id) return json(res, 400, { error: "id/order_id shart" });
+
+  const payload = {
+    status: "cancelled",
+    canceled_at: new Date().toISOString(),
+    cancel_reason: body.cancel_reason || body.reason || null,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await supabase
+    .from("orders")
+    .update(payload)
+    .eq("id", id)
+    .select("*")
+    .single();
+
+  if (error) return json(res, 500, { error: error.message });
+  return json(res, 200, { ok: true, order: data });
+}
+
+async function getTaxiOrder(req, res, body) {
+  const id = (req.query?.id || body?.id || body?.order_id || body?.orderId || "").toString();
+  if (!id) return json(res, 400, { error: "id/order_id shart" });
+
+  const { data, error } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) return json(res, 404, { error: error.message });
+  return json(res, 200, { order: data });
+}
+
+async function activeTaxiOrder(req, res, body) {
+  const client_id = (req.query?.client_id || body?.client_id || body?.passenger_id || "").toString();
+  if (!client_id) return json(res, 400, { error: "client_id/passenger_id shart" });
+
+  // Try common "active" statuses; adjust later if your enum differs.
+  const activeStatuses = ["created", "searching", "accepted", "arrived", "started", "in_progress"];
+
+  const { data, error } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("client_id", client_id)
+    .in("status", activeStatuses)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (error) return json(res, 500, { error: error.message });
+  return json(res, 200, { order: (data && data[0]) || null });
+}
+
+
+
 export default async function handler(req, res) {
   if (withCors(req, res)) return;
 
@@ -477,7 +665,21 @@ export default async function handler(req, res) {
       if (action === "mark_cancel_requested") return await markCancelRequested(req, res, body);
       if (action === "district_offers") return await districtOffers(req, res, body);
       if (action === "create_inter_district") return await createInterDistrict(req, res, body);
-      return json(res, 400, { error: "Noto‘g‘ri action (POST)" });
+
+      // TAXI actions (backward-compat with client)
+      if (action === "create" || action === "create_taxi" || action === "create_city" || action === "new") {
+        return await createTaxiOrder(req, res, body);
+      }
+      if (action === "cancel_taxi" || action === "cancel_order" || action === "cancel") {
+        return await cancelTaxiOrder(req, res, body);
+      }
+      if (action === "get_taxi" || action === "get_order" || action === "get") {
+        return await getTaxiOrder(req, res, body);
+      }
+      if (action === "active_taxi" || action === "active") {
+        return await activeTaxiOrder(req, res, body);
+      }
+            return json(res, 400, { error: "Noto‘g‘ri action (POST)" });
     }
 
     return json(res, 405, { error: "Method not allowed" });
