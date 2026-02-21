@@ -10,6 +10,12 @@ export default function ActivityChart({ driverId }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // driverId mavjud bo'lsa so'rov yuboramiz
+    if (!driverId) {
+      setLoading(false);
+      return;
+    }
+
     const fetchHistory = async () => {
       const { data: history } = await supabase
         .from('activity_history')

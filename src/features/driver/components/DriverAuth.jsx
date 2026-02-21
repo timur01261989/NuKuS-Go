@@ -39,7 +39,9 @@ export default function DriverAuth({ onBack }) {
   // --- 1. HAYDOVCHI STATUSINI TEKSHIRISH (LOGIKA) ---
   const checkDriverStatus = useCallback(async () => {
     try {
-      setStatus((s) => (s === "loading" ? s : "loading"));
+      // Har doim loading ga o'tkazamiz (shart yo'q)
+      setStatus("loading");
+
       // 1. Foydalanuvchi tizimga kirganmi?
       const {
         data: { user },
@@ -54,9 +56,7 @@ export default function DriverAuth({ onBack }) {
       // 2. Bazadan haydovchini qidiramiz
       const { data, error } = await supabase
         .from("drivers")
-        // Multiple schema variants exist (status text / approved boolean / etc.).
-        // Selecting missing columns causes PostgREST errors and redirect loops.
-        .select("*")
+        .select("status, approved, user_id")
         .eq("user_id", user.id)
         .maybeSingle();
 
@@ -69,13 +69,7 @@ export default function DriverAuth({ onBack }) {
       if (!data) {
         setStatus("none"); // Bazada yo'q -> Ro'yxatdan o'tishga
       } else {
-        const approved = typeof data.approved === "boolean" ? data.approved : null;
-        const statusText = typeof data.status === "string" ? data.status : null;
-
-        // Prefer explicit boolean if available; else fall back to status text.
-        if (approved === true) setStatus("active");
-        else if (approved === false) setStatus("pending");
-        else setStatus(normalizeDriverStatus(statusText));
+        setStatus(data.approved ? "active" : normalizeDriverStatus(data.status)); // 'pending' | 'active' | 'blocked' (normalizatsiya)
       }
     } catch (err) {
       console.error("Tarmoq xatosi:", err);
@@ -138,8 +132,8 @@ export default function DriverAuth({ onBack }) {
         <Card style={{ width: "100%", maxWidth: 420, borderRadius: 24, border: "none", boxShadow: "var(--shadow-soft)" }}>
           <Result
             icon={<StopOutlined style={{ color: "#ff4d4f", fontSize: 64 }} />}
-            title={<Title level={4} style={{ marginBottom: 0 }}>Haydovchi bo‘limiga kirish uchun login qiling</Title>}
-            subTitle={<Text type="secondary">Sessiya topilmadi. Avval tizimga kiring, so‘ng haydovchi bo‘limini oching.</Text>}
+            title={<Title level={4} style={{ marginBottom: 0 }}>Haydovchi bo'limiga kirish uchun login qiling</Title>}
+            subTitle={<Text type="secondary">Sessiya topilmadi. Avval tizimga kiring, so'ng haydovchi bo'limini oching.</Text>}
             extra={[
               <Button key="login" type="primary" size="large" style={{ width: "100%", borderRadius: 14, height: 48, fontWeight: 900 }} onClick={() => navigate("/login")}>
                 Login

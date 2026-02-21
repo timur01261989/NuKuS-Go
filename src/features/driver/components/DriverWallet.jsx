@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Typography, Row, Col, Button, List, Tag, Statistic, message, Modal } from 'antd';
+import { Card, Typography, Row, Col, Button, List, Tag, Statistic, message, Modal, Empty } from 'antd';
 import { 
   ArrowLeftOutlined, WalletOutlined, ArrowUpOutlined, 
   ArrowDownOutlined, BankOutlined, HistoryOutlined 
@@ -23,7 +23,8 @@ export default function DriverWallet({ onBack }) {
     if (user) {
       // 1. Joriy balansni olish
       const { data: driver } = await supabase.from('drivers').select('balance').eq('user_id', user.id).single();
-      if (driver) setBalance(driver.balance);
+      // Null yoki undefined bo'lsa 0 qo'yamiz
+      if (driver) setBalance(driver.balance ?? 0);
 
       // 2. Tranzaksiyalarni olish
       const { data: txs } = await supabase
@@ -38,16 +39,21 @@ export default function DriverWallet({ onBack }) {
   };
 
   const handleWithdraw = () => {
-    if (balance < 10000) {
+    // balance null/undefined bo'lsa 0 sifatida ko'ramiz
+    const safeBalance = balance ?? 0;
+    if (safeBalance < 10000) {
       message.warning("Minimal yechish miqdori 10 000 so'm");
       return;
     }
     Modal.confirm({
       title: 'Pul yechish',
-      content: `${balance.toLocaleString()} so'm kartangizga o'tkazilsinmi?`,
+      content: `${safeBalance.toLocaleString()} so'm kartangizga o'tkazilsinmi?`,
       onOk: () => message.success("So'rov qabul qilindi, 24 soat ichida tushadi.")
     });
   };
+
+  // Balance xavfsiz ko'rsatish
+  const safeBalance = balance ?? 0;
 
   return (
     <div style={{ padding: '20px', background: '#f8f9fa', minHeight: '100vh' }}>
@@ -68,7 +74,7 @@ export default function DriverWallet({ onBack }) {
       }}>
         <Statistic 
           title={<Text style={{ color: 'rgba(255,255,255,0.6)' }}>Asosiy balans</Text>}
-          value={balance} 
+          value={safeBalance} 
           precision={0}
           suffix="so'm"
           valueStyle={{ color: '#FFD700', fontSize: 32, fontWeight: 900 }}
@@ -97,6 +103,7 @@ export default function DriverWallet({ onBack }) {
       <List
         loading={loading}
         dataSource={transactions}
+        locale={{ emptyText: <Empty description="Tranzaksiyalar yo'q" /> }}
         renderItem={item => (
           <Card style={{ borderRadius: 16, marginBottom: 10, border: 'none' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -114,7 +121,7 @@ export default function DriverWallet({ onBack }) {
                 </div>
               </div>
               <Text strong style={{ color: item.type === 'income' ? '#52c41a' : '#ff4d4f' }}>
-                {item.type === 'income' ? '+' : '-'}{item.amount.toLocaleString()}
+                {item.type === 'income' ? '+' : '-'}{(item.amount ?? 0).toLocaleString()}
               </Text>
             </div>
           </Card>
