@@ -34,16 +34,24 @@ export default function RootRedirect() {
         const userId = s.session.user.id;
 
         // 1) If drivers row exists => driver flow (even if profiles.role says client)
+        // IMPORTANT: This repo contains multiple Supabase schema variants.
+        //  - Variant A: drivers(user_id PK, approved boolean)
+        //  - Variant B: drivers(id PK, user_id UNIQUE, is_online boolean, ...)
+        // If we select a column that doesn't exist (e.g., approved), PostgREST returns 400 and we incorrectly
+        // fall back to client home. To avoid breaking redirects on Vercel/Prod, always select("*") here.
         const { data: drv, error: drvErr } = await supabase
           .from("drivers")
-          // `drivers` jadvalida `status` ustuni yo'q.
-          // `status` ni select qilish PostgREST 400 (Bad Request) beradi va driver redirect noto'g'ri ishlaydi.
-          .select("approved,user_id")
+          .select("*")
           .eq("user_id", userId)
           .maybeSingle();
 
         if (!drvErr && drv) {
-          const approvedBool = typeof drv.approved === "boolean" ? drv.approved : false;
+          // If "approved" exists => use it. If not => treat as approved (older schema has no approval flow).
+          const approvedBool = Object.prototype.hasOwnProperty.call(drv, "approved")
+            ? typeof drv.approved === "boolean"
+              ? drv.approved
+              : false
+            : true;
           setTo(approvedBool ? "/driver/dashboard" : "/driver/pending");
           if (!mounted) return;
           setLoading(false);
@@ -93,3 +101,7 @@ export default function RootRedirect() {
 
   return <Navigate to={to} replace />;
 }
+
+// O'ZGARISHLAR RO'YXATI (RootRedirect.jsx):
+// - drivers jadvalidagi turli sxemalar (approved bor/yo'qligi) sababli PostgREST 400 bo'lib ketmasligi uchun .select("*") qilindi.
+// - approved ustuni mavjud bo'lmasa, eski sxema uchun "approved=true" deb qabul qilindi (aks holda driver doim pendingga tushib qolardi).
