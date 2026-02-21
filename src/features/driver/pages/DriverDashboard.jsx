@@ -29,6 +29,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../../../lib/supabase"; 
 import { useLanguage } from "../../../shared/i18n/useLanguage"; 
 import { startTracking } from "../components/services/locationService";
+import DriverHome from "../components/DriverHome";
 
 const { Title, Text } = Typography;
 
@@ -43,6 +44,23 @@ export default function DriverDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useLanguage(); 
+
+  /**
+   * Driver bosh sahifada xizmatlar (Shahar ichida / Viloyatlar aro / Tumanlar aro / Eltish / Yuk tashish)
+   * ko‘rinishi kerak. Hozirgi oqimda Drawer-menu asosidagi dashboard o‘rniga
+   * DriverHome (xizmatlar menyusi) ko‘rsatiladi.
+   *
+   * Eski dashboard kodi pastda qoldirilgan (o‘chirilmadi) — keyin qayta yoqish mumkin.
+   */
+  const onLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      navigate("/client/home", { replace: true });
+    }
+  };
+
+  return <DriverHome onLogout={onLogout} />;
 
   // =========================
   // STATE
