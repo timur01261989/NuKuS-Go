@@ -17,6 +17,14 @@ import { supabase } from "@lib/supabase";
  *  even if profiles.role is still "client" (common bug causing redirect to /client/home).
  */
 export default function RoleGate({ children, allow, redirectTo = "/login" }) {
+  if (!supabase) {
+    return (
+      <div style={{ padding: 16 }}>
+        Supabase konfiguratsiya topilmadi: <code>VITE_SUPABASE_URL</code> va <code>VITE_SUPABASE_ANON_KEY</code> ni tekshiring.
+      </div>
+    );
+  }
+
   const location = useLocation();
 
   const [loading, setLoading] = useState(true);
@@ -85,22 +93,15 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         // Only hit drivers table when it matters (driver routes OR mixed allow)
         if (a.driver) {
           const { data: drv, error: drvErr } = await withTimeout(
-            // IMPORTANT: Repo contains multiple Supabase schema variants.
-            // Some have drivers.approved, some don't. Selecting a missing column causes PostgREST 400,
-            // which breaks driver detection and can lead to wrong redirects.
-            // Always select("*") to be schema-compatible.
-            supabase.from("drivers").select("*").eq("user_id", userId).maybeSingle()
+            // `drivers` jadvalida `status` ustuni yo'q.
+            // `status` ni select qilish PostgREST 400 (Bad Request) beradi va RoleGate driver'ni topolmay qoladi.
+            supabase.from("drivers").select("approved,user_id").eq("user_id", userId).maybeSingle()
           );
 
           if (!drvErr && drv) {
             driverRow = drv;
             driverRowExists = true;
-            // If "approved" exists => use it. If not => treat as approved (older schema has no approval flow).
-            if (Object.prototype.hasOwnProperty.call(drv, "approved")) {
-              if (typeof drv.approved === "boolean") approved = drv.approved;
-            } else {
-              approved = true;
-            }
+            if (typeof drv.approved === "boolean") approved = drv.approved;
           }
         }
 
@@ -193,7 +194,3 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
 
   return <>{children}</>;
 }
-
-// O'ZGARISHLAR RO'YXATI (RoleGate.jsx):
-// - drivers jadvalidagi turli sxemalar (approved bor/yo'qligi) bilan mos bo'lishi uchun .select("*") qilindi.
-// - approved ustuni yo'q bo'lsa, eski sxema uchun driver'ni "approved=true" deb qabul qilish qo'shildi.
