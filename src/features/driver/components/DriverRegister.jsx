@@ -14,7 +14,7 @@ import {
 } from 'antd';
 import { UploadOutlined, LoadingOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { supabase } from '../supabaseClient';
+import { supabase } from '@/supabaseClient';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
