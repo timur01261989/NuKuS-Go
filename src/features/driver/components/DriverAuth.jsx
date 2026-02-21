@@ -39,26 +39,26 @@ export default function DriverAuth({ onBack }) {
   // --- 1. HAYDOVCHI STATUSINI TEKSHIRISH (LOGIKA) ---
   const checkDriverStatus = useCallback(async () => {
     try {
-      setStatus((s) => (s === "loading" ? s : "loading"));
       // 1. Foydalanuvchi tizimga kirganmi?
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
       if (!user) {
-        // Login yo'q: redirect qilish o'rniga login talab qilamiz (redirect loop bo'lmasin)
-        setStatus("need_login");
+        // Agar login qilmagan bo'lsa, bosh sahifaga otib yuboramiz
+        if (onBack) onBack();
+        else navigate("/");
         return;
       }
 
       // 2. Bazadan haydovchini qidiramiz
       const { data, error } = await supabase
         .from("drivers")
-        .select("status, approved, user_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
+        .select("status")
+        .eq("id", user.id)
+        .single();
 
-      if (error) {
+      if (error && error.code !== "PGRST116") {
         console.error("Baza xatosi:", error);
         message.error("Tizimda xatolik yuz berdi");
       }
@@ -67,7 +67,7 @@ export default function DriverAuth({ onBack }) {
       if (!data) {
         setStatus("none"); // Bazada yo'q -> Ro'yxatdan o'tishga
       } else {
-        setStatus(data.approved ? "active" : normalizeDriverStatus(data.status)); // 'pending' | 'active' | 'blocked' (normalizatsiya)
+        setStatus(normalizeDriverStatus(data.status)); // 'pending' | 'active' | 'blocked' (normalizatsiya)
       }
     } catch (err) {
       console.error("Tarmoq xatosi:", err);
@@ -122,31 +122,7 @@ export default function DriverAuth({ onBack }) {
     );
   }
 
-  
-  // 1.5 LOGIN KERAK
-  if (status === "need_login") {
-    return (
-      <div style={{ minHeight: "100vh", background: "var(--bg-layout)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-        <Card style={{ width: "100%", maxWidth: 420, borderRadius: 24, border: "none", boxShadow: "var(--shadow-soft)" }}>
-          <Result
-            icon={<StopOutlined style={{ color: "#ff4d4f", fontSize: 64 }} />}
-            title={<Title level={4} style={{ marginBottom: 0 }}>Haydovchi bo‘limiga kirish uchun login qiling</Title>}
-            subTitle={<Text type="secondary">Sessiya topilmadi. Avval tizimga kiring, so‘ng haydovchi bo‘limini oching.</Text>}
-            extra={[
-              <Button key="login" type="primary" size="large" style={{ width: "100%", borderRadius: 14, height: 48, fontWeight: 900 }} onClick={() => navigate("/login")}>
-                Login
-              </Button>,
-              <Button key="back" size="large" style={{ width: "100%", borderRadius: 14, height: 48, fontWeight: 700 }} icon={<ArrowLeftOutlined />} onClick={goBackMain}>
-                Orqaga
-              </Button>,
-            ]}
-          />
-        </Card>
-      </div>
-    );
-  }
-
-// 2. AKTIV HAYDOVCHI -> ISH STOLIGA (DRIVER HOME)
+  // 2. AKTIV HAYDOVCHI -> ISH STOLIGA (DRIVER HOME)
   if (status === "active") {
     // Eng muhim joyi: Agar active bo'lsa, biz boshqaruvni DriverHome ga beramiz.
     // onLogout funksiyasi DriverHome dagi "Chiqish" tugmasi uchun.

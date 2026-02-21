@@ -10,27 +10,19 @@ import { supabase } from "@lib/supabase";
  *  - driver: true/false
  *  - requireDriverApproved: true/false
  *
- * IMPORTANT:
- *  This app historically stored "role" in profiles, but in real life
- *  the truth for driver access is "drivers" table row existence.
- *  If drivers row exists => treat user as driver for driver routes,
- *  even if profiles.role is still "client" (common bug causing redirect to /client/home).
+ * Goal:
+ *  - Build-safe (no syntax traps)
+ *  - No "login flicker" while checking
+ *  - If profile row is missing (common after OTP auth), try to create it for CLIENT routes.
  */
 export default function RoleGate({ children, allow, redirectTo = "/login" }) {
-  if (!supabase) {
-    return (
-      <div style={{ padding: 16 }}>
-        Supabase konfiguratsiya topilmadi: <code>VITE_SUPABASE_URL</code> va <code>VITE_SUPABASE_ANON_KEY</code> ni tekshiring.
-      </div>
-    );
-  }
-
   const location = useLocation();
 
   const [loading, setLoading] = useState(true);
   const [ok, setOk] = useState(false);
   const [reason, setReason] = useState(null);
 
+  // allow object har renderda yangilanib effect qayta-qayta ishlamasin
   const allowKey = useMemo(() => {
     const a = allow || {};
     return JSON.stringify({
@@ -40,7 +32,7 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
     });
   }, [allow]);
 
-  const withTimeout = (promise, ms = 10000) =>
+  const withTimeout = (promise, ms = 8000) =>
     Promise.race([
       promise,
       new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms)),
@@ -61,8 +53,6 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         setLoading(true);
         setReason(null);
 
-        const a = allow || {};
-
         // 1) session
         const { data: s, error: sessionErr } = await withTimeout(supabase.auth.getSession());
         if (sessionErr) return finish(false, "session-error");
@@ -71,47 +61,36 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         if (!session) return finish(false, "no-session");
 
         const userId = session.user.id;
+        const a = allow || {};
 
-        // 2) profile role (best-effort)
-        let profileRole = null;
+        // 2) read profile.role
+        let role = null;
         let profileExists = false;
 
-        const { data: profile, error: profileErr } = await withTimeout(
-          supabase.from("profiles").select("role").eq("id", userId).maybeSingle()
-        );
-
-        if (!profileErr && profile?.role) {
-          profileExists = true;
-          profileRole = profile.role;
-        }
-
-        // 3) driver row (source of truth for driver access)
-        let driverRow = null;
-        let driverRowExists = false;
-        let approved = false;
-
-        // Only hit drivers table when it matters (driver routes OR mixed allow)
-        if (a.driver) {
-          const { data: drv, error: drvErr } = await withTimeout(
-            // `drivers` jadvalida `status` ustuni yo'q.
-            // `status` ni select qilish PostgREST 400 (Bad Request) beradi va RoleGate driver'ni topolmay qoladi.
-            supabase.from("drivers").select("approved,user_id").eq("user_id", userId).maybeSingle()
+        const readProfile = async () => {
+          const { data: profile, error: profileErr } = await withTimeout(
+            supabase.from("profiles").select("role").eq("id", userId).maybeSingle()
           );
 
-          if (!drvErr && drv) {
-            driverRow = drv;
-            driverRowExists = true;
-            if (typeof drv.approved === "boolean") approved = drv.approved;
+          if (!profileErr && profile?.role) {
+            profileExists = true;
+            role = profile.role;
+            return { profile, profileErr: null };
           }
-        }
 
-        // 4) Derive effective role
-        // If drivers row exists => effective role is driver (even if profile says client)
-        const effectiveRole = driverRowExists ? "driver" : profileRole;
+          // profile yo'q yoki RLS blokladi
+          profileExists = false;
+          role = null;
+          return { profile: null, profileErr };
+        };
 
-        // 5) Auto-create client profile if accessing client-only route and profile missing
-        if (!effectiveRole && a.client && !a.driver) {
+        const { profileErr } = await readProfile();
+
+        // 2.1) Agar CLIENT route bo'lsa va profile yo'q bo'lsa — profile yaratib ko'ramiz
+        // Bu OTP auth'dan keyin eng ko'p uchraydigan muammo.
+        if (!role && a.client && !a.driver) {
           try {
+            // RLS policy kerak: authenticated user o'z id'si bilan insert/upsert qila olishi.
             await withTimeout(
               supabase
                 .from("profiles")
@@ -126,45 +105,67 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
                 )
             );
           } catch {
-            // ignore
+            // ignore, qayta o'qib ko'ramiz
           }
 
-          const { data: p2 } = await withTimeout(
-            supabase.from("profiles").select("role").eq("id", userId).maybeSingle()
+          await readProfile();
+        }
+
+        if (!role) {
+          // profile yo'q bo'lsa driver/client routes'larda "loading→login flicker" bo'lmasin:
+          // aniq reason bilan qaytaramiz
+          return finish(false, profileErr ? "profile-error" : "no-profile");
+        }
+
+        // 3) driver approved / registration
+        let approved = false;
+        let driverRowExists = false;
+        if (role === "driver") {
+          const { data: drv, error: drvErr } = await withTimeout(
+            supabase.from("drivers").select("approved").eq("user_id", userId).maybeSingle()
           );
-          if (p2?.role) profileRole = p2.role;
+          if (!drvErr && drv) {
+            driverRowExists = true;
+            if (typeof drv.approved === "boolean") approved = drv.approved;
+          }
         }
 
-        // 6) Decide allow
-        if (effectiveRole === "client") {
-          if (!!a.client) return finish(true, null);
+        // 4) allow decision
+        let allowed = false;
 
-          // Client trying to access driver-only route
-          if (!!a.driver && !a.client) return finish(false, "not-driver");
+        if (role === "client") {
+          // client route OK only if explicitly allowed
+          allowed = !!a.client;
 
-          return finish(false, "not-allowed");
-        }
-
-        if (effectiveRole === "driver") {
-          if (!a.driver) return finish(false, "driver-not-allowed");
-
-          if (!driverRowExists) return finish(false, "driver-not-registered");
-
-          // approval gating (driver dashboard/orders)
-          if (a.requireDriverApproved) {
-            // `drivers` jadvalida `status` ustuni yo'q, shuning uchun faqat `approved` boolean bilan tekshiramiz.
-            if (!approved) return finish(false, "driver-not-approved");
+          // If user is a CLIENT but trying to access DRIVER-only route,
+          // we should send them to driver registration (not login).
+          if (!allowed && !!a.driver && !a.client) {
+            return finish(false, "not-driver");
+          }
+        } else if (role === "driver") {
+          if (!a.driver) {
+            return finish(false, "driver-not-allowed");
           }
 
-          return finish(true, null);
+          // If drivers row doesn't exist, user hasn't registered as driver yet
+          if (!driverRowExists) {
+            return finish(false, "driver-not-registered");
+          }
+
+          if (a.requireDriverApproved && !approved) {
+            return finish(false, "driver-not-approved");
+          }
+
+          allowed = true;
         }
 
-        // No role at all
-        // For driver routes: send to register. For others: login.
-        if (a.driver && !a.client) return finish(false, "driver-not-registered");
+// extra info
+        if (!profileExists && a.driver && !allowed) {
+          // driver flow bo'lishi mumkin, lekin profil yo'q — admin/trigger muammo
+          setReason((r) => r || "no-profile");
+        }
 
-        if (!profileExists && profileErr) return finish(false, "profile-error");
-        return finish(false, "no-profile");
+        return finish(allowed, allowed ? null : "not-allowed");
       } catch (e) {
         return finish(false, e?.message === "timeout" ? "timeout" : "error");
       }
@@ -175,7 +176,7 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
     return () => {
       mounted = false;
     };
-  }, [allowKey, location.pathname]);
+  }, [allowKey]);
 
   if (loading) {
     return (
@@ -186,11 +187,19 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
   }
 
   if (!ok) {
-    if (reason === "driver-not-approved") return <Navigate to="/driver/pending" replace />;
-    if (reason === "driver-not-registered" || reason === "not-driver") return <Navigate to="/driver/register" replace />;
+    // Driver flows
+    if (reason === "driver-not-approved") {
+      return <Navigate to="/driver/pending" replace />;
+    }
+    if (reason === "driver-not-registered" || reason === "not-driver") {
+      return <Navigate to="/driver/register" replace />;
+    }
 
+    // Default: go back to login
     return <Navigate to={redirectTo} replace state={{ from: location.pathname, reason }} />;
   }
+
+
 
   return <>{children}</>;
 }

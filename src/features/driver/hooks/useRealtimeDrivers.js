@@ -44,7 +44,7 @@ export default function useRealtimeDrivers({ enabled, center, radiusMeters = 200
       try {
         const d1 = await supabase
           .from("drivers")
-          .select("user_id,is_online,is_busy")
+          .select("id,is_online,is_busy")
           .eq("is_online", true)
           .eq("is_busy", false);
 
@@ -58,14 +58,7 @@ export default function useRealtimeDrivers({ enabled, center, radiusMeters = 200
 
         if (cancelled) return;
 
-        // Normalize to { id: user_id, ... } for the rest of the UI
-        setDrivers(
-          (d1.data || []).map((d) => ({
-            id: d.user_id,
-            is_online: d.is_online,
-            is_busy: d.is_busy,
-          }))
-        );
+        setDrivers(d1.data || []);
         setLocs(d2.data || []);
         setStatus("live");
       } catch {
@@ -86,16 +79,15 @@ export default function useRealtimeDrivers({ enabled, center, radiusMeters = 200
 
     const ch = supabase
       .channel("drivers-realtime")
-	      .on("postgres_changes", { event: "*", schema: "public", table: "drivers" }, (payload) => {
-	        const row = payload.new;
-	        const key = row?.user_id;
-	        if (!key) return;
+      .on("postgres_changes", { event: "*", schema: "public", table: "drivers" }, (payload) => {
+        const row = payload.new;
+        if (!row?.id) return;
 
-	        setDrivers((prev) => {
-	          const map = new Map(prev.map((x) => [x.id, x]));
-	          map.set(key, { ...row, id: key });
-	          return Array.from(map.values());
-	        });
+        setDrivers((prev) => {
+          const map = new Map(prev.map((x) => [x.id, x]));
+          map.set(row.id, row);
+          return Array.from(map.values());
+        });
       })
       .on(
         "postgres_changes",

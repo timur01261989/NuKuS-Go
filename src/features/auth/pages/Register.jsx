@@ -90,8 +90,7 @@ export default function Register() {
         if (profileError) throw profileError;
 
         message.success("Muvaffaqiyatli ro'yxatdan o'tdingiz!");
-        // Let RootRedirect (/) decide the correct start page.
-        navigate("/", { replace: true });
+        navigate("/client/home", { replace: true });
       }
     } catch (err) {
       message.error("Xatolik: " + err.message);

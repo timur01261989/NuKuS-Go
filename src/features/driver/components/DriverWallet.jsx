@@ -22,7 +22,7 @@ export default function DriverWallet({ onBack }) {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       // 1. Joriy balansni olish
-      const { data: driver } = await supabase.from('drivers').select('balance').eq('user_id', user.id).single();
+      const { data: driver } = await supabase.from('drivers').select('balance').eq('id', user.id).single();
       if (driver) setBalance(driver.balance);
 
       // 2. Tranzaksiyalarni olish

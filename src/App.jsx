@@ -142,7 +142,6 @@ export default function App() {
 
               {/* --- AUTO MARKET --- */}
               <Route path="/auto-market/*" element={<AutoMarketEntry />} />
-              <Route path="/market/*" element={<AutoMarketEntry />} />
 
               {/* --- SETTINGS / SUPPORT --- */}
               <Route path="/settings" element={<Settings />} />

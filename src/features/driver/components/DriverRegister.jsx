@@ -21,21 +21,12 @@ import {
   IdcardOutlined,
   FileTextOutlined,
 } from "@ant-design/icons";
-import { supabase } from "@lib/supabase";
+import { supabase } from "../../../lib/supabase";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 
 export default function DriverRegister({ onRegisterSuccess }) {
-  if (!supabase) {
-    return (
-      <div style={{ padding: 16 }}>
-        Supabase konfiguratsiya topilmadi. Vercel/.env ichida <code>VITE_SUPABASE_URL</code> va{" "}
-        <code>VITE_SUPABASE_ANON_KEY</code> ni tekshiring.
-      </div>
-    );
-  }
-
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [form] = Form.useForm();
@@ -186,7 +177,7 @@ export default function DriverRegister({ onRegisterSuccess }) {
 
       // 4) Bazaga yozish
       const payload = {
-        user_id: user.id,
+        id: user.id,
 
         first_name: values.first_name,
         last_name: values.last_name,
@@ -203,21 +194,11 @@ export default function DriverRegister({ onRegisterSuccess }) {
         tex_passport_url: texUrl,
         prava_url: pravaUrl,
 
-        // `drivers` jadvalida `status` ustuni yo'q. Pending holatini `approved=false` bilan ifodalaymiz.
-        approved: false,
+        status: "pending",
       };
 
       const { error } = await supabase.from("drivers").insert([payload]);
       if (error) throw error;
-
-      // ✅ Ensure profile role becomes "driver" (prevents redirect back to client)
-      try {
-        await supabase
-          .from("profiles")
-          .upsert({ id: user.id, role: "driver", phone: phoneFull, updated_at: new Date().toISOString() }, { onConflict: "id" });
-      } catch (e) {
-        // ignore (RLS might block), RoleGate/RootRedirect still uses drivers table as source of truth
-      }
 
       message.success("Arizangiz qabul qilindi!");
       if (onRegisterSuccess) onRegisterSuccess();

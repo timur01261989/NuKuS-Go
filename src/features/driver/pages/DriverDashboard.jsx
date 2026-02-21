@@ -72,8 +72,8 @@ export default function DriverDashboard() {
 
         const { data: driverData, error } = await supabase
           .from("drivers")
-          .select("first_name, last_name, phone, is_online, status, approved, user_id")
-          .eq("user_id", user.id)
+          .select("first_name, last_name, phone, is_online, status")
+          .eq("id", user.id)
           .single();
 
         if (error) {
@@ -125,7 +125,7 @@ export default function DriverDashboard() {
           is_online: checked,
           last_seen_at: new Date().toISOString() 
         })
-        .eq("user_id", user.id);
+        .eq("id", user.id);
 
       if (error) throw error;
 

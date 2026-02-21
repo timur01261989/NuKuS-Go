@@ -16,8 +16,6 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@lib/supabase";
 import { listMarketCars, formatPriceUZS } from "@services/marketService";
 import { useLanguage } from "@shared/i18n/useLanguage";
-import { haversineKm } from "../shared/geo/haversine";
-import { nominatimReverse as _nominatimReverse } from "../shared/geo/nominatim";
 
 const { Title, Text } = Typography;
 

@@ -1,16 +1,37 @@
 import { useEffect, useRef, useState } from "react";
-import { haversineKm as _haversineKm } from "../../shared/geo/haversine";
-import { osrmRoute as _osrmRoute } from "../../shared/geo/osrm";
 
-// Backward-compatible exports (keep old call signatures)
 export function haversineKm(a, b) {
-  return _haversineKm(a, b);
+  const toRad = (x) => (x * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(b[0] - a[0]);
+  const dLng = toRad(b[1] - a[1]);
+  const lat1 = toRad(a[0]);
+  const lat2 = toRad(b[0]);
+  const s1 = Math.sin(dLat / 2) ** 2;
+  const s2 = Math.sin(dLng / 2) ** 2;
+  const c = 2 * Math.asin(Math.min(1, Math.sqrt(s1 + Math.cos(lat1) * Math.cos(lat2) * s2)));
+  return R * c;
 }
 
 export async function osrmRoute(from, to, signal) {
-  return _osrmRoute(from, to, { signal });
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`;
+    const res = await fetch(url, { signal });
+    const data = await res.json();
+    const r = data?.routes?.[0];
+    if (r) {
+      return {
+        coords: r.geometry.coordinates.map(([lng, lat]) => [lat, lng]),
+        distanceKm: (r.distance || 0) / 1000,
+        durationMin: (r.duration || 0) / 60,
+      };
+    }
+  } catch (e) {
+    if (e?.name !== "AbortError") console.warn("OSRM xatolik:", e);
+  }
+  const approx = haversineKm(from, to);
+  return { coords: [from, to], distanceKm: approx, durationMin: approx * 2 };
 }
-
 
 export function useFreightRoute(pickupLatLng, dropoffLatLng) {
   const [routeCoords, setRouteCoords] = useState([]);
