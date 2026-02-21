@@ -1,0 +1,9 @@
+{
+  "watch": {
+    "enableHighAccuracy": true,
+    "timeoutMs": 15000,
+    "maximumAgeMs": 2000
+  },
+  "updateIntervalMs": 1000,
+  "minDistanceM": 3
+}

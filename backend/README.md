@@ -1,36 +1,16 @@
-# Auto Market AI Backend (Express + BullMQ)
+# React + Vite
 
-## What it does
-Implements the exact contract used by the React feature:
-- POST /ai/jobs -> { jobId }
-- GET /ai/jobs/:jobId -> { status, progress, steps, result, error }
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-## Run locally
-1) Start Redis
-   docker run -p 6379:6379 redis:7
+Currently, two official plugins are available:
 
-2) Install deps
-   npm i
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
 
-3) Configure env
-   cp .env.example .env
+## React Compiler
 
-4) Start API
-   npm run dev:api
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
 
-5) Start worker (new terminal)
-   npm run dev:worker
+## Expanding the ESLint configuration
 
-## Connect frontend
-Set frontend env:
-VITE_API_BASE_URL=http://localhost:4000
-
-## Switch to Python AI
-1) Run Python service (see ../python-ai/README.md)
-2) In backend .env:
-   AI_MODE=python
-   PY_AI_URL=http://127.0.0.1:8000
-
-3) Ensure Python AI can read the same upload directory:
-   - backend saves uploads to UPLOAD_DIR (default ./uploads relative to backend)
-   - python-ai validates paths using UPLOAD_DIR env (set it to backend uploads absolute path if needed)
+If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
