@@ -403,7 +403,7 @@ export default function DriverHome({ onLogout }) {
         }}
       >
         <Button
-          onClick={() => onLogout?.()}
+          onClick={() => navigate("/client/home")}
           icon={<ArrowLeftOutlined />}
           shape="circle"
           size="large"
