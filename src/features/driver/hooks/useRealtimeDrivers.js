@@ -22,6 +22,8 @@ export default function useRealtimeDrivers({ enabled, center, radiusMeters = 200
   const [locs, setLocs] = useState([]); // driver_locations table
   const [status, setStatus] = useState("idle"); // idle|loading|live|error
 
+  const getDriverKey = (row) => row?.user_id || row?.id || null;
+
   // initial load
   useEffect(() => {
     let cancelled = false;
@@ -42,12 +44,10 @@ export default function useRealtimeDrivers({ enabled, center, radiusMeters = 200
       setStatus("loading");
 
       try {
-        const d1 = await supabase
-          .from("drivers")
-          .select("user_id,is_online,is_busy")
-          .eq("is_online", true)
-          .eq("is_busy", false);
-
+        // IMPORTANT: the project uses multiple schema variants for `drivers`.
+        // Selecting a missing column (or filtering on a missing column) triggers PostgREST errors.
+        // So we load rows best-effort and filter in JS when columns exist.
+        const d1 = await supabase.from("drivers").select("*");
         if (d1.error) throw d1.error;
 
         const d2 = await supabase
@@ -58,13 +58,19 @@ export default function useRealtimeDrivers({ enabled, center, radiusMeters = 200
 
         if (cancelled) return;
 
-        // Normalize to { id: user_id, ... } for the rest of the UI
+        // Normalize drivers to a consistent shape.
+        // Prefer user_id as the stable identifier; fall back to id.
         setDrivers(
-          (d1.data || []).map((d) => ({
-            id: d.user_id,
-            is_online: d.is_online,
-            is_busy: d.is_busy,
-          }))
+          (d1.data || []).map((d) => {
+            const key = getDriverKey(d);
+            return {
+              ...d,
+              id: key,
+              // If schema doesn't have these fields, default to values that keep drivers visible.
+              is_online: typeof d?.is_online === "boolean" ? d.is_online : true,
+              is_busy: typeof d?.is_busy === "boolean" ? d.is_busy : false,
+            };
+          })
         );
         setLocs(d2.data || []);
         setStatus("live");
@@ -88,12 +94,17 @@ export default function useRealtimeDrivers({ enabled, center, radiusMeters = 200
       .channel("drivers-realtime")
 	      .on("postgres_changes", { event: "*", schema: "public", table: "drivers" }, (payload) => {
 	        const row = payload.new;
-	        const key = row?.user_id;
+	        const key = getDriverKey(row);
 	        if (!key) return;
 
 	        setDrivers((prev) => {
 	          const map = new Map(prev.map((x) => [x.id, x]));
-	          map.set(key, { ...row, id: key });
+	          map.set(key, {
+	            ...row,
+	            id: key,
+	            is_online: typeof row?.is_online === "boolean" ? row.is_online : (map.get(key)?.is_online ?? true),
+	            is_busy: typeof row?.is_busy === "boolean" ? row.is_busy : (map.get(key)?.is_busy ?? false),
+	          });
 	          return Array.from(map.values());
 	        });
       })
@@ -122,15 +133,30 @@ export default function useRealtimeDrivers({ enabled, center, radiusMeters = 200
   const driversInRadius = useMemo(() => {
     if (!enabled || !center?.length) return [];
 
-    const onlineSet = new Set(
-      (drivers || [])
-        .filter((d) => d.is_online === true && d.is_busy === false)
-        .map((d) => d.id)
-    );
+    // Build a set of "online & not busy" identifiers.
+    // Support both schema variants:
+    //  - driver_locations.driver_id references drivers.user_id
+    //  - driver_locations.driver_id references drivers.id
+    const onlineSet = new Set();
+    const idToUserId = new Map();
+
+    (drivers || [])
+      .filter((d) => d.is_online === true && d.is_busy === false)
+      .forEach((d) => {
+        if (d?.id) onlineSet.add(d.id);
+        if (d?.user_id) onlineSet.add(d.user_id);
+        if (d?.id && d?.user_id) idToUserId.set(d.id, d.user_id);
+      });
 
     return (locs || [])
       .filter((l) => onlineSet.has(l.driver_id))
-      .map((l) => ({ id: l.driver_id, lat: l.lat, lng: l.lng, updated_at: l.updated_at }))
+      .map((l) => ({
+        // Prefer returning user_id when we can map drivers.id -> drivers.user_id
+        id: idToUserId.get(l.driver_id) || l.driver_id,
+        lat: l.lat,
+        lng: l.lng,
+        updated_at: l.updated_at,
+      }))
       .filter((d) => haversineMeters(center, [d.lat, d.lng]) <= radiusMeters);
   }, [enabled, center?.[0], center?.[1], radiusMeters, drivers, locs]);
 
