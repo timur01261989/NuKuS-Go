@@ -72,9 +72,11 @@ export default function DriverDashboard() {
 
         const { data: driverData, error } = await supabase
           .from("drivers")
-          .select("first_name, last_name, phone, is_online, status, approved, user_id")
+          // Multiple schema variants exist (status text / approved boolean / etc.).
+          // Selecting missing columns causes PostgREST errors.
+          .select("*")
           .eq("user_id", user.id)
-          .single();
+          .maybeSingle();
 
         if (error) {
           console.error("Profil yuklashda xato:", error);
