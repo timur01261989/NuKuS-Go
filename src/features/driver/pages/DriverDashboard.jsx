@@ -26,7 +26,7 @@ import {
   StopOutlined
 } from "@ant-design/icons";
 import { useLocation, useNavigate } from "react-router-dom";
-import { supabase } from "../../../lib/supabase"; 
+import { supabase } from "@lib/supabase";
 import { useLanguage } from "../../../shared/i18n/useLanguage"; 
 import { startTracking } from "../components/services/locationService";
 
@@ -70,16 +70,22 @@ export default function DriverDashboard() {
           return;
         }
 
+        // NOTE: drivers jadvalida turli sxema variantlari bor (approved/status va boshqalar).
+        // Select("*") schema mismatch (PGRST204) xatolarini oldini oladi.
         const { data: driverData, error } = await supabase
           .from("drivers")
-          // Multiple schema variants exist (status text / approved boolean / etc.).
-          // Selecting missing columns causes PostgREST errors.
           .select("*")
           .eq("user_id", user.id)
           .maybeSingle();
 
         if (error) {
           console.error("Profil yuklashda xato:", error);
+          return;
+        }
+
+        if (!driverData) {
+          // driver row yo'q bo'lsa registerga yuboramiz (oq ekran bo'lmasin)
+          navigate("/driver/register", { replace: true });
           return;
         }
 

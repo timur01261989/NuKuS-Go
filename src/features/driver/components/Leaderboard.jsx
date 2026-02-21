@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, List, Avatar, Typography, Tag, Button, Segmented, Skeleton } from 'antd';
 import { 
   TrophyFilled, StarFilled, ArrowLeftOutlined, 
-  ThunderboltFilled, CrownFilled, UserOutlined
+  ThunderboltFilled, CrownFilled 
 } from '@ant-design/icons';
 import { supabase } from "../../../lib/supabase";
 
@@ -35,11 +35,11 @@ export default function Leaderboard({ onBack }) {
     <div style={{ padding: '20px', background: '#f8f9fa', minHeight: '100vh' }}>
       {/* HEADER */}
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={onBack} shape="circle" style={{ border: 'none' }} />
+        <Button icon={<ArrowLeftOutlined />} onClick={onBack} shape="circle" border="none" />
         <Title level={4} style={{ margin: '0 0 0 15px', fontFamily: 'YangoHeadline' }}>Reyting</Title>
       </div>
 
-      {/* TOP 1 KARTA - faqat ma'lumot yuklangan va driver mavjud bo'lsa ko'rsatamiz */}
+      {/* TOP 1 KARTA */}
       {!loading && drivers.length > 0 && (
         <Card style={{ 
           borderRadius: 24, background: 'linear-gradient(135deg, #FFD700 0%, #faad14 100%)', 
@@ -47,17 +47,11 @@ export default function Leaderboard({ onBack }) {
         }}>
           <CrownFilled style={{ fontSize: 40, color: '#fff', marginBottom: 10 }} />
           <div style={{ position: 'relative', display: 'inline-block' }}>
-            {/* avatar_url null bo'lsa UserOutlined icon ko'rsatamiz */}
-            <Avatar 
-              size={80} 
-              src={drivers[0].avatar_url || undefined} 
-              icon={!drivers[0].avatar_url ? <UserOutlined /> : undefined}
-              style={{ border: '4px solid #fff' }} 
-            />
+            <Avatar size={80} src={drivers[0].avatar_url} style={{ border: '4px solid #fff' }} />
             <Tag color="black" style={{ position: 'absolute', bottom: -10, left: '50%', transform: 'translateX(-50%)', borderRadius: 10, fontWeight: 'bold' }}>#1</Tag>
           </div>
-          <Title level={3} style={{ margin: '15px 0 5px', color: '#000' }}>{drivers[0].first_name || 'Noma\'lum'}</Title>
-          <Text strong style={{ color: 'rgba(0,0,0,0.6)' }}>{drivers[0].car_model || '---'}</Text>
+          <Title level={3} style={{ margin: '15px 0 5px', color: '#000' }}>{drivers[0].first_name}</Title>
+          <Text strong style={{ color: 'rgba(0,0,0,0.6)' }}>{drivers[0].car_model}</Text>
         </Card>
       )}
 
@@ -84,20 +78,15 @@ export default function Leaderboard({ onBack }) {
                   <Text strong style={{ width: 20, fontSize: 16, color: index < 3 ? '#faad14' : '#ccc' }}>
                     {index + 1}
                   </Text>
-                  {/* avatar_url null bo'lsa fallback icon */}
-                  <Avatar 
-                    src={driver.avatar_url || undefined} 
-                    icon={!driver.avatar_url ? <UserOutlined /> : undefined}
-                    size="large" 
-                  />
+                  <Avatar src={driver.avatar_url} size="large" />
                   <div>
-                    <Text strong style={{ display: 'block' }}>{driver.first_name || 'Noma\'lum'}</Text>
-                    <Text type="secondary" style={{ fontSize: 12 }}>{driver.car_model || '---'}</Text>
+                    <Text strong style={{ display: 'block' }}>{driver.first_name}</Text>
+                    <Text type="secondary" style={{ fontSize: 12 }}>{driver.car_model}</Text>
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <Tag color={filter === 'Faollik' ? 'orange' : 'blue'} icon={filter === 'Faollik' ? <ThunderboltFilled /> : <StarFilled />} style={{ borderRadius: 6 }}>
-                    {filter === 'Faollik' ? (driver.activity_points ?? 0) : (driver.average_rating ?? 0)}
+                    {filter === 'Faollik' ? driver.activity_points : driver.average_rating}
                   </Tag>
                 </div>
               </div>

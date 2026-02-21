@@ -100,9 +100,6 @@ export default function DriverMap() {
   const [routeCoords, setRouteCoords] = useState([]);
   const [focusTrigger, setFocusTrigger] = useState(0); // Xaritani markazlashtirish uchun signal
 
-  // Marshrut yangilanishini debounce qilish uchun ref
-  const routeUpdateTimer = useRef(null);
-
   // 1. Geolokatsiyani kuzatish
   useEffect(() => {
     if (!navigator.geolocation) return message.error("GPS ishlamaydi");
@@ -120,7 +117,7 @@ export default function DriverMap() {
     return () => navigator.geolocation.clearWatch(id);
   }, []);
 
-  // 2. Buyurtma so'rash (Polling) - ovoz faqat modal ko'rsatilganda yangraydigan bo'ldi
+  // 2. Buyurtma so'rash (Polling)
   useEffect(() => {
     if (!isOnline || currentOrder) return; // Agar band bo'lsa qidirmaymiz
 
@@ -141,8 +138,7 @@ export default function DriverMap() {
         if (res?.new_order) {
           setIncomingOrder(res.new_order);
           setShowModal(true);
-          // Ovoz faqat shu yerda: NewOrderModal o'zi ham useEffect orqali ovoz beradi,
-          // shuning uchun bu yerda qo'shimcha chaqirmaymiz (ikki marta yangramasligi uchun)
+          playAliceVoice("new_order"); // 🔊 "Yangi buyurtma"
         }
       } catch (e) {
         console.warn("Ping error", e);
@@ -152,20 +148,14 @@ export default function DriverMap() {
     return () => clearInterval(interval);
   }, [isOnline, currentOrder]);
 
-  // 3. Marshrutni yangilash (Navigatsiya) - debounce bilan (har GPS o'zgarishida emas)
+  // 3. Marshrutni yangilash (Navigatsiya)
   useEffect(() => {
     if (!currentOrder || !myLocation) {
       setRouteCoords([]);
       return;
     }
 
-    // Oldingi timer bo'lsa bekor qilamiz (debounce)
-    if (routeUpdateTimer.current) {
-      clearTimeout(routeUpdateTimer.current);
-    }
-
-    // 3 soniya kutib keyin marshrut yangilaymiz (juda ko'p API chaqiruvini oldini olish)
-    routeUpdateTimer.current = setTimeout(async () => {
+    const updateRoute = async () => {
       let target = null;
       // Agar status "accepted" bo'lsa -> Mijozga boramiz
       if (currentOrder.status === "accepted") {
@@ -180,12 +170,10 @@ export default function DriverMap() {
         const coords = await fetchOsrmRoute(myLocation, target);
         setRouteCoords(coords);
       }
-    }, 3000);
-
-    return () => {
-      if (routeUpdateTimer.current) clearTimeout(routeUpdateTimer.current);
     };
-  }, [currentOrder, myLocation]);
+
+    updateRoute();
+  }, [currentOrder, myLocation]); // Harakatlanganda marshrut yangilanadi
 
   // --- ACTIONS ---
 
@@ -255,9 +243,6 @@ export default function DriverMap() {
   const pickupPos = currentOrder ? [parseFloat(currentOrder.from_lat), parseFloat(currentOrder.from_lng)] : null;
   const destPos = currentOrder && currentOrder.to_lat ? [parseFloat(currentOrder.to_lat), parseFloat(currentOrder.to_lng)] : null;
 
-  // Telefon raqami xavfsiz olish (null bo'lsa href bo'sh bo'lmasin)
-  const passengerPhone = currentOrder?.passenger_phone || null;
-
   return (
     <div style={{ height: "100vh", width: "100%", position: "relative", display: "flex", flexDirection: "column" }}>
       
@@ -318,15 +303,7 @@ export default function DriverMap() {
                 {currentOrder.status === 'in_progress' ? currentOrder.dropoff_location : currentOrder.pickup_location}
               </Text>
             </div>
-            {/* Telefon raqami mavjud bo'lsagina href beradi */}
-            <Button 
-              shape="circle" 
-              icon={<PhoneOutlined />} 
-              size="large" 
-              type="primary" 
-              onClick={() => passengerPhone ? window.location.href = `tel:${passengerPhone}` : message.warning("Telefon raqami mavjud emas")}
-              disabled={!passengerPhone}
-            />
+            <Button shape="circle" icon={<PhoneOutlined />} size="large" type="primary" href={`tel:${currentOrder.passenger_phone}`} />
           </div>
 
           {/* STATUS TUGMALARI */}
