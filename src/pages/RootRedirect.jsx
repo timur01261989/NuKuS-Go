@@ -36,17 +36,15 @@ export default function RootRedirect() {
         // 1) If drivers row exists => driver flow (even if profiles.role says client)
         const { data: drv, error: drvErr } = await supabase
           .from("drivers")
-          .select("approved,status,user_id")
+          // `drivers` jadvalida `status` ustuni yo'q.
+          // `status` ni select qilish PostgREST 400 (Bad Request) beradi va driver redirect noto'g'ri ishlaydi.
+          .select("approved,user_id")
           .eq("user_id", userId)
           .maybeSingle();
 
         if (!drvErr && drv) {
           const approvedBool = typeof drv.approved === "boolean" ? drv.approved : false;
-          const status = String(drv.status || "").trim().toLowerCase();
-          const approvedByStatus = ["active", "approved", "ok", "enabled"].includes(status);
-          const effectiveApproved = approvedBool || approvedByStatus;
-
-          setTo(effectiveApproved ? "/driver/dashboard" : "/driver/pending");
+          setTo(approvedBool ? "/driver/dashboard" : "/driver/pending");
           if (!mounted) return;
           setLoading(false);
           return;

@@ -85,14 +85,15 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         // Only hit drivers table when it matters (driver routes OR mixed allow)
         if (a.driver) {
           const { data: drv, error: drvErr } = await withTimeout(
-            supabase.from("drivers").select("approved,status,user_id").eq("user_id", userId).maybeSingle()
+            // `drivers` jadvalida `status` ustuni yo'q.
+            // `status` ni select qilish PostgREST 400 (Bad Request) beradi va RoleGate driver'ni topolmay qoladi.
+            supabase.from("drivers").select("approved,user_id").eq("user_id", userId).maybeSingle()
           );
 
           if (!drvErr && drv) {
             driverRow = drv;
             driverRowExists = true;
             if (typeof drv.approved === "boolean") approved = drv.approved;
-            // if approved is NULL but status looks active/approved, treat as approved=false and let status decide below
           }
         }
 
@@ -143,12 +144,8 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
 
           // approval gating (driver dashboard/orders)
           if (a.requireDriverApproved) {
-            // if approved column is missing/NULL, fallback to status string
-            const status = String(driverRow?.status || "").trim().toLowerCase();
-            const isApprovedByStatus = ["active", "approved", "ok", "enabled"].includes(status);
-            const effectiveApproved = approved || isApprovedByStatus;
-
-            if (!effectiveApproved) return finish(false, "driver-not-approved");
+            // `drivers` jadvalida `status` ustuni yo'q, shuning uchun faqat `approved` boolean bilan tekshiramiz.
+            if (!approved) return finish(false, "driver-not-approved");
           }
 
           return finish(true, null);

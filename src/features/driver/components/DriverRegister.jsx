@@ -194,7 +194,8 @@ export default function DriverRegister({ onRegisterSuccess }) {
         tex_passport_url: texUrl,
         prava_url: pravaUrl,
 
-        status: "pending",
+        // `drivers` jadvalida `status` ustuni yo'q. Pending holatini `approved=false` bilan ifodalaymiz.
+        approved: false,
       };
 
       const { error } = await supabase.from("drivers").insert([payload]);
