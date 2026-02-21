@@ -138,7 +138,8 @@ export async function dispatch_handler(req, res) {
       .map(p => ({...p, dist_km: haversineKm(Number(p.lat), Number(p.lng), pickup.lat, pickup.lng)}))
       .filter(p => p.dist_km <= radius_km)
       .sort((a,b)=>a.dist_km-b.dist_km)
-      .slice(0, 15);
+      // ✅ Navbat bilan yuborish: eng yaqin 1 ta haydovchiga offer yuboramiz
+      .slice(0, 1);
 
     const expires_at = new Date(Date.now() + 15*1000).toISOString();
     const rows = ranked.map((p)=>({ order_id, driver_user_id: p.driver_user_id, status:'sent', sent_at: nowIso(), expires_at }));
@@ -202,7 +203,9 @@ export async function dispatch_smart_handler(req, res) {
       const st = statsMap.get(p.driver_user_id) || {};
       const s = score({ dist_km, rating_avg: st.rating_avg ?? 5, acceptance_rate: st.acceptance_rate ?? 1, completed_count: st.completed_count ?? 0 });
       return { ...p, dist_km, score: s };
-    }).filter(p => p.dist_km <= radius_km).sort((a,b)=>a.score-b.score).slice(0, 15);
+    }).filter(p => p.dist_km <= radius_km).sort((a,b)=>a.score-b.score)
+      // ✅ Navbat bilan yuborish: eng yaxshi (score) 1 ta haydovchi
+      .slice(0, 1);
 
     const expires_at = new Date(Date.now() + 15*1000).toISOString();
     const rows = ranked.map((p)=>({ order_id, driver_user_id: p.driver_user_id, status:'sent', sent_at: nowIso(), expires_at }));

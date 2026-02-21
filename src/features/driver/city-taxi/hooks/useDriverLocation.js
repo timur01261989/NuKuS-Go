@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { message } from "antd";
 import { useTaxi } from "../context/TaxiProvider";
 import { cityTaxiApi } from "../services/cityTaxiApi";
-import { smoothHeading } from "../utils/geo";
+import { haversineKm, smoothHeading } from "../utils/geo";
 
 /**
  * useDriverLocation.js
@@ -14,6 +14,7 @@ export function useDriverLocation({ enabled }) {
   const { dispatch } = useTaxi();
   const watchIdRef = useRef(null);
   const lastSendRef = useRef(0);
+  const lastSentLatLngRef = useRef(null);
   const lastHeadingRef = useRef(0);
 
   useEffect(() => {
@@ -44,8 +45,17 @@ export function useDriverLocation({ enabled }) {
       });
 
       const now = Date.now();
-      if (now - lastSendRef.current > 3500) {
+      // ✅ Throttle + distance gate:
+      // - juda tez-tez DB/serverga yozish (1s) -> write storm + realtime lag
+      // - amaliy MVP: 5-7 sekundda 1 marta yoki 25m+ siljisa yuboramiz
+      const last = lastSentLatLngRef.current;
+      const movedM = last ? haversineKm([last[0], last[1]], [lat, lng]) * 1000 : Infinity;
+      const dueByTime = now - lastSendRef.current >= 7000;
+      const dueByMove = movedM >= 25 && now - lastSendRef.current >= 5000;
+
+      if (dueByTime || dueByMove) {
         lastSendRef.current = now;
+        lastSentLatLngRef.current = [lat, lng];
         try {
           await cityTaxiApi.sendDriverLocation({ lat, lng, heading, accuracy: acc });
         } catch {

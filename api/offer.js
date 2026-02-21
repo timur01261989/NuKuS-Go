@@ -31,12 +31,23 @@ export async function offer_respond_handler(req, res) {
     if (oe) throw oe;
 
     if (action === 'accept') {
+      // ✅ Atomik qabul (race condition'ni kamaytirish):
+      // faqat order hali bo'sh bo'lsa va "active" holatda bo'lsa qabul qilamiz.
+      // (Ba'zi sxemalarda driver_id bo'lishi mumkin; bu handler driver_user_id'ni ishlatadi.)
       const { data: od, error: uerr } = await sb.from('orders')
         .update({ driver_user_id, status:'accepted', accepted_at: nowIso() })
         .eq('id', order_id)
+        .in('status', ['created','pending','searching','offered'])
+        .is('driver_user_id', null)
         .select('id,status,driver_user_id')
-        .single();
+        .maybeSingle();
       if (uerr) throw uerr;
+
+      if (!od) {
+        // Boshqa haydovchi oldin olib bo'lgan yoki status o'zgargan
+        return json(res, 200, { ok:false, taken:true, offer: off });
+      }
+
       return json(res, 200, { ok:true, offer: off, order: od });
     }
 
