@@ -39,7 +39,7 @@ export default function DriverAuth({ onBack }) {
   // --- 1. HAYDOVCHI STATUSINI TEKSHIRISH (LOGIKA) ---
   const checkDriverStatus = useCallback(async () => {
     try {
-      setStatus((s) => (s === "loading" ? s : "loading"));
+      setStatus("loading");
       // 1. Foydalanuvchi tizimga kirganmi?
       const {
         data: { user },
@@ -52,10 +52,10 @@ export default function DriverAuth({ onBack }) {
       }
 
       // 2. Bazadan haydovchini qidiramiz
-      // drivers jadvalida turli sxema variantlari bor (approved:boolean yoki status:text).
-      // Select("*") schema mismatch (PGRST204) xatolarini oldini oladi.
       const { data, error } = await supabase
         .from("drivers")
+        // Multiple schema variants exist (status text / approved boolean / etc.).
+        // Selecting missing columns causes PostgREST errors and redirect loops.
         .select("*")
         .eq("user_id", user.id)
         .maybeSingle();
@@ -69,9 +69,13 @@ export default function DriverAuth({ onBack }) {
       if (!data) {
         setStatus("none"); // Bazada yo'q -> Ro'yxatdan o'tishga
       } else {
-        const isApproved =
-          typeof data.approved === "boolean" ? data.approved : typeof data.status === "string" ? data.status === "approved" : true;
-        setStatus(isApproved ? "active" : normalizeDriverStatus(data.status));
+        const approved = typeof data.approved === "boolean" ? data.approved : null;
+        const statusText = typeof data.status === "string" ? data.status : null;
+
+        // Prefer explicit boolean if available; else fall back to status text.
+        if (approved === true) setStatus("active");
+        else if (approved === false) setStatus("pending");
+        else setStatus(normalizeDriverStatus(statusText));
       }
     } catch (err) {
       console.error("Tarmoq xatosi:", err);

@@ -46,6 +46,23 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
       new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms)),
     ]);
 
+  const deriveDriverApproved = (drv) => {
+    if (!drv) return false;
+
+    // Schema variant A: drivers.approved boolean
+    if (Object.prototype.hasOwnProperty.call(drv, "approved") && typeof drv.approved === "boolean") {
+      return drv.approved;
+    }
+
+    // Schema variant B: drivers.status text
+    if (Object.prototype.hasOwnProperty.call(drv, "status") && typeof drv.status === "string") {
+      return drv.status.trim().toLowerCase() === "approved";
+    }
+
+    // Older variants without approval gating
+    return true;
+  };
+
   useEffect(() => {
     let mounted = true;
 
@@ -93,26 +110,16 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         // Only hit drivers table when it matters (driver routes OR mixed allow)
         if (a.driver) {
           const { data: drv, error: drvErr } = await withTimeout(
-            // IMPORTANT: projectda "drivers" jadvalining bir nechta sxema variantlari bor.
-            // Ba'zilarida approved:boolean, ba'zilarida status:text('approved'|'pending'...).
-            // Bir ustunni select qilib qo'ysak (masalan, approved) PostgREST PGRST204 berib, role tekshiruvi yiqiladi.
-            // Shu sabab select("*") va pastda normalizatsiya qilamiz.
+            // IMPORTANT: the project uses multiple schema variants for `drivers`.
+            // Selecting a missing column (e.g. `approved`) triggers PGRST204 and causes redirect loops.
+            // So we select("*") and derive approval from available fields.
             supabase.from("drivers").select("*").eq("user_id", userId).maybeSingle()
           );
 
           if (!drvErr && drv) {
             driverRow = drv;
             driverRowExists = true;
-
-            // Normalize approval
-            if (typeof drv.approved === "boolean") {
-              approved = drv.approved;
-            } else if (typeof drv.status === "string") {
-              approved = drv.status === "approved";
-            } else {
-              // eski sxemalarda approval flow bo'lmagan bo'lishi mumkin
-              approved = true;
-            }
+            approved = deriveDriverApproved(drv);
           }
         }
 
@@ -157,6 +164,8 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         }
 
         if (effectiveRole === "driver") {
+          // Drivers should still be allowed to open client pages.
+          if (!a.driver && a.client) return finish(true, null);
           if (!a.driver) return finish(false, "driver-not-allowed");
 
           if (!driverRowExists) return finish(false, "driver-not-registered");

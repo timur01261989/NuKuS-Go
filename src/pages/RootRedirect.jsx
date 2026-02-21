@@ -6,13 +6,11 @@ import { supabase } from "@lib/supabase";
 /**
  * RootRedirect:
  *  - No session => /login
- *  - Session => decide route.
+ *  - Session => /client/home (default).
  *
- * IMPORTANT:
- *  Driver access MUST be based on "drivers" table row existence.
- *  Relying only on profiles.role causes a common bug:
- *    user registered as driver but profiles.role is still "client"
- *    => redirect to /client/home (wrong).
+ * NOTE:
+ *  Even if user is a driver, they should still be able to stay on client side.
+ *  Driver routes are accessed only when user explicitly navigates to /driver/*.
  */
 export default function RootRedirect() {
   const [loading, setLoading] = useState(true);
@@ -31,9 +29,8 @@ export default function RootRedirect() {
           return;
         }
 
-        // IMPORTANT PRODUCT RULE:
-        // Foydalanuvchi driver bo'lsa ham, default ochilish client/home bo'lishi kerak.
-        // Driver sahifaga o'tish faqat user /driver/* ga o'zi kirganda (menyudan) bo'ladi.
+        // Default landing after login: client home.
+        // Driver dashboard is accessed only from explicit /driver/* navigation.
         setTo("/client/home");
 
         if (!mounted) return;
@@ -61,7 +58,3 @@ export default function RootRedirect() {
 
   return <Navigate to={to} replace />;
 }
-
-// O'ZGARISHLAR RO'YXATI (RootRedirect.jsx):
-// - drivers jadvalidagi turli sxemalar (approved bor/yo'qligi) sababli PostgREST 400 bo'lib ketmasligi uchun .select("*") qilindi.
-// - approved ustuni mavjud bo'lmasa, eski sxema uchun "approved=true" deb qabul qilindi (aks holda driver doim pendingga tushib qolardi).

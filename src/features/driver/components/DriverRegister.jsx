@@ -203,12 +203,33 @@ export default function DriverRegister({ onRegisterSuccess }) {
         tex_passport_url: texUrl,
         prava_url: pravaUrl,
 
-        // `drivers` jadvalida `status` ustuni yo'q. Pending holatini `approved=false` bilan ifodalaymiz.
+        // Pending holati: schema variantiga qarab `status` yoki `approved` ishlatiladi.
+        status: "pending",
         approved: false,
       };
 
-      const { error } = await supabase.from("drivers").insert([payload]);
-      if (error) throw error;
+      // Insert with compatibility (some deployments use only `status`, some only `approved`).
+      // We try the combined payload first, then retry with the variant that matches the table.
+      const tryInsert = async (p) => {
+        const { error } = await supabase.from("drivers").insert([p]);
+        if (error) throw error;
+      };
+
+      try {
+        await tryInsert(payload);
+      } catch (e) {
+        const msg = String(e?.message || "").toLowerCase();
+        // Missing column errors (PostgREST)
+        if (msg.includes("could not find") && msg.includes("status")) {
+          const { status, ...rest } = payload;
+          await tryInsert(rest);
+        } else if (msg.includes("could not find") && msg.includes("approved")) {
+          const { approved, ...rest } = payload;
+          await tryInsert(rest);
+        } else {
+          throw e;
+        }
+      }
 
       // ✅ Ensure profile role becomes "driver" (prevents redirect back to client)
       try {

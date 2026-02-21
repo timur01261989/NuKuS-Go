@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Typography, Row, Col, Button, List, Tag, Statistic, message, Modal } from 'antd';
+import { Card, Typography, Row, Col, Button, List, Tag, Statistic, message, Modal, Empty } from 'antd';
 import { 
   ArrowLeftOutlined, WalletOutlined, ArrowUpOutlined, 
   ArrowDownOutlined, BankOutlined, HistoryOutlined 
@@ -23,7 +23,7 @@ export default function DriverWallet({ onBack }) {
     if (user) {
       // 1. Joriy balansni olish
       const { data: driver } = await supabase.from('drivers').select('balance').eq('user_id', user.id).single();
-      if (driver) setBalance(driver.balance);
+      if (driver) setBalance(driver.balance ?? 0);
 
       // 2. Tranzaksiyalarni olish
       const { data: txs } = await supabase
@@ -97,6 +97,7 @@ export default function DriverWallet({ onBack }) {
       <List
         loading={loading}
         dataSource={transactions}
+        locale={{ emptyText: <Empty description="Tranzaksiyalar yo'q" /> }}
         renderItem={item => (
           <Card style={{ borderRadius: 16, marginBottom: 10, border: 'none' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -114,7 +115,7 @@ export default function DriverWallet({ onBack }) {
                 </div>
               </div>
               <Text strong style={{ color: item.type === 'income' ? '#52c41a' : '#ff4d4f' }}>
-                {item.type === 'income' ? '+' : '-'}{item.amount.toLocaleString()}
+                {item.type === 'income' ? '+' : '-'}{(item.amount ?? 0).toLocaleString()}
               </Text>
             </div>
           </Card>

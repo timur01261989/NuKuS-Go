@@ -98,6 +98,7 @@ export default function DriverMap() {
   
   // Navigation
   const [routeCoords, setRouteCoords] = useState([]);
+  const routeUpdateTimer = useRef(null); // Debounce uchun
   const [focusTrigger, setFocusTrigger] = useState(0); // Xaritani markazlashtirish uchun signal
 
   // 1. Geolokatsiyani kuzatish
@@ -138,7 +139,7 @@ export default function DriverMap() {
         if (res?.new_order) {
           setIncomingOrder(res.new_order);
           setShowModal(true);
-          playAliceVoice("new_order"); // 🔊 "Yangi buyurtma"
+          // Ovoz NewOrderModal.jsx useEffect orqali o'zi chaladi (ikki marta chalmasligi uchun bu yerda yo'q)
         }
       } catch (e) {
         console.warn("Ping error", e);
@@ -155,7 +156,11 @@ export default function DriverMap() {
       return;
     }
 
-    const updateRoute = async () => {
+    // Oldingi debounce timeoutni bekor qilamiz
+    if (routeUpdateTimer.current) clearTimeout(routeUpdateTimer.current);
+
+    // 3 soniya kutib marshrut yangilaymiz (GPS har o'zgarishida emas)
+    routeUpdateTimer.current = setTimeout(async () => {
       let target = null;
       // Agar status "accepted" bo'lsa -> Mijozga boramiz
       if (currentOrder.status === "accepted") {
@@ -170,10 +175,12 @@ export default function DriverMap() {
         const coords = await fetchOsrmRoute(myLocation, target);
         setRouteCoords(coords);
       }
-    };
+    }, 3000);
 
-    updateRoute();
-  }, [currentOrder, myLocation]); // Harakatlanganda marshrut yangilanadi
+    return () => {
+      if (routeUpdateTimer.current) clearTimeout(routeUpdateTimer.current);
+    };
+  }, [currentOrder, myLocation]); // Harakatlanganda marshrut yangilanadi (debounce bilan)
 
   // --- ACTIONS ---
 
@@ -303,7 +310,21 @@ export default function DriverMap() {
                 {currentOrder.status === 'in_progress' ? currentOrder.dropoff_location : currentOrder.pickup_location}
               </Text>
             </div>
-            <Button shape="circle" icon={<PhoneOutlined />} size="large" type="primary" href={`tel:${currentOrder.passenger_phone}`} />
+            <Button
+              shape="circle"
+              icon={<PhoneOutlined />}
+              size="large"
+              type="primary"
+              disabled={!currentOrder.passenger_phone}
+              onClick={() => {
+                if (currentOrder.passenger_phone) {
+                  window.location.href = `tel:${currentOrder.passenger_phone}`;
+                } else {
+                  // message import orqali chaqirilgan
+                  message.warning("Telefon raqami mavjud emas");
+                }
+              }}
+            />
           </div>
 
           {/* STATUS TUGMALARI */}

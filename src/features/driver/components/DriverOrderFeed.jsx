@@ -97,16 +97,16 @@ export default function DriverHome({ onLogout }) {
 
   const onProfileTouchStart = (e) => { touchStartY.current = e.touches[0].clientY; };
   const onProfileTouchMove = (e) => {
-    if (touchStartY.current !== null) {
+    if (touchStartY.current !== null && drawerInnerRef.current) {
       const dy = e.touches[0].clientY - touchStartY.current;
-      if (dy > 50) drawerInnerRef.current.style.transform = `translateY(${dy}px)`;
+      if (dy > 0 && drawerInnerRef.current) drawerInnerRef.current.style.transform = `translateY(${dy}px)`;
     }
   };
   const onProfileTouchEnd = (e) => {
     if (touchStartY.current !== null) {
       const dy = e.changedTouches[0].clientY - touchStartY.current;
       if (dy > 100) setProfileOpen(false);
-      else drawerInnerRef.current.style.transform = "";
+      else if (drawerInnerRef.current) drawerInnerRef.current.style.transform = "";
       touchStartY.current = null;
     }
   };

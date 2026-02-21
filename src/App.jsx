@@ -78,7 +78,7 @@ export default function App() {
 	              <Route
                 path="/client/home"
                 element={
-                  <RoleGate allow={{ client: true, driver: true }}>
+                  <RoleGate allow={{ client: true, driver: false }}>
                     <ClientHome />
                   </RoleGate>
                 }
@@ -86,7 +86,7 @@ export default function App() {
               <Route
                 path="/client/taxi"
                 element={
-                  <RoleGate allow={{ client: true, driver: true }}>
+                  <RoleGate allow={{ client: true, driver: false }}>
                     <ClientTaxi />
                   </RoleGate>
                 }
@@ -94,7 +94,7 @@ export default function App() {
 	              <Route
 	                path="/client/inter-provincial"
 	                element={
-	                  <RoleGate allow={{ client: true, driver: true }}>
+	                  <RoleGate allow={{ client: true, driver: false }}>
 	                    <ClientIntercity />
 	                  </RoleGate>
 	                }
@@ -102,7 +102,7 @@ export default function App() {
 	              <Route
 	                path="/client/inter-district"
 	                element={
-	                  <RoleGate allow={{ client: true, driver: true }}>
+	                  <RoleGate allow={{ client: true, driver: false }}>
 	                    <ClientInterDistrict />
 	                  </RoleGate>
 	                }
@@ -110,7 +110,7 @@ export default function App() {
 	              <Route
 	                path="/client/freight"
 	                element={
-	                  <RoleGate allow={{ client: true, driver: true }}>
+	                  <RoleGate allow={{ client: true, driver: false }}>
 	                    <ClientFreight />
 	                  </RoleGate>
 	                }
@@ -118,7 +118,7 @@ export default function App() {
 	              <Route
 	                path="/client/delivery"
 	                element={
-	                  <RoleGate allow={{ client: true, driver: true }}>
+	                  <RoleGate allow={{ client: true, driver: false }}>
 	                    <ClientDelivery />
 	                  </RoleGate>
 	                }
@@ -126,7 +126,7 @@ export default function App() {
               <Route
                 path="/client/orders"
                 element={
-                  <RoleGate allow={{ client: true, driver: true }}>
+                  <RoleGate allow={{ client: true, driver: false }}>
                     <ClientOrders />
                   </RoleGate>
                 }
@@ -134,7 +134,7 @@ export default function App() {
               <Route
                 path="/client/addresses"
                 element={
-                  <RoleGate allow={{ client: true, driver: true }}>
+                  <RoleGate allow={{ client: true, driver: false }}>
                     <MyAddresses />
                   </RoleGate>
                 }

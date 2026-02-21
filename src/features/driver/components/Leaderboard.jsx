@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, List, Avatar, Typography, Tag, Button, Segmented, Skeleton } from 'antd';
 import { 
   TrophyFilled, StarFilled, ArrowLeftOutlined, 
-  ThunderboltFilled, CrownFilled 
+  ThunderboltFilled, CrownFilled, UserOutlined
 } from '@ant-design/icons';
 import { supabase } from "../../../lib/supabase";
 
@@ -47,7 +47,12 @@ export default function Leaderboard({ onBack }) {
         }}>
           <CrownFilled style={{ fontSize: 40, color: '#fff', marginBottom: 10 }} />
           <div style={{ position: 'relative', display: 'inline-block' }}>
-            <Avatar size={80} src={drivers[0].avatar_url} style={{ border: '4px solid #fff' }} />
+            <Avatar
+              size={80}
+              src={drivers[0].avatar_url || undefined}
+              icon={!drivers[0].avatar_url ? <UserOutlined /> : undefined}
+              style={{ border: '4px solid #fff' }}
+            />
             <Tag color="black" style={{ position: 'absolute', bottom: -10, left: '50%', transform: 'translateX(-50%)', borderRadius: 10, fontWeight: 'bold' }}>#1</Tag>
           </div>
           <Title level={3} style={{ margin: '15px 0 5px', color: '#000' }}>{drivers[0].first_name}</Title>
@@ -78,7 +83,11 @@ export default function Leaderboard({ onBack }) {
                   <Text strong style={{ width: 20, fontSize: 16, color: index < 3 ? '#faad14' : '#ccc' }}>
                     {index + 1}
                   </Text>
-                  <Avatar src={driver.avatar_url} size="large" />
+                  <Avatar
+                    src={driver.avatar_url || undefined}
+                    icon={!driver.avatar_url ? <UserOutlined /> : undefined}
+                    size="large"
+                  />
                   <div>
                     <Text strong style={{ display: 'block' }}>{driver.first_name}</Text>
                     <Text type="secondary" style={{ fontSize: 12 }}>{driver.car_model}</Text>
@@ -86,7 +95,7 @@ export default function Leaderboard({ onBack }) {
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <Tag color={filter === 'Faollik' ? 'orange' : 'blue'} icon={filter === 'Faollik' ? <ThunderboltFilled /> : <StarFilled />} style={{ borderRadius: 6 }}>
-                    {filter === 'Faollik' ? driver.activity_points : driver.average_rating}
+                    {filter === 'Faollik' ? (driver.activity_points ?? 0) : (driver.average_rating ?? 0)}
                   </Tag>
                 </div>
               </div>
