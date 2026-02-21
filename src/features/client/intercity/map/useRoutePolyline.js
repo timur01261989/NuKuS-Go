@@ -1,39 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { haversineKm } from "../../shared/geo/haversine";
+import { osrmRoute } from "../../shared/geo/osrm";
 
-function haversineKm(a, b) {
-  const R = 6371;
-  const toRad = (d) => (d * Math.PI) / 180;
-  const dLat = toRad(b[0] - a[0]);
-  const dLng = toRad(b[1] - a[1]);
-  const lat1 = toRad(a[0]);
-  const lat2 = toRad(b[0]);
-  const s =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
-  const c = 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
-  return R * c;
-}
 
-async function osrmRoute(from, to, signal) {
-  // OSRM yo'nalish topa olmasa ham xato bermaslik uchun
-  try {
-    const url = `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`;
-    const res = await fetch(url, { signal });
-    const data = await res.json();
-    const r = data?.routes?.[0];
-    if (r) {
-      return {
-        coords: r.geometry.coordinates.map(([lng, lat]) => [lat, lng]),
-        distanceKm: (r.distance || 0) / 1000,
-        durationMin: (r.duration || 0) / 60,
-      };
-    }
-  } catch (e) {
-    if (e?.name === "AbortError") return null;
-    console.warn("OSRM yo'nalish chizishda xatolik:", e);
-  }
-  return null;
-}
 
 /**
  * useRoutePolyline(fromLatLng, toLatLng)
@@ -66,7 +35,7 @@ export function useRoutePolyline(fromLatLng, toLatLng) {
     setLoading(true);
 
     (async () => {
-      const r = await osrmRoute(fromLatLng, toLatLng, ac.signal);
+      const r = await osrmRoute(fromLatLng, toLatLng, { signal: ac.signal });
       if (ac.signal.aborted) return;
 
       if (r) {

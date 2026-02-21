@@ -23,7 +23,7 @@ export default function Leaderboard({ onBack }) {
 
     const { data, error } = await supabase
       .from('drivers')
-      .select('id, first_name, avatar_url, activity_points, average_rating, car_model')
+      .select('user_id, first_name, avatar_url, activity_points, average_rating, car_model')
       .order(orderBy, { ascending: false })
       .limit(10);
 

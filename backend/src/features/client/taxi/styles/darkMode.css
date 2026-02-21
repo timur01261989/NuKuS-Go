@@ -1,9 +1,0 @@
-/* darkMode.css
-   Hook: add class 'night-mode-active' on body or toggle with state
-*/
-body.night-mode-active .yg-sheet,
-body.night-mode-active .yg-search-top {
-  background: rgba(20,20,20,0.95);
-  color: #fff;
-}
-body.night-mode-active .yg-field-value { color: rgba(255,255,255,0.9); }

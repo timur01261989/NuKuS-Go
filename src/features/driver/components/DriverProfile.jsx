@@ -40,7 +40,7 @@ export default function DriverProfile({ onBack, onLogout }) {
       const { data } = await supabase
         .from('drivers')
         .select('first_name, car_model, car_color, plate_number, avatar_url, average_rating, rating_count')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
         .single();
 
       if (data) setDriverData(data);

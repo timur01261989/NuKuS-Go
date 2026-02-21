@@ -1,3 +1,4 @@
+import { nominatimReverse as _nominatimReverse } from "../../shared/geo/nominatim";
 // deliveryApi.js — frontend API
 import api from "@/utils/apiHelper";
 
@@ -19,11 +20,9 @@ export const deliveryApi = {
 };
 
 // Reverse geocode (Nominatim)
+
 export async function nominatimReverse(lat, lng, signal) {
-  const url = `https://nominatim.openstreetmap.org/reverse?format=json&zoom=18&addressdetails=1&lat=${encodeURIComponent(
-    lat
-  )}&lon=${encodeURIComponent(lng)}`;
-  const res = await fetch(url, { signal, headers: { "Accept-Language": "uz,ru,en" } });
-  const data = await res.json();
-  return data?.display_name || "";
+  // Preserve previous behavior: let network/JSON errors bubble up (no swallowing)
+  return _nominatimReverse(lat, lng, { signal, swallowErrors: false });
 }
+

@@ -37,7 +37,7 @@ import DriverDelivery from "./services/DriverDelivery";
 
 import DriverProfile from "./DriverProfile";
 
-import { supabase } from "../../../lib/supabase"; 
+import { supabase } from "@lib/supabase"; 
 import { startTracking } from "./services/locationService";
 
 const { Title, Text } = Typography;
@@ -49,14 +49,14 @@ export default function DriverHome({ onLogout }) {
   // STATE
   // =========================
   const [selectedService, setSelectedService] = useState(
-    localStorage.getItem("driverActiveService") || null
+    (typeof window !== "undefined" ? localStorage.getItem("driverActiveService") : null) || null
   );
   const [profileOpen, setProfileOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Online flag (persist)
   const [isOnline, setIsOnline] = useState(() => {
-    const v = localStorage.getItem("driverOnline");
+    const v = (typeof window !== "undefined" ? localStorage.getItem("driverOnline") : null);
     return v === "1";
   });
 
@@ -78,12 +78,12 @@ export default function DriverHome({ onLogout }) {
   // =========================
   const selectService = (key) => {
     setSelectedService(key);
-    localStorage.setItem("driverActiveService", key);
+    if (typeof window !== "undefined") localStorage.setItem("driverActiveService", key);
   };
 
   const backToMenu = () => {
     setSelectedService(null);
-    localStorage.removeItem("driverActiveService");
+    if (typeof window !== "undefined") localStorage.removeItem("driverActiveService");
   };
 
   // =========================
@@ -199,13 +199,13 @@ export default function DriverHome({ onLogout }) {
             is_online: next,
             last_seen_at: new Date().toISOString(),
           })
-          .eq("id", user.id);
+          .eq("user_id", user.id);
 
       if (error) throw error;
 
       // 2. State yangilash
       setIsOnline(next);
-      localStorage.setItem("driverOnline", next ? "1" : "0");
+      if (typeof window !== "undefined") localStorage.setItem("driverOnline", next ? "1" : "0");
       
       // 3. Backendga xabar
       await sendDriverState(user.id, next);

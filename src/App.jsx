@@ -36,6 +36,7 @@ const ClientDelivery = lazy(() => import("@features/client/delivery/DeliveryPage
 // --- DRIVER ---
 const DriverOrders = lazy(() => import("@features/driver/pages/DriverOrders"));
 const DriverDashboard = lazy(() => import("@features/driver/pages/DriverDashboard"));
+const DriverRegister = lazy(() => import("@features/driver/components/DriverRegister"));
 
 // --- SETTINGS ---
 const Settings = lazy(() => import("@features/settings/pages/Settings"));
@@ -141,15 +142,26 @@ export default function App() {
 
               {/* --- AUTO MARKET --- */}
               <Route path="/auto-market/*" element={<AutoMarketEntry />} />
+              <Route path="/market/*" element={<AutoMarketEntry />} />
 
               {/* --- SETTINGS / SUPPORT --- */}
               <Route path="/settings" element={<Settings />} />
               <Route path="/support" element={<Support />} />
 
-              {/* --- DRIVER (PROTECTED) --- */}
-	              <Route path="/driver" element={<Navigate to="/driver/dashboard" replace />} />
-	              {/* eski menyuda /driver/home ishlatilgan */}
-	              <Route path="/driver/home" element={<Navigate to="/driver/dashboard" replace />} />
+                            {/* --- DRIVER (PROTECTED) --- */}
+              <Route path="/driver" element={<Navigate to="/driver/dashboard" replace />} />
+              {/* eski menyuda /driver/home ishlatilgan */}
+              <Route path="/driver/home" element={<Navigate to="/driver/dashboard" replace />} />
+
+              <Route
+                path="/driver/register"
+                element={
+                  <RoleGate allow={{ client: true, driver: true, requireDriverApproved: false }}>
+                    <DriverRegister />
+                  </RoleGate>
+                }
+              />
+
               <Route
                 path="/driver/dashboard"
                 element={
