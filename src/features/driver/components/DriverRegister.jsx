@@ -27,7 +27,11 @@ import { supabase } from "@lib/supabase";
 const { Title, Text } = Typography;
 const { Option } = Select;
 
-export default function DriverRegister({ onRegisterSuccess }) {
+function DriverRegister({ onRegisterSuccess }) {
+  // If this page ever goes "white", it's almost always a runtime render error.
+  // Keep a tiny error boundary wrapper at the route level so we see the real error
+  // instead of a blank screen.
+
   // Prevent white-screen crashes when Supabase env is missing/misconfigured.
   // (RoleGate already guards this for most routes, but keep this component safe when used elsewhere.)
   if (!supabase) {
@@ -548,5 +552,56 @@ export default function DriverRegister({ onRegisterSuccess }) {
         </div>
       </Form>
     </div>
+  );
+}
+
+// ---------- Minimal Error Boundary (prevents "white screen") ----------
+// NOTE: We keep this in the same file to avoid architecture changes.
+class _DriverRegisterErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, info) {
+    // eslint-disable-next-line no-console
+    console.error("[DriverRegister] render error:", error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 16 }}>
+          <div style={{ fontWeight: 600, marginBottom: 8 }}>Driver register sahifasida xato chiqdi.</div>
+          <div style={{ opacity: 0.85, marginBottom: 8 }}>Console’da ham xato ko‘rinadi. Quyidagi matnni yuboring.</div>
+          <pre
+            style={{
+              whiteSpace: "pre-wrap",
+              background: "#111",
+              color: "#fff",
+              padding: 12,
+              borderRadius: 8,
+              overflow: "auto",
+            }}
+          >
+            {String(this.state.error?.message || this.state.error || "Unknown error")}
+          </pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// Default export is the wrapped version so existing lazy imports keep working.
+export default function DriverRegisterWithBoundary(props) {
+  return (
+    <_DriverRegisterErrorBoundary>
+      <DriverRegister {...props} />
+    </_DriverRegisterErrorBoundary>
   );
 }
