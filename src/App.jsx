@@ -152,6 +152,8 @@ export default function App() {
               <Route path="/driver" element={<Navigate to="/driver/dashboard" replace />} />
               {/* eski menyuda /driver/home ishlatilgan */}
               <Route path="/driver/home" element={<Navigate to="/driver/dashboard" replace />} />
+              {/* /driver-mode -> ClientHome dagi tugma shu yo'lga yuboradi */}
+              <Route path="/driver-mode" element={<Navigate to="/driver/dashboard" replace />} />
 
               <Route
                 path="/driver/register"

@@ -56,7 +56,9 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
 
     // Schema variant B: drivers.status text
     if (Object.prototype.hasOwnProperty.call(drv, "status") && typeof drv.status === "string") {
-      return drv.status.trim().toLowerCase() === "approved";
+      const s = drv.status.trim().toLowerCase();
+      // "active" ham "approved" bilan teng (admin tasdiqlash natijasi)
+      return ["approved", "active", "verified", "enabled", "ok"].includes(s);
     }
 
     // Older variants without approval gating
@@ -125,7 +127,12 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
 
         // 4) Derive effective role
         // If drivers row exists => effective role is driver (even if profile says client)
-        const effectiveRole = driverRowExists ? "driver" : profileRole;
+        // Also: if profile says "driver" but no drivers row -> still treat as driver (redirect to register)
+        const effectiveRole = driverRowExists
+          ? "driver"
+          : profileRole === "driver"
+          ? "driver"
+          : profileRole;
 
         // 5) Auto-create client profile if accessing client-only route and profile missing
         if (!effectiveRole && a.client && !a.driver) {
