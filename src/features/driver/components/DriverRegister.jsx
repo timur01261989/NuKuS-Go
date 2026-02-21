@@ -21,12 +21,23 @@ import {
   IdcardOutlined,
   FileTextOutlined,
 } from "@ant-design/icons";
-import { supabase } from "../../../lib/supabase";
+// Use the same module ID as the rest of the app to avoid accidental duplicate Supabase clients.
+import { supabase } from "@lib/supabase";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 
 export default function DriverRegister({ onRegisterSuccess }) {
+  // Prevent white-screen crashes when Supabase env is missing/misconfigured.
+  // (RoleGate already guards this for most routes, but keep this component safe when used elsewhere.)
+  if (!supabase) {
+    return (
+      <div style={{ padding: 16 }}>
+        Supabase konfiguratsiya topilmadi: <code>VITE_SUPABASE_URL</code> va <code>VITE_SUPABASE_ANON_KEY</code> ni tekshiring.
+      </div>
+    );
+  }
+
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [form] = Form.useForm();
@@ -176,18 +187,12 @@ export default function DriverRegister({ onRegisterSuccess }) {
       const phoneFull = `+998${phoneOnlyDigits}`;
 
       // 4) Bazaga yozish
-      // NOTE:
-      // Supabase schema variants exist in this project.
-      // Some DBs use a minimal `public.drivers(user_id, approved, created_at)` table (see supabase_min_auth_schema_FIXED.sql).
-      // In that case, inserting extra columns (avatar_url, car_photo_url, ... etc) causes PostgREST 400:
-      //   "Could not find the 'avatar_url' column of 'drivers' in the schema cache".
-      // We keep the full payload for future extended schemas, but ONLY insert the minimal columns to avoid breaking production.
-      const payload_full = {
+      const payload = {
         user_id: user.id,
 
         first_name: values.first_name,
         last_name: values.last_name,
-        middle_name: values.middle_name,
+        middle_name: values.middle_name || null,
         phone: phoneFull,
 
         car_model: values.car_model,
@@ -203,16 +208,6 @@ export default function DriverRegister({ onRegisterSuccess }) {
         // `drivers` jadvalida `status` ustuni yo'q. Pending holatini `approved=false` bilan ifodalaymiz.
         approved: false,
       };
-
-      // minimal payload (schema-safe)
-      const payload = {
-        user_id: user.id,
-        approved: false,
-      };
-
-      // Keep payload_full reachable (prevents accidental deletion and helps debugging).
-      // eslint-disable-next-line no-unused-expressions
-      payload_full && null;
 
       const { error } = await supabase.from("drivers").insert([payload]);
       if (error) throw error;
@@ -555,7 +550,3 @@ export default function DriverRegister({ onRegisterSuccess }) {
     </div>
   );
 }
-// O'ZGARISHLAR RO'YXATI (DriverRegister.jsx):
-// - Supabase `drivers` jadvali minimal sxemada (user_id, approved, created_at) bo'lganda `avatar_url` va boshqa ustunlar yo'qligi sababli 400 (PGRST204) xatolik chiqardi.
-// - Shu xatoni sindirmasdan tuzatish uchun `payload_full` saqlandi, lekin DB'ga faqat minimal `payload` (user_id, approved) insert qilinadigan qilindi.
-// - Natija: Vercel/production'da driver ro'yxatdan o'tish endi "schema cache" xatosiz ishlaydi, role aniqlash drivers row mavjudligiga tayangan holda davom etadi.
