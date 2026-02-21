@@ -93,15 +93,27 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         // Only hit drivers table when it matters (driver routes OR mixed allow)
         if (a.driver) {
           const { data: drv, error: drvErr } = await withTimeout(
-            // `drivers` jadvalida `status` ustuni yo'q.
-            // `status` ni select qilish PostgREST 400 (Bad Request) beradi va RoleGate driver'ni topolmay qoladi.
-            supabase.from("drivers").select("approved,user_id").eq("user_id", userId).maybeSingle()
+            // This repo has multiple schema variants for `drivers`.
+            // Selecting a missing column (e.g., "approved") causes PostgREST 400 and breaks routing.
+            // Always select("*") and derive approval from either:
+            //  - approved:boolean (new schema)
+            //  - status:text ("approved"/"pending"/"rejected")
+            supabase.from("drivers").select("*").eq("user_id", userId).maybeSingle()
           );
 
           if (!drvErr && drv) {
             driverRow = drv;
             driverRowExists = true;
-            if (typeof drv.approved === "boolean") approved = drv.approved;
+
+            // derive approval
+            if (Object.prototype.hasOwnProperty.call(drv, "approved") && typeof drv.approved === "boolean") {
+              approved = drv.approved;
+            } else if (typeof drv.status === "string") {
+              approved = drv.status === "approved";
+            } else {
+              // older schema without approval flow
+              approved = true;
+            }
           }
         }
 
@@ -146,13 +158,24 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         }
 
         if (effectiveRole === "driver") {
-          if (!a.driver) return finish(false, "driver-not-allowed");
+          // Drivers are allowed to use client pages too.
+          // If this gate is client-only (a.client=true, a.driver=false), allow access.
+          if (!a.driver) {
+            if (a.client) return finish(true, null);
+            return finish(false, "driver-not-allowed");
+          }
 
-          if (!driverRowExists) return finish(false, "driver-not-registered");
+          // Allow visiting /driver/register even if the driver row does not exist yet.
+          // (This avoids an infinite redirect loop back to the same route.)
+          if (!driverRowExists) {
+            if (!a.requireDriverApproved && a.client && location.pathname === "/driver/register") {
+              return finish(true, null);
+            }
+            return finish(false, "driver-not-registered");
+          }
 
           // approval gating (driver dashboard/orders)
           if (a.requireDriverApproved) {
-            // `drivers` jadvalida `status` ustuni yo'q, shuning uchun faqat `approved` boolean bilan tekshiramiz.
             if (!approved) return finish(false, "driver-not-approved");
           }
 

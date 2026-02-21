@@ -33,32 +33,12 @@ export default function RootRedirect() {
 
         const userId = s.session.user.id;
 
-        // 1) If drivers row exists => driver flow (even if profiles.role says client)
-        // IMPORTANT: This repo contains multiple Supabase schema variants.
-        //  - Variant A: drivers(user_id PK, approved boolean)
-        //  - Variant B: drivers(id PK, user_id UNIQUE, is_online boolean, ...)
-        // If we select a column that doesn't exist (e.g., approved), PostgREST returns 400 and we incorrectly
-        // fall back to client home. To avoid breaking redirects on Vercel/Prod, always select("*") here.
-        const { data: drv, error: drvErr } = await supabase
-          .from("drivers")
-          .select("*")
-          .eq("user_id", userId)
-          .maybeSingle();
+        // IMPORTANT PRODUCT RULE:
+        //  - A user may be registered as a driver AND still use the client app.
+        //  - Therefore, root redirect must NOT force driver dashboard.
+        // Driver mode should be entered only when user navigates to /driver/* explicitly.
 
-        if (!drvErr && drv) {
-          // If "approved" exists => use it. If not => treat as approved (older schema has no approval flow).
-          const approvedBool = Object.prototype.hasOwnProperty.call(drv, "approved")
-            ? typeof drv.approved === "boolean"
-              ? drv.approved
-              : false
-            : true;
-          setTo(approvedBool ? "/driver/dashboard" : "/driver/pending");
-          if (!mounted) return;
-          setLoading(false);
-          return;
-        }
-
-        // 2) Fallback to profile role
+        // 1) Use profile role as a soft hint only.
         const { data: profile, error: profileErr } = await supabase
           .from("profiles")
           .select("role")
@@ -67,14 +47,9 @@ export default function RootRedirect() {
 
         const role = !profileErr ? profile?.role : null;
 
-        if (role === "driver") {
-          // If profile says driver but no drivers row, send to register to avoid loops
-          setTo("/driver/register");
-        } else if (role === "client") {
-          setTo("/client/home");
-        } else {
-          setTo("/login");
-        }
+        // Default home after login is always the client home.
+        // (Driver features are available via a separate entry point in the UI.)
+        setTo("/client/home");
 
         if (!mounted) return;
         setLoading(false);
