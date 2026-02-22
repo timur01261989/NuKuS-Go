@@ -117,7 +117,7 @@ export async function dispatch_handler(req, res) {
 
     if (!hasSupabaseEnv()) {
       // demo mode
-      return json(res, 200, { ok:true, demo:true, offered:0 });
+      return json(res, 200, { ok:true, error:'Server misconfigured', offered:0 });
     }
 
     const sb = getSupabaseAdmin();
