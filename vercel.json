@@ -17,14 +17,12 @@
       "destination": "/assets/$1"
     },
     {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
-    }
-  ],
-  "crons": [
-    {
-      "path": "/api/cron_dispatch",
-      "schedule": "*/1 * * * *"
     }
   ]
 }
