@@ -42,6 +42,64 @@ function initials(name) {
 
 export default function DriverDashboard() {
   const navigate = useNavigate();
+
+  // Gate: driver must have an application before accessing dashboard
+  const [gateLoading, setGateLoading] = useState(true);
+  const [gateAllowed, setGateAllowed] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const run = async () => {
+      try {
+        const { data: authData, error: authErr } = await supabase.auth.getUser();
+        if (authErr) throw authErr;
+
+        const userId = authData?.user?.id;
+        if (!userId) {
+          navigate("/login", { replace: true });
+          return;
+        }
+
+        const { data: appRow, error: appErr } = await supabase
+          .from("driver_applications")
+          .select("status, created_at")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (appErr) throw appErr;
+
+        if (!appRow) {
+          navigate("/driver/register", { replace: true });
+          return;
+        }
+
+        const status = (appRow.status || "").toString().toLowerCase();
+
+        if (["pending", "submitted", "waiting", "review"].includes(status)) {
+          navigate("/driver/pending", { replace: true });
+          return;
+        }
+
+        // Approved (or any other non-pending state) -> allow
+        if (isMounted) setGateAllowed(true);
+      } catch (e) {
+        console.error("Driver dashboard gate error:", e);
+        // Fail safe: send to register so driver can proceed
+        navigate("/driver/register", { replace: true });
+      } finally {
+        if (isMounted) setGateLoading(false);
+      }
+    };
+
+    run();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [navigate]);
   const location = useLocation();
   const { t } = useLanguage(); 
 
@@ -61,6 +119,19 @@ export default function DriverDashboard() {
       navigate("/login", { replace: true });
     }
   };
+
+    if (gateLoading) {
+    return (
+      <div style={{ padding: 24, textAlign: "center" }}>
+        Yuklanmoqda...
+      </div>
+    );
+  }
+
+  if (!gateAllowed) {
+    // Redirect is in progress
+    return null;
+  }
 
   return <DriverHome onLogout={onLogout} />;
 

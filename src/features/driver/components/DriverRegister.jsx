@@ -20,21 +20,38 @@ import { supabase } from '../../../lib/supabase';
 const PHONE_PREFIX = '+998';
 
 function sanitizeFilename(originalName) {
-  const name = (originalName || 'file')
-    .toString()
-    // normalize unicode -> remove accents/diacritics
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    // replace spaces with underscores
-    .replace(/\s+/g, '_')
-    // keep only safe chars
-    .replace(/[^a-zA-Z0-9._-]/g, '')
-    // avoid empty names
-    .replace(/^\.+/, '');
+  const fallbackBase = `file_${Date.now()}`;
 
-  // If name became empty, fall back
-  return name && name.length ? name.slice(0, 120) : `file_${Date.now()}`;
+  const raw = (originalName || '').toString().trim();
+
+  // Split extension safely (keep last dot only)
+  const lastDot = raw.lastIndexOf('.');
+  const baseRaw = lastDot > 0 ? raw.slice(0, lastDot) : raw || fallbackBase;
+  const extRaw = lastDot > 0 ? raw.slice(lastDot + 1) : '';
+
+  const cleanBase = baseRaw
+    // normalize unicode -> remove accents/diacritics (latin)
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, '_')
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 80);
+
+  const cleanExt = extRaw
+    .toString()
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .slice(0, 10);
+
+  const base = cleanBase && cleanBase.length ? cleanBase : fallbackBase;
+  const ext = cleanExt && cleanExt.length ? cleanExt : '';
+
+  return ext ? `${base}.${ext}` : base;
 }
+
 
 function buildStoragePath(userId, file) {
   const safeName = sanitizeFilename(file?.name);
