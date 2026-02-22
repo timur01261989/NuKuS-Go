@@ -23,34 +23,59 @@ export async function driver_location_handler(req, res) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
     const order_id = String(body.order_id || '').trim();
     const driver_user_id = String(body.driver_user_id || '').trim();
+    const driver_id = String(body.driver_id || driver_user_id || '').trim();
     const lat = Number(body.lat);
     const lng = Number(body.lng);
     const bearing = body.bearing === undefined ? null : Number(body.bearing);
     const speed = body.speed === undefined ? null : Number(body.speed);
 
-    if (!order_id) return badRequest(res, 'order_id kerak');
-    if (!driver_user_id) return badRequest(res, 'driver_user_id kerak');
+    // order_id is optional for global driver location updates
+    const hasOrderId = !!order_id;
+    if (!driver_id) return badRequest(res, 'driver_id kerak');
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return badRequest(res, 'lat/lng noto‘g‘ri');
 
     // rate limit (location updates can flood DB)
-    if (!hit(`loc:${driver_user_id}:${order_id}`, 1200)) return json(res, 200, { ok:true, skipped:true });
+    if (!hit(`loc:${driver_id}:${order_id||'global'}`, 1200)) return json(res, 200, { ok:true, skipped:true });
 
     if (hasSupabaseEnv()) {
       const sb = getSupabaseAdmin();
-      const { data, error } = await sb
-        .from('driver_locations')
-        .upsert([{
-          order_id,
-          driver_user_id,
-          lat,
-          lng,
-          bearing,
-          speed,
-          updated_at: nowIso()
-        }], { onConflict: 'order_id,driver_user_id' })
-        .select('order_id,driver_user_id,lat,lng,bearing,speed,updated_at')
-        .single();
-      if (error) throw error;
+      
+// TRY_DRIVER_ID_SCHEMA: prefer driver_id-based schema (driver_locations PK: driver_id)
+let data, error;
+try {
+  ({ data, error } = await sb
+    .from('driver_locations')
+    .upsert([{
+      driver_id,
+      lat,
+      lng,
+      bearing,
+      speed,
+      updated_at: nowIso()
+    }], { onConflict: 'driver_id' })
+    .select('driver_id,lat,lng,bearing,speed,updated_at'));
+} catch (e) {
+  error = e;
+}
+
+// Fallback for legacy schema (PK: order_id,driver_user_id)
+if (error && hasOrderId) {
+  const fb = await sb
+    .from('driver_locations')
+    .upsert([{
+      order_id,
+      driver_user_id: driver_id,
+      lat,
+      lng,
+      bearing,
+      speed,
+      updated_at: nowIso()
+    }], { onConflict: 'order_id,driver_user_id' })
+    .select('order_id,driver_user_id,lat,lng,bearing,speed,updated_at');
+  data = fb.data;
+  error = fb.error;
+}
+if (error) throw error;
       return json(res, 200, { ok:true, location: data });
     }
 
@@ -77,9 +102,10 @@ export async function driver_state_handler(req, res) {
 
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
     const driver_user_id = String(body.driver_user_id || '').trim();
+    const driver_id = String(body.driver_id || driver_user_id || '').trim();
     const state = String(body.state || '').trim().toLowerCase();
 
-    if (!driver_user_id) return badRequest(res, 'driver_user_id kerak');
+    if (!driver_id) return badRequest(res, 'driver_id kerak');
     if (!ALLOWED_STATE.has(state)) return badRequest(res, 'state noto‘g‘ri');
 
     // rate limit
@@ -127,7 +153,7 @@ export async function driver_heartbeat_handler(req, res) {
     const lng = body.lng === undefined ? null : Number(body.lng);
     const bearing = body.bearing === undefined ? null : Number(body.bearing);
 
-    if (!driver_user_id) return badRequest(res, 'driver_user_id kerak');
+    if (!driver_id) return badRequest(res, 'driver_id kerak');
 
     // rate limit
     if (!hit(`hb:${driver_user_id}`, 900)) return json(res, 200, { ok:true, skipped:true });

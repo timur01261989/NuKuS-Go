@@ -206,7 +206,14 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
           if (!a.driver && a.client) return finish(true, null);
           if (!a.driver) return finish(false, "driver-not-allowed");
 
-          if (!driverRowExists) return finish(false, "driver-not-registered");
+          if (!driverRowExists) {
+            // Variant A: driver access is based on `drivers` row.
+            // If application exists (pending/approved), keep user on pending instead of bouncing to register.
+            if (applicationStatus && ["pending", "submitted", "waiting", "review", "approved"].includes(applicationStatus)) {
+              return finish(false, "driver-not-approved");
+            }
+            return finish(false, "driver-not-registered");
+          }
 
           // approval gating (driver dashboard/orders)
           if (a.requireDriverApproved) {

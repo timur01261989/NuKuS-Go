@@ -1,4 +1,4 @@
-import { json, badRequest, serverError, nowIso } from './_shared/cors.js';
+import { json, badRequest, serverError, nowIso, hit } from './_shared/cors.js';
 import { getSupabaseAdmin } from './_shared/supabase.js';
 import { haversineKm } from './_shared/geo.js';
 
@@ -42,6 +42,9 @@ export async function driver_ping_handler(req, res) {
     const is_online = true;
 
     if (!driver_user_id) return badRequest(res, 'driver_user_id kerak');
+
+    // driver_ping rate limit
+    if (!hit(`ping:${driver_user_id}`, 800)) return json(res, 200, { ok:true, skipped:true });
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return badRequest(res, 'lat/lng noto‘g‘ri');
 
     if (!hasSupabaseEnv()) return serverError(res, 'SUPABASE_URL va service role key (SUPABASE_SERVICE_ROLE_KEY) server envda yo\'q');
@@ -115,9 +118,13 @@ export async function dispatch_handler(req, res) {
 
     if (!order_id) return badRequest(res, 'order_id kerak');
 
+    // dispatch rate limit: prevent client polling from spamming server
+    if (!hit(`dispatch:${order_id}`, 1500)) {
+      return json(res, 200, { ok:true, skipped:true });
+    }
+
     if (!hasSupabaseEnv()) {
-      // demo mode
-      return json(res, 200, { ok:true, demo:true, offered:0 });
+      return serverError(res, 'SUPABASE_URL va service role key (SUPABASE_SERVICE_ROLE_KEY) server envda yo\'q');
     }
 
     const sb = getSupabaseAdmin();
@@ -175,6 +182,11 @@ export async function dispatch_smart_handler(req, res) {
     const radius_km = Number(body.radius_km || 7);
 
     if (!order_id) return badRequest(res, 'order_id kerak');
+
+    // dispatch rate limit: prevent client polling from spamming server
+    if (!hit(`dispatch:${order_id}`, 1500)) {
+      return json(res, 200, { ok:true, skipped:true });
+    }
     if (!hasSupabaseEnv()) return serverError(res, 'SUPABASE_URL va service role key (SUPABASE_SERVICE_ROLE_KEY) server envda yo\'q');
 const sb = getSupabaseAdmin();
     const pickup = await resolvePickup(sb, order_id, body.pickup);

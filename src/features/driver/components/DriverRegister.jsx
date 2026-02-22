@@ -203,14 +203,19 @@ export default function DriverRegister() {
       // TUZATISH: Drivers jadvaliga ham pending record yaratish
       // Bu RoleGate ning requireDriverApproved tekshiruviga javob beradi
       try {
+        const fullName = [values.last_name, values.first_name, values.father_name]
+          .filter(Boolean)
+          .join(" ")
+          .trim();
+
         const driverPayload = {
           user_id: user.id,
-          status: 'pending',
-          approved: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          full_name: fullName || null,
+          car_model: values.car_model || null,
+          car_number: values.car_plate_number || null,
+          // is_online defaults to false in DB; do not set here.
         };
-        
+
         const { error: driverError } = await supabase
           .from('drivers')
           .upsert(driverPayload, { onConflict: 'user_id' });

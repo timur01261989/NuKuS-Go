@@ -34,11 +34,11 @@ const sb = getSupabaseAdmin();
       // faqat order hali bo'sh bo'lsa va "active" holatda bo'lsa qabul qilamiz.
       // (Ba'zi sxemalarda driver_id bo'lishi mumkin; bu handler driver_user_id'ni ishlatadi.)
       const { data: od, error: uerr } = await sb.from('orders')
-        .update({ driver_user_id, status:'accepted', accepted_at: nowIso() })
+        .update({ driver_id: driver_user_id, status:'accepted', accepted_at: nowIso() })
         .eq('id', order_id)
         .in('status', ['created','pending','searching','offered'])
-        .is('driver_user_id', null)
-        .select('id,status,driver_user_id')
+        .is('driver_id', null)
+        .select('id,status,driver_id')
         .maybeSingle();
       if (uerr) throw uerr;
 
