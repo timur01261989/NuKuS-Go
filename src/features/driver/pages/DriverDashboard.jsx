@@ -42,7 +42,6 @@ function initials(name) {
 
 export default function DriverDashboard() {
   const navigate = useNavigate();
-  const [driverId, setDriverId] = useState(null);
 
   // Gate: driver must have an application before accessing dashboard
   const [gateLoading, setGateLoading] = useState(true);
@@ -57,7 +56,6 @@ export default function DriverDashboard() {
         if (authErr) throw authErr;
 
         const userId = authData?.user?.id;
-        setDriverId(userId || null);
         if (!userId) {
           navigate("/login", { replace: true });
           return;
@@ -108,37 +106,7 @@ export default function DriverDashboard() {
 
     run();
 
-  
-
-// Presence heartbeat: keeps driver online in dispatch selection (prevents ghost drivers)
-useEffect(() => {
-  if (!driverId) return;
-  let stopped = false;
-
-  const ping = async () => {
-    try {
-      await fetch("/api/presence/heartbeat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ driver_id: driverId, state: "online" }),
-      });
-    } catch (_) {
-      // ignore heartbeat errors
-    }
-  };
-
-  ping();
-  const t = setInterval(() => {
-    if (!stopped) ping();
-  }, 25000);
-
-  return () => {
-    stopped = true;
-    clearInterval(t);
-  };
-}, [driverId]);
-
-  return () => {
+    return () => {
       isMounted = false;
     };
   }, [navigate]);
@@ -176,6 +144,16 @@ useEffect(() => {
   }
 
   return <DriverHome onLogout={onLogout} />;
+
+}
+
+// =========================
+// Legacy dashboard (preserved, not removed). Moved into its own component to avoid React hook order errors.
+// =========================
+function LegacyDriverDashboard() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { t } = useLanguage();
 
   // =========================
   // STATE
