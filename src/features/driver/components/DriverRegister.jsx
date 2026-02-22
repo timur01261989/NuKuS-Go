@@ -17,6 +17,43 @@ import {
 import { UploadOutlined } from '@ant-design/icons';
 import { supabase } from '../../../lib/supabase';
 
+const PHONE_PREFIX = '+998';
+
+function sanitizeFilename(originalName) {
+  const name = (originalName || 'file')
+    .toString()
+    // normalize unicode -> remove accents/diacritics
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    // replace spaces with underscores
+    .replace(/\s+/g, '_')
+    // keep only safe chars
+    .replace(/[^a-zA-Z0-9._-]/g, '')
+    // avoid empty names
+    .replace(/^\.+/, '');
+
+  // If name became empty, fall back
+  return name && name.length ? name.slice(0, 120) : `file_${Date.now()}`;
+}
+
+function buildStoragePath(userId, file) {
+  const safeName = sanitizeFilename(file?.name);
+  const rand = Math.random().toString(36).slice(2, 10);
+  return `driver_applications/${userId}/${Date.now()}_${rand}_${safeName}`;
+}
+
+function normalizeUzPhone(value) {
+  const v = (value ?? '').toString();
+  // keep only digits and +
+  const cleaned = v.replace(/[^\d+]/g, '');
+  // extract digits only
+  let digits = cleaned.replace(/\D/g, '');
+  // remove leading 998 if user typed it
+  if (digits.startsWith('998')) digits = digits.slice(3);
+  digits = digits.slice(0, 9); // Uzbekistan: 9 digits after country code
+  return PHONE_PREFIX + digits;
+}
+
 const { Title, Text } = Typography;
 
 // Validation helpers
@@ -26,7 +63,7 @@ const PASSPORT_RE = /^[A-Za-z]{2}\d{7}$/; // AA1234567
 
 async function uploadToStorage(userId, file, bucket = 'driver-docs') {
   if (!file) return null;
-  const filePath = `driver_applications/${userId}/${Date.now()}_${file.name}`;
+  const filePath = buildStoragePath(userId, file);
 
   const { error } = await supabase.storage.from(bucket).upload(filePath, file, {
     cacheControl: '3600',
@@ -250,6 +287,8 @@ export default function DriverRegister() {
                   <Form.Item
                     label="Telefon raqami"
                     name="phone"
+                    initialValue={PHONE_PREFIX}
+                    normalize={normalizeUzPhone}
                     rules={[
                       { required: true, message: 'Telefon raqamini kiriting' },
                       { pattern: PHONE_RE, message: 'Masalan: +998901234567' },
