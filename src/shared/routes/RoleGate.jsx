@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { Spin } from "antd";
-import { supabase } from "@lib/supabase";
+import { supabase } from "@/lib/supabase";
 
 /**
  * RoleGate
