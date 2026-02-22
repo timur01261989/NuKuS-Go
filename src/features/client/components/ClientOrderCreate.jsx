@@ -272,6 +272,7 @@ export default function ClientOrderCreateYandexStyle() {
   const reverseAbortRef = useRef(null);
   const searchAbortRef = useRef(null);
   const pollRef = useRef(null);
+  const lastDispatchRef = useRef(0);
 
   const isNight = useMemo(() => document.body.classList.contains("night-mode-active"), []);
 
@@ -472,7 +473,21 @@ export default function ClientOrderCreateYandexStyle() {
           const driver = res?.data?.assigned_driver || res?.assigned_driver || res?.assignedDriver || null;
           if (driver) setAssignedDriver(driver);
 
-          if (st === "accepted" || st === "arrived") {
+          
+          // FIX: keep dispatch moving while searching (offer timeout / next driver)
+          if (st === "searching" && !driver) {
+            const now = Date.now();
+            if (now - (lastDispatchRef.current || 0) > 6000) {
+              lastDispatchRef.current = now;
+              try {
+                const d = await api.post("/api/dispatch", { order_id: String(id) });
+                if (d?.error) console.warn("Dispatch error:", d.error);
+              } catch (e) {
+                // ignore dispatch polling errors
+              }
+            }
+          }
+if (st === "accepted" || st === "arrived") {
             setStage("accepted");
           }
           if (st === "completed") {
