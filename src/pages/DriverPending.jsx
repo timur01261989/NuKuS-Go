@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Button, Card, Typography } from "antd";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../../../lib/supabase";
+import { supabase } from "./lib/supabase";
 
 const { Title, Text } = Typography;
 
