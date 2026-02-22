@@ -18,7 +18,7 @@ export async function subscribeDriverLocation(orderId, onChange) {
   const sb = assertSupabase();
 
   // We support multiple schema variants:
-  // Variant A (order-scoped): driver_locations(order_id, driver_id, lat, lng, updated_at, ...)
+  // Variant A (order-scoped): driver_locations(order_id, driver_user_id, lat, lng, updated_at, ...)
   // Variant B (driver-scoped): driver_locations(driver_id, lat, lng, updated_at, ...)
   //
   // We detect columns and choose the safest subscription strategy.
@@ -33,7 +33,7 @@ export async function subscribeDriverLocation(orderId, onChange) {
   };
 
   const hasOrderId = await hasColumn('order_id');
-  const hasDriverUserId = await hasColumn('driver_id');
+  const hasDriverUserId = await hasColumn('driver_user_id');
   const hasDriverId = await hasColumn('driver_id');
 
   let driverLocChannel = null;
@@ -74,7 +74,7 @@ export async function subscribeDriverLocation(orderId, onChange) {
     currentDriverKey = driverKey;
     const filter = hasDriverId
       ? `driver_id=eq.${driverKey}`
-      : (hasDriverUserId ? `driver_id=eq.${driverKey}` : null);
+      : (hasDriverUserId ? `driver_user_id=eq.${driverKey}` : null);
 
     if (!filter) return;
 
@@ -89,7 +89,7 @@ export async function subscribeDriverLocation(orderId, onChange) {
       (payload) => {
         const row = payload?.new || null;
         const driverKey =
-          row?.driver_id ||
+          row?.driver_user_id ||
           row?.driver_id ||
           row?.driverId ||
           null;

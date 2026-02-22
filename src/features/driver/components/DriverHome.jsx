@@ -406,8 +406,15 @@ export default function DriverHome({ onLogout }) {
           onClick={() => {
             // Driver menyusidan chiqishda client sahifasiga "uchib ketish" oldini olamiz.
             // Agar history mavjud bo'lsa, oddiy ortga qaytamiz; bo'lmasa driver dashboardga.
-            // Back should stay inside driver flow; browser history may jump to client pages.
-            navigate("/driver/dashboard");
+            try {
+              if (typeof window !== "undefined" && window.history && window.history.length > 1) {
+                navigate(-1);
+              } else {
+                navigate("/driver/dashboard", { replace: true });
+              }
+            } catch {
+              navigate("/driver/dashboard", { replace: true });
+            }
           }}
           icon={<ArrowLeftOutlined />}
           shape="circle"

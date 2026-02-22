@@ -23,34 +23,34 @@ async function trySelectOrdersByDriver(sb, userId) {
   // Support schema variants: orders.driver_user_id or orders.driver_id
   let q = sb.from('orders').select('*');
   // Prefer driver_user_id
-  let res = await q.eq('driver_id', userId).order('created_at', { ascending: false });
+  let res = await q.eq('driver_user_id', userId).order('created_at', { ascending: false });
   if (!res.error) return res;
-  // Fallback to driver_user_id (legacy schema)
-  res = await sb.from('orders').select('*').eq('driver_user_id', userId).order('created_at', { ascending: false });
+  // Fallback to driver_id
+  res = await sb.from('orders').select('*').eq('driver_id', userId).order('created_at', { ascending: false });
   return res;
 }
 
 async function tryAcceptOrder(sb, orderId, userId) {
   // Atomic-ish accept with schema variant support.
-  // Prefer driver_id column (DB truth).
+  // Prefer driver_user_id column.
   let res = await sb
     .from('orders')
     .update({ status: 'accepted', driver_user_id: userId, accepted_at: new Date().toISOString() })
     .eq('id', orderId)
-    .in('status', ['created','pending','searching','offered'])
+    .eq('status', 'offered')
     .is('driver_user_id', null)
     .select('*')
     .maybeSingle();
 
   if (!res.error) return res;
 
-  // Fallback to driver_user_id column (legacy schema)
+  // Fallback to driver_id column
   res = await sb
     .from('orders')
-    .update({ status: 'accepted', driver_user_id: userId, accepted_at: new Date().toISOString() })
+    .update({ status: 'accepted', driver_id: userId, accepted_at: new Date().toISOString() })
     .eq('id', orderId)
-    .in('status', ['created','pending','searching','offered'])
-    .is('driver_user_id', null)
+    .eq('status', 'offered')
+    .is('driver_id', null)
     .select('*')
     .maybeSingle();
 

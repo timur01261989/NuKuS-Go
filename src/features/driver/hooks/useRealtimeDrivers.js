@@ -1,6 +1,3 @@
-
-// FIX: normalize driver id safely (keeps existing logic)
-const normalizeDriverId = (row) => row?.driver_id ?? row?.driver_user_id ?? row?.user_id ?? row?.id;
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 

@@ -1,6 +1,3 @@
-
-// FIX: throttle location updates (no logic removed)
-const lastLocationHit = {};
 // api/driver.js
 // Driver endpoints: location, state, heartbeat (presence)
 

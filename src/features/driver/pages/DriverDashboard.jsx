@@ -61,39 +61,29 @@ export default function DriverDashboard() {
           return;
         }
 
-                // Variant A gate: driver access is controlled by `drivers` table.
-        // - No drivers row   -> go to registration
-        // - drivers not approved -> go to pending
-        // - approved -> allow dashboard
-        const { data: drvRow, error: drvErr } = await supabase
-          .from("drivers")
-          .select("approved, status, created_at, updated_at")
+        const { data: appRow, error: appErr } = await supabase
+          .from("driver_applications")
+          .select("status, created_at")
           .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(1)
           .maybeSingle();
 
-        if (drvErr) throw drvErr;
+        if (appErr) throw appErr;
 
-        if (!drvRow) {
+        if (!appRow) {
           navigate("/driver/register", { replace: true });
           return;
         }
 
-        let approved = false;
-        if (typeof drvRow.approved === "boolean") {
-          approved = drvRow.approved;
-        } else if (typeof drvRow.status === "string") {
-          const s = drvRow.status.trim().toLowerCase();
-          approved = ["approved", "active", "verified", "enabled", "ok"].includes(s);
-        } else {
-          // legacy fallback: row exists => allow
-          approved = true;
-        }
+        const status = (appRow.status || "").toString().toLowerCase();
 
-        if (!approved) {
+        if (["pending", "submitted", "waiting", "review"].includes(status)) {
           navigate("/driver/pending", { replace: true });
           return;
         }
 
+        // Approved (or any other non-pending state) -> allow
         if (isMounted) setGateAllowed(true);
       } catch (e) {
         console.error("Driver dashboard gate error:", e);

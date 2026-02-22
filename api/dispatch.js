@@ -24,43 +24,6 @@ async function resolvePickup(sb, order_id, pickupFromBody) {
   if (!p || !Number.isFinite(Number(p.lat)) || !Number.isFinite(Number(p.lng))) return null;
   return { lat: Number(p.lat), lng: Number(p.lng) };
 }
-
-async function getActiveOffer(sb, order_id) {
-  const now = nowIso();
-  const { data, error } = await sb
-    .from('order_offers')
-    .select('order_id,driver_user_id,status,expires_at,sent_at')
-    .eq('order_id', order_id)
-    .eq('status', 'sent')
-    .gt('expires_at', now)
-    .order('sent_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw error;
-  return data || null;
-}
-
-async function expireOffers(sb, order_id) {
-  const now = nowIso();
-  const { error } = await sb
-    .from('order_offers')
-    .update({ status: 'expired' })
-    .eq('order_id', order_id)
-    .eq('status', 'sent')
-    .lte('expires_at', now);
-  if (error) throw error;
-}
-
-async function getOfferedDriverIds(sb, order_id) {
-  const { data, error } = await sb
-    .from('order_offers')
-    .select('driver_user_id,status')
-    .eq('order_id', order_id)
-    .limit(5000);
-  if (error) throw error;
-  return new Set((data || []).map(r => r.driver_user_id));
-}
-
 /**
  * POST /api/dispatch
  * body: { action:"driver_ping", driver_user_id, lat, lng, bearing?, status? }
@@ -161,16 +124,6 @@ export async function dispatch_handler(req, res) {
     const pickup = await resolvePickup(sb, order_id, body.pickup);
     if (!pickup) return badRequest(res, 'pickup lat/lng kerak (body.pickup yoki orders.pickup)');
 
-// FIX: Offer timeout support (navbat bilan). If there is an active (unexpired) offer for this order, do not send a new one.
-const activeOffer = await getActiveOffer(sb, order_id);
-if (activeOffer) {
-  return json(res, 200, { ok:true, offered: 0, active_offer: activeOffer });
-}
-
-// Expire any old offers so the next driver can be offered
-await expireOffers(sb, order_id);
-const alreadyOffered = await getOfferedDriverIds(sb, order_id);
-
     const since = new Date(Date.now() - 2*60*1000).toISOString();
 
     const { data: pres, error: pe } = await sb.from('driver_presence')
@@ -184,7 +137,6 @@ const alreadyOffered = await getOfferedDriverIds(sb, order_id);
       .filter(p => p.lat != null && p.lng != null)
       .map(p => ({...p, dist_km: haversineKm(Number(p.lat), Number(p.lng), pickup.lat, pickup.lng)}))
       .filter(p => p.dist_km <= radius_km)
-      .filter(p => !alreadyOffered.has(p.driver_user_id))
       .sort((a,b)=>a.dist_km-b.dist_km)
       // ✅ Navbat bilan yuborish: eng yaqin 1 ta haydovchiga offer yuboramiz
       .slice(0, 1);
@@ -228,16 +180,6 @@ const sb = getSupabaseAdmin();
     const pickup = await resolvePickup(sb, order_id, body.pickup);
     if (!pickup) return badRequest(res, 'pickup lat/lng kerak (body.pickup yoki orders.pickup)');
 
-// FIX: Offer timeout support (navbat bilan). If there is an active (unexpired) offer for this order, do not send a new one.
-const activeOffer = await getActiveOffer(sb, order_id);
-if (activeOffer) {
-  return json(res, 200, { ok:true, offered: 0, active_offer: activeOffer });
-}
-
-// Expire any old offers so the next driver can be offered
-await expireOffers(sb, order_id);
-const alreadyOffered = await getOfferedDriverIds(sb, order_id);
-
     const since = new Date(Date.now() - 2*60*1000).toISOString();
 
     const { data: pres, error: pe } = await sb.from('driver_presence')
@@ -260,8 +202,7 @@ const alreadyOffered = await getOfferedDriverIds(sb, order_id);
       const st = statsMap.get(p.driver_user_id) || {};
       const s = score({ dist_km, rating_avg: st.rating_avg ?? 5, acceptance_rate: st.acceptance_rate ?? 1, completed_count: st.completed_count ?? 0 });
       return { ...p, dist_km, score: s };
-    }).filter(p => p.dist_km <= radius_km)
-      .filter(p => !alreadyOffered.has(p.driver_user_id)).sort((a,b)=>a.score-b.score)
+    }).filter(p => p.dist_km <= radius_km).sort((a,b)=>a.score-b.score)
       // ✅ Navbat bilan yuborish: eng yaxshi (score) 1 ta haydovchi
       .slice(0, 1);
 

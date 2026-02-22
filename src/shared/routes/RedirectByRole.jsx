@@ -1,102 +1,63 @@
-import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
-import supabase from "../../config/supabaseClient";
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/lib/supabase";
 
 /**
- * Root redirect:
- * - admin -> /admin
- * - driver -> /driver/dashboard  (or /driver/pending, /driver/register depending on application status)
- * - client (default) -> /client/home
+ * RedirectByRole
+ * Purpose: Decide the safest default landing route after auth.
  *
- * NOTE: This component is used only for "/" (root). It should not force users out of pages they intentionally visit.
+ * IMPORTANT:
+ * - Default to CLIENT to avoid "everybody becomes driver" UX.
+ * - Admin/dispatch still go to their dashboards.
+ * - Driver users can always open /driver/dashboard manually or via the app's "Driver mode" entrypoint.
  */
 export default function RedirectByRole() {
-  const [target, setTarget] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    let isMounted = true;
+    let cancelled = false;
 
-    async function load() {
+    async function run() {
       try {
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession();
+        const { data: authData } = await supabase.auth.getUser();
+        const user = authData?.user;
 
-        if (sessionError) {
-          console.error("RedirectByRole: sessionError", sessionError);
-        }
-
-        const user = session?.user;
         if (!user) {
-          if (isMounted) setTarget("/login");
+          if (!cancelled) navigate("/login", { replace: true });
           return;
         }
 
-        // 1) read profile
-        const { data: profile, error: profileError } = await supabase
+        // Fetch profile role (if RLS blocks it, we still fall back to client)
+        let role = "client";
+        const { data: profile, error: profileErr } = await supabase
           .from("profiles")
-          .select("role,is_admin")
+          .select("role")
           .eq("id", user.id)
           .maybeSingle();
 
-        if (profileError) {
-          console.error("RedirectByRole: profileError", profileError);
+        if (!profileErr && profile?.role) {
+          role = profile.role;
         }
 
-        // admin always wins
-        if (profile?.is_admin) {
-          if (isMounted) setTarget("/admin");
-          return;
+        // Route decision
+        if (!cancelled) {
+          if (role === "admin") return navigate("/admin/dashboard", { replace: true });
+          if (role === "dispatch") return navigate("/dispatch/dashboard", { replace: true });
+
+          // Default
+          return navigate("/client/home", { replace: true });
         }
-
-        const role = profile?.role || "client";
-
-        // 2) driver route decision
-        if (role === "driver") {
-          const { data: appRow, error: appError } = await supabase
-            .from("driver_applications")
-            .select("status")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (appError) {
-            console.error("RedirectByRole: driver app error", appError);
-          }
-
-          const status = appRow?.status || null;
-
-          if (!status) {
-            if (isMounted) setTarget("/driver/register");
-            return;
-          }
-
-          if (status === "approved") {
-            if (isMounted) setTarget("/driver/dashboard");
-            return;
-          }
-
-          // pending / rejected / other
-          if (isMounted) setTarget("/driver/pending");
-          return;
-        }
-
-        // 3) client default
-        if (isMounted) setTarget("/client/home");
       } catch (e) {
-        console.error("RedirectByRole: unexpected error", e);
-        if (isMounted) setTarget("/client/home");
+        // Safe fallback
+        if (!cancelled) navigate("/client/home", { replace: true });
       }
     }
 
-    load();
+    run();
     return () => {
-      isMounted = false;
+      cancelled = true;
     };
-  }, []);
+  }, [navigate]);
 
-  if (!target) return null;
-  return <Navigate to={target} replace />;
+  return null;
 }

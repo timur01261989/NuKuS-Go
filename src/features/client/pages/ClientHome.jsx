@@ -303,7 +303,7 @@ export default function ClientHome() {
             style={{ height: 44, borderRadius: 12, textAlign: "left" }}
             onClick={() => {
               close();
-              navigate("/driver-mode", { replace: true });
+              navigate("/driver-mode");
             }}
           >
             {t?.workAsDriver || "Haydovchi bo‘lib ishlash"}
