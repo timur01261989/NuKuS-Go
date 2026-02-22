@@ -272,7 +272,10 @@ export default function ClientOrderCreateYandexStyle() {
   const reverseAbortRef = useRef(null);
   const searchAbortRef = useRef(null);
   const pollRef = useRef(null);
-  const lastDispatchRef = useRef(0);
+
+  // Dispatch safety: avoid spamming /api/dispatch and avoid overlapping requests
+  const dispatchInFlightRef = useRef(false);
+  const lastDispatchAttemptRef = useRef(0);
 
   const isNight = useMemo(() => document.body.classList.contains("night-mode-active"), []);
 
@@ -473,21 +476,23 @@ export default function ClientOrderCreateYandexStyle() {
           const driver = res?.data?.assigned_driver || res?.assigned_driver || res?.assignedDriver || null;
           if (driver) setAssignedDriver(driver);
 
-          
-          // FIX: keep dispatch moving while searching (offer timeout / next driver)
-          if (st === "searching" && !driver) {
-            const now = Date.now();
-            if (now - (lastDispatchRef.current || 0) > 6000) {
-              lastDispatchRef.current = now;
-              try {
-                const d = await api.post("/api/dispatch", { order_id: String(id) });
-                if (d?.error) console.warn("Dispatch error:", d.error);
-              } catch (e) {
-                // ignore dispatch polling errors
-              }
-            }
-          }
-if (st === "accepted" || st === "arrived") {
+// Retry dispatch while still searching (prevents "stuck" orders when driver doesn't respond)
+if (st === "searching" && !driver) {
+  const nowTs = Date.now();
+  if (!dispatchInFlightRef.current && nowTs - lastDispatchAttemptRef.current >= 6000) {
+    dispatchInFlightRef.current = true;
+    lastDispatchAttemptRef.current = nowTs;
+    try {
+      await api.post("/api/dispatch", { order_id: String(id) });
+    } catch {
+      // ignore dispatch retry errors (next tick will retry)
+    } finally {
+      dispatchInFlightRef.current = false;
+    }
+  }
+}
+
+          if (st === "accepted" || st === "arrived") {
             setStage("accepted");
           }
           if (st === "completed") {
