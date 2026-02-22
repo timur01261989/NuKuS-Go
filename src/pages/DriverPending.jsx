@@ -30,19 +30,20 @@ export default function DriverPending() {
         return;
       }
 
-      // 2) If profile role is already driver, we can treat as approved
-      //    (this is the most reliable "final state" for route guards)
-      const { data: profile, error: profileErr } = await supabase
-        .from("profiles")
-        .select("id, role")
-        .eq("id", user.id)
+            // 2) Driver row is the SOURCE OF TRUTH for driver access (Variant A)
+      //    We ONLY redirect to dashboard when the drivers row is approved.
+      //    This prevents redirect loops where RoleGate checks `drivers` but this page checks something else.
+      const { data: drvRow, error: drvErr } = await supabase
+        .from("drivers")
+        .select("approved, status, updated_at")
+        .eq("user_id", user.id)
         .maybeSingle();
 
-      if (profileErr) {
-        console.error("Profile select error:", profileErr);
+      if (drvErr) {
+        console.error("drivers select error:", drvErr);
       }
 
-      // 3) Check latest driver application status
+      // 3) Check latest driver application status (for messaging ONLY)
       //    (driver_applications row is created when user submits registration)
       const { data: appRow, error: appErr } = await supabase
         .from("driver_applications")
@@ -56,36 +57,25 @@ export default function DriverPending() {
         console.error("driver_applications select error:", appErr);
       }
 
-      const role = profile?.role || null;
-      const appStatus = appRow?.status || null;
-
-      // Variant A (recommended): final driver access is based on:
-      //  - profiles.role === 'driver'
-      //  - a corresponding row exists in `drivers` table
-      // The `driver_applications` table is ONLY the registration request (pending/rejected history).
-      let driverRow = null;
-      let driverRowExists = false;
-
-      try {
-        const { data: drv, error: drvErr } = await supabase
-          .from("drivers")
-          .select("id, user_id")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (drvErr) {
-          console.error("drivers select error:", drvErr);
-        } else if (drv) {
-          driverRow = drv;
-          driverRowExists = true;
+      // Derive approval from drivers row (schema supports `approved` boolean or `status` text)
+      let isDriverApproved = false;
+      if (drvRow) {
+        if (typeof drvRow.approved === "boolean") {
+          isDriverApproved = drvRow.approved;
+        } else if (typeof drvRow.status === "string") {
+          const s = drvRow.status.trim().toLowerCase();
+          isDriverApproved = ["approved", "active", "verified", "enabled", "ok"].includes(s);
+        } else {
+          // If schema has no explicit approval fields, treat existence as approved (legacy)
+          isDriverApproved = true;
         }
-      } catch (e) {
-        console.error("drivers select exception:", e);
       }
 
+const appStatus = appRow?.status || null;
+
       // Decide final status for this page
-      // Approved ONLY if role is driver AND drivers row exists (Variant A)
-      const isApproved = role === "driver" && driverRowExists;
+      // Approved if role is driver OR app status is approved
+      const isApproved = isDriverApproved;
       const isRejected = appStatus === "rejected";
 
       if (isApproved) {
@@ -96,16 +86,6 @@ export default function DriverPending() {
         // Important: only redirect once we are sure approved,
         // and let RoleGate / dashboard routes see the updated profile role.
         navigate("/driver/dashboard", { replace: true });
-        return;
-      }
-
-      // Defensive: if role already became 'driver' but drivers row is missing,
-      // stay on pending with a clear message (prevents redirect loops).
-      if (role === "driver" && !driverRowExists) {
-        setStatus("pending");
-        setMessage("Admin tasdiqlagan bo‘lishi mumkin, lekin haydovchi profili (drivers jadvali) topilmadi. Iltimos, birozdan so‘ng qayta tekshiring yoki admin bilan bog‘laning.");
-        setLoading(false);
-        setChecking(false);
         return;
       }
 

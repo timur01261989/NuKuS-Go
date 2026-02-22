@@ -61,50 +61,41 @@ export default function DriverDashboard() {
           return;
         }
 
-        // Variant A: driver access is based on a row in `drivers` table.
-// `driver_applications` is only the registration request (pending/rejected history).
+                // Variant A gate: driver access is controlled by `drivers` table.
+        // - No drivers row   -> go to registration
+        // - drivers not approved -> go to pending
+        // - approved -> allow dashboard
         const { data: drvRow, error: drvErr } = await supabase
           .from("drivers")
-          .select("id, user_id")
+          .select("approved, status, created_at, updated_at")
           .eq("user_id", userId)
           .maybeSingle();
 
-        if (drvErr) {
-          console.error("drivers select error:", drvErr);
-        }
+        if (drvErr) throw drvErr;
 
-        if (drvRow) {
-          // Driver exists -> allow
-          if (isMounted) setGateAllowed(true);
-          return;
-        }
-
-        // No driver row yet -> fall back to application status to decide pending/register.
-        const { data: appRow, error: appErr } = await supabase
-          .from("driver_applications")
-          .select("status, created_at")
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (appErr) throw appErr;
-
-        if (!appRow) {
+        if (!drvRow) {
           navigate("/driver/register", { replace: true });
           return;
         }
 
-        const status = (appRow.status || "").toString().toLowerCase();
+        let approved = false;
+        if (typeof drvRow.approved === "boolean") {
+          approved = drvRow.approved;
+        } else if (typeof drvRow.status === "string") {
+          const s = drvRow.status.trim().toLowerCase();
+          approved = ["approved", "active", "verified", "enabled", "ok"].includes(s);
+        } else {
+          // legacy fallback: row exists => allow
+          approved = true;
+        }
 
-        if (["pending", "submitted", "waiting", "review", "approved"].includes(status)) {
-          // Even if application is approved, drivers row is the source of truth for Variant A.
+        if (!approved) {
           navigate("/driver/pending", { replace: true });
           return;
         }
 
-        // Any other state -> allow (fail-open)
-        if (isMounted) setGateAllowed(true);      } catch (e) {
+        if (isMounted) setGateAllowed(true);
+      } catch (e) {
         console.error("Driver dashboard gate error:", e);
         // Fail safe: send to register so driver can proceed
         navigate("/driver/register", { replace: true });
