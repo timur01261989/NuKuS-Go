@@ -127,6 +127,30 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
           }
         }
 
+        // 3b) driver application (when driver row is not created yet)
+        // Some projects create the `drivers` row only after admin approval.
+        // In that case we must allow /driver/pending for users who already submitted an application.
+        let driverApplication = null;
+        let driverApplicationExists = false;
+
+        if (a.driver && !driverRowExists) {
+          const { data: app, error: appErr } = await withTimeout(
+            supabase
+              .from("driver_applications")
+              .select("id,status,created_at")
+              .eq("user_id", userId)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle()
+          );
+
+          if (!appErr && app) {
+            driverApplication = app;
+            driverApplicationExists = true;
+          }
+        }
+
+
         // 4) Derive effective role
         // Role is always taken from profiles.role.
         // Drivers table is used to determine registration/approval only.
@@ -173,7 +197,15 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
           if (!a.driver && a.client) return finish(true, null);
           if (!a.driver) return finish(false, "driver-not-allowed");
 
-          if (!driverRowExists) return finish(false, "driver-not-registered");
+        if (!driverRowExists) {
+          if (driverApplicationExists) {
+            // Application already submitted; treat as "pending".
+            // If this route requires approval, send to pending; otherwise allow (e.g. /driver/pending).
+            if (a.requireDriverApproved) return finish(false, "driver-not-approved");
+            return finish(true, null);
+          }
+          return finish(false, "driver-not-registered");
+        }
 
           // approval gating (driver dashboard/orders)
           if (a.requireDriverApproved) {
