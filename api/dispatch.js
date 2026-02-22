@@ -1,4 +1,4 @@
-import { json, badRequest, serverError, nowIso, hit } from './_shared/cors.js';
+import { json, badRequest, serverError, nowIso } from './_shared/cors.js';
 import { getSupabaseAdmin } from './_shared/supabase.js';
 import { haversineKm } from './_shared/geo.js';
 
@@ -42,9 +42,6 @@ export async function driver_ping_handler(req, res) {
     const is_online = true;
 
     if (!driver_user_id) return badRequest(res, 'driver_user_id kerak');
-
-    // driver_ping rate limit
-    if (!hit(`ping:${driver_user_id}`, 800)) return json(res, 200, { ok:true, skipped:true });
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return badRequest(res, 'lat/lng noto‘g‘ri');
 
     if (!hasSupabaseEnv()) return serverError(res, 'SUPABASE_URL va service role key (SUPABASE_SERVICE_ROLE_KEY) server envda yo\'q');
@@ -118,18 +115,46 @@ export async function dispatch_handler(req, res) {
 
     if (!order_id) return badRequest(res, 'order_id kerak');
 
-    // dispatch rate limit: prevent client polling from spamming server
-    if (!hit(`dispatch:${order_id}`, 1500)) {
-      return json(res, 200, { ok:true, skipped:true });
-    }
-
     if (!hasSupabaseEnv()) {
-      return serverError(res, 'SUPABASE_URL va service role key (SUPABASE_SERVICE_ROLE_KEY) server envda yo\'q');
+      return serverError(res, 'Server misconfigured: missing SUPABASE env');
     }
 
     const sb = getSupabaseAdmin();
     const pickup = await resolvePickup(sb, order_id, body.pickup);
     if (!pickup) return badRequest(res, 'pickup lat/lng kerak (body.pickup yoki orders.pickup)');
+
+
+// offer housekeeping: expire old offers and avoid spamming the same driver
+const nowTs = nowIso();
+// expire timed-out offers for this order
+await sb.from('order_offers')
+  .update({ status: 'expired', responded_at: nowTs })
+  .eq('order_id', order_id)
+  .eq('status', 'sent')
+  .lte('expires_at', nowTs);
+
+// if there is still an active offer, do not send a new one yet
+const { data: activeOffer, error: aoe } = await sb.from('order_offers')
+  .select('driver_user_id,expires_at')
+  .eq('order_id', order_id)
+  .eq('status', 'sent')
+  .gt('expires_at', nowTs)
+  .order('expires_at', { ascending: false })
+  .limit(1)
+  .maybeSingle();
+if (aoe) throw aoe;
+if (activeOffer?.driver_user_id) {
+  return json(res, 200, { ok:true, offered:0, active_offer: activeOffer });
+}
+
+// avoid re-offering to drivers who already got an offer recently (sent/rejected/expired)
+const { data: already, error: ale } = await sb.from('order_offers')
+  .select('driver_user_id')
+  .eq('order_id', order_id)
+  .in('status', ['sent','rejected','expired','accepted'])
+  .limit(5000);
+if (ale) throw ale;
+const alreadySet = new Set((already||[]).map(r => r.driver_user_id).filter(Boolean));
 
     const since = new Date(Date.now() - 2*60*1000).toISOString();
 
@@ -144,6 +169,7 @@ export async function dispatch_handler(req, res) {
       .filter(p => p.lat != null && p.lng != null)
       .map(p => ({...p, dist_km: haversineKm(Number(p.lat), Number(p.lng), pickup.lat, pickup.lng)}))
       .filter(p => p.dist_km <= radius_km)
+      .filter(p => !alreadySet || !alreadySet.has(p.driver_user_id))
       .sort((a,b)=>a.dist_km-b.dist_km)
       // ✅ Navbat bilan yuborish: eng yaqin 1 ta haydovchiga offer yuboramiz
       .slice(0, 1);
@@ -182,15 +208,43 @@ export async function dispatch_smart_handler(req, res) {
     const radius_km = Number(body.radius_km || 7);
 
     if (!order_id) return badRequest(res, 'order_id kerak');
-
-    // dispatch rate limit: prevent client polling from spamming server
-    if (!hit(`dispatch:${order_id}`, 1500)) {
-      return json(res, 200, { ok:true, skipped:true });
-    }
     if (!hasSupabaseEnv()) return serverError(res, 'SUPABASE_URL va service role key (SUPABASE_SERVICE_ROLE_KEY) server envda yo\'q');
 const sb = getSupabaseAdmin();
     const pickup = await resolvePickup(sb, order_id, body.pickup);
     if (!pickup) return badRequest(res, 'pickup lat/lng kerak (body.pickup yoki orders.pickup)');
+
+
+// offer housekeeping: expire old offers and avoid spamming the same driver
+const nowTs = nowIso();
+// expire timed-out offers for this order
+await sb.from('order_offers')
+  .update({ status: 'expired', responded_at: nowTs })
+  .eq('order_id', order_id)
+  .eq('status', 'sent')
+  .lte('expires_at', nowTs);
+
+// if there is still an active offer, do not send a new one yet
+const { data: activeOffer, error: aoe } = await sb.from('order_offers')
+  .select('driver_user_id,expires_at')
+  .eq('order_id', order_id)
+  .eq('status', 'sent')
+  .gt('expires_at', nowTs)
+  .order('expires_at', { ascending: false })
+  .limit(1)
+  .maybeSingle();
+if (aoe) throw aoe;
+if (activeOffer?.driver_user_id) {
+  return json(res, 200, { ok:true, offered:0, active_offer: activeOffer });
+}
+
+// avoid re-offering to drivers who already got an offer recently (sent/rejected/expired)
+const { data: already, error: ale } = await sb.from('order_offers')
+  .select('driver_user_id')
+  .eq('order_id', order_id)
+  .in('status', ['sent','rejected','expired','accepted'])
+  .limit(5000);
+if (ale) throw ale;
+const alreadySet = new Set((already||[]).map(r => r.driver_user_id).filter(Boolean));
 
     const since = new Date(Date.now() - 2*60*1000).toISOString();
 
@@ -214,7 +268,8 @@ const sb = getSupabaseAdmin();
       const st = statsMap.get(p.driver_user_id) || {};
       const s = score({ dist_km, rating_avg: st.rating_avg ?? 5, acceptance_rate: st.acceptance_rate ?? 1, completed_count: st.completed_count ?? 0 });
       return { ...p, dist_km, score: s };
-    }).filter(p => p.dist_km <= radius_km).sort((a,b)=>a.score-b.score)
+    }).filter(p => p.dist_km <= radius_km)
+      .filter(p => !alreadySet || !alreadySet.has(p.driver_user_id)).sort((a,b)=>a.score-b.score)
       // ✅ Navbat bilan yuborish: eng yaxshi (score) 1 ta haydovchi
       .slice(0, 1);
 
