@@ -26,7 +26,7 @@ import {
   StopOutlined
 } from "@ant-design/icons";
 import { useLocation, useNavigate } from "react-router-dom";
-import { supabase } from "../../../lib/supabase"; 
+import { supabase } from "@/lib/supabase"; 
 import { useLanguage } from "../../../shared/i18n/useLanguage"; 
 import { startTracking } from "../components/services/locationService";
 import DriverHome from "../components/DriverHome";

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Skeleton } from "antd";
-import { supabase } from "@lib/supabase";
+import { supabase } from "@/lib/supabase";
 
 // Arxivdan olgan fayllaringizni shu yerdan chaqiramiz:
 import DriverAuth from "./components/DriverAuth";

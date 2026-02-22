@@ -37,7 +37,7 @@ import DriverDelivery from "./services/DriverDelivery";
 
 import DriverProfile from "./DriverProfile";
 
-import { supabase } from "@lib/supabase"; 
+import { supabase } from "@/lib/supabase"; 
 import { startTracking } from "./services/locationService";
 
 const { Title, Text } = Typography;

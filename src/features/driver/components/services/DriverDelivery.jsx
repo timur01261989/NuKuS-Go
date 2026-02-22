@@ -4,7 +4,7 @@
 
 import React, { useMemo } from "react";
 import { Card, Typography } from "antd";
-import { supabase } from "../../../../lib/supabase";
+import { supabase } from "@/lib/supabase";
 import {
   IntegrationProvider,
   UnifiedParcelFeed,

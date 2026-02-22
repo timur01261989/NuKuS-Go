@@ -1,728 +1,571 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from "react";
 import {
   Form,
   Input,
   Button,
+  Select,
   Upload,
   message,
-  Card,
   Typography,
+  Steps,
   Row,
   Col,
-  Select,
-  DatePicker,
-} from 'antd';
-import { UploadOutlined, LoadingOutlined } from '@ant-design/icons';
-import dayjs from 'dayjs';
-import { supabase } from "../../../lib/supabase";
+} from "antd";
+import {
+  CarOutlined,
+  NumberOutlined,
+  UserOutlined,
+  UploadOutlined,
+  CheckCircleOutlined,
+  CameraOutlined,
+  IdcardOutlined,
+  FileTextOutlined,
+} from "@ant-design/icons";
+import { supabase } from "@/lib/supabase";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 
-// Latin letters only (space, apostrophe, dash allowed)
-const LATIN_NAME_RE = /^[A-Za-z\s'\-]+$/;
-// Simple alphanumeric for IDs (spaces not allowed)
-const ID_RE = /^[A-Za-z0-9]+$/;
+export default function DriverRegister({ onRegisterSuccess }) {
+  if (!supabase) {
+    return (
+      <div style={{ padding: 16 }}>
+        Supabase konfiguratsiya topilmadi. Vercel/.env ichida <code>VITE_SUPABASE_URL</code> va{" "}
+        <code>VITE_SUPABASE_ANON_KEY</code> ni tekshiring.
+      </div>
+    );
+  }
 
-const DriverRegister = ({ onRegisterSuccess }) => {
   const [loading, setLoading] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
   const [form] = Form.useForm();
 
-  // Upload state
-  const [uploading, setUploading] = useState({
-    avatar_url: false,
-    car_photo_url: false,
-    tex_passport_photo_url: false,
-    prava_photo_url: false,
+  // Fayllar uchun alohida statelar (preview va UI uchun)
+  const [driverPhoto, setDriverPhoto] = useState(null);
+  const [carPhoto, setCarPhoto] = useState(null);
+  const [pravaPhoto, setPravaPhoto] = useState(null);
+  const [texPassportPhoto, setTexPassportPhoto] = useState(null);
 
-    // NEW (additional)
-    passport_front_url: false,
-    passport_back_url: false,
-    license_front_url: false,
-    license_back_url: false,
-    tex_front_url: false,
-    tex_back_url: false,
+  // ✅ Qaysi fieldlar qaysi stepga tegishli
+  const stepFields = useMemo(() => {
+    return [
+      ["first_name", "last_name", "middle_name", "phone", "driver_photo"],
+      ["car_model", "plate_number", "car_color", "car_year"],
+      ["car_photo", "tex_passport_photo", "prava_photo"],
+    ];
+  }, []);
+
+  // ✅ Upload props: faylni state + form ichiga yozib, REQUIRED validation ishlatamiz
+  const uploadProps = (fieldName, setFile) => ({
+    beforeUpload: (file) => {
+      setFile(file);
+      form.setFieldsValue({ [fieldName]: file });
+      // shu field bo‘yicha validationni darrov tekshir
+      form.validateFields([fieldName]).catch(() => {});
+      return false; // avtomatik upload bo‘lmasin (biz qo‘lda upload qilamiz)
+    },
+    onRemove: () => {
+      setFile(null);
+      form.setFieldsValue({ [fieldName]: null });
+      form.validateFields([fieldName]).catch(() => {});
+    },
+    maxCount: 1,
+    listType: "picture-card",
+    showUploadList: { showPreviewIcon: false },
   });
 
-  const uploadToStorage = async (file, folder) => {
+  // Kichik yordamchi upload tugmasi
+  const UploadButton = ({ text, icon }) => (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "var(--card-text)",
+      }}
+    >
+      <div style={{ fontSize: 22, marginBottom: 6 }}>{icon}</div>
+      <div style={{ marginTop: 2, fontSize: 12 }}>{text}</div>
+    </div>
+  );
+
+  // ✅ Step o‘tishda: shu step fieldlarini validate qilib keyin o‘tkazamiz
+  const goNext = async () => {
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `${folder}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage.from('drivers').upload(filePath, file);
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage.from('drivers').getPublicUrl(filePath);
-      return urlData.publicUrl;
-    } catch (error) {
-      console.error('Upload error:', error);
-      throw error;
-    }
-  };
-
-  const handleUpload = async (file, field) => {
-    setUploading((prev) => ({ ...prev, [field]: true }));
-
-    try {
-      const url = await uploadToStorage(file, field);
-      form.setFieldsValue({ [field]: url });
-      message.success(`${field} yuklandi`);
-    } catch (error) {
-      message.error(`${field} yuklashda xatolik: ${error.message}`);
-    } finally {
-      setUploading((prev) => ({ ...prev, [field]: false }));
-    }
-
-    return false; // Prevent automatic upload
-  };
-
-  const normalizeDigits = (v) => (v || '').toString().replace(/\D/g, '');
-
-  const insertDriverApplication = async (values) => {
-    // The UI should send full driver application to a dedicated table.
-    // If that table doesn't exist, we fallback to old behavior (drivers) with minimal fields.
-
-    const applicationPayload = {
-      // identity
-      first_name: values.first_name?.trim(),
-      last_name: values.last_name?.trim(),
-      middle_name: values.middle_name?.trim(),
-      phone_number: values.phone_number ? `+998${values.phone_number}` : null,
-
-      // NEW numbers
-      passport_id: values.passport_id?.trim() || null,
-      prava_number: values.prava_number?.trim() || null,
-
-      // car
-      car_model: values.car_model?.trim(),
-      plate_number: values.plate_number?.trim()?.toUpperCase(),
-      car_color: values.car_color,
-      car_year: values.car_year,
-
-      // photos (existing)
-      avatar_url: values.avatar_url,
-      car_photo_url: values.car_photo_url,
-      tex_passport_photo_url: values.tex_passport_photo_url,
-      prava_photo_url: values.prava_photo_url,
-
-      // photos (NEW)
-      passport_front_url: values.passport_front_url || null,
-      passport_back_url: values.passport_back_url || null,
-      license_front_url: values.license_front_url || null,
-      license_back_url: values.license_back_url || null,
-      tex_front_url: values.tex_front_url || null,
-      tex_back_url: values.tex_back_url || null,
-
-      // status
-      status: 'pending',
-    };
-
-    // Prefer driver_applications
-    try {
-      const { data: authData } = await supabase.auth.getUser();
-      const user = authData?.user;
-      if (!user) throw new Error('Avtorizatsiya topilmadi. Qayta login qiling.');
-
-      const { error } = await supabase
-        .from('driver_applications')
-        .upsert(
-          {
-            user_id: user.id,
-            ...applicationPayload,
-          },
-          { onConflict: 'user_id' }
-        );
-
-      if (!error) return;
-
-      // If table doesn't exist -> fallback below
-      if (error.code !== '42P01') {
-        // If it exists but schema mismatch, show error clearly
-        throw error;
-      }
+      await form.validateFields(stepFields[currentStep]);
+      setCurrentStep((s) => Math.min(s + 1, 2));
     } catch (e) {
-      if (e?.code && e.code !== '42P01') throw e;
-      // else continue fallback
+      message.error("Iltimos, barcha majburiy maydonlarni to‘ldiring.");
     }
-
-    // Fallback: old table drivers (only guaranteed columns)
-    const { data: authData2 } = await supabase.auth.getUser();
-    const user2 = authData2?.user;
-    if (!user2) throw new Error('Avtorizatsiya topilmadi. Qayta login qiling.');
-
-    const minimalDriversPayload = {
-      user_id: user2.id,
-      // keep status concept even if table has it
-      status: 'pending',
-      avatar_url: values.avatar_url,
-      updated_at: new Date().toISOString(),
-    };
-
-    const { error: driversErr } = await supabase.from('drivers').upsert(minimalDriversPayload, {
-      onConflict: 'user_id',
-    });
-
-    if (driversErr) throw driversErr;
   };
 
-  const handleSubmit = async (values) => {
+  const goBack = () => setCurrentStep((s) => Math.max(s - 1, 0));
+
+  // ✅ Faylni Supabase Storage’ga yuklash helperi
+  // Eslatma: bucket nomi "drivers" deb yozilgan. Sizda boshqacha bo‘lsa shu yerni o‘zgartirasiz.
+  const uploadToStorage = async ({ bucket, userId, folder, file }) => {
+    if (!file) return null;
+
+    const safeName = String(file.name || "file")
+      .replace(/\s+/g, "_")
+      .replace(/[^\w.\-]/g, "");
+
+    const path = `${userId}/${folder}/${Date.now()}_${safeName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(bucket)
+      .upload(path, file, {
+        upsert: true,
+        contentType: file.type || "application/octet-stream",
+      });
+
+    if (uploadError) {
+      throw new Error(`Storage upload xato: ${uploadError.message}`);
+    }
+
+    // Public bucket bo‘lsa ishlaydi, private bo‘lsa ham URL qaytaradi lekin ochilmasligi mumkin.
+    const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+    const publicUrl = data?.publicUrl || null;
+
+    return publicUrl || path; // public bo‘lmasa hech bo‘lmasa path saqlanadi
+  };
+
+  const handleRegister = async (values) => {
     setLoading(true);
-
     try {
-      await insertDriverApplication(values);
+      // 1) Userni aniqlash
+      const {
+        data: { user },
+        error: userErr,
+      } = await supabase.auth.getUser();
 
-      message.success('Arizangiz yuborildi. Admin tasdiqlagandan keyin dashboard ochiladi.');
+      if (userErr) throw userErr;
 
-      if (onRegisterSuccess) {
-        onRegisterSuccess();
+      if (!user) {
+        message.error("Tizimga kirilmagan!");
+        setLoading(false);
+        return;
       }
-    } catch (error) {
-      console.error('Register error:', error);
-      message.error(`Ro'yxatdan o'tishda xatolik: ${error.message}`);
+
+      // 2) Fayllarni Storage’ga yuklash (REAL upload)
+      // Bucket: "drivers" (o‘zingizdagi bucket nomiga moslang)
+      const bucket = "drivers";
+
+      const avatarUrl = await uploadToStorage({
+        bucket,
+        userId: user.id,
+        folder: "avatar",
+        file: values.driver_photo,
+      });
+
+      const carUrl = await uploadToStorage({
+        bucket,
+        userId: user.id,
+        folder: "car",
+        file: values.car_photo,
+      });
+
+      const texUrl = await uploadToStorage({
+        bucket,
+        userId: user.id,
+        folder: "tex-passport",
+        file: values.tex_passport_photo,
+      });
+
+      const pravaUrl = await uploadToStorage({
+        bucket,
+        userId: user.id,
+        folder: "prava",
+        file: values.prava_photo,
+      });
+
+      // 3) Telefonni normalize (+998)
+      const phoneOnlyDigits = String(values.phone || "").replace(/\D/g, "");
+      const phoneFull = `+998${phoneOnlyDigits}`;
+
+      // 4) Bazaga yozish
+      const payload = {
+        user_id: user.id,
+
+        first_name: values.first_name,
+        last_name: values.last_name,
+        middle_name: values.middle_name || null,
+        phone: phoneFull,
+
+        car_model: values.car_model,
+        car_color: values.car_color,
+        plate_number: String(values.plate_number || "").toUpperCase().trim(),
+        car_year: Number(values.car_year),
+
+        avatar_url: avatarUrl,
+        car_photo_url: carUrl,
+        tex_passport_url: texUrl,
+        prava_url: pravaUrl,
+
+        // Pending holati: schema variantiga qarab `status` yoki `approved` ishlatiladi.
+        status: "pending",
+        approved: false,
+      };
+
+      // Insert with compatibility (some deployments use only `status`, some only `approved`).
+      // We try the combined payload first, then retry with the variant that matches the table.
+      const tryInsert = async (p) => {
+        const { error } = await supabase.from("drivers").insert([p]);
+        if (error) throw error;
+      };
+
+      try {
+        await tryInsert(payload);
+      } catch (e) {
+        const msg = String(e?.message || "").toLowerCase();
+        // Missing column errors (PostgREST)
+        if (msg.includes("could not find") && msg.includes("status")) {
+          const { status, ...rest } = payload;
+          await tryInsert(rest);
+        } else if (msg.includes("could not find") && msg.includes("approved")) {
+          const { approved, ...rest } = payload;
+          await tryInsert(rest);
+        } else {
+          throw e;
+        }
+      }
+
+      // ✅ Ensure profile role becomes "driver" (prevents redirect back to client)
+      try {
+        await supabase
+          .from("profiles")
+          .upsert({ id: user.id, role: "driver", phone: phoneFull, updated_at: new Date().toISOString() }, { onConflict: "id" });
+      } catch (e) {
+        // ignore (RLS might block), RoleGate/RootRedirect still uses drivers table as source of truth
+      }
+
+      message.success("Arizangiz qabul qilindi!");
+      if (onRegisterSuccess) onRegisterSuccess();
+
+      // optional: form reset
+      form.resetFields();
+      setDriverPhoto(null);
+      setCarPhoto(null);
+      setTexPassportPhoto(null);
+      setPravaPhoto(null);
+      setCurrentStep(0);
+    } catch (err) {
+      console.error(err);
+      message.error("Xatolik: " + (err?.message || "Noma'lum xato"));
     } finally {
       setLoading(false);
     }
   };
 
-  const currentYear = dayjs().year();
-
   return (
-    <div style={{ minHeight: '100vh', background: '#f0f2f5', padding: '24px' }}>
-      <Row justify="center">
-        <Col xs={24} sm={22} md={18} lg={14} xl={12}>
-          <Card
-            style={{ borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-            bodyStyle={{ padding: '32px' }}
+    <div
+      style={{
+        padding: "0 20px 40px",
+        background: "var(--bg-layout)",
+        minHeight: "100vh",
+        color: "var(--text)",
+      }}
+    >
+      <div style={{ textAlign: "center", marginBottom: 30 }}>
+        <div
+          style={{
+            background: "rgba(255, 215, 0, 0.18)",
+            border: "1px solid rgba(255, 215, 0, 0.25)",
+            width: 70,
+            height: 70,
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            margin: "0 auto 15px",
+          }}
+        >
+          <CarOutlined style={{ fontSize: 35, color: "var(--brand)" }} />
+        </div>
+        <Title level={3} style={{ margin: 0, color: "var(--text)" }}>
+          Haydovchi bo&apos;ling
+        </Title>
+        <Text type="secondary">
+          Ma&apos;lumotlarni to&apos;ldiring va daromad qilishni boshlang
+        </Text>
+      </div>
+
+      <Steps
+        current={currentStep}
+        size="small"
+        style={{ marginBottom: 30 }}
+        items={[{ title: "Shaxsiy" }, { title: "Mashina" }, { title: "Hujjatlar" }]}
+      />
+
+      <Form
+        form={form}
+        layout="vertical"
+        onFinish={handleRegister}
+        initialValues={{ car_year: "2023" }}
+      >
+        {/* ====== 1-QADAM: SHAXSIY ====== */}
+        <div style={{ display: currentStep === 0 ? "block" : "none" }}>
+          <Form.Item
+            name="first_name"
+            label="Ismingiz"
+            rules={[{ required: true, message: "Ismingizni kiriting" }]}
           >
-            <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-              <Title level={2} style={{ margin: 0, color: '#1890ff' }}>
-                Haydovchi Ro'yxatdan O'tish
-              </Title>
-              <Text type="secondary">Ma'lumotlarni to'ldiring va hujjat rasmlarini yuklang</Text>
+            <Input prefix={<UserOutlined />} size="large" placeholder="Masalan: Timur" />
+          </Form.Item>
+
+          <Form.Item
+            name="last_name"
+            label="Familiyangiz"
+            rules={[{ required: true, message: "Familiyangizni kiriting" }]}
+          >
+            <Input
+              prefix={<UserOutlined />}
+              size="large"
+              placeholder="Masalan: Xalmuratov"
+            />
+          </Form.Item>
+
+          <Form.Item name="middle_name" label="Otasining ismi">
+            <Input
+              prefix={<UserOutlined />}
+              size="large"
+              placeholder="Masalan: Azatovich"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="phone"
+            label="Telefon raqam"
+            rules={[
+              { required: true, message: "Telefon raqamni kiriting" },
+              {
+                validator: (_, value) => {
+                  const v = String(value || "").replace(/\D/g, "");
+                  if (!v) return Promise.reject(new Error("Telefon raqamni kiriting"));
+                  if (v.length !== 9)
+                    return Promise.reject(
+                      new Error("9 xonali raqam kiriting (masalan: 901234567)")
+                    );
+                  return Promise.resolve();
+                },
+              },
+            ]}
+          >
+            <Input
+              addonBefore="+998"
+              size="large"
+              placeholder="90 123 45 67"
+              inputMode="numeric"
+              onChange={(e) => {
+                // faqat raqam
+                const digits = e.target.value.replace(/\D/g, "").slice(0, 9);
+                form.setFieldsValue({ phone: digits });
+              }}
+            />
+          </Form.Item>
+
+          {/* Hidden form field: REQUIRED upload validation uchun */}
+          <Form.Item
+            name="driver_photo"
+            rules={[{ required: true, message: "Selfi rasmingizni yuklang" }]}
+            style={{ display: "none" }}
+          >
+            <Input />
+          </Form.Item>
+
+          <Form.Item label="Shaxsiy rasmingiz (Selfi)" required>
+            <div
+              style={{
+                textAlign: "center",
+                border: "1px dashed var(--field-border)",
+                padding: 10,
+                borderRadius: 10,
+                background: "var(--field-bg)",
+              }}
+            >
+              <Upload {...uploadProps("driver_photo", setDriverPhoto)}>
+                {!driverPhoto && <UploadButton text="Rasm yuklash" icon={<CameraOutlined />} />}
+              </Upload>
+              <Text type="secondary" style={{ fontSize: 11 }}>
+                Yuzingiz aniq ko&apos;ringan bo&apos;lishi shart
+              </Text>
             </div>
+          </Form.Item>
 
-            <Form form={form} layout="vertical" onFinish={handleSubmit} size="large">
-              <Title level={4}>Shaxsiy Ma'lumotlar</Title>
+          <Button type="primary" block size="large" onClick={goNext} style={{ marginTop: 10 }}>
+            Keyingi qadam
+          </Button>
+        </div>
 
-              <Row gutter={16}>
-                <Col span={8}>
-                  <Form.Item
-                    name="last_name"
-                    label="Familiya"
-                    rules={[
-                      { required: true, message: 'Familiya kiritish majburiy' },
-                      {
-                        validator: (_, v) => {
-                          if (!v) return Promise.resolve();
-                          const val = v.trim();
-                          if (!LATIN_NAME_RE.test(val)) {
-                            return Promise.reject(new Error("Faqat lotin harflari (A-Z) ishlating"));
-                          }
-                          if (val.length > 50) {
-                            return Promise.reject(new Error('Familiya juda uzun'));
-                          }
-                          return Promise.resolve();
-                        },
-                      },
-                    ]}
-                  >
-                    <Input placeholder="Familiyangiz" />
-                  </Form.Item>
-                </Col>
+        {/* ====== 2-QADAM: MASHINA ====== */}
+        <div style={{ display: currentStep === 1 ? "block" : "none" }}>
+          <Form.Item name="car_model" label="Mashina modeli" rules={[{ required: true }]}>
+            <Select size="large" placeholder="Tanlang">
+              <Option value="Gentra">Chevrolet Gentra</Option>
+              <Option value="Cobalt">Chevrolet Cobalt</Option>
+              <Option value="Nexia3">Nexia 3</Option>
+              <Option value="Spark">Spark</Option>
+              <Option value="Onix">Onix</Option>
+              <Option value="Monza">Monza</Option>
+              <Option value="Damas">Damas</Option>
+              <Option value="Boshqa">Boshqa</Option>
+            </Select>
+          </Form.Item>
 
-                <Col span={8}>
-                  <Form.Item
-                    name="first_name"
-                    label="Ism"
-                    rules={[
-                      { required: true, message: 'Ism kiritish majburiy' },
-                      {
-                        validator: (_, v) => {
-                          if (!v) return Promise.resolve();
-                          const val = v.trim();
-                          if (!LATIN_NAME_RE.test(val)) {
-                            return Promise.reject(new Error("Faqat lotin harflari (A-Z) ishlating"));
-                          }
-                          if (val.length > 50) {
-                            return Promise.reject(new Error('Ism juda uzun'));
-                          }
-                          return Promise.resolve();
-                        },
-                      },
-                    ]}
-                  >
-                    <Input placeholder="Ismingiz" />
-                  </Form.Item>
-                </Col>
+          <Form.Item
+            name="plate_number"
+            label="Davlat raqami"
+            rules={[
+              { required: true, message: "Davlat raqamini kiriting" },
+              {
+                validator: (_, value) => {
+                  const v = String(value || "").trim();
+                  if (!v) return Promise.reject(new Error("Davlat raqamini kiriting"));
+                  if (v.length < 6) return Promise.reject(new Error("Davlat raqami juda qisqa"));
+                  return Promise.resolve();
+                },
+              },
+            ]}
+          >
+            <Input
+              prefix={<NumberOutlined />}
+              size="large"
+              placeholder="95 A 777 AA"
+              style={{ textTransform: "uppercase" }}
+              onChange={(e) => {
+                const up = String(e.target.value || "").toUpperCase();
+                form.setFieldsValue({ plate_number: up });
+              }}
+            />
+          </Form.Item>
 
-                <Col span={8}>
-                  <Form.Item
-                    name="middle_name"
-                    label="Otasining ismi"
-                    rules={[
-                      { required: true, message: "Otasining ismini kiriting" },
-                      {
-                        validator: (_, v) => {
-                          if (!v) return Promise.resolve();
-                          const val = v.trim();
-                          if (!LATIN_NAME_RE.test(val)) {
-                            return Promise.reject(new Error("Faqat lotin harflari (A-Z) ishlating"));
-                          }
-                          if (val.length > 50) {
-                            return Promise.reject(new Error("Otasining ismi juda uzun"));
-                          }
-                          return Promise.resolve();
-                        },
-                      },
-                    ]}
-                  >
-                    <Input placeholder="Otasining ismi" />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item
-                    name="phone_number"
-                    label="Telefon Raqam"
-                    rules={[
-                      { required: true, message: 'Telefon raqam kiritish majburiy' },
-                      {
-                        validator: (_, v) => {
-                          const digits = normalizeDigits(v);
-                          if (!digits) return Promise.resolve();
-                          if (digits.length !== 9) {
-                            return Promise.reject(new Error("Telefon raqam 9 ta raqam bo'lishi kerak"));
-                          }
-                          return Promise.resolve();
-                        },
-                      },
-                    ]}
-                  >
-                    <Input
-                      addonBefore="+998"
-                      placeholder="901234567"
-                      maxLength={9}
-                      onChange={(e) => {
-                        const value = normalizeDigits(e.target.value).slice(0, 9);
-                        form.setFieldsValue({ phone_number: value });
-                      }}
-                    />
-                  </Form.Item>
-                </Col>
-
-                <Col span={12}>
-                  <Form.Item
-                    name="passport_id"
-                    label="Pasport ID / Pasport raqami"
-                    rules={[
-                      { required: true, message: 'Pasport ID (yoki raqam) kiritish majburiy' },
-                      {
-                        validator: (_, v) => {
-                          if (!v) return Promise.resolve();
-                          const val = v.trim();
-                          if (!ID_RE.test(val)) {
-                            return Promise.reject(new Error('Faqat harf va raqam (bo‘sh joysiz)'));
-                          }
-                          if (val.length < 5) {
-                            return Promise.reject(new Error('Juda qisqa'));
-                          }
-                          if (val.length > 20) {
-                            return Promise.reject(new Error('Juda uzun'));
-                          }
-                          return Promise.resolve();
-                        },
-                      },
-                    ]}
-                  >
-                    <Input
-                      placeholder="AA1234567 / 123456789"
-                      maxLength={20}
-                      onChange={(e) => {
-                        const val = (e.target.value || '').replace(/\s/g, '').slice(0, 20);
-                        form.setFieldsValue({ passport_id: val });
-                      }}
-                    />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item
-                    name="prava_number"
-                    label="Haydovchilik guvohnomasi raqami"
-                    rules={[
-                      { required: true, message: 'Prava raqami kiritish majburiy' },
-                      {
-                        validator: (_, v) => {
-                          if (!v) return Promise.resolve();
-                          const val = v.trim();
-                          if (!ID_RE.test(val)) {
-                            return Promise.reject(new Error('Faqat harf va raqam (bo‘sh joysiz)'));
-                          }
-                          if (val.length < 5) {
-                            return Promise.reject(new Error('Juda qisqa'));
-                          }
-                          if (val.length > 20) {
-                            return Promise.reject(new Error('Juda uzun'));
-                          }
-                          return Promise.resolve();
-                        },
-                      },
-                    ]}
-                  >
-                    <Input
-                      placeholder="Prava raqami"
-                      maxLength={20}
-                      onChange={(e) => {
-                        const val = (e.target.value || '').replace(/\s/g, '').slice(0, 20);
-                        form.setFieldsValue({ prava_number: val });
-                      }}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item
-                    name="birth_date"
-                    label="Tug'ilgan Sana"
-                    rules={[{ required: true, message: "Tug'ilgan sanani tanlang" }]}
-                  >
-                    <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Title level={4} style={{ marginTop: '24px' }}>
-                Avtomobil Ma'lumotlari
-              </Title>
-
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item
-                    name="car_model"
-                    label="Avtomobil Modeli"
-                    rules={[{ required: true, message: 'Model kiritish majburiy' }]}
-                  >
-                    <Input placeholder="Masalan: Lacetti" />
-                  </Form.Item>
-                </Col>
-
-                <Col span={12}>
-                  <Form.Item
-                    name="plate_number"
-                    label="Davlat Raqami"
-                    rules={[
-                      { required: true, message: 'Davlat raqami kiritish majburiy' },
-                      {
-                        validator: (_, v) => {
-                          if (!v) return Promise.resolve();
-                          const val = v.trim();
-                          if (val.length > 8) {
-                            return Promise.reject(new Error('Davlat raqami 8 ta belgidan oshmasin'));
-                          }
-                          return Promise.resolve();
-                        },
-                      },
-                    ]}
-                  >
-                    <Input
-                      placeholder="Masalan: 01A123BC"
-                      maxLength={8}
-                      onChange={(e) => {
-                        const val = (e.target.value || '').toUpperCase().slice(0, 8);
-                        form.setFieldsValue({ plate_number: val });
-                      }}
-                    />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item
-                    name="car_color"
-                    label="Rangi"
-                    rules={[{ required: true, message: 'Rang tanlash majburiy' }]}
-                  >
-                    <Select placeholder="Rangni tanlang">
-                      <Option value="oq">Oq</Option>
-                      <Option value="qora">Qora</Option>
-                      <Option value="kulrang">Kulrang</Option>
-                      <Option value="qizil">Qizil</Option>
-                      <Option value="kok">Ko'k</Option>
-                      <Option value="yashil">Yashil</Option>
-                      <Option value="sariq">Sariq</Option>
-                      <Option value="boshqa">Boshqa</Option>
-                    </Select>
-                  </Form.Item>
-                </Col>
-
-                <Col span={12}>
-                  <Form.Item
-                    name="car_year"
-                    label="Ishlab Chiqarilgan Yili"
-                    rules={[
-                      { required: true, message: 'Yil kiritish majburiy' },
-                      {
-                        validator: (_, value) => {
-                          if (!value) return Promise.resolve();
-                          if (value < 1990) return Promise.reject(new Error('Yil 1990 dan kichik bo\'lmasin'));
-                          if (value > currentYear) {
-                            return Promise.reject(new Error(`Yil ${currentYear} dan katta bo'lmasin`));
-                          }
-                          return Promise.resolve();
-                        },
-                      },
-                    ]}
-                  >
-                    <Input
-                      type="number"
-                      placeholder="2020"
-                      min={1990}
-                      max={currentYear}
-                      onChange={(e) => {
-                        const value = parseInt(e.target.value, 10);
-                        if (!Number.isNaN(value)) {
-                          const clamped = Math.min(Math.max(value, 1990), currentYear);
-                          form.setFieldsValue({ car_year: clamped });
-                        }
-                      }}
-                    />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Title level={4} style={{ marginTop: '24px' }}>
-                Hujjatlar va Rasmlar
-              </Title>
-
-              <Row gutter={16}>
-                {/* Selfie */}
-                <Col span={12}>
-                  <Form.Item
-                    name="avatar_url"
-                    label="Shaxsiy Foto (Selfi)"
-                    rules={[{ required: true, message: 'Shaxsiy foto yuklash majburiy' }]}
-                  >
-                    <Upload
-                      beforeUpload={(file) => handleUpload(file, 'avatar_url')}
-                      showUploadList={false}
-                      accept="image/*"
-                    >
-                      <Button icon={uploading.avatar_url ? <LoadingOutlined /> : <UploadOutlined />}>
-                        {uploading.avatar_url ? 'Yuklanmoqda...' : 'Selfi Yuklash'}
-                      </Button>
-                    </Upload>
-                  </Form.Item>
-                </Col>
-
-                {/* Car photo */}
-                <Col span={12}>
-                  <Form.Item
-                    name="car_photo_url"
-                    label="Mashina Rasmi"
-                    rules={[{ required: true, message: 'Mashina rasmini yuklash majburiy' }]}
-                  >
-                    <Upload
-                      beforeUpload={(file) => handleUpload(file, 'car_photo_url')}
-                      showUploadList={false}
-                      accept="image/*"
-                    >
-                      <Button icon={uploading.car_photo_url ? <LoadingOutlined /> : <UploadOutlined />}>
-                        {uploading.car_photo_url ? 'Yuklanmoqda...' : 'Mashina Rasmini Yuklash'}
-                      </Button>
-                    </Upload>
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              {/* Passport images (NEW) */}
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item
-                    name="passport_front_url"
-                    label="Pasport Rasmi (Old tomoni)"
-                    rules={[{ required: true, message: 'Pasport old tomon rasmini yuklang' }]}
-                  >
-                    <Upload
-                      beforeUpload={(file) => handleUpload(file, 'passport_front_url')}
-                      showUploadList={false}
-                      accept="image/*"
-                    >
-                      <Button
-                        icon={uploading.passport_front_url ? <LoadingOutlined /> : <UploadOutlined />}
-                      >
-                        {uploading.passport_front_url ? 'Yuklanmoqda...' : 'Pasport Oldini Yuklash'}
-                      </Button>
-                    </Upload>
-                  </Form.Item>
-                </Col>
-
-                <Col span={12}>
-                  <Form.Item
-                    name="passport_back_url"
-                    label="Pasport Rasmi (Orqa tomoni)"
-                    rules={[{ required: true, message: 'Pasport orqa tomon rasmini yuklang' }]}
-                  >
-                    <Upload
-                      beforeUpload={(file) => handleUpload(file, 'passport_back_url')}
-                      showUploadList={false}
-                      accept="image/*"
-                    >
-                      <Button
-                        icon={uploading.passport_back_url ? <LoadingOutlined /> : <UploadOutlined />}
-                      >
-                        {uploading.passport_back_url ? 'Yuklanmoqda...' : 'Pasport Orqasini Yuklash'}
-                      </Button>
-                    </Upload>
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              {/* Driver license images (NEW) */}
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item
-                    name="license_front_url"
-                    label="Haydovchilik guvohnomasi (Old tomoni)"
-                    rules={[{ required: true, message: 'Guvohnoma old tomon rasmini yuklang' }]}
-                  >
-                    <Upload
-                      beforeUpload={(file) => handleUpload(file, 'license_front_url')}
-                      showUploadList={false}
-                      accept="image/*"
-                    >
-                      <Button
-                        icon={uploading.license_front_url ? <LoadingOutlined /> : <UploadOutlined />}
-                      >
-                        {uploading.license_front_url ? 'Yuklanmoqda...' : 'Guvohnoma Oldini Yuklash'}
-                      </Button>
-                    </Upload>
-                  </Form.Item>
-                </Col>
-
-                <Col span={12}>
-                  <Form.Item
-                    name="license_back_url"
-                    label="Haydovchilik guvohnomasi (Orqa tomoni)"
-                    rules={[{ required: true, message: 'Guvohnoma orqa tomon rasmini yuklang' }]}
-                  >
-                    <Upload
-                      beforeUpload={(file) => handleUpload(file, 'license_back_url')}
-                      showUploadList={false}
-                      accept="image/*"
-                    >
-                      <Button
-                        icon={uploading.license_back_url ? <LoadingOutlined /> : <UploadOutlined />}
-                      >
-                        {uploading.license_back_url ? 'Yuklanmoqda...' : 'Guvohnoma Orqasini Yuklash'}
-                      </Button>
-                    </Upload>
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              {/* Tech passport images (NEW) */}
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item
-                    name="tex_front_url"
-                    label="Texpasport (Old tomoni)"
-                    rules={[{ required: true, message: 'Texpasport old tomon rasmini yuklang' }]}
-                  >
-                    <Upload
-                      beforeUpload={(file) => handleUpload(file, 'tex_front_url')}
-                      showUploadList={false}
-                      accept="image/*"
-                    >
-                      <Button icon={uploading.tex_front_url ? <LoadingOutlined /> : <UploadOutlined />}>
-                        {uploading.tex_front_url ? 'Yuklanmoqda...' : 'Texpasport Oldini Yuklash'}
-                      </Button>
-                    </Upload>
-                  </Form.Item>
-                </Col>
-
-                <Col span={12}>
-                  <Form.Item
-                    name="tex_back_url"
-                    label="Texpasport (Orqa tomoni)"
-                    rules={[{ required: true, message: 'Texpasport orqa tomon rasmini yuklang' }]}
-                  >
-                    <Upload
-                      beforeUpload={(file) => handleUpload(file, 'tex_back_url')}
-                      showUploadList={false}
-                      accept="image/*"
-                    >
-                      <Button icon={uploading.tex_back_url ? <LoadingOutlined /> : <UploadOutlined />}>
-                        {uploading.tex_back_url ? 'Yuklanmoqda...' : 'Texpasport Orqasini Yuklash'}
-                      </Button>
-                    </Upload>
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              {/* Existing single-photo fields kept for backward compatibility */}
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item
-                    name="tex_passport_photo_url"
-                    label="Texnik Pasport (Eskicha 1 ta rasm)"
-                    rules={[{ required: false }]}
-                  >
-                    <Upload
-                      beforeUpload={(file) => handleUpload(file, 'tex_passport_photo_url')}
-                      showUploadList={false}
-                      accept="image/*"
-                    >
-                      <Button
-                        icon={uploading.tex_passport_photo_url ? <LoadingOutlined /> : <UploadOutlined />}
-                      >
-                        {uploading.tex_passport_photo_url
-                          ? 'Yuklanmoqda...'
-                          : 'Texnik Pasport (1 ta) Yuklash'}
-                      </Button>
-                    </Upload>
-                  </Form.Item>
-                </Col>
-
-                <Col span={12}>
-                  <Form.Item
-                    name="prava_photo_url"
-                    label="Prava (Eskicha 1 ta rasm)"
-                    rules={[{ required: false }]}
-                  >
-                    <Upload
-                      beforeUpload={(file) => handleUpload(file, 'prava_photo_url')}
-                      showUploadList={false}
-                      accept="image/*"
-                    >
-                      <Button icon={uploading.prava_photo_url ? <LoadingOutlined /> : <UploadOutlined />}>
-                        {uploading.prava_photo_url ? 'Yuklanmoqda...' : 'Prava (1 ta) Yuklash'}
-                      </Button>
-                    </Upload>
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Form.Item style={{ marginTop: '32px', textAlign: 'center' }}>
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  loading={loading}
-                  style={{ height: '48px', padding: '0 48px', fontSize: '16px' }}
-                >
-                  {loading ? "Yuborilmoqda..." : "Arizani Yuborish"}
-                </Button>
+          <Row gutter={10}>
+            <Col span={12}>
+              <Form.Item
+                name="car_color"
+                label="Rangi"
+                rules={[{ required: true, message: "Rangini kiriting" }]}
+              >
+                <Input placeholder="Oq" size="large" />
               </Form.Item>
-            </Form>
-          </Card>
-        </Col>
-      </Row>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="car_year"
+                label="Yili"
+                rules={[
+                  { required: true, message: "Yilini kiriting" },
+                  {
+                    validator: (_, value) => {
+                      const y = Number(value);
+                      const now = new Date().getFullYear();
+                      if (!y) return Promise.reject(new Error("Yilini kiriting"));
+                      if (y < 1980 || y > now + 1)
+                        return Promise.reject(new Error(`Yil 1980 - ${now + 1} oralig‘ida bo‘lsin`));
+                      return Promise.resolve();
+                    },
+                  },
+                ]}
+              >
+                <Input
+                  inputMode="numeric"
+                  size="large"
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, "").slice(0, 4);
+                    form.setFieldsValue({ car_year: digits });
+                  }}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <div style={{ display: "flex", gap: 10 }}>
+            <Button block size="large" onClick={goBack}>
+              Ortga
+            </Button>
+            <Button type="primary" block size="large" onClick={goNext}>
+              Keyingi
+            </Button>
+          </div>
+        </div>
+
+        {/* ====== 3-QADAM: HUJJATLAR ====== */}
+        <div style={{ display: currentStep === 2 ? "block" : "none" }}>
+          <Title level={5} style={{ color: "var(--text)" }}>
+            Hujjatlarni yuklash
+          </Title>
+
+          {/* Hidden fields: REQUIRED upload validation */}
+          <Form.Item
+            name="car_photo"
+            rules={[{ required: true, message: "Mashina rasmini yuklang" }]}
+            style={{ display: "none" }}
+          >
+            <Input />
+          </Form.Item>
+
+          <Form.Item
+            name="tex_passport_photo"
+            rules={[{ required: true, message: "Tex pasport rasmini yuklang" }]}
+            style={{ display: "none" }}
+          >
+            <Input />
+          </Form.Item>
+
+          <Form.Item
+            name="prava_photo"
+            rules={[{ required: true, message: "Prava rasmini yuklang" }]}
+            style={{ display: "none" }}
+          >
+            <Input />
+          </Form.Item>
+
+          <Form.Item label="Mashina rasmi (Oldidan)" required>
+            <Upload {...uploadProps("car_photo", setCarPhoto)} style={{ width: "100%" }}>
+              {!carPhoto && <UploadButton text="Mashina rasmi" icon={<CarOutlined />} />}
+            </Upload>
+          </Form.Item>
+
+          <Form.Item label="Texnik pasport (Oldi va orqasi)" required>
+            <Upload {...uploadProps("tex_passport_photo", setTexPassportPhoto)}>
+              {!texPassportPhoto && (
+                <UploadButton text="Texpasport" icon={<FileTextOutlined />} />
+              )}
+            </Upload>
+          </Form.Item>
+
+          <Form.Item label="Haydovchilik guvohnomasi (Prava)" required>
+            <Upload {...uploadProps("prava_photo", setPravaPhoto)}>
+              {!pravaPhoto && <UploadButton text="Prava" icon={<IdcardOutlined />} />}
+            </Upload>
+          </Form.Item>
+
+          <div style={{ marginTop: 30, display: "flex", gap: 10 }}>
+            <Button block size="large" onClick={goBack}>
+              Ortga
+            </Button>
+            <Button
+              type="primary"
+              block
+              size="large"
+              htmlType="submit"
+              loading={loading}
+              icon={<CheckCircleOutlined />}
+              style={{ background: "#52c41a", borderColor: "#52c41a", fontWeight: "bold" }}
+            >
+              Arizani Yuborish
+            </Button>
+          </div>
+
+          <div style={{ marginTop: 12 }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Eslatma: Fayllar Supabase Storage&apos;ga yuklanadi. Bucket nomi sizda boshqacha
+              bo&apos;lsa, kodda <b>bucket = &quot;drivers&quot;</b> joyini o&apos;zgartiring.
+            </Text>
+          </div>
+        </div>
+      </Form>
     </div>
   );
-};
-
-export default DriverRegister;
+}

@@ -4,6 +4,6 @@
 // va alias: "@" -> "src".
 //
 // Agar sizda alias yo'q bo'lsa, import yo'lini o'zingizga moslab o'zgartiring:
-//   import { supabase } from "../../../lib/supabase";
+//   import { supabase } from "@/lib/supabase";
 
 export { supabase } from '@/lib/supabase';

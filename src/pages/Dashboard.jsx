@@ -12,7 +12,7 @@ import {
 } from "@ant-design/icons";
 
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../lib/supabase";
+import { supabase } from "@/lib/supabase";
 import ClientDashboard from "../features/client/components/ClientDashboard";
 
 import { translations } from "@i18n/translations";

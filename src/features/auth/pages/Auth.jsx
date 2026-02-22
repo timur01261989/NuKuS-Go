@@ -15,7 +15,7 @@ import { useLanguage } from "@shared/i18n/useLanguage";
 import { LockOutlined, GlobalOutlined, PhoneOutlined } from "@ant-design/icons";
 
 import { translations } from "@i18n/translations";
-import { supabase } from "@lib/supabase";
+import { supabase } from "@/lib/supabase";
 
 const { Title, Text } = Typography;
 

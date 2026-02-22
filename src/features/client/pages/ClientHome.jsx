@@ -13,7 +13,7 @@ import {
   UserOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { listMarketCars, formatPriceUZS } from "@services/marketService";
 import { useLanguage } from "@shared/i18n/useLanguage";
 import { haversineKm } from "../shared/geo/haversine";

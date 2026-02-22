@@ -1,4 +1,4 @@
-import api from "../../../../utils/apiHelper";
+import api from "@/utils/apiHelper";
 
 /**
  * cityTaxiApi.js

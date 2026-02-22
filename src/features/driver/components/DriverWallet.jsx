@@ -4,7 +4,7 @@ import {
   ArrowLeftOutlined, WalletOutlined, ArrowUpOutlined, 
   ArrowDownOutlined, BankOutlined, HistoryOutlined 
 } from '@ant-design/icons';
-import { supabase } from "../../../lib/supabase";
+import { supabase } from "@/lib/supabase";
 
 const { Title, Text } = Typography;
 

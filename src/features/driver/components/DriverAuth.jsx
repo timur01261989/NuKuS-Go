@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Button, Result, Card, Skeleton, message, Typography } from "antd";
 import { ClockCircleOutlined, StopOutlined, ReloadOutlined, ArrowLeftOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@lib/supabase";
+import { supabase } from "@/lib/supabase";
 import DriverHome from "./DriverHome";
 import DriverRegister from "./DriverRegister";
 

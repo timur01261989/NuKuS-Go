@@ -7,7 +7,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-import { supabase } from "../../../lib/supabase"; 
+import { supabase } from "@/lib/supabase"; 
 
 // --- MAP ICON FIX ---
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -100,27 +100,16 @@ export default function DriverOrderFeed() {
       }
 
       // Optimistik yangilanish (UI tezroq ishlashi uchun)
-      const { data: acceptedRows, error } = await supabase
+      const { error } = await supabase
         .from('orders')
-        // ⚠️ Eslatma: accepted_at/updated_at ustunlari har doim ham sxemada bo'lmasligi mumkin.
-        // Shuning uchun minimal, mos keladigan payload yuboramiz.
         .update({ 
             status: 'accepted', 
-            driver_id: user.id,
+            driver_id: user.id 
         })
         .eq('id', order.id)
-        .in('status', ['pending', 'searching']) // Faqat bo'shlarini olish
-        .is('driver_id', null)
-        .select('id,driver_id,status');
+        .in('status', ['pending', 'searching']); // Faqat bo'shlarini olish
 
       if (error) throw error;
-
-      // ✅ Atomik qabul: agar boshqa haydovchi oldin olsa, update 0 qator bo'ladi
-      if (!acceptedRows || acceptedRows.length === 0) {
-        message.warning("Ulgurmadingiz, buyurtmani boshqa haydovchi oldi.");
-        fetchOrders();
-        return;
-      }
       
       // Tekshiramiz, rostan ham bizga o'tdimi
       const { data: check } = await supabase.from('orders').select('driver_id').eq('id', order.id).single();
@@ -144,24 +133,10 @@ export default function DriverOrderFeed() {
   const updateStatus = async (newStatus) => {
       if (!activeOrder) return;
 
-      // ✅ Qat'iy status yo'li (state machine) - order "stuck" va noto'g'ri o'tishlarni kamaytiradi
-      const allowed = {
-        accepted: ['arrived'],
-        arrived: ['in_progress'],
-        in_progress: ['completed'],
-      };
-      const cur = activeOrder.status;
-      const ok = (allowed[cur] || []).includes(newStatus);
-      if (!ok) {
-        message.warning(`Noto'g'ri status o'tishi: ${cur} -> ${newStatus}`);
-        return;
-      }
-
       const { error } = await supabase
         .from('orders')
         .update({ status: newStatus })
-        .eq('id', activeOrder.id)
-        .eq('status', cur);
+        .eq('id', activeOrder.id);
 
       if (!error) {
           setActiveOrder({ ...activeOrder, status: newStatus });
@@ -172,10 +147,6 @@ export default function DriverOrderFeed() {
               setActiveOrder(null);
               fetchOrders();
           }
-      } else {
-          message.error("Status yangilashda xatolik: " + error.message);
-          // Agar race bo'lsa yoki order boshqa joyda o'zgargan bo'lsa, qayta tortamiz
-          checkActiveOrder();
       }
   };
 

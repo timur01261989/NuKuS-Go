@@ -4,7 +4,7 @@ import {
   ArrowLeftOutlined, EnvironmentOutlined, 
   ClockCircleOutlined, CarOutlined 
 } from '@ant-design/icons';
-import { supabase } from '../../../lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 const { Text, Title } = Typography;
 

@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
-import api from "./utils/apiHelper";
+import api from "@/utils/apiHelper";
 
 // ✅ Ant Design reset
 import "antd/dist/reset.css";

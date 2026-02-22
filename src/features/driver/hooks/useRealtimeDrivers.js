@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "../../../lib/supabase";
+import { supabase } from "@/lib/supabase";
 
 function haversineMeters(a, b) {
   const toRad = (v) => (v * Math.PI) / 180;

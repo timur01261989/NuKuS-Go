@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { List, Card, Typography, Tag, Button, Spin, Empty } from 'antd';
 import { ClockCircleOutlined, EnvironmentFilled, ArrowLeftOutlined, RightOutlined } from '@ant-design/icons';
-import { supabase } from '../../../lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 const { Title, Text } = Typography;
 

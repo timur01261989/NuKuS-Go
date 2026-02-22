@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { Spin } from "antd";
-import { supabase } from "@lib/supabase";
+import { supabase } from "@/lib/supabase";
 
 /**
  * RoleGate
@@ -11,12 +11,10 @@ import { supabase } from "@lib/supabase";
  *  - requireDriverApproved: true/false
  *
  * IMPORTANT:
- *  Role truth source MUST be `profiles.role`.
- *  `drivers` table row existence is ONLY for driver registration/approval state,
- *  and must NOT override a user's role.
- *
- *  Why: if you treat "drivers row exists" as role=driver, then any client who once
- *  created a drivers row (or has a leftover row) gets forced into driver routes.
+ *  This app historically stored "role" in profiles, but in real life
+ *  the truth for driver access is "drivers" table row existence.
+ *  If drivers row exists => treat user as driver for driver routes,
+ *  even if profiles.role is still "client" (common bug causing redirect to /client/home).
  */
 export default function RoleGate({ children, allow, redirectTo = "/login" }) {
   if (!supabase) {
@@ -128,9 +126,13 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         }
 
         // 4) Derive effective role
-        // Role is always taken from profiles.role.
-        // Drivers table is used to determine registration/approval only.
-        const effectiveRole = profileRole;
+        // If drivers row exists => effective role is driver (even if profile says client)
+        // Also: if profile says "driver" but no drivers row -> still treat as driver (redirect to register)
+        const effectiveRole = driverRowExists
+          ? "driver"
+          : profileRole === "driver"
+          ? "driver"
+          : profileRole;
 
         // 5) Auto-create client profile if accessing client-only route and profile missing
         if (!effectiveRole && a.client && !a.driver) {

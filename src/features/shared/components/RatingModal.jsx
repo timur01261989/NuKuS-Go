@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Modal, Rate, Input, Button, Typography, message } from 'antd';
 import { StarFilled } from '@ant-design/icons';
-import { supabase } from '../../../lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 const { Title, Text } = Typography;
 

@@ -4,7 +4,7 @@ import {
   TrophyFilled, StarFilled, ArrowLeftOutlined, 
   ThunderboltFilled, CrownFilled, UserOutlined
 } from '@ant-design/icons';
-import { supabase } from "../../../lib/supabase";
+import { supabase } from "@/lib/supabase";
 
 const { Title, Text } = Typography;
 
