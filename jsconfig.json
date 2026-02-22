@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "src/*"
+      ],
+      "@shared/*": [
+        "src/shared/*"
+      ],
+      "@features/*": [
+        "src/features/*"
+      ],
+      "@services/*": [
+        "src/services/*"
+      ],
+      "@utils/*": [
+        "src/utils/*"
+      ],
+      "@lib/*": [
+        "src/lib/*"
+      ],
+      "@i18n/*": [
+        "src/i18n/*"
+      ],
+      "@providers/*": [
+        "src/providers/*"
+      ]
+    }
+  },
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}
