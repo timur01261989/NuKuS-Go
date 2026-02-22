@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { appConfig } from "../../../shared/config/appConfig";
 import {
   Button,
@@ -44,7 +44,6 @@ const { Title, Text } = Typography;
 
 export default function DriverHome({ onLogout }) {
   const navigate = useNavigate();
-  const location = useLocation(); // YANGI - client sahifasiga qaytish uchun
 
   // =========================
   // STATE
@@ -54,6 +53,43 @@ export default function DriverHome({ onLogout }) {
   );
   const [profileOpen, setProfileOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // =========================
+  // BACK (browser / Android back) handling
+  // =========================
+  // Bu loyihada servislar route bilan emas, ichki state bilan ochiladi.
+  // Shuning uchun foydalanuvchi "Shahar ichi"ga kirganda browser back ishlamay qoladi.
+  // Yechim: servis ochilganda history'ga bitta state push qilamiz.
+  // Back bosilganda popstate keladi va menyuga qaytaramiz.
+  useEffect(() => {
+    const onPopState = () => {
+      setSelectedService((prev) => {
+        if (prev) {
+          try {
+            localStorage.removeItem("driverActiveService");
+          } catch (e) {}
+          return null;
+        }
+        return prev;
+      });
+    };
+
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedService) return;
+    try {
+      window.history.pushState(
+        { driverService: selectedService, ts: Date.now() },
+        "",
+        window.location.href
+      );
+    } catch (e) {
+      // ignore
+    }
+  }, [selectedService]);
 
   // Online flag (persist)
   const [isOnline, setIsOnline] = useState(() => {
@@ -405,15 +441,15 @@ export default function DriverHome({ onLogout }) {
       >
         <Button
           onClick={() => {
-            // TUZATISH: Client sahifasiga to'g'ri qaytish
-            const previousPath = location.state?.from;
-            
-            if (previousPath && (previousPath.startsWith("/client") || previousPath.startsWith("/delivery") || previousPath.startsWith("/freight") || previousPath.startsWith("/intercity") || previousPath.startsWith("/interdistrict"))) {
-              // Client sahifasiga qaytish
-              navigate(previousPath, { replace: false });
-            } else {
-              // Yoki dashboard ga qaytish
-              setSelectedService(null);
+            // Driver menyusidan chiqishda client sahifasiga "uchib ketish" oldini olamiz.
+            // Agar history mavjud bo'lsa, oddiy ortga qaytamiz; bo'lmasa driver dashboardga.
+            try {
+              if (typeof window !== "undefined" && window.history && window.history.length > 1) {
+                navigate(-1);
+              } else {
+                navigate("/driver/dashboard", { replace: true });
+              }
+            } catch {
               navigate("/driver/dashboard", { replace: true });
             }
           }}
