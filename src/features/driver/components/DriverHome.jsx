@@ -445,7 +445,7 @@ export default function DriverHome({ onLogout }) {
             // Agar history mavjud bo'lsa, oddiy ortga qaytamiz; bo'lmasa driver dashboardga.
             try {
               if (typeof window !== "undefined" && window.history && window.history.length > 1) {
-                navigate(-1);
+                navigate("/client/home", { replace: true });
               } else {
                 navigate("/driver/dashboard", { replace: true });
               }
