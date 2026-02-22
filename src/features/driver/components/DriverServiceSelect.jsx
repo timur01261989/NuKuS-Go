@@ -29,7 +29,9 @@ export default function DriverServiceSelect({ onSelectService }) {
 
   // --- Chiqish funksiyasi ---
   const handleExit = () => {
-    navigate('/'); 
+    // Driver mode ichida ortga qaytish: history bo'lsa -1, bo'lmasa driver dashboard
+    if (window.history.length > 1) navigate(-1);
+    else navigate('/driver/dashboard');
   };
 
   // --- Xizmatlar ro'yxati ---

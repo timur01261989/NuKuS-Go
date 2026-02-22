@@ -93,7 +93,11 @@ export default function DriverAuth({ onBack }) {
   // Asosiy ilovaga qaytish
   const goBackMain = () => {
     if (onBack) onBack();
-    else navigate("/");
+    else {
+      // Driver oqimidan chiqib ketmaslik uchun: history bo'lsa ortga, bo'lmasa driver dashboard
+      if (window.history.length > 1) navigate(-1);
+      else navigate('/driver/dashboard');
+    }
   };
 
   // Statusni qayta tekshirish (Refresh)
