@@ -37,7 +37,7 @@ import DriverDelivery from "./services/DriverDelivery";
 
 import DriverProfile from "./DriverProfile";
 
-import { supabase } from "@/lib/supabase"; 
+import { supabase } from "@lib/supabase"; 
 import { startTracking } from "./services/locationService";
 
 const { Title, Text } = Typography;
@@ -403,7 +403,9 @@ export default function DriverHome({ onLogout }) {
         }}
       >
         <Button
-          onClick={() => navigate("/client/home")}
+          // Driver menyusidan chiqib ketganda client sahifasiga tashlab yubormaymiz.
+          // Bu tugma driver bosh sahifasida qolishi kerak.
+          onClick={() => navigate("/driver/dashboard")}
           icon={<ArrowLeftOutlined />}
           shape="circle"
           size="large"
