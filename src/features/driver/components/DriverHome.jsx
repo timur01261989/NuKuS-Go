@@ -403,9 +403,19 @@ export default function DriverHome({ onLogout }) {
         }}
       >
         <Button
-          // Driver menyusidan chiqib ketganda client sahifasiga tashlab yubormaymiz.
-          // Bu tugma driver bosh sahifasida qolishi kerak.
-          onClick={() => navigate("/driver/dashboard")}
+          onClick={() => {
+            // Driver menyusidan chiqishda client sahifasiga "uchib ketish" oldini olamiz.
+            // Agar history mavjud bo'lsa, oddiy ortga qaytamiz; bo'lmasa driver dashboardga.
+            try {
+              if (typeof window !== "undefined" && window.history && window.history.length > 1) {
+                navigate(-1);
+              } else {
+                navigate("/driver/dashboard", { replace: true });
+              }
+            } catch {
+              navigate("/driver/dashboard", { replace: true });
+            }
+          }}
           icon={<ArrowLeftOutlined />}
           shape="circle"
           size="large"

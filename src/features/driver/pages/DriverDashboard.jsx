@@ -26,7 +26,7 @@ import {
   StopOutlined
 } from "@ant-design/icons";
 import { useLocation, useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase"; 
+import { supabase } from "../../../lib/supabase"; 
 import { useLanguage } from "../../../shared/i18n/useLanguage"; 
 import { startTracking } from "../components/services/locationService";
 import DriverHome from "../components/DriverHome";
@@ -56,7 +56,9 @@ export default function DriverDashboard() {
     try {
       await supabase.auth.signOut();
     } finally {
-      navigate("/client/home", { replace: true });
+      // Logoutdan keyin client home'ga yuborish "rol aralashuvi" va redirect loop keltirib chiqarishi mumkin.
+      // Eng toza oqim: login sahifasiga qaytish.
+      navigate("/login", { replace: true });
     }
   };
 
