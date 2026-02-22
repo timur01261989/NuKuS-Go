@@ -61,6 +61,25 @@ export default function DriverDashboard() {
           return;
         }
 
+        // Variant A: driver access is based on a row in `drivers` table.
+// `driver_applications` is only the registration request (pending/rejected history).
+        const { data: drvRow, error: drvErr } = await supabase
+          .from("drivers")
+          .select("id, user_id")
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        if (drvErr) {
+          console.error("drivers select error:", drvErr);
+        }
+
+        if (drvRow) {
+          // Driver exists -> allow
+          if (isMounted) setGateAllowed(true);
+          return;
+        }
+
+        // No driver row yet -> fall back to application status to decide pending/register.
         const { data: appRow, error: appErr } = await supabase
           .from("driver_applications")
           .select("status, created_at")
@@ -78,14 +97,14 @@ export default function DriverDashboard() {
 
         const status = (appRow.status || "").toString().toLowerCase();
 
-        if (["pending", "submitted", "waiting", "review"].includes(status)) {
+        if (["pending", "submitted", "waiting", "review", "approved"].includes(status)) {
+          // Even if application is approved, drivers row is the source of truth for Variant A.
           navigate("/driver/pending", { replace: true });
           return;
         }
 
-        // Approved (or any other non-pending state) -> allow
-        if (isMounted) setGateAllowed(true);
-      } catch (e) {
+        // Any other state -> allow (fail-open)
+        if (isMounted) setGateAllowed(true);      } catch (e) {
         console.error("Driver dashboard gate error:", e);
         // Fail safe: send to register so driver can proceed
         navigate("/driver/register", { replace: true });

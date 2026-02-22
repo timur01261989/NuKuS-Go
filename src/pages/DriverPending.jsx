@@ -59,9 +59,33 @@ export default function DriverPending() {
       const role = profile?.role || null;
       const appStatus = appRow?.status || null;
 
+      // Variant A (recommended): final driver access is based on:
+      //  - profiles.role === 'driver'
+      //  - a corresponding row exists in `drivers` table
+      // The `driver_applications` table is ONLY the registration request (pending/rejected history).
+      let driverRow = null;
+      let driverRowExists = false;
+
+      try {
+        const { data: drv, error: drvErr } = await supabase
+          .from("drivers")
+          .select("id, user_id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (drvErr) {
+          console.error("drivers select error:", drvErr);
+        } else if (drv) {
+          driverRow = drv;
+          driverRowExists = true;
+        }
+      } catch (e) {
+        console.error("drivers select exception:", e);
+      }
+
       // Decide final status for this page
-      // Approved if role is driver OR app status is approved
-      const isApproved = role === "driver" || appStatus === "approved";
+      // Approved ONLY if role is driver AND drivers row exists (Variant A)
+      const isApproved = role === "driver" && driverRowExists;
       const isRejected = appStatus === "rejected";
 
       if (isApproved) {
@@ -72,6 +96,16 @@ export default function DriverPending() {
         // Important: only redirect once we are sure approved,
         // and let RoleGate / dashboard routes see the updated profile role.
         navigate("/driver/dashboard", { replace: true });
+        return;
+      }
+
+      // Defensive: if role already became 'driver' but drivers row is missing,
+      // stay on pending with a clear message (prevents redirect loops).
+      if (role === "driver" && !driverRowExists) {
+        setStatus("pending");
+        setMessage("Admin tasdiqlagan bo‘lishi mumkin, lekin haydovchi profili (drivers jadvali) topilmadi. Iltimos, birozdan so‘ng qayta tekshiring yoki admin bilan bog‘laning.");
+        setLoading(false);
+        setChecking(false);
         return;
       }
 
