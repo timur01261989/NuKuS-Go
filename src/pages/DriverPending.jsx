@@ -1,113 +1,166 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { Alert, Button, Card, Typography } from "antd";
+import React, { useEffect, useState } from "react";
+import { Button, Card, Typography, Spin, message } from "antd";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 
 const { Title, Text } = Typography;
 
+// Pending sahifasi: haydovchi tasdiqlanishini kutadi.
+// Tasdiq bo'lganini tekshirish: 1) profiles.role === 'driver' 2) driver_applications.status === 'approved'
 export default function DriverPending() {
   const navigate = useNavigate();
-
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState(null);
-  const [role, setRole] = useState(null);
-  const [errorMsg, setErrorMsg] = useState("");
+  const [checkingStatus, setCheckingStatus] = useState(false);
 
-  const checkStatus = useCallback(async () => {
-    setLoading(true);
-    setErrorMsg("");
+  const isApprovedStatus = (v) =>
+    typeof v === "string" && ["approved", "active", "verified", "enabled", "ok"].includes(v.toLowerCase());
+
+  const checkApprovedAndRedirect = async (opts = { showToast: false }) => {
     try {
-      const { data: authData, error: authError } = await supabase.auth.getUser();
-      if (authError) throw authError;
+      setCheckingStatus(true);
 
-      const user = authData?.user;
-      if (!user?.id) {
+      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      if (authErr) {
+        // Auth bo'lmasa login ga qaytarish (pendingda qolib ketmasin)
+        console.error("Auth getUser error:", authErr);
         navigate("/login", { replace: true });
         return;
       }
 
-      // Latest driver application status
-      const { data: appRow, error: appError } = await supabase
+      const userId = authData?.user?.id;
+      if (!userId) {
+        navigate("/login", { replace: true });
+        return;
+      }
+
+      // 1) Avvalo profiles dan rolni tekshiramiz (admin tasdiqlaganda shuni o'zgartiryapsiz)
+      const { data: profile, error: profErr } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (profErr) {
+        console.error("profiles role tekshirish xato:", profErr);
+      }
+
+      if (profile?.role && String(profile.role).toLowerCase() === "driver") {
+        if (opts.showToast) message.success("Siz tasdiqlandingiz! Dashboordga yo'natilmoqda...");
+        navigate("/driver/dashboard", { replace: true });
+        return;
+      }
+
+      // 2) Agar role hali driver bo'lmasa, driver_applications dagi eng oxirgi arizani tekshiramiz
+      const { data: app, error: appErr } = await supabase
         .from("driver_applications")
-        .select("id,status")
-        .eq("user_id", user.id)
+        .select("status, created_at")
+        .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (appError) throw appError;
 
-      if (!appRow) {
-        // If user never applied, send to register
-        navigate("/driver/register", { replace: true });
+      if (appErr) {
+        console.error("driver_applications tekshirish xato:", appErr);
         return;
       }
 
-      const currentStatus = appRow.status ?? null;
-      setStatus(currentStatus);
+      if (app && isApprovedStatus(app.status)) {
+        // Bu holatda admin arizani approved qilgan, lekin profiles.role hali yangilanmagan bo'lishi mumkin.
+        // Biz bu yerda profiles ni update qilmaymiz (RLS sababli ko'pincha ruxsat yo'q).
+        // Admin update qilgandan keyin yoki trigger orqali role yangilansa avtomatik o'tadi.
+        if (opts.showToast) message.success("Ariza tasdiqlangan! Dashboordga yo'natilmoqda...");
+        navigate("/driver/dashboard", { replace: true });
+        return;
+      }
+    } catch (err) {
+      console.error("Status tekshirish xatosi:", err);
+    } finally {
+      setCheckingStatus(false);
+    }
+  };
 
-      // Role gate usually reads profiles.role
-      const { data: profileRow, error: profileError } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
+  // Har 3 soniyada status tekshirish
+  useEffect(() => {
+    let interval;
+
+    // Avvalo darhol tekshir
+    checkApprovedAndRedirect();
+
+    // Keyin 3 soniyada bir tekshir
+    interval = setInterval(() => checkApprovedAndRedirect(), 3000);
+
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigate]);
+
+  const handleRefresh = async () => {
+    setLoading(true);
+    try {
+      await checkApprovedAndRedirect({ showToast: true });
+      // Agar hali ham pending bo'lsa, info ko'rsatamiz
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData?.user?.id;
+      if (!userId) return;
+
+      const { data: app } = await supabase
+        .from("driver_applications")
+        .select("status, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
-      if (profileError) throw profileError;
 
-      const currentRole = profileRow?.role ?? null;
-      setRole(currentRole);
-
-      // Approved + role switched => let them into driver area
-      if (currentStatus === "approved" && currentRole === "driver") {
-        // If your driver home route is different, change it here.
-        navigate("/driver", { replace: true });
-        return;
+      if (!app) {
+        message.info("Ariza topilmadi. Qaytadan ro'yxatdan o'ting.");
+      } else {
+        message.info(`Holatingiz: ${app.status || "pending"}. Admin tekshiruvda...`);
       }
-
-      // Approved but role not switched => explain
-      if (currentStatus === "approved" && currentRole !== "driver") {
-        setErrorMsg(
-          "Ariza tasdiqlangan, lekin profilingiz 'driver' roliga o'tmagan. Supabase'da profiles.role = 'driver' qilib qo'ying."
-        );
-      }
-    } catch (e) {
-      setErrorMsg(e?.message || "Xatolik yuz berdi");
+    } catch (err) {
+      message.error("Tekshirishda xato: " + (err?.message || ""));
     } finally {
       setLoading(false);
     }
-  }, [navigate]);
-
-  useEffect(() => {
-    checkStatus();
-  }, [checkStatus]);
+  };
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, background: "#f5f6f8" }}>
-      <Card style={{ width: 420, maxWidth: "100%", borderRadius: 16 }}>
-        <Title level={4} style={{ marginTop: 0 }}>Haydovchi tasdiqlanmagan</Title>
+      <Card style={{ width: 450, maxWidth: "100%", borderRadius: 16 }}>
+        <Title level={4} style={{ marginTop: 0 }}>⏳ Haydovchi tasdiqlanmagan</Title>
         <Text type="secondary">
-          Sizning haydovchi profilingiz admin tomonidan tekshirilmoqda. Tasdiqlangandan keyin haydovchi rejimiga kira olasiz.
+          Sizning haydovchi profilingiz admin tomonidan tekshirilmoqda. Tasdiqlangandan keyin haydovchi rejimiga avtomatik kirish amalga oshadi.
         </Text>
 
-        {(status || role) && (
-          <div style={{ marginTop: 10 }}>
-            <Text type="secondary">
-              Status: <b>{status ?? "-"}</b> &nbsp;|&nbsp; Role: <b>{role ?? "-"}</b>
+        <div style={{ marginTop: 20, padding: 12, background: "#f0f0f0", borderRadius: 8 }}>
+          {checkingStatus && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Spin size="small" />
+              <Text type="secondary" style={{ fontSize: 12 }}>Status tekshirilmoqda...</Text>
+            </div>
+          )}
+          {!checkingStatus && (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Status har 3 soniyada avtomatik tekshiriladi. Shuningdek quyidagi "Qayta tekshir" tugmasini bosishingiz mumkin.
             </Text>
-          </div>
-        )}
+          )}
+        </div>
 
-        {errorMsg ? (
-          <div style={{ marginTop: 12 }}>
-            <Alert type="error" showIcon message={errorMsg} />
-          </div>
-        ) : null}
-
-        <div style={{ marginTop: 14, display: "flex", gap: 10 }}>
-          <Button type="primary" style={{ background: "#000", borderColor: "#000" }} loading={loading} onClick={checkStatus}>
+        <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 10 }}>
+          <Button
+            type="primary"
+            style={{ background: "#000", borderColor: "#000" }}
+            onClick={handleRefresh}
+            loading={loading}
+            block
+          >
             Qayta tekshir
           </Button>
-          <Button onClick={() => navigate("/client")}>Yolovchi rejimiga qaytish</Button>
-          <Button onClick={() => navigate("/driver-mode")}>Ma’lumotlarni ko‘rish</Button>
+
+          <Button
+            onClick={() => navigate("/client")}
+            block
+          >
+            Yolovchi rejimiga qaytish
+          </Button>
         </div>
       </Card>
     </div>
