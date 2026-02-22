@@ -54,6 +54,43 @@ export default function DriverHome({ onLogout }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // =========================
+  // BACK (browser / Android back) handling
+  // =========================
+  // Bu loyihada servislar route bilan emas, ichki state bilan ochiladi.
+  // Shuning uchun foydalanuvchi "Shahar ichi"ga kirganda browser back ishlamay qoladi.
+  // Yechim: servis ochilganda history'ga bitta state push qilamiz.
+  // Back bosilganda popstate keladi va menyuga qaytaramiz.
+  useEffect(() => {
+    const onPopState = () => {
+      setSelectedService((prev) => {
+        if (prev) {
+          try {
+            localStorage.removeItem("driverActiveService");
+          } catch (e) {}
+          return null;
+        }
+        return prev;
+      });
+    };
+
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedService) return;
+    try {
+      window.history.pushState(
+        { driverService: selectedService, ts: Date.now() },
+        "",
+        window.location.href
+      );
+    } catch (e) {
+      // ignore
+    }
+  }, [selectedService]);
+
   // Online flag (persist)
   const [isOnline, setIsOnline] = useState(() => {
     const v = (typeof window !== "undefined" ? localStorage.getItem("driverOnline") : null);
