@@ -37,6 +37,7 @@ const ClientDelivery = lazy(() => import("@features/client/delivery/DeliveryPage
 const DriverOrders = lazy(() => import("@features/driver/pages/DriverOrders"));
 const DriverDashboard = lazy(() => import("@features/driver/pages/DriverDashboard"));
 const DriverRegister = lazy(() => import("@features/driver/components/DriverRegister"));
+const DriverModeRedirect = lazy(() => import("@shared/routes/DriverModeRedirect")); // YANGI
 
 // --- SETTINGS ---
 const Settings = lazy(() => import("@features/settings/pages/Settings"));
@@ -152,8 +153,8 @@ export default function App() {
               <Route path="/driver" element={<Navigate to="/driver/dashboard" replace />} />
               {/* eski menyuda /driver/home ishlatilgan */}
               <Route path="/driver/home" element={<Navigate to="/driver/dashboard" replace />} />
-              {/* /driver-mode -> ClientHome dagi tugma shu yo'lga yuboradi */}
-              <Route path="/driver-mode" element={<Navigate to="/driver/dashboard" replace />} />
+              {/* /driver-mode -> DriverModeRedirect (location state o'tkaza oladi) */}
+              <Route path="/driver-mode" element={<DriverModeRedirect />} />
 
               <Route
                 path="/driver/register"
