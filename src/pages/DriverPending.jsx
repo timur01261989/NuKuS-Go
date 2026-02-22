@@ -1,168 +1,211 @@
 import React, { useEffect, useState } from "react";
-import { Button, Card, Typography, Spin, message } from "antd";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../lib/supabase";
+import { supabase } from "../supabaseClient";
 
-const { Title, Text } = Typography;
-
-// Pending sahifasi: haydovchi tasdiqlanishini kutadi.
-// Tasdiq bo'lganini tekshirish: 1) profiles.role === 'driver' 2) driver_applications.status === 'approved'
 export default function DriverPending() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [checkingStatus, setCheckingStatus] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState("pending"); // pending | approved | rejected | none
+  const [message, setMessage] = useState("");
+  const [checking, setChecking] = useState(false);
 
-  const isApprovedStatus = (v) =>
-    typeof v === "string" && ["approved", "active", "verified", "enabled", "ok"].includes(v.toLowerCase());
+  const fetchDriverStatus = async () => {
+    if (checking) return;
+    setChecking(true);
 
-  const checkApprovedAndRedirect = async (opts = { showToast: false }) => {
     try {
-      setCheckingStatus(true);
+      setMessage("");
 
-      const { data: authData, error: authErr } = await supabase.auth.getUser();
-      if (authErr) {
-        // Auth bo'lmasa login ga qaytarish (pendingda qolib ketmasin)
-        console.error("Auth getUser error:", authErr);
+      // 1) Auth user
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError) {
+        console.error("Auth error:", authError);
+      }
+      const user = authData?.user;
+
+      if (!user) {
+        setLoading(false);
+        setChecking(false);
         navigate("/login", { replace: true });
         return;
       }
 
-      const userId = authData?.user?.id;
-      if (!userId) {
-        navigate("/login", { replace: true });
-        return;
-      }
-
-      // 1) Avvalo profiles dan rolni tekshiramiz (admin tasdiqlaganda shuni o'zgartiryapsiz)
-      const { data: profile, error: profErr } = await supabase
+      // 2) If profile role is already driver, we can treat as approved
+      //    (this is the most reliable "final state" for route guards)
+      const { data: profile, error: profileErr } = await supabase
         .from("profiles")
-        .select("role")
-        .eq("id", userId)
+        .select("id, role")
+        .eq("id", user.id)
         .maybeSingle();
 
-      if (profErr) {
-        console.error("profiles role tekshirish xato:", profErr);
+      if (profileErr) {
+        console.error("Profile select error:", profileErr);
       }
 
-      if (profile?.role && String(profile.role).toLowerCase() === "driver") {
-        if (opts.showToast) message.success("Siz tasdiqlandingiz! Dashboordga yo'natilmoqda...");
-        navigate("/driver/dashboard", { replace: true });
-        return;
-      }
-
-      // 2) Agar role hali driver bo'lmasa, driver_applications dagi eng oxirgi arizani tekshiramiz
-      const { data: app, error: appErr } = await supabase
+      // 3) Check latest driver application status
+      //    (driver_applications row is created when user submits registration)
+      const { data: appRow, error: appErr } = await supabase
         .from("driver_applications")
-        .select("status, created_at")
-        .eq("user_id", userId)
+        .select("id, status, created_at")
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
       if (appErr) {
-        console.error("driver_applications tekshirish xato:", appErr);
-        return;
+        console.error("driver_applications select error:", appErr);
       }
 
-      if (app && isApprovedStatus(app.status)) {
-        // Bu holatda admin arizani approved qilgan, lekin profiles.role hali yangilanmagan bo'lishi mumkin.
-        // Biz bu yerda profiles ni update qilmaymiz (RLS sababli ko'pincha ruxsat yo'q).
-        // Admin update qilgandan keyin yoki trigger orqali role yangilansa avtomatik o'tadi.
-        if (opts.showToast) message.success("Ariza tasdiqlangan! Dashboordga yo'natilmoqda...");
+      const role = profile?.role || null;
+      const appStatus = appRow?.status || null;
+
+      // Decide final status for this page
+      // Approved if role is driver OR app status is approved
+      const isApproved = role === "driver" || appStatus === "approved";
+      const isRejected = appStatus === "rejected";
+
+      if (isApproved) {
+        setStatus("approved");
+        setLoading(false);
+        setChecking(false);
+
+        // Important: only redirect once we are sure approved,
+        // and let RoleGate / dashboard routes see the updated profile role.
         navigate("/driver/dashboard", { replace: true });
         return;
       }
-    } catch (err) {
-      console.error("Status tekshirish xatosi:", err);
-    } finally {
-      setCheckingStatus(false);
+
+      if (isRejected) {
+        setStatus("rejected");
+        setMessage("Arizangiz rad etilgan. Qayta ro‘yxatdan o‘ting.");
+        setLoading(false);
+        setChecking(false);
+        return;
+      }
+
+      if (!appRow) {
+        // User has no application yet
+        setStatus("none");
+        setMessage("Siz hali haydovchi arizasini yubormagansiz.");
+        setLoading(false);
+        setChecking(false);
+        return;
+      }
+
+      // Otherwise: still pending
+      setStatus("pending");
+      setMessage("");
+      setLoading(false);
+      setChecking(false);
+    } catch (e) {
+      console.error("DriverPending error:", e);
+      setMessage("Xatolik yuz berdi. Keyinroq qayta urinib ko‘ring.");
+      setLoading(false);
+      setChecking(false);
     }
   };
 
-  // Har 3 soniyada status tekshirish
   useEffect(() => {
-    let interval;
-
-    // Avvalo darhol tekshir
-    checkApprovedAndRedirect();
-
-    // Keyin 3 soniyada bir tekshir
-    interval = setInterval(() => checkApprovedAndRedirect(), 3000);
-
+    fetchDriverStatus();
+    const interval = setInterval(fetchDriverStatus, 3000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigate]);
+  }, []);
 
-  const handleRefresh = async () => {
-    setLoading(true);
-    try {
-      await checkApprovedAndRedirect({ showToast: true });
-      // Agar hali ham pending bo'lsa, info ko'rsatamiz
-      const { data: authData } = await supabase.auth.getUser();
-      const userId = authData?.user?.id;
-      if (!userId) return;
-
-      const { data: app } = await supabase
-        .from("driver_applications")
-        .select("status, created_at")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (!app) {
-        message.info("Ariza topilmadi. Qaytadan ro'yxatdan o'ting.");
-      } else {
-        message.info(`Holatingiz: ${app.status || "pending"}. Admin tekshiruvda...`);
-      }
-    } catch (err) {
-      message.error("Tekshirishda xato: " + (err?.message || ""));
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (loading) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ color: "#fff" }}>Yuklanmoqda...</div>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, background: "#f5f6f8" }}>
-      <Card style={{ width: 450, maxWidth: "100%", borderRadius: 16 }}>
-        <Title level={4} style={{ marginTop: 0 }}>⏳ Haydovchi tasdiqlanmagan</Title>
-        <Text type="secondary">
-          Sizning haydovchi profilingiz admin tomonidan tekshirilmoqda. Tasdiqlangandan keyin haydovchi rejimiga avtomatik kirish amalga oshadi.
-        </Text>
-
-        <div style={{ marginTop: 20, padding: 12, background: "#f0f0f0", borderRadius: 8 }}>
-          {checkingStatus && (
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <Spin size="small" />
-              <Text type="secondary" style={{ fontSize: 12 }}>Status tekshirilmoqda...</Text>
-            </div>
-          )}
-          {!checkingStatus && (
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              Status har 3 soniyada avtomatik tekshiriladi. Shuningdek quyidagi "Qayta tekshir" tugmasini bosishingiz mumkin.
-            </Text>
-          )}
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 520,
+          background: "#1f2937",
+          borderRadius: 16,
+          padding: 18,
+          boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
+          color: "#fff",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <span style={{ fontSize: 18 }}>⏳</span>
+          <h2 style={{ margin: 0, fontSize: 18, letterSpacing: 0.2 }}>HAYDOVCHI TASDIQLANMAGAN</h2>
         </div>
 
-        <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 10 }}>
-          <Button
-            type="primary"
-            style={{ background: "#000", borderColor: "#000" }}
-            onClick={handleRefresh}
-            loading={loading}
-            block
-          >
-            Qayta tekshir
-          </Button>
+        <p style={{ marginTop: 8, marginBottom: 14, opacity: 0.9, lineHeight: 1.35 }}>
+          Sizning haydovchi profilingiz tekshiruvda. Tasdiqlangandan keyin haydovchi rejimga avtomatik kirish amalga oshadi.
+        </p>
 
-          <Button
-            onClick={() => navigate("/client")}
-            block
+        {message ? (
+          <div
+            style={{
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              padding: 10,
+              borderRadius: 12,
+              marginBottom: 12,
+              fontSize: 14,
+            }}
           >
-            Yolovchi rejimiga qaytish
-          </Button>
+            {message}
+          </div>
+        ) : null}
+
+        <div style={{ display: "grid", gap: 10 }}>
+          <button
+            onClick={fetchDriverStatus}
+            style={{
+              height: 42,
+              borderRadius: 12,
+              border: "none",
+              background: "#374151",
+              color: "#fff",
+              cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            QAYTA TEKSHIR
+          </button>
+
+          <button
+            onClick={() => navigate("/", { replace: true })}
+            style={{
+              height: 42,
+              borderRadius: 12,
+              border: "none",
+              background: "#e5e7eb",
+              color: "#111827",
+              cursor: "pointer",
+              fontWeight: 700,
+            }}
+          >
+            YO‘LOVCHI REJIMGA QAYTISH
+          </button>
+
+          {status === "none" ? (
+            <button
+              onClick={() => navigate("/driver/register", { replace: true })}
+              style={{
+                height: 42,
+                borderRadius: 12,
+                border: "none",
+                background: "#60a5fa",
+                color: "#0b1220",
+                cursor: "pointer",
+                fontWeight: 800,
+              }}
+            >
+              HAYDOVCHI ARIZASINI YUBORISH
+            </button>
+          ) : null}
         </div>
-      </Card>
+      </div>
     </div>
   );
 }
