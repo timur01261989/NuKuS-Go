@@ -12,7 +12,7 @@ import {
   LogoutOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { listMarketCars, formatPriceUZS } from "@services/marketService";
 import { useLanguage } from "@shared/i18n/useLanguage";
@@ -30,6 +30,7 @@ function initials(name) {
 
 export default function ClientHome() {
   const navigate = useNavigate();
+  const location = useLocation(); // YANGI - driver mode ga kelayotganda state o'tish
   const { t } = useLanguage();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profile, setProfile] = useState({ fullName: "", avatarUrl: "" });
@@ -303,7 +304,10 @@ export default function ClientHome() {
             style={{ height: 44, borderRadius: 12, textAlign: "left" }}
             onClick={() => {
               close();
-              navigate("/driver-mode", { replace: true });
+              navigate("/driver-mode", { 
+                replace: true,
+                state: { from: location.pathname }
+              });
             }}
           >
             {t?.workAsDriver || "Haydovchi bo‘lib ishlash"}
