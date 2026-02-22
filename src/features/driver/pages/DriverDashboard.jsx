@@ -50,6 +50,8 @@ export default function DriverDashboard() {
   useEffect(() => {
     let isMounted = true;
 
+    // RoleGate already enforces driver access.
+    // Dashboard should not perform extra redirects (prevents redirect loops).
     const run = async () => {
       try {
         const { data: authData, error: authErr } = await supabase.auth.getUser();
@@ -61,44 +63,10 @@ export default function DriverDashboard() {
           return;
         }
 
-                // Variant A gate: driver access is controlled by `drivers` table.
-        // - No drivers row   -> go to registration
-        // - drivers not approved -> go to pending
-        // - approved -> allow dashboard
-        const { data: drvRow, error: drvErr } = await supabase
-          .from("drivers")
-          .select("approved, status, created_at, updated_at")
-          .eq("user_id", userId)
-          .maybeSingle();
-
-        if (drvErr) throw drvErr;
-
-        if (!drvRow) {
-          navigate("/driver/register", { replace: true });
-          return;
-        }
-
-        let approved = false;
-        if (typeof drvRow.approved === "boolean") {
-          approved = drvRow.approved;
-        } else if (typeof drvRow.status === "string") {
-          const s = drvRow.status.trim().toLowerCase();
-          approved = ["approved", "active", "verified", "enabled", "ok"].includes(s);
-        } else {
-          // legacy fallback: row exists => allow
-          approved = true;
-        }
-
-        if (!approved) {
-          navigate("/driver/pending", { replace: true });
-          return;
-        }
-
         if (isMounted) setGateAllowed(true);
       } catch (e) {
         console.error("Driver dashboard gate error:", e);
-        // Fail safe: send to register so driver can proceed
-        navigate("/driver/register", { replace: true });
+        navigate("/login", { replace: true });
       } finally {
         if (isMounted) setGateLoading(false);
       }
@@ -144,16 +112,6 @@ export default function DriverDashboard() {
   }
 
   return <DriverHome onLogout={onLogout} />;
-
-}
-
-// =========================
-// Legacy dashboard (preserved, not removed). Moved into its own component to avoid React hook order errors.
-// =========================
-function LegacyDriverDashboard() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { t } = useLanguage();
 
   // =========================
   // STATE

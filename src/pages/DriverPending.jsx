@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../services/supabaseClient";
+import { supabase } from "@/lib/supabase";
+import { useSessionProfile } from "@shared/auth/useSessionProfile";
 
 export default function DriverPending() {
   const navigate = useNavigate();
@@ -9,6 +10,8 @@ export default function DriverPending() {
   const [message, setMessage] = useState("");
   const [checking, setChecking] = useState(false);
 
+  const { loading: authLoading, user } = useSessionProfile({ includeDriver: true, includeApplication: true });
+
   const fetchDriverStatus = async () => {
     if (checking) return;
     setChecking(true);
@@ -16,12 +19,22 @@ export default function DriverPending() {
     try {
       setMessage("");
 
-      // 1) Auth user
-      const { data: authData, error: authError } = await supabase.auth.getUser();
-      if (authError) {
-        console.error("Auth error:", authError);
+      // 1) Auth user (prefer hook)
+      const hookUser = user;
+      let authUser = hookUser;
+      if (!authUser) {
+        const { data: authData, error: authError } = await supabase.auth.getUser();
+        if (authError) console.error("Auth error:", authError);
+        authUser = authData?.user ?? null;
       }
-      const user = authData?.user;
+      const userId = authUser?.id ?? null;
+      if (!userId) {
+        setStatus("none");
+        setMessage("Login qiling.");
+        setLoading(false);
+        setChecking(false);
+        return;
+      }
 
       if (!user) {
         setLoading(false);
@@ -36,7 +49,7 @@ export default function DriverPending() {
       const { data: drvRow, error: drvErr } = await supabase
         .from("drivers")
         .select("approved, status, updated_at")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .maybeSingle();
 
       if (drvErr) {
@@ -48,7 +61,7 @@ export default function DriverPending() {
       const { data: appRow, error: appErr } = await supabase
         .from("driver_applications")
         .select("id, status, created_at")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import supabase from "../../config/supabaseClient";
+import { supabase } from "@/lib/supabase";
+import { useSessionProfile } from "@shared/auth/useSessionProfile";
 
 /**
  * Root redirect:
@@ -13,90 +14,63 @@ import supabase from "../../config/supabaseClient";
 export default function RedirectByRole() {
   const [target, setTarget] = useState(null);
 
+  // Single loader (no redirects while loading)
+  const { loading, user, role, isAdmin, driverExists, driverApproved, applicationStatus } = useSessionProfile({
+    includeDriver: true,
+    includeApplication: true,
+  });
+
   useEffect(() => {
     let isMounted = true;
 
-    async function load() {
-      try {
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession();
+    const decide = async () => {
+      if (!supabase) return;
 
-        if (sessionError) {
-          console.error("RedirectByRole: sessionError", sessionError);
-        }
+      // Not logged in -> login
+      if (!user) {
+        if (isMounted) setTarget("/login");
+        return;
+      }
 
-        const user = session?.user;
-        if (!user) {
-          if (isMounted) setTarget("/login");
+      // Admin always wins
+      if (isAdmin) {
+        if (isMounted) setTarget("/admin");
+        return;
+      }
+
+      if (role === "driver") {
+        // Variant A: driver access is controlled by drivers table
+        if (!driverExists) {
+          // If they have a pending application, keep them on pending
+          if (applicationStatus === "pending") {
+            if (isMounted) setTarget("/driver/pending");
+            return;
+          }
+          if (isMounted) setTarget("/driver/register");
           return;
         }
 
-        // 1) read profile
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("role,is_admin")
-          .eq("id", user.id)
-          .maybeSingle();
-
-        if (profileError) {
-          console.error("RedirectByRole: profileError", profileError);
-        }
-
-        // admin always wins
-        if (profile?.is_admin) {
-          if (isMounted) setTarget("/admin");
-          return;
-        }
-
-        const role = profile?.role || "client";
-
-        // 2) driver route decision
-        if (role === "driver") {
-          const { data: appRow, error: appError } = await supabase
-            .from("driver_applications")
-            .select("status")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (appError) {
-            console.error("RedirectByRole: driver app error", appError);
-          }
-
-          const status = appRow?.status || null;
-
-          if (!status) {
-            if (isMounted) setTarget("/driver/register");
-            return;
-          }
-
-          if (status === "approved") {
-            if (isMounted) setTarget("/driver/dashboard");
-            return;
-          }
-
-          // pending / rejected / other
+        if (!driverApproved) {
           if (isMounted) setTarget("/driver/pending");
           return;
         }
 
-        // 3) client default
-        if (isMounted) setTarget("/client/home");
-      } catch (e) {
-        console.error("RedirectByRole: unexpected error", e);
-        if (isMounted) setTarget("/client/home");
+        if (isMounted) setTarget("/driver/dashboard");
+        return;
       }
-    }
 
-    load();
+      // Default client
+      if (isMounted) setTarget("/client/home");
+    };
+
+    // Only decide after loading is finished (prevents redirect storms)
+    if (!loading) decide();
+
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [loading, user, role, isAdmin, driverExists, driverApproved, applicationStatus]);
 
-  if (!target) return null;
+  if (loading || !target) return null;
   return <Navigate to={target} replace />;
 }

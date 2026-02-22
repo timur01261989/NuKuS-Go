@@ -304,7 +304,7 @@ export default function ClientHome() {
             style={{ height: 44, borderRadius: 12, textAlign: "left" }}
             onClick={() => {
               close();
-              navigate("/driver-mode", { 
+              navigate("/driver/dashboard", { 
                 replace: true,
                 state: { from: location.pathname }
               });
