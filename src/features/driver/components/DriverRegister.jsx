@@ -226,17 +226,18 @@ export default function DriverRegister() {
       message.success('Ariza qabul qilindi. Pending sahifasiga yo\'natilmoqda...');
 
       // Redirect to pending page
-      setTimeout(() => {
-        navigate('/driver/pending', { replace: true });
-      }, 500);
+    setTimeout(() => {
+      navigate('/driver/pending', { replace: true });
+    }, 500);
 
-    } catch (err) {
-      console.error('Driver register error:', err);
-      message.error(`Ro'yxatdan o'tishda xatolik: ${err?.message || 'Noma'lum xato'}`);
-    } finally {
-      setLoading(false);
-    }
-  };
+  } catch (err) {
+    console.error('Driver register error:', err);
+    // Satrni backticks ( ` ) ichiga oldik, shunda o'zbekcha tutuq belgilari xalaqit bermaydi
+    message.error(`Ro'yxatdan o'tishda xatolik: ${err?.message || "Noma'lum xato"}`);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', padding: 16 }}>
