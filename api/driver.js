@@ -52,8 +52,6 @@ try {
     }], { onConflict: 'driver_id' })
     .select('driver_id,lat,lng,speed_kmh,updated_at')
     .single();
-  if (error) throw error;
-  return json(res, 200, { ok:true, location: data });
 } catch (e) {
   // Fallback legacy schema: driver_locations(order_id, driver_user_id, ...)
   const { data, error } = await sb

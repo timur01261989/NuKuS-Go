@@ -1,3 +1,14 @@
+
+// Location throttle (prevents flooding server/DB when many drivers are online)
+const lastLocSent = new Map(); // key -> timestamp ms
+const shouldSendLoc = (key, minMs = 6000) => {
+  const now = Date.now();
+  const last = lastLocSent.get(key) || 0;
+  if (now - last < minMs) return false;
+  lastLocSent.set(key, now);
+  return true;
+};
+
 const API_BASE = (import.meta?.env?.VITE_API_BASE || '').replace(/\/$/, '');
 
 async function postJson(path, body) {
@@ -23,6 +34,10 @@ export async function updateOrderStatus({ order_id, status, driver_user_id }) {
 }
 
 export async function upsertDriverLocation({ order_id, driver_user_id, lat, lng, bearing, speed }) {
+  const key = `${String(driver_user_id||'')}:${String(order_id||'')}`;
+  if (!shouldSendLoc(key, 6000)) {
+    return { ok: true, skipped: true };
+  }
   return postJson('/api/driver-location', { order_id, driver_user_id, lat, lng, bearing, speed });
 }
 

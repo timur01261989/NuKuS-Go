@@ -5,6 +5,24 @@ function hasSupabaseEnv() {
   return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
+
+async function logOrderEvent(sb, payload) {
+  try {
+    await sb.from('order_events').insert([{
+      order_id: String(payload.order_id || ''),
+      event: String(payload.event || ''),
+      from_status: payload.from_status ?? null,
+      to_status: payload.to_status ?? null,
+      actor_role: payload.actor_role ?? null,
+      actor_id: payload.actor_id ?? null,
+      reason: payload.reason ?? null,
+      created_at: nowIso(),
+    }]);
+  } catch (_) {
+    // ignore event logging errors
+  }
+}
+
 export async function offer_respond_handler(req, res) {
   try {
     if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Method not allowed' });
@@ -46,6 +64,15 @@ const sb = getSupabaseAdmin();
         // Boshqa haydovchi oldin olib bo'lgan yoki status o'zgargan
         return json(res, 200, { ok:false, taken:true, offer: off });
       }
+
+      await logOrderEvent(sb, {
+        order_id,
+        event: 'order_accepted',
+        from_status: 'searching',
+        to_status: 'accepted',
+        actor_role: 'driver',
+        actor_id: driver_user_id,
+      });
 
       return json(res, 200, { ok:true, offer: off, order: od });
     }

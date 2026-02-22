@@ -11,6 +11,8 @@ import dispatchHandler from "./dispatch.js";
 import offerHandler from "./offer.js";
 import walletHandler from "./wallet.js";
 import sosHandler from "./sos.js";
+import presenceHandler from "./presence.js";
+import cronDispatchHandler from "./cron_dispatch.js";
 
 function getRouteKey(path) {
   // path is already without leading /api/
@@ -80,6 +82,15 @@ export default async function handler(req, res) {
     if (path.startsWith("dispatch")) {
       return await dispatchHandler(req, res);
     }
+
+    if (path.startsWith("presence")) {
+      return await presenceHandler(req, res);
+    }
+
+    if (path.startsWith("cron_dispatch")) {
+      return await cronDispatchHandler(req, res);
+    }
+
 
     if (path.startsWith("offer")) {
       return await offerHandler(req, res);

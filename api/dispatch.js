@@ -6,6 +6,24 @@ function hasSupabaseEnv() {
   return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
+
+async function logOrderEvent(sb, payload) {
+  try {
+    await sb.from('order_events').insert([{
+      order_id: String(payload.order_id || ''),
+      event: String(payload.event || ''),
+      from_status: payload.from_status ?? null,
+      to_status: payload.to_status ?? null,
+      actor_role: payload.actor_role ?? null,
+      actor_id: payload.actor_id ?? null,
+      reason: payload.reason ?? null,
+      created_at: nowIso(),
+    }]);
+  } catch (_) {
+    // ignore event logging errors
+  }
+}
+
 async function resolvePickup(sb, order_id, pickupFromBody) {
   // If pickup not provided, try to read from orders table
   if (pickupFromBody && Number.isFinite(Number(pickupFromBody.lat)) && Number.isFinite(Number(pickupFromBody.lng))) {
@@ -133,6 +151,12 @@ await sb.from('order_offers')
   .eq('status', 'sent')
   .lte('expires_at', nowTs);
 
+    await logOrderEvent(sb, {
+      order_id,
+      event: 'offer_expired',
+      actor_role: 'system',
+    });
+
 // if there is still an active offer, do not send a new one yet
 const { data: activeOffer, error: aoe } = await sb.from('order_offers')
   .select('driver_user_id,expires_at')
@@ -180,6 +204,13 @@ const alreadySet = new Set((already||[]).map(r => r.driver_user_id).filter(Boole
     if (rows.length) {
       const { error: oe } = await sb.from('order_offers').upsert(rows, { onConflict: 'order_id,driver_user_id' });
       if (oe) throw oe;
+
+      await logOrderEvent(sb, {
+        order_id,
+        event: 'offer_sent',
+        actor_role: 'system',
+        actor_id: String(rows[0]?.driver_user_id || ''),
+      });
     }
 
     return json(res, 200, { ok:true, offered: rows.length, drivers: ranked.map(r=>({driver_user_id:r.driver_user_id, dist_km:r.dist_km})) });
@@ -222,6 +253,12 @@ await sb.from('order_offers')
   .eq('order_id', order_id)
   .eq('status', 'sent')
   .lte('expires_at', nowTs);
+
+    await logOrderEvent(sb, {
+      order_id,
+      event: 'offer_expired',
+      actor_role: 'system',
+    });
 
 // if there is still an active offer, do not send a new one yet
 const { data: activeOffer, error: aoe } = await sb.from('order_offers')
@@ -278,6 +315,13 @@ const alreadySet = new Set((already||[]).map(r => r.driver_user_id).filter(Boole
     if (rows.length) {
       const { error: oe } = await sb.from('order_offers').upsert(rows, { onConflict: 'order_id,driver_user_id' });
       if (oe) throw oe;
+
+      await logOrderEvent(sb, {
+        order_id,
+        event: 'offer_sent',
+        actor_role: 'system',
+        actor_id: String(rows[0]?.driver_user_id || ''),
+      });
     }
     return json(res, 200, { ok:true, offered: rows.length, drivers: ranked.map(r=>({driver_user_id:r.driver_user_id, dist_km:r.dist_km, score:r.score})) });
   } catch (e) { return serverError(res, e); }
