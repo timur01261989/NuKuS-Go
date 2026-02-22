@@ -20,38 +20,16 @@ import { supabase } from '../../../lib/supabase';
 const PHONE_PREFIX = '+998';
 
 function sanitizeFilename(originalName) {
-  const fallbackBase = `file_${Date.now()}`;
-
-  const raw = (originalName || '').toString().trim();
-
-  // Split extension safely (keep last dot only)
-  const lastDot = raw.lastIndexOf('.');
-  const baseRaw = lastDot > 0 ? raw.slice(0, lastDot) : raw || fallbackBase;
-  const extRaw = lastDot > 0 ? raw.slice(lastDot + 1) : '';
-
-  const cleanBase = baseRaw
-    // normalize unicode -> remove accents/diacritics (latin)
-    .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/\s+/g, '_')
-    .replace(/[^a-zA-Z0-9_-]/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 80);
-
-  const cleanExt = extRaw
+  const name = (originalName || 'file')
     .toString()
     .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-zA-Z0-9]/g, '')
-    .slice(0, 10);
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '_')
+    .replace(/[^a-zA-Z0-9._-]/g, '')
+    .replace(/^\.+/, '');
 
-  const base = cleanBase && cleanBase.length ? cleanBase : fallbackBase;
-  const ext = cleanExt && cleanExt.length ? cleanExt : '';
-
-  return ext ? `${base}.${ext}` : base;
+  return name && name.length ? name.slice(0, 120) : `file_${Date.now()}`;
 }
-
 
 function buildStoragePath(userId, file) {
   const safeName = sanitizeFilename(file?.name);
@@ -61,13 +39,10 @@ function buildStoragePath(userId, file) {
 
 function normalizeUzPhone(value) {
   const v = (value ?? '').toString();
-  // keep only digits and +
   const cleaned = v.replace(/[^\d+]/g, '');
-  // extract digits only
   let digits = cleaned.replace(/\D/g, '');
-  // remove leading 998 if user typed it
   if (digits.startsWith('998')) digits = digits.slice(3);
-  digits = digits.slice(0, 9); // Uzbekistan: 9 digits after country code
+  digits = digits.slice(0, 9);
   return PHONE_PREFIX + digits;
 }
 
@@ -76,7 +51,7 @@ const { Title, Text } = Typography;
 // Validation helpers
 const LATIN_NAME_RE = /^[A-Za-z\s'\-]+$/;
 const PHONE_RE = /^\+?\d{9,15}$/;
-const PASSPORT_RE = /^[A-Za-z]{2}\d{7}$/; // AA1234567
+const PASSPORT_RE = /^[A-Za-z]{2}\d{7}$/;
 
 async function uploadToStorage(userId, file, bucket = 'driver-docs') {
   if (!file) return null;
@@ -88,7 +63,6 @@ async function uploadToStorage(userId, file, bucket = 'driver-docs') {
   });
   if (error) throw error;
 
-  // We store the path (key). Your app can create signed/public URLs later.
   return filePath;
 }
 
@@ -101,7 +75,6 @@ export default function DriverRegister() {
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(0);
 
-  // Files
   const [selfieFile, setSelfieFile] = useState(null);
   const [passportFrontFile, setPassportFrontFile] = useState(null);
   const [passportBackFile, setPassportBackFile] = useState(null);
@@ -112,14 +85,13 @@ export default function DriverRegister() {
   const [licenseFrontFile, setLicenseFrontFile] = useState(null);
   const [licenseBackFile, setLicenseBackFile] = useState(null);
 
-  // Optional car photos (table supports them; UI doesn't force)
   const [carPhotoFile1, setCarPhotoFile1] = useState(null);
   const [carPhotoFile2, setCarPhotoFile2] = useState(null);
   const [carPhotoFile3, setCarPhotoFile3] = useState(null);
   const [carPhotoFile4, setCarPhotoFile4] = useState(null);
 
   const steps = [
-    { title: 'Shaxsiy ma’lumotlar' },
+    { title: 'Shaxsiy ma\'lumotlar' },
     { title: 'Mashina' },
     { title: 'Guvohnoma' },
   ];
@@ -163,7 +135,6 @@ export default function DriverRegister() {
       const user = authData?.user;
       if (!user?.id) throw new Error('User not authenticated');
 
-      // Final guard
       if (!selfieFile || !passportFrontFile || !passportBackFile) {
         throw new Error('Selfi va pasport rasmlari majburiy');
       }
@@ -174,7 +145,7 @@ export default function DriverRegister() {
         throw new Error('Guvohnoma (oldi/orqasi) majburiy');
       }
 
-      // Uploads
+      // Upload all files
       const selfie_url = await uploadToStorage(user.id, selfieFile);
       const passport_front_url = await uploadToStorage(user.id, passportFrontFile);
       const passport_back_url = await uploadToStorage(user.id, passportBackFile);
@@ -185,13 +156,11 @@ export default function DriverRegister() {
       const driver_license_front_url = await uploadToStorage(user.id, licenseFrontFile);
       const driver_license_back_url = await uploadToStorage(user.id, licenseBackFile);
 
-      // Optional
       const car_photo_1 = await uploadToStorage(user.id, carPhotoFile1);
       const car_photo_2 = await uploadToStorage(user.id, carPhotoFile2);
       const car_photo_3 = await uploadToStorage(user.id, carPhotoFile3);
       const car_photo_4 = await uploadToStorage(user.id, carPhotoFile4);
 
-      // IMPORTANT: Use column names that реально bor
       const payload = {
         user_id: user.id,
 
@@ -218,7 +187,6 @@ export default function DriverRegister() {
         driver_license_front_url,
         driver_license_back_url,
 
-        // keep existing fields if table expects them
         car_photo_1,
         car_photo_2,
         car_photo_3,
@@ -232,13 +200,39 @@ export default function DriverRegister() {
         .upsert(payload, { onConflict: 'user_id' });
       if (upsertError) throw upsertError;
 
-      message.success('Ariza qabul qilindi');
+      // TUZATISH: Drivers jadvaliga ham pending record yaratish
+      // Bu RoleGate ning requireDriverApproved tekshiruviga javob beradi
+      try {
+        const driverPayload = {
+          user_id: user.id,
+          status: 'pending',
+          approved: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        
+        const { error: driverError } = await supabase
+          .from('drivers')
+          .upsert(driverPayload, { onConflict: 'user_id' });
+        
+        if (driverError) {
+          console.warn('Could not create drivers record:', driverError);
+          // Bu xato kritik emas, ariza yo'llandirilgan, shunchaki warning
+        }
+      } catch (err) {
+        console.warn('Driver record creation warning:', err);
+      }
+
+      message.success('Ariza qabul qilindi. Pending sahifasiga yo\'natilmoqda...');
 
       // Redirect to pending page
-      navigate('/driver/pending', { replace: true });
+      setTimeout(() => {
+        navigate('/driver/pending', { replace: true });
+      }, 500);
+
     } catch (err) {
       console.error('Driver register error:', err);
-      message.error(`Ro‘yxatdan o‘tishda xatolik: ${err?.message || 'Noma’lum xato'}`);
+      message.error(`Ro'yxatdan o'tishda xatolik: ${err?.message || 'Noma'lum xato'}`);
     } finally {
       setLoading(false);
     }
@@ -247,19 +241,19 @@ export default function DriverRegister() {
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', padding: 16 }}>
       <Card>
-        <Title level={3} style={{ marginBottom: 8 }}>
-          Haydovchi ro‘yxatdan o‘tish
-        </Title>
-        <Text type="secondary">3 ta bosqich: shaxsiy ma’lumotlar → mashina → guvohnoma.</Text>
+        <Title level={3} style={{ marginTop: 0 }}>Haydovchi registratsiyasi</Title>
+        <Text type="secondary">
+          Iltimos, barcha ma'lumotlarni toliqlashtirib, kerakli hujjatlarning rasmlari yuklang.
+        </Text>
 
         <Divider />
-        <Steps current={step} items={steps} />
-        <Divider />
 
-        <Form form={form} layout="vertical" onFinish={handleSubmit} initialValues={{ car_year: currentYear }}>
+        <Steps current={step} items={steps} style={{ marginBottom: 24 }} />
+
+        <Form form={form} layout="vertical" onFinish={handleSubmit}>
           {step === 0 && (
             <>
-              <Divider orientation="left">1) Shaxsiy ma’lumotlar</Divider>
+              <Divider orientation="left">1) Shaxsiy ma'lumotlar</Divider>
               <Row gutter={16}>
                 <Col xs={24} md={8}>
                   <Form.Item
@@ -270,31 +264,31 @@ export default function DriverRegister() {
                       { pattern: LATIN_NAME_RE, message: 'Faqat lotin harflari' },
                     ]}
                   >
-                    <Input maxLength={50} placeholder="Familya" />
+                    <Input maxLength={50} placeholder="Aliyev" />
                   </Form.Item>
                 </Col>
                 <Col xs={24} md={8}>
                   <Form.Item
-                    label="Ism"
+                    label="Ismi"
                     name="first_name"
                     rules={[
-                      { required: true, message: 'Ismni kiriting' },
+                      { required: true, message: 'Ismini kiriting' },
                       { pattern: LATIN_NAME_RE, message: 'Faqat lotin harflari' },
                     ]}
                   >
-                    <Input maxLength={50} placeholder="Ism" />
+                    <Input maxLength={50} placeholder="Akbar" />
                   </Form.Item>
                 </Col>
                 <Col xs={24} md={8}>
                   <Form.Item
-                    label="Sharifi (Otasining ismi)"
+                    label="Otasining ismi"
                     name="father_name"
                     rules={[
-                      { required: true, message: 'Sharifni kiriting' },
+                      { required: true, message: 'Otasining ismini kiriting' },
                       { pattern: LATIN_NAME_RE, message: 'Faqat lotin harflari' },
                     ]}
                   >
-                    <Input maxLength={50} placeholder="Sharif" />
+                    <Input maxLength={50} placeholder="Mirza" />
                   </Form.Item>
                 </Col>
               </Row>
@@ -304,30 +298,32 @@ export default function DriverRegister() {
                   <Form.Item
                     label="Telefon raqami"
                     name="phone"
-                    initialValue={PHONE_PREFIX}
-                    normalize={normalizeUzPhone}
-                    rules={[
-                      { required: true, message: 'Telefon raqamini kiriting' },
-                      { pattern: PHONE_RE, message: 'Masalan: +998901234567' },
-                    ]}
+                    rules={[{ required: true, message: 'Telefon raqami majburiy' }]}
                   >
-                    <Input maxLength={15} placeholder="+998901234567" />
+                    <Input
+                      maxLength={13}
+                      placeholder="+998 99 123-45-67"
+                      onChange={(e) => {
+                        const normalized = normalizeUzPhone(e.target.value);
+                        form.setFieldsValue({ phone: normalized });
+                      }}
+                    />
                   </Form.Item>
                 </Col>
                 <Col xs={24} md={12}>
                   <Form.Item
-                    label="Pasport raqami"
+                    label="Pasport ID (AA1234567)"
                     name="passport_id"
                     rules={[
-                      { required: true, message: 'Pasport raqamini kiriting' },
-                      { pattern: PASSPORT_RE, message: 'Masalan: AA1234567' },
+                      { required: true, message: 'Pasport ID kiriting' },
+                      { pattern: PASSPORT_RE, message: 'Format: AA1234567 (2 harf + 7 raqam)' },
                     ]}
                   >
                     <Input
                       maxLength={9}
-                      placeholder="AA1234567"
+                      placeholder="AB1234567"
                       onChange={(e) => {
-                        const v = (e.target.value || '').toUpperCase().replace(/\s+/g, '');
+                        const v = (e.target.value || '').toUpperCase();
                         form.setFieldsValue({ passport_id: v });
                       }}
                     />
@@ -335,10 +331,10 @@ export default function DriverRegister() {
                 </Col>
               </Row>
 
-              <Divider orientation="left">Rasmlar</Divider>
+              <Divider orientation="left">Shaxsiy hujjatlar</Divider>
               <Row gutter={16}>
-                <Col xs={24} md={8}>
-                  <Form.Item label="Selfi" required>
+                <Col xs={24} md={12}>
+                  <Form.Item label="Selfi rasm" required>
                     <Upload
                       maxCount={1}
                       beforeUpload={(file) => {
@@ -350,7 +346,10 @@ export default function DriverRegister() {
                     </Upload>
                   </Form.Item>
                 </Col>
-                <Col xs={24} md={8}>
+              </Row>
+
+              <Row gutter={16}>
+                <Col xs={24} md={12}>
                   <Form.Item label="Pasport (old tomoni)" required>
                     <Upload
                       maxCount={1}
@@ -363,7 +362,7 @@ export default function DriverRegister() {
                     </Upload>
                   </Form.Item>
                 </Col>
-                <Col xs={24} md={8}>
+                <Col xs={24} md={12}>
                   <Form.Item label="Pasport (orqa tomoni)" required>
                     <Upload
                       maxCount={1}
@@ -382,7 +381,7 @@ export default function DriverRegister() {
 
           {step === 1 && (
             <>
-              <Divider orientation="left">2) Mashina ma’lumotlari</Divider>
+              <Divider orientation="left">2) Mashina ma'lumotlari</Divider>
               <Row gutter={16}>
                 <Col xs={24} md={12}>
                   <Form.Item
@@ -475,17 +474,6 @@ export default function DriverRegister() {
                   </Form.Item>
                 </Col>
               </Row>
-
-              {/* Optional: keep hidden by default, but still available if you want later */}
-              {/*
-              <Divider orientation="left">Mashina rasmlari (ixtiyoriy)</Divider>
-              <Row gutter={16}>
-                <Col xs={24} md={6}><Upload beforeUpload={(f)=>{setCarPhotoFile1(f);return false;}} maxCount={1}><Button icon={<UploadOutlined/>}>1</Button></Upload></Col>
-                <Col xs={24} md={6}><Upload beforeUpload={(f)=>{setCarPhotoFile2(f);return false;}} maxCount={1}><Button icon={<UploadOutlined/>}>2</Button></Upload></Col>
-                <Col xs={24} md={6}><Upload beforeUpload={(f)=>{setCarPhotoFile3(f);return false;}} maxCount={1}><Button icon={<UploadOutlined/>}>3</Button></Upload></Col>
-                <Col xs={24} md={6}><Upload beforeUpload={(f)=>{setCarPhotoFile4(f);return false;}} maxCount={1}><Button icon={<UploadOutlined/>}>4</Button></Upload></Col>
-              </Row>
-              */}
             </>
           )}
 
