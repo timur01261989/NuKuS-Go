@@ -106,7 +106,33 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
           profileRole = profile.role;
         }
 
-        // 3) driver row (source of truth for driver access)
+        
+        // 3) driver application (registration/approval state)
+        // NOTE: Users may still have profiles.role='client' while they have a pending driver application.
+        // In that case, driver routes must not loop back to /driver/register; they should go to /driver/pending.
+        let application = null;
+        let applicationStatus = null;
+
+        try {
+          const { data: app, error: appErr } = await withTimeout(
+            supabase
+              .from("driver_applications")
+              .select("status")
+              .eq("user_id", userId)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle()
+          );
+
+          if (!appErr && app) {
+            application = app;
+            if (typeof app.status === "string") applicationStatus = app.status.trim().toLowerCase();
+          }
+        } catch {
+          // ignore - we will fall back to role-only gating
+        }
+
+// 3) driver row (source of truth for driver access)
         let driverRow = null;
         let driverRowExists = false;
         let approved = false;
@@ -126,30 +152,6 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
             approved = deriveDriverApproved(drv);
           }
         }
-
-        // 3b) driver application (when driver row is not created yet)
-        // Some projects create the `drivers` row only after admin approval.
-        // In that case we must allow /driver/pending for users who already submitted an application.
-        let driverApplication = null;
-        let driverApplicationExists = false;
-
-        if (a.driver && !driverRowExists) {
-          const { data: app, error: appErr } = await withTimeout(
-            supabase
-              .from("driver_applications")
-              .select("id,status,created_at")
-              .eq("user_id", userId)
-              .order("created_at", { ascending: false })
-              .limit(1)
-              .maybeSingle()
-          );
-
-          if (!appErr && app) {
-            driverApplication = app;
-            driverApplicationExists = true;
-          }
-        }
-
 
         // 4) Derive effective role
         // Role is always taken from profiles.role.
@@ -184,6 +186,13 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
 
         // 6) Decide allow
         if (effectiveRole === "client") {
+          // If a client has a pending driver application, allow driver pending page,
+          // and redirect any driver-only pages to pending (prevents register<->pending loops).
+          if (applicationStatus === "pending") {
+            if (location.pathname === "/driver/pending") return finish(true, null);
+            if (!!a.driver && !a.client) return finish(false, "driver-not-approved");
+          }
+
           if (!!a.client) return finish(true, null);
 
           // Client trying to access driver-only route
@@ -197,15 +206,7 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
           if (!a.driver && a.client) return finish(true, null);
           if (!a.driver) return finish(false, "driver-not-allowed");
 
-        if (!driverRowExists) {
-          if (driverApplicationExists) {
-            // Application already submitted; treat as "pending".
-            // If this route requires approval, send to pending; otherwise allow (e.g. /driver/pending).
-            if (a.requireDriverApproved) return finish(false, "driver-not-approved");
-            return finish(true, null);
-          }
-          return finish(false, "driver-not-registered");
-        }
+          if (!driverRowExists) return finish(false, "driver-not-registered");
 
           // approval gating (driver dashboard/orders)
           if (a.requireDriverApproved) {
@@ -217,7 +218,10 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
 
         // No role at all
         // For driver routes: send to register. For others: login.
-        if (a.driver && !a.client) return finish(false, "driver-not-registered");
+        if (a.driver && !a.client) {
+          if (applicationStatus === "pending") return finish(false, "driver-not-approved");
+          return finish(false, "driver-not-registered");
+        }
 
         if (!profileExists && profileErr) return finish(false, "profile-error");
         return finish(false, "no-profile");
