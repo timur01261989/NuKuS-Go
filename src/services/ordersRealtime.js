@@ -14,66 +14,94 @@ export function subscribeOrder(orderId, onChange) {
   return () => sb.removeChannel(channel);
 }
 
-export function subscribeDriverLocation(orderId, onChange) {
+export async function subscribeDriverLocation(orderId, onChange) {
   const sb = assertSupabase();
 
-  // IMPORTANT:
-  // The app has multiple schema variants.
-  // In common variants, `driver_locations` does NOT have `order_id`.
-  // Instead, we subscribe to the assigned driver_id (from orders table) and then listen to:
-  //   driver_locations where driver_id == <driverId>
-  // If driver_id changes (reassign), we rewire the subscription.
+  // We support multiple schema variants:
+  // Variant A (order-scoped): driver_locations(order_id, driver_user_id, lat, lng, updated_at, ...)
+  // Variant B (driver-scoped): driver_locations(driver_id, lat, lng, updated_at, ...)
+  //
+  // We detect columns and choose the safest subscription strategy.
+
+  const hasColumn = async (col) => {
+    try {
+      const { error } = await sb.from('driver_locations').select(col).limit(1);
+      return !error;
+    } catch {
+      return false;
+    }
+  };
+
+  const hasOrderId = await hasColumn('order_id');
+  const hasDriverUserId = await hasColumn('driver_user_id');
+  const hasDriverId = await hasColumn('driver_id');
 
   let driverLocChannel = null;
-  let currentDriverId = null;
+  let orderChannel = null;
 
-  const subscribeByDriverId = (driverId) => {
-    if (!driverId) return;
+  const subscribeByFilter = (channelName, filter) => {
     if (driverLocChannel) {
       sb.removeChannel(driverLocChannel);
       driverLocChannel = null;
     }
-
-    currentDriverId = driverId;
     driverLocChannel = sb
-      .channel(`driverloc:${orderId}:${driverId}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'driver_locations', filter: `driver_id=eq.${driverId}` },
+        { event: '*', schema: 'public', table: 'driver_locations', filter },
         (payload) => onChange?.(payload)
       )
       .subscribe();
   };
 
-  // Track order changes to find/re-find driver_id.
-  const orderChannel = sb
+  if (hasOrderId && hasDriverUserId) {
+    // Best case: subscribe by order_id directly.
+    subscribeByFilter(`driverloc:order:${orderId}`, `order_id=eq.${orderId}`);
+
+    // No need to track orders changes in this variant.
+    return () => {
+      if (driverLocChannel) sb.removeChannel(driverLocChannel);
+    };
+  }
+
+  // Fallback: subscribe by assigned driver id from the orders table.
+  let currentDriverKey = null;
+
+  const subscribeByDriverKey = (driverKey) => {
+    if (!driverKey) return;
+    if (currentDriverKey === driverKey && driverLocChannel) return;
+
+    currentDriverKey = driverKey;
+    const filter = hasDriverId
+      ? `driver_id=eq.${driverKey}`
+      : (hasDriverUserId ? `driver_user_id=eq.${driverKey}` : null);
+
+    if (!filter) return;
+
+    subscribeByFilter(`driverloc:driver:${orderId}:${driverKey}`, filter);
+  };
+
+  orderChannel = sb
     .channel(`order_driver:${orderId}`)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` },
       (payload) => {
-        const nextDriverId = payload?.new?.driver_id || null;
-        if (nextDriverId && nextDriverId !== currentDriverId) {
-          subscribeByDriverId(nextDriverId);
-        }
-        // Forward order payload too (keeps existing consumers working if they rely on it).
-        onChange?.(payload);
+        const row = payload?.new || null;
+        const driverKey =
+          row?.driver_user_id ||
+          row?.driver_id ||
+          row?.driverId ||
+          null;
+
+        subscribeByDriverKey(driverKey);
+        onChange?.({ type: 'order_change', payload });
       }
     )
     .subscribe();
 
-  // Initial best-effort fetch of driver_id.
-  (async () => {
-    try {
-      const { data, error } = await sb.from('orders').select('driver_id').eq('id', orderId).maybeSingle();
-      if (!error && data?.driver_id) subscribeByDriverId(data.driver_id);
-    } catch {
-      // ignore
-    }
-  })();
-
   return () => {
     if (driverLocChannel) sb.removeChannel(driverLocChannel);
-    sb.removeChannel(orderChannel);
+    if (orderChannel) sb.removeChannel(orderChannel);
   };
 }

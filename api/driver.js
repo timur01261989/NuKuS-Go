@@ -32,6 +32,9 @@ export async function driver_location_handler(req, res) {
     if (!driver_user_id) return badRequest(res, 'driver_user_id kerak');
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return badRequest(res, 'lat/lng noto‘g‘ri');
 
+    // rate limit (location updates can flood DB)
+    if (!hit(`loc:${driver_user_id}:${order_id}`, 1200)) return json(res, 200, { ok:true, skipped:true });
+
     if (hasSupabaseEnv()) {
       const sb = getSupabaseAdmin();
       const { data, error } = await sb

@@ -12,13 +12,36 @@ export default function RideHistory({ userId, role, onBack }) {
   useEffect(() => {
     const fetchHistory = async () => {
       setLoading(true);
-      const userField = role === 'driver' ? 'driver_id' : 'client_id';
+      let data = null;
 
-      const { data } = await supabase
-        .from('orders')
-        .select('*')
-        .eq(userField, userId)
-        .order('created_at', { ascending: false });
+      if (role === 'driver') {
+        // Support schema variants: orders.driver_user_id or orders.driver_id
+        let r = await supabase
+          .from('orders')
+          .select('*')
+          .eq('driver_user_id', userId)
+          .order('created_at', { ascending: false });
+
+        if (r.error) {
+          r = await supabase
+            .from('orders')
+            .select('*')
+            .eq('driver_id', userId)
+            .order('created_at', { ascending: false });
+        }
+
+        data = r.data || [];
+      } else {
+        const r = await supabase
+          .from('orders')
+          .select('*')
+          .eq('client_id', userId)
+          .order('created_at', { ascending: false });
+
+        data = r.data || [];
+      }
+
+      
 
       if (data) setHistory(data);
       setLoading(false);

@@ -44,9 +44,9 @@ export async function driver_ping_handler(req, res) {
     if (!driver_user_id) return badRequest(res, 'driver_user_id kerak');
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return badRequest(res, 'lat/lng noto‘g‘ri');
 
-    if (!hasSupabaseEnv()) {
-      // demo mode: no offers
-      return json(res, 200, { ok:true, demo:true });
+    if (!hasSupabaseEnv()) return serverError(res, 'SUPABASE_URL va service role key (SUPABASE_SERVICE_ROLE_KEY) server envda yo\'q');
+
+);
     }
 
     const sb = getSupabaseAdmin();
@@ -175,9 +175,8 @@ export async function dispatch_smart_handler(req, res) {
     const radius_km = Number(body.radius_km || 7);
 
     if (!order_id) return badRequest(res, 'order_id kerak');
-    if (!hasSupabaseEnv()) return json(res, 200, { ok:true, demo:true, offered:0 });
-
-    const sb = getSupabaseAdmin();
+    if (!hasSupabaseEnv()) return serverError(res, 'SUPABASE_URL va service role key (SUPABASE_SERVICE_ROLE_KEY) server envda yo\'q');
+const sb = getSupabaseAdmin();
     const pickup = await resolvePickup(sb, order_id, body.pickup);
     if (!pickup) return badRequest(res, 'pickup lat/lng kerak (body.pickup yoki orders.pickup)');
 
@@ -250,9 +249,8 @@ export async function traffic_eta_handler(req, res) {
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return badRequest(res, 'lat/lng kerak');
     if (!Number.isFinite(base_eta_seconds) || base_eta_seconds <= 0) return badRequest(res, 'base_eta_seconds noto‘g‘ri');
 
-    if (!hasSupabaseEnv()) return json(res, 200, { ok:true, provider:'DEMO', multiplier:1.0, eta_seconds: Math.round(base_eta_seconds) });
-
-    const sb = getSupabaseAdmin();
+    if (!hasSupabaseEnv()) return serverError(res, 'SUPABASE_URL va service role key (SUPABASE_SERVICE_ROLE_KEY) server envda yo\'q');
+const sb = getSupabaseAdmin();
     const { data: zones, error } = await sb.from('traffic_zones')
       .select('center_lat,center_lng,radius_km,multiplier')
       .eq('is_active', true)
@@ -283,9 +281,8 @@ export async function heatmap_handler(req, res) {
     const minutes = Number(url.searchParams.get('minutes') || 60);
     const cell = Number(url.searchParams.get('cell') || 0.02);
 
-    if (!hasSupabaseEnv()) return json(res, 200, { ok:true, demo:true, items: [] });
-
-    const sb = getSupabaseAdmin();
+    if (!hasSupabaseEnv()) return serverError(res, 'SUPABASE_URL va service role key (SUPABASE_SERVICE_ROLE_KEY) server envda yo\'q');
+const sb = getSupabaseAdmin();
     const since = new Date(Date.now() - minutes*60*1000).toISOString();
     const { data, error } = await sb.from('orders').select('id,created_at,pickup').gte('created_at', since).limit(5000);
     if (error) throw error;

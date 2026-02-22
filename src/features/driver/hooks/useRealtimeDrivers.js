@@ -23,6 +23,7 @@ export default function useRealtimeDrivers({ enabled, center, radiusMeters = 200
   const [status, setStatus] = useState("idle"); // idle|loading|live|error
 
   const getDriverKey = (row) => row?.user_id || row?.id || null;
+  const getLocKey = (row) => row?.driver_user_id || row?.driver_id || row?.user_id || row?.id || null;
 
   // initial load
   useEffect(() => {
@@ -52,7 +53,7 @@ export default function useRealtimeDrivers({ enabled, center, radiusMeters = 200
 
         const d2 = await supabase
           .from("driver_locations")
-          .select("driver_id,lat,lng,updated_at");
+          .select("*");
 
         if (d2.error) throw d2.error;
 
@@ -113,14 +114,15 @@ export default function useRealtimeDrivers({ enabled, center, radiusMeters = 200
         { event: "*", schema: "public", table: "driver_locations" },
         (payload) => {
           const row = payload.new;
-          if (!row?.driver_id) return;
+          const k = getLocKey(row);
+          if (!k) return;
 
           setLocs((prev) => {
-            const map = new Map(prev.map((x) => [x.driver_id, x]));
-            map.set(row.driver_id, row);
+            const map = new Map(prev.map((x) => [getLocKey(x), x]));
+            map.set(k, row);
             return Array.from(map.values());
           });
-        }
+}
       )
       .subscribe();
 

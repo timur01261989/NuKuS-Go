@@ -8,9 +8,8 @@ function hasSupabaseEnv() {
 export async function sos_handler(req, res) {
   try {
     if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Method not allowed' });
-    if (!hasSupabaseEnv()) return json(res, 200, { ok:true, demo:true });
-
-    const sb = getSupabaseAdmin();
+    if (!hasSupabaseEnv()) return serverError(res, 'SUPABASE_URL va service role key (SUPABASE_SERVICE_ROLE_KEY) server envda yo\'q');
+const sb = getSupabaseAdmin();
     const body = typeof req.body === 'string' ? JSON.parse(req.body||'{}') : (req.body||{});
 
     const user_id = String(body.user_id||'').trim();

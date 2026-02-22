@@ -17,9 +17,8 @@ export async function offer_respond_handler(req, res) {
     if (!order_id) return badRequest(res, 'order_id kerak');
     if (!driver_user_id) return badRequest(res, 'driver_user_id kerak');
     if (!['accept','reject'].includes(action)) return badRequest(res, 'action accept|reject');
-    if (!hasSupabaseEnv()) return json(res, 200, { ok:true, demo:true });
-
-    const sb = getSupabaseAdmin();
+    if (!hasSupabaseEnv()) return serverError(res, 'SUPABASE_URL va service role key (SUPABASE_SERVICE_ROLE_KEY) server envda yo\'q');
+const sb = getSupabaseAdmin();
     const status = action === 'accept' ? 'accepted' : 'rejected';
 
     const { data: off, error: oe } = await sb.from('order_offers')
@@ -71,9 +70,8 @@ function hasSupabaseEnv() {
  */
 export async function offer_timeout_handler(req, res) {
   try {
-    if (!hasSupabaseEnv()) return json(res, 200, { ok:true, demo:true, updated:0 });
-
-    const sb = getSupabaseAdmin();
+    if (!hasSupabaseEnv()) return serverError(res, 'SUPABASE_URL va service role key (SUPABASE_SERVICE_ROLE_KEY) server envda yo\'q');
+const sb = getSupabaseAdmin();
     const now = new Date().toISOString();
 
     const { data, error } = await sb.from('order_offers')
@@ -98,8 +96,8 @@ function hasSupabaseEnv() {
 
 export async function messages_handler(req, res) {
   try {
-    if (!hasSupabaseEnv()) return json(res, 200, { ok:true, demo:true, items: [] });
-    const sb = getSupabaseAdmin();
+    if (!hasSupabaseEnv()) return serverError(res, 'SUPABASE_URL va service role key (SUPABASE_SERVICE_ROLE_KEY) server envda yo\'q');
+const sb = getSupabaseAdmin();
 
     if (req.method === 'GET') {
       const order_id = String(req.query?.order_id||'').trim();
@@ -148,9 +146,8 @@ export async function notifications_read_handler(req, res) {
     const user_id = String(body.user_id||'').trim();
     if (!id) return badRequest(res, 'id kerak');
     if (!user_id) return badRequest(res, 'user_id kerak');
-    if (!hasSupabaseEnv()) return json(res, 200, { ok:true, demo:true });
-
-    const sb = getSupabaseAdmin();
+    if (!hasSupabaseEnv()) return serverError(res, 'SUPABASE_URL va service role key (SUPABASE_SERVICE_ROLE_KEY) server envda yo\'q');
+const sb = getSupabaseAdmin();
     const { data, error } = await sb.from('notifications').update({ is_read:true }).eq('id', id).eq('user_id', user_id).select('*').single();
     if (error) throw error;
     return json(res, 200, { ok:true, notification: data });
@@ -167,9 +164,8 @@ export async function notify_handler(req, res) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body||'{}') : (req.body||{});
     const user_id = String(body.user_id||'').trim();
     if (!user_id) return badRequest(res, 'user_id kerak');
-    if (!hasSupabaseEnv()) return json(res, 200, { ok:true, demo:true });
-
-    const sb = getSupabaseAdmin();
+    if (!hasSupabaseEnv()) return serverError(res, 'SUPABASE_URL va service role key (SUPABASE_SERVICE_ROLE_KEY) server envda yo\'q');
+const sb = getSupabaseAdmin();
     const { data, error } = await sb.from('notifications').insert([{
       user_id,
       type: body.type || 'system',
