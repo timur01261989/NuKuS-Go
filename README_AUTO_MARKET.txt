@@ -1,4 +1,4 @@
-AUTO SAVDO (Yo'lovchi dashboard ichidaa)
+AUTO SAVDO (Yo'lovchi dashboard ichidaas)
 - ClientDashboard: 5ta tugma qoladi. Tagiga 'Avto savdo' preview qo'shildi.
 - 'Savdoga kirish' bosilsa Modal panel ochiladi va e'lonlar ro'yxati chiqadi.
 - Ma'lumotlar: public/config/market_listings.json (test uchun sample).
