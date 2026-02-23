@@ -17,6 +17,17 @@ import notificationsHandler from "../server/api/notifications.js";
 import gamificationHandler from "../server/api/gamification.js";
 import pricingHandler from "../server/api/pricing.js";
 
+
+function normalizePath(rawPath) {
+  // Supports both direct path (/api/order) and rewritten query (?path=order)
+  let p = String(rawPath || "");
+  // remove any leading slashes
+  p = p.replace(/^\/+/, "");
+  // drop any query fragments accidentally passed
+  p = p.split("?")[0].split("#")[0];
+  return p;
+}
+
 function getRouteKey(path) {
   // path is already without leading /api/
   const parts = String(path || "").split("/").filter(Boolean); // ["driver","state"]
@@ -65,7 +76,19 @@ function getRouteKey(path) {
 export default async function handler(req, res) {
   try {
     const url = new URL(req.url, "http://localhost");
-    const path = url.pathname.replace(/^\/api\/?/, "");
+    // Vercel rewrite friendly: /api/(.*) -> /api?path=$1
+    const queryPath = url.searchParams.get("path");
+    const directPath = url.pathname.replace(/^\/api\/?/, "");
+    const path = normalizePath(queryPath || directPath);
+
+    // Basic CORS (safe default). Adjust origins if you want stricter policy.
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") {
+      res.statusCode = 204;
+      return res.end();
+    }
 
     // routeKey for subroutes (used by dispatch/driver modules)
     req.routeKey = getRouteKey(path);
@@ -123,8 +146,16 @@ export default async function handler(req, res) {
     res.setHeader("Content-Type", "application/json");
     res.end(JSON.stringify({ error: "API route topilmadi" }));
   } catch (e) {
+    const isProd = String(process.env.NODE_ENV || "").toLowerCase() === "production";
     res.statusCode = 500;
     res.setHeader("Content-Type", "application/json");
-    res.end(JSON.stringify({ error: e?.message || "Server error" }));
+    res.end(
+      JSON.stringify({
+        error: e?.message || "Server error",
+        name: isProd ? undefined : e?.name,
+        // stack can help you debug on Vercel logs; keep it hidden for clients in production.
+        stack: isProd ? undefined : e?.stack,
+      })
+    );
   }
 }
