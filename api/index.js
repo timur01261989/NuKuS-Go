@@ -4,18 +4,18 @@
  * Routes all /api/* requests to corresponding module
  */
 
-import orderHandler from "./order.js";
-import authHandler from "./auth.js";
-import driverHandler from "./driver.js";
-import dispatchHandler from "./dispatch.js";
-import offerHandler from "./offer.js";
-import walletHandler from "./wallet.js";
-import sosHandler from "./sos.js";
-import presenceHandler from "./_shared/presence.js";
-import cronDispatchHandler from "./_shared/cron_dispatch.js";
-import notificationsHandler from "./notifications.js";
-import gamificationHandler from "./gamification.js";
-import pricingHandler from "./pricing.js";
+import orderHandler from "../server/api/order.js";
+import authHandler from "../server/api/auth.js";
+import driverHandler from "../server/api/driver.js";
+import dispatchHandler from "../server/api/dispatch.js";
+import offerHandler from "../server/api/offer.js";
+import walletHandler from "../server/api/wallet.js";
+import sosHandler from "../server/api/sos.js";
+import presenceHandler from "../server/api/presence.js";
+import cronDispatchHandler from "../server/api/cron_dispatch.js";
+import notificationsHandler from "../server/api/notifications.js";
+import gamificationHandler from "../server/api/gamification.js";
+import pricingHandler from "../server/api/pricing.js";
 
 function getRouteKey(path) {
   // path is already without leading /api/
