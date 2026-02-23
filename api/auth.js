@@ -2,8 +2,8 @@
 // Combined auth: OTP request + OTP verify
 
 import crypto from 'crypto';
-import { json, badRequest, nowIso, uid } from './_shared/cors.js';
 import { json, badRequest, nowIso, uid, isPhone } from './_shared/cors.js';
+// NOTE: duplicate import removed to avoid build failure (kept full functionality).
 
 
 export async function auth_otp_request_handler(req, res) {
@@ -16,7 +16,7 @@ export async function auth_otp_request_handler(req, res) {
 
   // DEMO: return fixed OTP and session id
   const session_id = uid('otp');
-  const otp_code = '1111'; // demo only
+  const otp_code = '111111'; // demo only
   return json(res, 200, { ok:true, session_id, otp_code, sent_at: nowIso() });
 }
 
@@ -34,7 +34,7 @@ export async function auth_otp_verify_handler(req, res) {
   const { session_id, otp_code, phone } = body;
 
   if (!session_id) return badRequest(res, 'session_id kerak');
-  if (String(otp_code||'') !== '1111') return badRequest(res, 'OTP noto‘g‘ri');
+  if (String(otp_code||'') !== '111111') return badRequest(res, 'OTP noto‘g‘ri');
 
   const secret = process.env.AUTH_SECRET || 'dev-secret-change-me';
   const user = { id: uid('u'), phone: String(phone||'').trim(), created_at: nowIso() };
@@ -64,7 +64,7 @@ export default async function auth(req, res, routeKey = 'auth') {
       // default: if client calls /api/auth without action, infer by body fields
       try {
         const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-        if (body.code) return await auth_otp_verify_handler(req, res);
+        if (body.otp_code || body.code) return await auth_otp_verify_handler(req, res);
         return await auth_otp_request_handler(req, res);
       } catch {
         return await auth_otp_request_handler(req, res);
