@@ -12,4 +12,4 @@ UI:
 Storage:
 - marketStorage.js: localStorage ga saqlaydi (test). Keyin APIga ko'chiriladi.
 
-Sertifikat / reklama / integrity qismlari qo'shilmadi.
+Sertifikat / reklama / integrity qismlari qo'shilmadii.
