@@ -20,21 +20,6 @@
 
 import { createClient } from "@supabase/supabase-js";
 
-// Ensure req.query exists (Vercel/Node request does NOT always provide it)
-function ensureQuery(req) {
-  try {
-    if (!req.query) {
-      const url = new URL(req.url, 'http://localhost');
-      req.query = Object.fromEntries(url.searchParams.entries());
-    }
-  } catch {
-    if (!req.query) req.query = {};
-  }
-}
-
-
-// [import moved to top] import { createClient } from "@supabase/supabase-js";
-
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
@@ -44,13 +29,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
 });
 
 function sendJson(res, status, body) {
-  // Vercel Node runtime may not provide Express-style res.status()
-  if (typeof res.status === "function") {
-    try { res.status(status); } catch { res.statusCode = status; }
-  } else {
-    res.statusCode = status;
-  }
-  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.status(status).setHeader("Content-Type", "application/json; charset=utf-8");
   res.end(JSON.stringify(body));
 }
 
@@ -685,8 +664,6 @@ async function activeTaxiOrder(req, res, body) {
 
 
 export default async function handler(req, res) {
-  ensureQuery(req);
-
   if (withCors(req, res)) return;
 
   const body = req.method === "POST" ? await readBody(req) : {};
