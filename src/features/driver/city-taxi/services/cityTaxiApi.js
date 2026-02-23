@@ -1,4 +1,5 @@
 import api from "@/utils/apiHelper";
+import { supabase } from "@/lib/supabase";
 
 /**
  * cityTaxiApi.js
@@ -57,12 +58,35 @@ export const cityTaxiApi = {
   },
 
   async sendDriverLocation({ lat, lng, heading, accuracy }) {
-    const res = await api.post("/api/driver", { action: "location", lat, lng, heading, accuracy });
+    // NOTE: backend server/api/driver.js routes:
+    // - action:"location" => requires { order_id, driver_user_id } (active trip location)
+    // - action:"heartbeat" => upserts driver_presence (needed for dispatch)
+    // When driver is waiting for orders we must send heartbeat, otherwise backend returns 400.
+    const { data: userRes } = await supabase.auth.getUser();
+    const driver_user_id = userRes?.user?.id || null;
+
+    const res = await api.post("/api/driver", {
+      action: "heartbeat",
+      driver_user_id,
+      is_online: true,
+      lat,
+      lng,
+      heading,
+      accuracy,
+    });
     return pickData(res);
   },
 
   async setDriverOnline(isOnline) {
-    const res = await api.post("/api/driver", { action: "state", isOnline });
+    // Backend expects: { action:"state", driver_user_id, state:"online"|"offline" }
+    const { data: userRes } = await supabase.auth.getUser();
+    const driver_user_id = userRes?.user?.id || null;
+
+    const res = await api.post("/api/driver", {
+      action: "state",
+      driver_user_id,
+      state: isOnline ? "online" : "offline",
+    });
     return pickData(res);
   },
 };
