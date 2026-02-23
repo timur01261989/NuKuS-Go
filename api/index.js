@@ -17,17 +17,6 @@ import notificationsHandler from "../server/api/notifications.js";
 import gamificationHandler from "../server/api/gamification.js";
 import pricingHandler from "../server/api/pricing.js";
 
-// --- CORS SOZLAMALARI (Frontend ulanishi uchun shart) ---
-function setCorsHeaders(req, res) {
-  res.setHeader('Access-Control-Allow-Credentials', true);
-  res.setHeader('Access-Control-Allow-Origin', '*'); // Yoki aniq domen: 'https://sizning-sayt.uz'
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
-  );
-}
-
 function getRouteKey(path) {
   // path is already without leading /api/
   const parts = String(path || "").split("/").filter(Boolean); // ["driver","state"]
@@ -74,24 +63,12 @@ function getRouteKey(path) {
 }
 
 export default async function handler(req, res) {
-  // 1. CORS headerlarini o'rnatish
-  setCorsHeaders(req, res);
-
-  // 2. OPTIONS so'roviga darhol javob berish (Preflight)
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
-
   try {
     const url = new URL(req.url, "http://localhost");
-    // /api/ ni olib tashlash va toza path olish
     const path = url.pathname.replace(/^\/api\/?/, "");
 
     // routeKey for subroutes (used by dispatch/driver modules)
     req.routeKey = getRouteKey(path);
-
-    // --- ROUTING LOGIC ---
 
     if (path.startsWith("order")) {
       return await orderHandler(req, res);
@@ -102,7 +79,6 @@ export default async function handler(req, res) {
     }
 
     if (path.startsWith("driver") || path.startsWith("driver-")) {
-      // Driver handler routeKey ni kutadi
       return await driverHandler(req, res, req.routeKey || "driver");
     }
 
@@ -117,6 +93,7 @@ export default async function handler(req, res) {
     if (path.startsWith("cron_dispatch")) {
       return await cronDispatchHandler(req, res);
     }
+
 
     if (path.startsWith("offer")) {
       return await offerHandler(req, res);
@@ -142,18 +119,12 @@ export default async function handler(req, res) {
       return await pricingHandler(req, res);
     }
 
-    // Agar hech qaysi route tushmasa
     res.statusCode = 404;
     res.setHeader("Content-Type", "application/json");
-    res.end(JSON.stringify({ error: "API route topilmadi", path: path }));
-
+    res.end(JSON.stringify({ error: "API route topilmadi" }));
   } catch (e) {
-    console.error("API Router Error:", e);
     res.statusCode = 500;
     res.setHeader("Content-Type", "application/json");
-    res.end(JSON.stringify({ 
-      error: e?.message || "Server error", 
-      hint: "Check server logs for import errors" 
-    }));
+    res.end(JSON.stringify({ error: e?.message || "Server error" }));
   }
 }
