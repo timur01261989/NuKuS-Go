@@ -12,11 +12,14 @@ body {
 }
 /* =========================================
    0.2) BRAND TOKEN (PRIMARY COLOR)
-   AntD theme colorPrimary = var(--brand)
-   Shu token bo‘lmasa rang qora bo‘lib qoladi.
+   Gold primary — Yandex Go premium style
 ========================================= */
 :root {
-  --brand: #1677ff; /* 🔵 Ko‘k primary */
+  --brand: #FFD700;
+}
+
+body.night-mode-active {
+  --brand: #FFD700;
 }
 
 /* Agar night mode bo‘lsa ham ko‘k bo‘lsin */
@@ -134,11 +137,10 @@ h5,
 
 /* =========================================
    6) LEAFLET BASE
-   Map filter’lar (night/day) endi tokens.css’da bo‘ladi.
-   Bu yerda faqat xavfsiz default background qoldiramiz.
+   Map background — dark default
 ========================================= */
 .leaflet-container {
-  background: #f0f0f0 !important;
+  background: #0d1117 !important;
 }
 
 /* =========================================

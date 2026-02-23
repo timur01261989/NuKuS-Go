@@ -1,28 +1,183 @@
+/* =========================================
+   PREMIUM ANIMATIONS — NuKuS Go
+========================================= */
+
+/* Fade In Up */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Fade In */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Slide Up from bottom */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scale In */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Shimmer (loading glow) */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Glow pulse */
+@keyframes glowPulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(255, 215, 0, 0.30);
+  }
+}
+
+/* Neon pulse */
+@keyframes neonPulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(0, 242, 255, 0.12);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(0, 242, 255, 0.25);
+  }
+}
+
+/* Utility classes */
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease both;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-glow-pulse {
+  animation: glowPulse 2.5s ease-in-out infinite;
+}
+
+.animate-neon-pulse {
+  animation: neonPulse 2.5s ease-in-out infinite;
+}
+
+/* Stagger utility (JS assigns --i) */
+.stagger-item {
+  animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--i, 0) * 80ms);
+}
+
+/* Shimmer placeholder */
+.shimmer-bg {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.10) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Press scale — buttons */
+.press-scale {
+  transition: transform 0.1s ease;
+}
+
+.press-scale:active {
+  transform: scale(0.96);
+}
+
+/* Order overlay premium */
 .order-overlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(5, 8, 16, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 9999;
 }
 
-/* Pulsatsiya (miltillash) effekti */
+.order-card {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  padding: 25px;
+  border-radius: 22px;
+  text-align: center;
+  width: 85%;
+  color: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.65);
+}
+
+/* Pulsatsiya */
 @keyframes pulse-bg {
-  0% { background-color: rgba(255, 0, 0, 0.6); }
-  50% { background-color: rgba(255, 165, 0, 0.6); }
-  100% { background-color: rgba(255, 0, 0, 0.6); }
+  0% { background-color: rgba(255, 70, 70, 0.25); }
+  50% { background-color: rgba(255, 165, 0, 0.25); }
+  100% { background-color: rgba(255, 70, 70, 0.25); }
 }
 
 .animated-pulse {
-  animation: pulse-bg 1s infinite;
+  animation: pulse-bg 1.5s infinite;
 }
 
-.order-card {
-  background: white;
-  padding: 25px;
-  border-radius: 20px;
-  text-align: center;
-  width: 85%;
+/* Searching waves */
+.yg-wave {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 215, 0, 0.50);
+  transform: translate(-50%, -50%);
+  animation: yg-wave 1.4s infinite;
+  z-index: 650;
+  pointer-events: none;
+}
+
+.yg-wave:nth-child(2) { animation-delay: 0.35s; }
+.yg-wave:nth-child(3) { animation-delay: 0.7s; }
+
+@keyframes yg-wave {
+  0% { opacity: 0.8; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(7); }
 }

@@ -1,30 +1,31 @@
 /* ===============================
-   AntD + Premium Black Cards default
-   MAQSAD:
-   - Card’lar default premium qora bo‘lsin ✅
-   - Lekin Divider/Input/Button butun app bo‘ylab buzilib ketmasin ✅
-   - Night mode ham body.night-mode-active bilan ishlasin ✅
+   AntD Premium Dark Theme Overrides
+   Yandex Go style — glass surfaces, gold accents
 =============================== */
 
 /* ===============================
-   1) CARD — premium black default
+   1) CARD — glass surface default
 =============================== */
-
-/* Card umumiy ko‘rinishi */
 .ant-card {
   background: var(--card-bg) !important;
   border: 1px solid var(--card-border) !important;
   box-shadow: var(--shadow-soft) !important;
   border-radius: var(--radius-xl) !important;
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* Card header chizig‘ini yo‘q qilamiz */
+.ant-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hard) !important;
+}
+
 .ant-card-head {
   border-bottom: none !important;
   background: transparent !important;
 }
 
-/* Card title va body textlar */
 .ant-card .ant-typography,
 .ant-card .ant-card-head-title,
 .ant-card .ant-card-body,
@@ -39,35 +40,47 @@
 }
 
 /* ===============================
-   2) INPUT / SELECT / PICKER
-   TUZATISH:
-   - Global inputlar page token’lari bilan ishlaydi (day mode’da oq ko‘rinadi)
-   - Premium inputlar faqat Card/Modal/Drawer ichida qora bo‘ladi
+   2) INPUT / SELECT — glass fields
 =============================== */
-
-/* --------- GLOBAL (PAGE) INPUTS --------- */
-/* Day layout’da inputlar oq bo‘lishi uchun: bg-elevated ishlatamiz */
 .ant-input,
 .ant-input-affix-wrapper,
 .ant-select-selector,
 .ant-picker {
-  background: var(--bg-elevated) !important;
-  border-color: rgba(0,0,0,0.12) !important;
+  background: var(--field-bg) !important;
+  border-color: var(--field-border) !important;
   color: var(--text) !important;
+  border-radius: var(--radius) !important;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-/* Select ichidagi textlar (MUHIM!) */
+.ant-input:focus,
+.ant-input-affix-wrapper:focus,
+.ant-input-affix-wrapper-focused,
+.ant-select-focused .ant-select-selector {
+  border-color: var(--brand) !important;
+  box-shadow: 0 0 0 3px var(--field-focus) !important;
+}
+
 .ant-select-selection-item,
 .ant-select-selection-placeholder {
   color: var(--text) !important;
 }
 
-/* Placeholder token */
 .ant-input::placeholder {
   color: var(--placeholder) !important;
 }
 
-/* --------- PREMIUM (CARD / MODAL / DRAWER) INPUTS --------- */
+.ant-select-arrow {
+  color: var(--placeholder) !important;
+}
+
+.ant-input-group-addon {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: var(--field-border) !important;
+  color: var(--text-2) !important;
+}
+
+/* Card/Modal/Drawer input overrides */
 .ant-card .ant-input,
 .ant-card .ant-input-affix-wrapper,
 .ant-card .ant-select-selector,
@@ -85,17 +98,6 @@
   color: var(--card-text) !important;
 }
 
-/* Premium select textlar */
-.ant-card .ant-select-selection-item,
-.ant-card .ant-select-selection-placeholder,
-.ant-modal-content .ant-select-selection-item,
-.ant-modal-content .ant-select-selection-placeholder,
-.ant-drawer-content .ant-select-selection-item,
-.ant-drawer-content .ant-select-selection-placeholder {
-  color: var(--card-text) !important;
-}
-
-/* Premium placeholder */
 .ant-card .ant-input::placeholder,
 .ant-modal-content .ant-input::placeholder,
 .ant-drawer-content .ant-input::placeholder {
@@ -103,14 +105,52 @@
 }
 
 /* ===============================
-   3) BUTTON
+   3) BUTTON — pill style with gold primary
 =============================== */
 .ant-btn {
-  border-radius: 16px;
+  border-radius: var(--radius) !important;
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.ant-btn-default {
+  background: var(--field-bg) !important;
+  border-color: var(--field-border) !important;
+  color: var(--text) !important;
+}
+
+.ant-btn-default:hover {
+  border-color: rgba(255, 255, 255, 0.25) !important;
+  background: rgba(255, 255, 255, 0.10) !important;
+}
+
+.ant-btn-primary {
+  background: linear-gradient(180deg, #FFD700, #F5C400) !important;
+  border-color: rgba(255, 215, 0, 0.6) !important;
+  color: #0a0e1a !important;
+  font-weight: 900;
+  box-shadow: 0 8px 24px rgba(255, 215, 0, 0.25);
+}
+
+.ant-btn-primary:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 12px 30px rgba(255, 215, 0, 0.35);
+}
+
+.ant-btn-primary:active {
+  transform: scale(0.97);
+}
+
+.ant-btn-text {
+  color: var(--text) !important;
+}
+
+.ant-btn-text:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
 }
 
 /* ===============================
-   4) MODAL / DRAWER — premium
+   4) MODAL / DRAWER — premium glass
 =============================== */
 .ant-modal-content {
   background: var(--card-bg-strong) !important;
@@ -118,26 +158,43 @@
   box-shadow: var(--shadow-hard) !important;
   border-radius: var(--radius-xl) !important;
   color: var(--card-text) !important;
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
 }
 
-/* Drawer container */
-.ant-drawer-content {
-  background: var(--card-bg-strong) !important;
+.ant-modal-header {
+  background: transparent !important;
+  border-bottom: 1px solid var(--card-divider) !important;
+}
+
+.ant-modal-title {
   color: var(--card-text) !important;
 }
 
-/* Drawer header/body text */
+.ant-modal-close-x {
+  color: var(--card-text-2) !important;
+}
+
+.ant-drawer-content {
+  background: var(--card-bg-strong) !important;
+  color: var(--card-text) !important;
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+}
+
 .ant-drawer .ant-typography,
 .ant-drawer .ant-drawer-title,
 .ant-drawer .ant-drawer-body {
   color: var(--card-text) !important;
 }
 
+.ant-drawer-header {
+  background: transparent !important;
+  border-bottom: 1px solid var(--card-divider) !important;
+}
+
 /* ===============================
    5) DIVIDER
-   TUZATISH:
-   - Global divider: page divider (day’da qora, night’da oq)
-   - Card/Modal/Drawer ichida: card divider
 =============================== */
 .ant-divider {
   border-color: var(--divider) !important;
@@ -147,4 +204,137 @@
 .ant-modal-content .ant-divider,
 .ant-drawer-content .ant-divider {
   border-color: var(--card-divider) !important;
+}
+
+/* ===============================
+   6) SEGMENTED / SWITCH — glass
+=============================== */
+.ant-segmented {
+  background: var(--field-bg) !important;
+  border-radius: var(--radius) !important;
+  padding: 3px !important;
+}
+
+.ant-segmented-item {
+  color: var(--text-2) !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+.ant-segmented-item-selected {
+  background: var(--brand) !important;
+  color: #0a0e1a !important;
+  font-weight: 800;
+  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+}
+
+.ant-switch-checked {
+  background: var(--brand) !important;
+}
+
+/* ===============================
+   7) TAG
+=============================== */
+.ant-tag {
+  background: var(--field-bg) !important;
+  border-color: var(--field-border) !important;
+  color: var(--text) !important;
+  border-radius: 999px !important;
+}
+
+/* ===============================
+   8) DROPDOWN / POPOVER
+=============================== */
+.ant-dropdown-menu,
+.ant-popover-inner,
+.ant-select-dropdown {
+  background: rgba(15, 20, 35, 0.95) !important;
+  border: 1px solid var(--card-border) !important;
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow-hard) !important;
+}
+
+.ant-dropdown-menu-item,
+.ant-select-item {
+  color: var(--text) !important;
+}
+
+.ant-dropdown-menu-item:hover,
+.ant-select-item-option-active {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.ant-select-item-option-selected {
+  background: rgba(255, 215, 0, 0.12) !important;
+  font-weight: 800;
+}
+
+/* ===============================
+   9) TYPOGRAPHY global override
+=============================== */
+.ant-typography {
+  color: var(--text) !important;
+}
+
+.ant-typography-secondary,
+.ant-typography.ant-typography-secondary {
+  color: var(--text-2) !important;
+}
+
+/* ===============================
+   10) SPIN / PROGRESS
+=============================== */
+.ant-spin-dot-item {
+  background: var(--brand) !important;
+}
+
+.ant-progress-text {
+  color: var(--text-2) !important;
+}
+
+/* ===============================
+   11) FORM
+=============================== */
+.ant-form-item-label > label {
+  color: var(--text) !important;
+}
+
+.ant-form-item-explain-error {
+  color: #ff4d4f !important;
+}
+
+/* ===============================
+   12) LIST
+=============================== */
+.ant-list-item {
+  border-color: var(--divider) !important;
+}
+
+.ant-list-item-meta-title {
+  color: var(--text) !important;
+}
+
+.ant-list-item-meta-description {
+  color: var(--text-2) !important;
+}
+
+/* ===============================
+   13) CHECKBOX
+=============================== */
+.ant-checkbox-wrapper {
+  color: var(--text) !important;
+}
+
+/* ===============================
+   14) MESSAGE / NOTIFICATION
+=============================== */
+.ant-message-notice-content {
+  background: rgba(15, 20, 35, 0.95) !important;
+  border: 1px solid var(--card-border) !important;
+  color: var(--text) !important;
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow-hard) !important;
 }
