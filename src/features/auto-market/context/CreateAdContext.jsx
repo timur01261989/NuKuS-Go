@@ -27,6 +27,19 @@ const defaultAd = {
   seller: { name: "", phone: "" },
   location: { lat: null, lng: null, city: "" },
   is_top: false,
+
+  // YANGI: Vikup (Rent-to-Own) maydonlari
+  vikup: false,              // vikupga berilmoqda
+  vikup_initial: "",         // boshlang'ich to'lov (USD)
+  vikup_monthly: "",         // oylik to'lov (USD)
+  vikup_months: "12",        // muddat (oy)
+  vikup_interest: "0",       // foiz stavkasi
+
+  // YANGI: Barter maydonlari
+  barter: false,             // barter qabul qilinadi
+  barter_brand: "",          // qaysi brend qabul qilinadi
+  barter_model: "",          // qaysi model qabul qilinadi
+  barter_extra_ok: false,    // ustiga pul to'lashga tayyor
 };
 
 function safeParse(raw, fallback) {

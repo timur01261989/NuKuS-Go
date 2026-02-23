@@ -4,10 +4,12 @@ import { MarketProvider } from "./MarketContext";
 import { CreateAdProvider } from "./CreateAdContext";
 import { CompareProvider } from "./CompareContext";
 import { AiProcessProvider } from "./AiProcessContext";
+import { GarajProvider } from "./GarajContext";
 
 /**
  * Single wrapper to keep AutoMarketEntry clean.
  * IMPORTANT: Market/Compare/CreateAd order is preserved to avoid behavior changes.
+ * YANGI: GarajProvider qo'shildi ("Mening Garajim" uchun)
  */
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -22,7 +24,9 @@ export default function AppProviders({ children }) {
       <MarketProvider>
         <CompareProvider>
           <AiProcessProvider>
-            <CreateAdProvider>{children}</CreateAdProvider>
+            <GarajProvider>
+              <CreateAdProvider>{children}</CreateAdProvider>
+            </GarajProvider>
           </AiProcessProvider>
         </CompareProvider>
       </MarketProvider>

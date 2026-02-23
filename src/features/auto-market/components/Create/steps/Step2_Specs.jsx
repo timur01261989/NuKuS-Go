@@ -1,8 +1,13 @@
 import React from "react";
-import { Card, Input, Select, Switch } from "antd";
+import { Card, Input, Select, Switch, InputNumber } from "antd";
 import { useCreateAd } from "../../../context/CreateAdContext";
-import { CITIES, FUELS, TRANSMISSIONS, COLORS, BODY_TYPES, DRIVE_TYPES } from "../../../services/staticData";
+import { CITIES, FUELS, TRANSMISSIONS, COLORS, BODY_TYPES, DRIVE_TYPES, ALL_MODELS_FLAT } from "../../../services/staticData";
 
+/**
+ * Step2_Specs
+ * Asl funksionallik to'liq saqlangan.
+ * YANGI: Vikupga berish toggle + vikup shartlari + Barter toggle + barter model
+ */
 export default function Step2_Specs() {
   const { ad, patch } = useCreateAd();
 
@@ -57,6 +62,7 @@ export default function Step2_Specs() {
         </div>
       </div>
 
+      {/* Asl switch'lar */}
       <div style={{ display: "flex", gap: 14, marginTop: 14, flexWrap: "wrap" }}>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <Switch checked={!!ad.kredit} onChange={(v)=>patch({ kredit: v })} />
@@ -70,7 +76,95 @@ export default function Step2_Specs() {
           <Switch checked={!!ad.is_top} onChange={(v)=>patch({ is_top: v })} />
           <span style={{ fontWeight: 800, color: "#0f172a" }}>TOP e'lon</span>
         </div>
+        {/* YANGI */}
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <Switch checked={!!ad.vikup} onChange={(v)=>patch({ vikup: v })} />
+          <span style={{ fontWeight: 800, color: "#d97706" }}>💳 Vikupga berish</span>
+        </div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <Switch checked={!!ad.barter} onChange={(v)=>patch({ barter: v })} />
+          <span style={{ fontWeight: 800, color: "#059669" }}>🔄 Barter qabul</span>
+        </div>
       </div>
+
+      {/* Vikup shartlari */}
+      {ad.vikup && (
+        <div style={{ marginTop: 14, padding: 12, background: "#fffbeb", borderRadius: 14, border: "1.5px solid #fde68a" }}>
+          <div style={{ fontWeight: 800, color: "#d97706", marginBottom: 10 }}>💳 Vikup shartlari</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div>
+              <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700, marginBottom: 4 }}>Boshlang'ich to'lov ($)</div>
+              <InputNumber
+                value={ad.vikup_initial ? Number(ad.vikup_initial) : null}
+                onChange={(v) => patch({ vikup_initial: String(v || "") })}
+                style={{ width: "100%" }} min={0} placeholder="2000"
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700, marginBottom: 4 }}>Oylik to'lov ($)</div>
+              <InputNumber
+                value={ad.vikup_monthly ? Number(ad.vikup_monthly) : null}
+                onChange={(v) => patch({ vikup_monthly: String(v || "") })}
+                style={{ width: "100%" }} min={0} placeholder="300"
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700, marginBottom: 4 }}>Muddat (oy)</div>
+              <Select
+                value={ad.vikup_months || "12"}
+                onChange={(v) => patch({ vikup_months: v })}
+                style={{ width: "100%" }}
+                options={["6","12","18","24","36","48","60"].map(x=>({value:x,label:`${x} oy`}))}
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700, marginBottom: 4 }}>Foiz (yillik %)</div>
+              <InputNumber
+                value={ad.vikup_interest ? Number(ad.vikup_interest) : 0}
+                onChange={(v) => patch({ vikup_interest: String(v || "0") })}
+                style={{ width: "100%" }} min={0} max={100} placeholder="0"
+              />
+            </div>
+          </div>
+          {ad.vikup_monthly && ad.vikup_months && (
+            <div style={{ marginTop: 10, fontSize: 12, color: "#92400e", fontWeight: 700 }}>
+              Umumiy: ${(Number(ad.vikup_initial||0) + Number(ad.vikup_monthly||0) * Number(ad.vikup_months||0)).toLocaleString()}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Barter qabul qilish — qaysi mashina? */}
+      {ad.barter && (
+        <div style={{ marginTop: 14, padding: 12, background: "#f0fdf4", borderRadius: 14, border: "1.5px solid #86efac" }}>
+          <div style={{ fontWeight: 800, color: "#059669", marginBottom: 10 }}>🔄 Qaysi mashina qabul qilinadi?</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div>
+              <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700, marginBottom: 4 }}>Marka</div>
+              <Select
+                value={ad.barter_brand || undefined}
+                onChange={(v) => patch({ barter_brand: v, barter_model: "" })}
+                allowClear
+                placeholder="Har qanday"
+                style={{ width: "100%" }}
+                options={[{ value: "", label: "Har qanday" }, ...["Chevrolet","KIA","Hyundai","Toyota","Mercedes","BMW"].map(b => ({ value: b, label: b }))]}
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700, marginBottom: 4 }}>Model</div>
+              <Input
+                value={ad.barter_model}
+                onChange={(e) => patch({ barter_model: e.target.value })}
+                placeholder="Masalan: Cobalt"
+              />
+            </div>
+          </div>
+          <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center" }}>
+            <Switch checked={!!ad.barter_extra_ok} onChange={(v) => patch({ barter_extra_ok: v })} />
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#059669" }}>Ustiga pul to'lashga tayyor</span>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }

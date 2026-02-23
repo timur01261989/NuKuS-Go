@@ -3,6 +3,11 @@ import { Drawer, Button, Input, Select, Switch, Slider } from "antd";
 import { useMarket } from "../../context/MarketContext";
 import { CITIES, FUELS, TRANSMISSIONS, COLORS, BRANDS, MODELS_BY_BRAND } from "../../services/staticData";
 
+/**
+ * FullFilterDrawer
+ * Asl funksionallik to'liq saqlangan.
+ * YANGI: Vikup va Barter switch'lari qo'shildi
+ */
 export default function FullFilterDrawer({ open, onClose }) {
   const { filters, patchFilters, resetFilters } = useMarket();
 
@@ -81,6 +86,15 @@ export default function FullFilterDrawer({ open, onClose }) {
           <div style={{ display:"flex", gap: 10, alignItems:"center" }}>
             <Switch checked={filters.nearMe} onChange={(v)=>patchFilters({ nearMe: v })} />
             <span style={{ fontWeight: 800 }}>Yaqin atrof</span>
+          </div>
+          {/* YANGI */}
+          <div style={{ display:"flex", gap: 10, alignItems:"center" }}>
+            <Switch checked={filters.vikup} onChange={(v)=>patchFilters({ vikup: v })} />
+            <span style={{ fontWeight: 800, color: "#d97706" }}>💳 Vikup</span>
+          </div>
+          <div style={{ display:"flex", gap: 10, alignItems:"center" }}>
+            <Switch checked={filters.barter} onChange={(v)=>patchFilters({ barter: v })} />
+            <span style={{ fontWeight: 800, color: "#059669" }}>🔄 Barter</span>
           </div>
         </div>
 

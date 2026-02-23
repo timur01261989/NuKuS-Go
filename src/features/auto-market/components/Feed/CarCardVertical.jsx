@@ -3,6 +3,11 @@ import PriceTag from "../Common/PriceTag";
 import FavoriteButton from "../Common/FavoriteButton";
 import StatusBadge from "../Common/StatusBadge";
 
+/**
+ * CarCardVertical
+ * Asl funksionallik to'liq saqlangan.
+ * YANGI: vikup va barter badge'lari qo'shildi
+ */
 export default function CarCardVertical({ ad, onClick }) {
   const badge = ad.is_top ? "TOP" : null;
   return (
@@ -19,10 +24,13 @@ export default function CarCardVertical({ ad, onClick }) {
     >
       <div style={{ position: "relative", height: 170 }}>
         <img src={ad.images?.[0]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-        <div style={{ position: "absolute", left: 10, top: 10, display: "flex", gap: 8 }}>
-          {badge ? <StatusBadge type={badge} /> : null}
-          {ad.kredit ? <StatusBadge type="CREDIT" /> : null}
+        <div style={{ position: "absolute", left: 10, top: 10, display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {badge       ? <StatusBadge type={badge}    /> : null}
+          {ad.kredit   ? <StatusBadge type="CREDIT"   /> : null}
           {ad.exchange ? <StatusBadge type="EXCHANGE" /> : null}
+          {/* YANGI */}
+          {ad.vikup    ? <StatusBadge type="VIKUP"    /> : null}
+          {ad.barter   ? <StatusBadge type="BARTER"   /> : null}
         </div>
         <div style={{ position: "absolute", right: 10, top: 10 }}>
           <FavoriteButton adId={ad.id} />

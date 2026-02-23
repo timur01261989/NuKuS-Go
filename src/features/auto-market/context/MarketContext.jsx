@@ -19,6 +19,14 @@ const defaultFilters = {
   nearMe: false,
   radiusKm: 10,
   center: null,
+
+  // YANGI: Vikup, Barter, Zapchast filtrlari
+  vikup: false,         // faqat vikupga beriladiganlar
+  barter: false,        // faqat barterga tayyor
+  zapchastBrand: "",    // zapchast bo'limida marka filtri
+  zapchastModel: "",    // zapchast bo'limida model filtri
+  zapchastCategory: "", // zapchast kategoriyasi
+  isRazborka: false,    // faqat razborka e'lonlari
 };
 
 function safeParse(raw, fallback) {

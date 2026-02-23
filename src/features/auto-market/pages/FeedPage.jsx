@@ -1,21 +1,58 @@
+/**
+ * FeedPage
+ * Asl funksionallik to'liq saqlangan.
+ * YANGI: Lentada har 5 ta kartadan keyin SponsoredCarCard ko'rinadi.
+ */
 import React, { useState } from "react";
 import { Button, Input, Spin } from "antd";
 import { PlusOutlined, FilterOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import StoriesRail from "../components/Feed/StoriesRail";
 import SmartFilterBar from "../components/Feed/SmartFilterBar";
+import QuickNavPanel from "../components/Feed/QuickNavPanel";
 import CarCardVertical from "../components/Feed/CarCardVertical";
+import SponsoredCarCard, { DEFAULT_SPONSORS } from "../components/Feed/SponsoredCarCard";
 import CompareFloatBtn from "../components/Feed/CompareFloatBtn";
 import SortDropdown from "../components/Feed/SortDropdown";
 import FullFilterDrawer from "../components/Filters/FullFilterDrawer";
 import useCarList from "../hooks/useCarList";
 import { useMarket } from "../context/MarketContext";
 
+const SPONSOR_EVERY = 5; // har nechta kartadan keyin sponsor
+
 export default function FeedPage() {
   const nav = useNavigate();
   const [drawer, setDrawer] = useState(false);
   const { filters, patchFilters } = useMarket();
   const { items, loading, error, page, pageCount, go } = useCarList(filters, { pageSize: 12 });
+
+  // Sponsor indeksini sahifa bo'yicha aylantirish
+  const sponsorIdx = (page - 1) % DEFAULT_SPONSORS.length;
+
+  // Kartalar orasiga sponsor qo'shish
+  const renderItems = () => {
+    const result = [];
+    items.forEach((ad, i) => {
+      result.push(
+        <CarCardVertical
+          key={ad.id}
+          ad={ad}
+          onClick={() => nav(`/auto-market/ad/${ad.id}`)}
+        />
+      );
+      // Har SPONSOR_EVERY kartadan keyin bitta sponsor
+      if ((i + 1) % SPONSOR_EVERY === 0 && i < items.length - 1) {
+        const sp = DEFAULT_SPONSORS[(sponsorIdx + Math.floor(i / SPONSOR_EVERY)) % DEFAULT_SPONSORS.length];
+        result.push(
+          <SponsoredCarCard
+            key={`sponsor_${i}`}
+            sponsor={sp}
+          />
+        );
+      }
+    });
+    return result;
+  };
 
   return (
     <div style={{ paddingBottom: 90 }}>
@@ -42,6 +79,7 @@ export default function FeedPage() {
       </div>
 
       <StoriesRail />
+      <QuickNavPanel />
       <SmartFilterBar />
 
       <div style={{ padding: "12px 14px" }}>
@@ -51,13 +89,7 @@ export default function FeedPage() {
           <div style={{ color:"#ef4444", fontWeight: 800 }}>{error}</div>
         ) : (
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
-            {items.map((ad) => (
-              <CarCardVertical
-                key={ad.id}
-                ad={ad}
-                onClick={() => nav(`/auto-market/ad/${ad.id}`)}
-              />
-            ))}
+            {renderItems()}
           </div>
         )}
 

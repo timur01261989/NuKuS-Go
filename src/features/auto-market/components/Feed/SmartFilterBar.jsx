@@ -3,6 +3,11 @@ import { Button, Space, Tag } from "antd";
 import { BRANDS, MODELS_BY_BRAND } from "../../services/staticData";
 import { useMarket } from "../../context/MarketContext";
 
+/**
+ * SmartFilterBar
+ * Asl funksionallik to'liq saqlangan (marka, model, kredit, obmen).
+ * YANGI: "Vikup bor" va "Barter bor" teg'lari qo'shildi
+ */
 export default function SmartFilterBar() {
   const { filters, patchFilters } = useMarket();
 
@@ -55,6 +60,21 @@ export default function SmartFilterBar() {
             onClick={() => patchFilters({ exchange: !filters.exchange })}
           >
             Obmen
+          </Tag>
+          {/* YANGI */}
+          <Tag
+            color={filters.vikup ? "orange" : "default"}
+            style={{ cursor: "pointer", borderRadius: 999 }}
+            onClick={() => patchFilters({ vikup: !filters.vikup })}
+          >
+            💳 Vikup
+          </Tag>
+          <Tag
+            color={filters.barter ? "success" : "default"}
+            style={{ cursor: "pointer", borderRadius: 999 }}
+            onClick={() => patchFilters({ barter: !filters.barter })}
+          >
+            🔄 Barter
           </Tag>
         </div>
       ) : null}
