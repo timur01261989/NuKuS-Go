@@ -28,7 +28,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession: false },
 });
 
-function json(res, status, body) {
+function sendJson(res, status, body) {
   res.status(status).setHeader("Content-Type", "application/json; charset=utf-8");
   res.end(JSON.stringify(body));
 }
@@ -97,7 +97,7 @@ async function listInterProv(req, res) {
   } = req.query || {};
 
   if (!from_region || !to_region) {
-    return json(res, 400, { error: "from_region va to_region shart" });
+    return sendJson(res, 400, { error: "from_region va to_region shart" });
   }
 
   let q = supabase
@@ -127,14 +127,14 @@ async function listInterProv(req, res) {
   }
 
   const { data, error } = await q;
-  if (error) return json(res, 500, { error: error.message });
+  if (error) return sendJson(res, 500, { error: error.message });
 
-  return json(res, 200, { orders: data || [] });
+  return sendJson(res, 200, { orders: data || [] });
 }
 
 async function listMyBookings(req, res) {
   const passenger_id = (req.query?.passenger_id || "").toString();
-  if (!passenger_id) return json(res, 400, { error: "passenger_id shart" });
+  if (!passenger_id) return sendJson(res, 400, { error: "passenger_id shart" });
 
   const { data, error } = await supabase
     .from("trip_booking_requests")
@@ -142,9 +142,9 @@ async function listMyBookings(req, res) {
     .eq("passenger_id", passenger_id)
     .order("created_at", { ascending: false });
 
-  if (error) return json(res, 500, { error: error.message });
+  if (error) return sendJson(res, 500, { error: error.message });
 
-  return json(res, 200, { bookings: data || [] });
+  return sendJson(res, 200, { bookings: data || [] });
 }
 
 async function bookInterProv(req, res, body) {
@@ -153,10 +153,10 @@ async function bookInterProv(req, res, body) {
   const seats = Number(body.seats || 1);
 
   if (!orderId || !passenger_id) {
-    return json(res, 400, { error: "orderId/adId va passenger_id shart" });
+    return sendJson(res, 400, { error: "orderId/adId va passenger_id shart" });
   }
   if (!Number.isFinite(seats) || seats <= 0) {
-    return json(res, 400, { error: "seats noto‘g‘ri" });
+    return sendJson(res, 400, { error: "seats noto‘g‘ri" });
   }
 
   // 1) Read order
@@ -166,10 +166,10 @@ async function bookInterProv(req, res, body) {
     .eq("id", orderId)
     .single();
 
-  if (ordErr || !order) return json(res, 404, { error: "Order topilmadi" });
+  if (ordErr || !order) return sendJson(res, 404, { error: "Order topilmadi" });
 
   const avail = Number(order.seats_available || 0);
-  if (avail < seats) return json(res, 400, { error: "Bo‘sh o‘rin yetarli emas" });
+  if (avail < seats) return sendJson(res, 400, { error: "Bo‘sh o‘rin yetarli emas" });
 
   // 2) Create booking request
   const bookingPayload = {
@@ -189,7 +189,7 @@ async function bookInterProv(req, res, body) {
     .select("*")
     .single();
 
-  if (bErr) return json(res, 500, { error: bErr.message });
+  if (bErr) return sendJson(res, 500, { error: bErr.message });
 
   // 3) Decrement seats (best-effort)
   const newAvail = Math.max(0, avail - seats);
@@ -202,13 +202,13 @@ async function bookInterProv(req, res, body) {
 
   // If update fails, still return booking (but warn)
   if (updErr) {
-    return json(res, 200, {
+    return sendJson(res, 200, {
       booking,
       warning: "Booking yaratildi, lekin seats update xatolik: " + updErr.message,
     });
   }
 
-  return json(res, 200, { booking });
+  return sendJson(res, 200, { booking });
 }
 
 async function restoreSeatsForBooking(bookingRow) {
@@ -237,15 +237,15 @@ async function cancelBooking(req, res, body) {
   const booking_id = body.booking_id || body.id;
   const passenger_id = body.passenger_id || body.passengerId;
 
-  if (!booking_id) return json(res, 400, { error: "booking_id shart" });
+  if (!booking_id) return sendJson(res, 400, { error: "booking_id shart" });
 
   const q = supabase.from("trip_booking_requests").select("*").eq("id", booking_id).single();
   const { data: booking, error } = await q;
-  if (error || !booking) return json(res, 404, { error: "Booking topilmadi" });
+  if (error || !booking) return sendJson(res, 404, { error: "Booking topilmadi" });
 
   if (passenger_id && booking.passenger_id !== passenger_id) {
     // service-role key should be used, but we keep a guard
-    return json(res, 403, { error: "Ruxsat yo‘q" });
+    return sendJson(res, 403, { error: "Ruxsat yo‘q" });
   }
 
   const { error: updErr } = await supabase
@@ -253,33 +253,33 @@ async function cancelBooking(req, res, body) {
     .update({ status: "cancelled" })
     .eq("id", booking_id);
 
-  if (updErr) return json(res, 500, { error: updErr.message });
+  if (updErr) return sendJson(res, 500, { error: updErr.message });
 
   // restore seats best-effort
   await restoreSeatsForBooking(booking);
 
-  return json(res, 200, { ok: true });
+  return sendJson(res, 200, { ok: true });
 }
 
 async function markCancelRequested(req, res, body) {
   const booking_id = body.booking_id || body.id;
-  if (!booking_id) return json(res, 400, { error: "booking_id shart" });
+  if (!booking_id) return sendJson(res, 400, { error: "booking_id shart" });
 
   const { error } = await supabase
     .from("trip_booking_requests")
     .update({ status: "cancel_requested" })
     .eq("id", booking_id);
 
-  if (error) return json(res, 500, { error: error.message });
-  return json(res, 200, { ok: true });
+  if (error) return sendJson(res, 500, { error: error.message });
+  return sendJson(res, 200, { ok: true });
 }
 
 async function editBookingSeats(req, res, body) {
   const booking_id = body.booking_id || body.id;
   const seats_requested = Number(body.seats_requested || body.seats || 1);
-  if (!booking_id) return json(res, 400, { error: "booking_id shart" });
+  if (!booking_id) return sendJson(res, 400, { error: "booking_id shart" });
   if (!Number.isFinite(seats_requested) || seats_requested <= 0) {
-    return json(res, 400, { error: "seats_requested noto‘g‘ri" });
+    return sendJson(res, 400, { error: "seats_requested noto‘g‘ri" });
   }
 
   // Read booking + order
@@ -288,21 +288,21 @@ async function editBookingSeats(req, res, body) {
     .select("*")
     .eq("id", booking_id)
     .single();
-  if (bErr || !booking) return json(res, 404, { error: "Booking topilmadi" });
+  if (bErr || !booking) return sendJson(res, 404, { error: "Booking topilmadi" });
 
   const { data: order } = await supabase
     .from("orders")
     .select("*")
     .eq("id", booking.order_id)
     .single();
-  if (!order) return json(res, 404, { error: "Order topilmadi" });
+  if (!order) return sendJson(res, 404, { error: "Order topilmadi" });
 
   const oldSeats = Number(booking.seats_requested || 1);
   const delta = seats_requested - oldSeats;
 
   // If increasing seats -> must have availability
   if (delta > 0 && Number(order.seats_available || 0) < delta) {
-    return json(res, 400, { error: "Bo‘sh o‘rin yetarli emas" });
+    return sendJson(res, 400, { error: "Bo‘sh o‘rin yetarli emas" });
   }
 
   // Update booking
@@ -310,7 +310,7 @@ async function editBookingSeats(req, res, body) {
     .from("trip_booking_requests")
     .update({ seats_requested })
     .eq("id", booking_id);
-  if (updB) return json(res, 500, { error: updB.message });
+  if (updB) return sendJson(res, 500, { error: updB.message });
 
   // Update seats available best-effort
   const newAvail = Math.max(0, Number(order.seats_available || 0) - delta);
@@ -321,7 +321,7 @@ async function editBookingSeats(req, res, body) {
     .update({ seats_available: newAvail, status: newStatus })
     .eq("id", booking.order_id);
 
-  return json(res, 200, { ok: true });
+  return sendJson(res, 200, { ok: true });
 }
 
 
@@ -404,10 +404,10 @@ async function districtOffers(req, res, body) {
   const fromDistrict = (req.query?.fromDistrict || body?.fromDistrict || "Nukus").toString();
   const toDistrict = (req.query?.toDistrict || body?.toDistrict || "").toString();
   const filters = body?.filters || {};
-  if (!toDistrict) return json(res, 400, { error: "toDistrict shart" });
+  if (!toDistrict) return sendJson(res, 400, { error: "toDistrict shart" });
 
   const result = makeDistrictOffers({ fromDistrict, toDistrict, filters });
-  return json(res, 200, result);
+  return sendJson(res, 200, result);
 }
 
 async function createInterDistrict(req, res, body) {
@@ -415,7 +415,7 @@ async function createInterDistrict(req, res, body) {
   const toDistrict = (body?.toDistrict || "").toString();
   const seats = Number(body?.seats || 1);
   const filters = body?.filters || {};
-  if (!toDistrict) return json(res, 400, { error: "toDistrict shart" });
+  if (!toDistrict) return sendJson(res, 400, { error: "toDistrict shart" });
 
   const result = makeDistrictOffers({ fromDistrict, toDistrict, filters });
   const distance_km = Number(body?.distance_km || result.distanceKm);
@@ -445,11 +445,11 @@ async function createInterDistrict(req, res, body) {
       .single();
 
     if (error) {
-      return json(res, 200, { created: false, warning: error.message, distance_km, duration_min, price });
+      return sendJson(res, 200, { created: false, warning: error.message, distance_km, duration_min, price });
     }
-    return json(res, 200, { created: true, id: data?.id, order: data });
+    return sendJson(res, 200, { created: true, id: data?.id, order: data });
   } catch (e) {
-    return json(res, 200, { created: false, warning: e?.message || "insert failed", distance_km, duration_min, price });
+    return sendJson(res, 200, { created: false, warning: e?.message || "insert failed", distance_km, duration_min, price });
   }
 }
 
@@ -545,10 +545,10 @@ function resolvePickupDropoff(body) {
 async function createTaxiOrder(req, res, body) {
   const client_id =
     (body.client_id || body.passenger_id || body.user_id || body.clientId || getAuthUid(req) || "").toString();
-  if (!client_id) return json(res, 400, { error: "client_id (yoki passenger_id) shart" });
+  if (!client_id) return sendJson(res, 400, { error: "client_id (yoki passenger_id) shart" });
 
   const { pickup, dropoff } = resolvePickupDropoff(body);
-  if (!pickup) return json(res, 400, { error: "pickup koordinata shart" });
+  if (!pickup) return sendJson(res, 400, { error: "pickup koordinata shart" });
 
   const route = body.route || body.polyline || body.routeInfo || null;
   const notes = body.notes || body.note || body.comment || null;
@@ -596,19 +596,19 @@ async function createTaxiOrder(req, res, body) {
   }
 
   if (!inserted) {
-    return json(res, 200, {
+    return sendJson(res, 200, {
       created: false,
       warning: lastErr?.message || "insert failed",
       hint: "orders table ustunlari mos kelmayapti yoki RLS bloklayapti",
     });
   }
 
-  return json(res, 200, { created: true, order: inserted, id: inserted.id });
+  return sendJson(res, 200, { created: true, order: inserted, id: inserted.id });
 }
 
 async function cancelTaxiOrder(req, res, body) {
   const id = (body.id || body.order_id || body.orderId || "").toString();
-  if (!id) return json(res, 400, { error: "id/order_id shart" });
+  if (!id) return sendJson(res, 400, { error: "id/order_id shart" });
 
   const payload = {
     status: "cancelled",
@@ -624,13 +624,13 @@ async function cancelTaxiOrder(req, res, body) {
     .select("*")
     .single();
 
-  if (error) return json(res, 500, { error: error.message });
-  return json(res, 200, { ok: true, order: data });
+  if (error) return sendJson(res, 500, { error: error.message });
+  return sendJson(res, 200, { ok: true, order: data });
 }
 
 async function getTaxiOrder(req, res, body) {
   const id = (req.query?.id || body?.id || body?.order_id || body?.orderId || "").toString();
-  if (!id) return json(res, 400, { error: "id/order_id shart" });
+  if (!id) return sendJson(res, 400, { error: "id/order_id shart" });
 
   const { data, error } = await supabase
     .from("orders")
@@ -638,13 +638,13 @@ async function getTaxiOrder(req, res, body) {
     .eq("id", id)
     .single();
 
-  if (error) return json(res, 404, { error: error.message });
-  return json(res, 200, { order: data });
+  if (error) return sendJson(res, 404, { error: error.message });
+  return sendJson(res, 200, { order: data });
 }
 
 async function activeTaxiOrder(req, res, body) {
   const client_id = (req.query?.client_id || body?.client_id || body?.passenger_id || "").toString();
-  if (!client_id) return json(res, 400, { error: "client_id/passenger_id shart" });
+  if (!client_id) return sendJson(res, 400, { error: "client_id/passenger_id shart" });
 
   // Try common "active" statuses; adjust later if your enum differs.
   const activeStatuses = ["created", "searching", "accepted", "arrived", "started", "in_progress"];
@@ -657,8 +657,8 @@ async function activeTaxiOrder(req, res, body) {
     .order("created_at", { ascending: false })
     .limit(1);
 
-  if (error) return json(res, 500, { error: error.message });
-  return json(res, 200, { order: (data && data[0]) || null });
+  if (error) return sendJson(res, 500, { error: error.message });
+  return sendJson(res, 200, { order: (data && data[0]) || null });
 }
 
 
@@ -674,7 +674,7 @@ export default async function handler(req, res) {
       if (action === "list_inter_prov") return await listInterProv(req, res);
       if (action === "list_my_inter_prov_bookings") return await listMyBookings(req, res);
       if (action === "district_offers") return await districtOffers(req, res, body);
-      return json(res, 400, { error: "Noto‘g‘ri action (GET)" });
+      return sendJson(res, 400, { error: "Noto‘g‘ri action (GET)" });
     }
 
     if (req.method === "POST") {
@@ -700,11 +700,11 @@ export default async function handler(req, res) {
       if (action === "active_taxi" || action === "active") {
         return await activeTaxiOrder(req, res, body);
       }
-            return json(res, 400, { error: "Noto‘g‘ri action (POST)" });
+            return sendJson(res, 400, { error: "Noto‘g‘ri action (POST)" });
     }
 
-    return json(res, 405, { error: "Method not allowed" });
+    return sendJson(res, 405, { error: "Method not allowed" });
   } catch (e) {
-    return json(res, 500, { error: e?.message || "Server error" });
+    return sendJson(res, 500, { error: e?.message || "Server error" });
   }
 }
