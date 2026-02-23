@@ -18,6 +18,9 @@
 import { json, badRequest, serverError } from "../_shared/cors.js";
 import { getSupabaseAdmin } from "../_shared/supabase.js";
 
+// [import moved to top] import { json, badRequest, serverError } from "../_shared/cors.js";
+// [import moved to top] import { getSupabaseAdmin } from "../_shared/supabase.js";
+
 function hasEnv() {
   return !!(
     process.env.SUPABASE_URL &&

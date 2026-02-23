@@ -19,6 +19,10 @@ import { json, serverError } from "../_shared/cors.js";
 import { getSupabaseAdmin } from "../_shared/supabase.js";
 import { dispatch_handler } from "./dispatch.js";
 
+// [import moved to top] import { json, serverError } from "../_shared/cors.js";
+// [import moved to top] import { getSupabaseAdmin } from "../_shared/supabase.js";
+// [import moved to top] import { dispatch_handler } from "./dispatch.js";
+
 function hasSupabaseEnv() {
   return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 }

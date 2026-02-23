@@ -1,9 +1,28 @@
 import { json, badRequest, serverError, nowIso } from '../_shared/cors.js';
 import { getSupabaseAdmin } from '../_shared/supabase.js';
+import { json, serverError, nowIso } from '../_shared/cors.js';
+import { json, badRequest, serverError } from '../_shared/cors.js';
+
+// Ensure req.query exists (Vercel/Node request does NOT always provide it)
+function ensureQuery(req) {
+  try {
+    if (!req.query) {
+      const url = new URL(req.url, 'http://localhost');
+      req.query = Object.fromEntries(url.searchParams.entries());
+    }
+  } catch {
+    if (!req.query) req.query = {};
+  }
+}
+
+
+// [import moved to top] import { json, badRequest, serverError, nowIso } from '../_shared/cors.js';
+// [import moved to top] import { getSupabaseAdmin } from '../_shared/supabase.js';
 
 function hasSupabaseEnv() {
   return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
+
 
 async function logOrderEvent(sb, payload) {
   try {
@@ -35,8 +54,7 @@ export async function offer_respond_handler(req, res) {
     if (!driver_user_id) return badRequest(res, 'driver_user_id kerak');
     if (!['accept','reject'].includes(action)) return badRequest(res, 'action accept|reject');
     if (!hasSupabaseEnv()) return serverError(res, 'SUPABASE_URL va service role key (SUPABASE_SERVICE_ROLE_KEY) server envda yo\'q');
-
-    const sb = getSupabaseAdmin();
+const sb = getSupabaseAdmin();
     const status = action === 'accept' ? 'accepted' : 'rejected';
 
     const { data: off, error: oe } = await sb.from('order_offers')
@@ -48,6 +66,9 @@ export async function offer_respond_handler(req, res) {
     if (oe) throw oe;
 
     if (action === 'accept') {
+      // ✅ Atomik qabul (race condition'ni kamaytirish):
+      // faqat order hali bo'sh bo'lsa va "active" holatda bo'lsa qabul qilamiz.
+      // (Ba'zi sxemalarda driver_id bo'lishi mumkin; bu handler driver_user_id'ni ishlatadi.)
       const { data: od, error: uerr } = await sb.from('orders')
         .update({ driver_id: driver_user_id, status:'accepted', accepted_at: nowIso() })
         .eq('id', order_id)
@@ -58,6 +79,7 @@ export async function offer_respond_handler(req, res) {
       if (uerr) throw uerr;
 
       if (!od) {
+        // Boshqa haydovchi oldin olib bo'lgan yoki status o'zgargan
         return json(res, 200, { ok:false, taken:true, offer: off });
       }
 
@@ -79,6 +101,13 @@ export async function offer_respond_handler(req, res) {
   }
 }
 
+// [import moved to top] import { json, serverError, nowIso } from '../_shared/cors.js';
+// [import moved to top] import { getSupabaseAdmin } from '../_shared/supabase.js';
+
+function hasSupabaseEnv() {
+  return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
 /**
  * GET /api/offer-timeout
  * Marks order_offers where status='sent' and expires_at < now() as 'timeout'.
@@ -87,8 +116,7 @@ export async function offer_respond_handler(req, res) {
 export async function offer_timeout_handler(req, res) {
   try {
     if (!hasSupabaseEnv()) return serverError(res, 'SUPABASE_URL va service role key (SUPABASE_SERVICE_ROLE_KEY) server envda yo\'q');
-
-    const sb = getSupabaseAdmin();
+const sb = getSupabaseAdmin();
     const now = new Date().toISOString();
 
     const { data, error } = await sb.from('order_offers')
@@ -104,11 +132,19 @@ export async function offer_timeout_handler(req, res) {
   }
 }
 
+// [import moved to top] import { json, badRequest, serverError } from '../_shared/cors.js';
+// [import moved to top] import { getSupabaseAdmin } from '../_shared/supabase.js';
+
+function hasSupabaseEnv() {
+  return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
 export async function messages_handler(req, res) {
+  ensureQuery(req);
+
   try {
     if (!hasSupabaseEnv()) return serverError(res, 'SUPABASE_URL va service role key (SUPABASE_SERVICE_ROLE_KEY) server envda yo\'q');
-
-    const sb = getSupabaseAdmin();
+const sb = getSupabaseAdmin();
 
     if (req.method === 'GET') {
       const order_id = String(req.query?.order_id||'').trim();
@@ -129,7 +165,7 @@ export async function messages_handler(req, res) {
       const msg = String(body.body||'').trim();
       if (!order_id) return badRequest(res, 'order_id kerak');
       if (!sender_user_id) return badRequest(res, 'sender_user_id kerak');
-      if (!msg) return badRequest(res, 'body bo\'sh');
+      if (!msg) return badRequest(res, 'body bo‘sh');
 
       const { data, error } = await sb.from('messages')
         .insert([{ order_id, sender_user_id, body: msg }])
@@ -145,6 +181,10 @@ export async function messages_handler(req, res) {
   }
 }
 
+// [import moved to top] import { json, badRequest, serverError } from '../_shared/cors.js';
+// [import moved to top] import { getSupabaseAdmin } from '../_shared/supabase.js';
+function hasSupabaseEnv(){ return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY); }
+
 export async function notifications_read_handler(req, res) {
   try {
     if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Method not allowed' });
@@ -154,18 +194,16 @@ export async function notifications_read_handler(req, res) {
     if (!id) return badRequest(res, 'id kerak');
     if (!user_id) return badRequest(res, 'user_id kerak');
     if (!hasSupabaseEnv()) return serverError(res, 'SUPABASE_URL va service role key (SUPABASE_SERVICE_ROLE_KEY) server envda yo\'q');
-
-    const sb = getSupabaseAdmin();
-    const { data, error } = await sb.from('notifications')
-      .update({ is_read:true })
-      .eq('id', id)
-      .eq('user_id', user_id)
-      .select('*')
-      .single();
+const sb = getSupabaseAdmin();
+    const { data, error } = await sb.from('notifications').update({ is_read:true }).eq('id', id).eq('user_id', user_id).select('*').single();
     if (error) throw error;
     return json(res, 200, { ok:true, notification: data });
   } catch (e) { return serverError(res, e); }
 }
+
+// [import moved to top] import { json, badRequest, serverError } from '../_shared/cors.js';
+// [import moved to top] import { getSupabaseAdmin } from '../_shared/supabase.js';
+function hasSupabaseEnv(){ return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY); }
 
 export async function notify_handler(req, res) {
   try {
@@ -174,8 +212,7 @@ export async function notify_handler(req, res) {
     const user_id = String(body.user_id||'').trim();
     if (!user_id) return badRequest(res, 'user_id kerak');
     if (!hasSupabaseEnv()) return serverError(res, 'SUPABASE_URL va service role key (SUPABASE_SERVICE_ROLE_KEY) server envda yo\'q');
-
-    const sb = getSupabaseAdmin();
+const sb = getSupabaseAdmin();
     const { data, error } = await sb.from('notifications').insert([{
       user_id,
       type: body.type || 'system',
@@ -189,6 +226,9 @@ export async function notify_handler(req, res) {
 }
 
 export default async function handler(req, res) {
+  ensureQuery(req);
+
+  // req.routeKey is set by api/index.js; fallback to query param or path
   const rk = req.routeKey || (req.query && req.query.routeKey) || '';
   switch (rk) {
     case 'offer':
@@ -202,6 +242,7 @@ export default async function handler(req, res) {
     case 'notify':
       return await notify_handler(req, res);
     default:
+      // If this module is used directly (without index router), run the first handler.
       return await offer_respond_handler(req, res);
   }
 }

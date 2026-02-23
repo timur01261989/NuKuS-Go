@@ -1,6 +1,22 @@
 import { json, badRequest, serverError } from '../_shared/cors.js';
 import { getSupabaseAdmin } from '../_shared/supabase.js';
 
+// Ensure req.query exists (Vercel/Node request does NOT always provide it)
+function ensureQuery(req) {
+  try {
+    if (!req.query) {
+      const url = new URL(req.url, 'http://localhost');
+      req.query = Object.fromEntries(url.searchParams.entries());
+    }
+  } catch {
+    if (!req.query) req.query = {};
+  }
+}
+
+
+// [import moved to top] import { json, badRequest, serverError } from '../_shared/cors.js';
+// [import moved to top] import { getSupabaseAdmin } from '../_shared/supabase.js';
+
 function hasSupabaseEnv() {
   return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
@@ -32,6 +48,8 @@ const sb = getSupabaseAdmin();
 }
 
 export default async function handler(req, res) {
+  ensureQuery(req);
+
   // req.routeKey is set by api/index.js; fallback to query param or path
   const rk = req.routeKey || (req.query && req.query.routeKey) || '';
   switch (rk) {

@@ -4,6 +4,9 @@
 import { getSupabaseAdmin } from '../_shared/supabase.js';
 import { json, badRequest, serverError, nowIso, store, hit } from '../_shared/cors.js';
 
+// [import moved to top] import { getSupabaseAdmin } from '../_shared/supabase.js';
+// [import moved to top] import { json, badRequest, serverError, nowIso, store, hit } from '../_shared/cors.js';
+
 function hasSupabaseEnv() {
   return !!(
     process.env.SUPABASE_URL &&
