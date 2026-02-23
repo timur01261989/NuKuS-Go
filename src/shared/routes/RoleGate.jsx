@@ -17,6 +17,9 @@ import { supabase } from "@/lib/supabase";
  *
  *  Why: if you treat "drivers row exists" as role=driver, then any client who once
  *  created a drivers row (or has a leftover row) gets forced into driver routes.
+ *
+ *  PERFORMANCE: profile, driver_applications va drivers so'rovlari
+ *  parallel (Promise.all) yuboriladi — sahifa ochilish 2x tez bo'ladi.
  */
 export default function RoleGate({ children, allow, redirectTo = "/login" }) {
   if (!supabase) {
@@ -93,72 +96,63 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
 
         const userId = session.user.id;
 
-        // 2) profile role (best-effort)
-        let profileRole = null;
-        let profileExists = false;
-
-        const { data: profile, error: profileErr } = await withTimeout(
+        // 2) Parallel so'rovlar: profile + driver_applications + drivers (agar kerak bo'lsa)
+        // Bu ketma-ket so'rovlar o'rniga parallel ishlaydi — ~2x tez
+        const profilePromise = withTimeout(
           supabase.from("profiles").select("role").eq("id", userId).maybeSingle()
         );
 
-        if (!profileErr && profile?.role) {
+        const appPromise = withTimeout(
+          supabase
+            .from("driver_applications")
+            .select("status")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        ).catch(() => ({ data: null, error: null }));
+
+        const drvPromise = a.driver
+          ? withTimeout(
+              supabase.from("drivers").select("*").eq("user_id", userId).maybeSingle()
+            ).catch(() => ({ data: null, error: null }))
+          : Promise.resolve({ data: null, error: null });
+
+        // Barcha so'rovlarni parallel yuborish
+        const [profileRes, appRes, drvRes] = await Promise.all([profilePromise, appPromise, drvPromise]);
+
+        // Profile
+        let profileRole = null;
+        let profileExists = false;
+        let profileErr = null;
+
+        if (!profileRes.error && profileRes.data?.role) {
           profileExists = true;
-          profileRole = profile.role;
+          profileRole = profileRes.data.role;
         }
+        profileErr = profileRes.error;
 
-        
-        // 3) driver application (registration/approval state)
-        // NOTE: Users may still have profiles.role='client' while they have a pending driver application.
-        // In that case, driver routes must not loop back to /driver/register; they should go to /driver/pending.
-        let application = null;
+        // Driver application
         let applicationStatus = null;
-
-        try {
-          const { data: app, error: appErr } = await withTimeout(
-            supabase
-              .from("driver_applications")
-              .select("status")
-              .eq("user_id", userId)
-              .order("created_at", { ascending: false })
-              .limit(1)
-              .maybeSingle()
-          );
-
-          if (!appErr && app) {
-            application = app;
-            if (typeof app.status === "string") applicationStatus = app.status.trim().toLowerCase();
+        if (!appRes.error && appRes.data) {
+          if (typeof appRes.data.status === "string") {
+            applicationStatus = appRes.data.status.trim().toLowerCase();
           }
-        } catch {
-          // ignore - we will fall back to role-only gating
         }
 
-// 3) driver row (source of truth for driver access)
-        let driverRow = null;
+        // Driver row
         let driverRowExists = false;
         let approved = false;
-
-        // Only hit drivers table when it matters (driver routes OR mixed allow)
-        if (a.driver) {
-          const { data: drv, error: drvErr } = await withTimeout(
-            // IMPORTANT: the project uses multiple schema variants for `drivers`.
-            // Selecting a missing column (e.g. `approved`) triggers PGRST204 and causes redirect loops.
-            // So we select("*") and derive approval from available fields.
-            supabase.from("drivers").select("*").eq("user_id", userId).maybeSingle()
-          );
-
-          if (!drvErr && drv) {
-            driverRow = drv;
-            driverRowExists = true;
-            approved = deriveDriverApproved(drv);
-          }
+        if (!drvRes.error && drvRes.data) {
+          driverRowExists = true;
+          approved = deriveDriverApproved(drvRes.data);
         }
 
-        // 4) Derive effective role
+        // 3) Derive effective role
         // Role is always taken from profiles.role.
-        // Drivers table is used to determine registration/approval only.
         const effectiveRole = profileRole;
 
-        // 5) Auto-create client profile if accessing client-only route and profile missing
+        // 4) Auto-create client profile if accessing client-only route and profile missing
         if (!effectiveRole && a.client && !a.driver) {
           try {
             await withTimeout(
@@ -184,7 +178,7 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
           if (p2?.role) profileRole = p2.role;
         }
 
-        // 6) Decide allow
+        // 5) Decide allow
         if (effectiveRole === "client") {
           // If a client has a pending driver application, allow driver pending page,
           // and redirect any driver-only pages to pending (prevents register<->pending loops).

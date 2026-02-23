@@ -1,0 +1,51 @@
+{
+  "name": "Nukus Go",
+  "short_name": "NukusGo",
+  "description": "Nukus shahrida tez va qulay taksi xizmati",
+  "theme_color": "#FFD700",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/",
+  "start_url": "/",
+  "lang": "uz",
+  "categories": ["transportation", "lifestyle"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Taksi buyurtma",
+      "short_name": "Taksi",
+      "description": "Tezda taksi buyurtma bering",
+      "url": "/client/taxi",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Haydovchi paneli",
+      "short_name": "Haydovchi",
+      "description": "Haydovchi rejimiga o'tish",
+      "url": "/driver/dashboard",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "screenshots": [],
+  "prefer_related_applications": false
+}

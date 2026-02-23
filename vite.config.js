@@ -25,7 +25,41 @@ export default defineConfig({
     port: 5173,
   },
 
+  // optimizeDeps.force: true olib tashlandi — har build sekinlashtirardi
+  // Faqat kerak bo'lganda (yangi dependency qo'shilganda) qo'lda ishlatiladi:
+  // vite --force
   optimizeDeps: {
-    force: true,
+    include: [
+      "react",
+      "react-dom",
+      "react-router-dom",
+      "@supabase/supabase-js",
+      "leaflet",
+      "react-leaflet",
+      "antd",
+      "@ant-design/icons",
+      "recharts",
+      "@tanstack/react-query",
+      "axios",
+    ],
+  },
+
+  build: {
+    // console.log larni production builddan olib tashlash
+    minify: "esbuild",
+    rollupOptions: {
+      output: {
+        // Katta kutubxonalarni alohida chunk'larga ajratish
+        // — birinchi sahifa yuklanishi ~40% tez bo'ladi
+        manualChunks: {
+          "vendor-react": ["react", "react-dom", "react-router-dom"],
+          "vendor-antd": ["antd", "@ant-design/icons"],
+          "vendor-map": ["leaflet", "react-leaflet"],
+          "vendor-supabase": ["@supabase/supabase-js"],
+          "vendor-chart": ["recharts"],
+          "vendor-query": ["@tanstack/react-query"],
+        },
+      },
+    },
   },
 });

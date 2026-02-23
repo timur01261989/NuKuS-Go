@@ -46,6 +46,8 @@ import TaxiSearchSheet from "./TaxiSearchSheet";
 import DestinationPicker from "./DestinationPicker";
 import { haversineKm } from "../shared/geo/haversine";
 import { nominatimReverse as _nominatimReverse } from "../shared/geo/nominatim";
+import RatingModal from "@features/shared/components/RatingModal";
+import ClientBonusWidget from "@/features/client/components/ClientBonusWidget";
 
 // Backward-compatible signature (lat, lng, signal)
 async function nominatimReverse(lat, lng, signal) {
@@ -383,6 +385,12 @@ export default function ClientTaxiPage() {
   const [orderId, setOrderId] = useState(null);
   const [orderStatus, setOrderStatus] = useState(null);
   const [assignedDriver, setAssignedDriver] = useState(null); // {first_name, car_model, plate, avatar_url, lat, lng, bearing, rating}
+  // Reyting modal — safar yakunlangandan keyin ochiladi
+  const [ratingVisible, setRatingVisible] = useState(false);
+  const [completedOrderForRating, setCompletedOrderForRating] = useState(null);
+  // Cashback bonus widget
+  const [bonusVisible, setBonusVisible] = useState(false);
+  const [earnedBonus, setEarnedBonus] = useState(0);
   const [etaMin, setEtaMin] = useState(null);
 
   // actions / modals
@@ -800,6 +808,21 @@ export default function ClientTaxiPage() {
           setOrderStatus(st);
           if (st === "accepted") speak("Haydovchi topildi");
           if (st === "arrived") speak("Haydovchi yetib keldi");
+          // Safar yakunlandi — reyting modalini ochish
+          if (st === "completed" || st === "done") {
+            speak("Safar yakunlandi. Rahmat!");
+            const drvId = o?.driver?.id || o?.driver_user_id || o?.assigned_driver_id || null;
+            const clientId = o?.client_user_id || o?.user_id || null;
+            setCompletedOrderForRating({
+              id: orderId,
+              driver_user_id: drvId,
+              client_user_id: clientId,
+            });
+            setRatingVisible(true);
+            // Cashback hisoblash: narxning 1%i
+            const price = Number(o?.price || o?.amount || o?.priceUzs || 0);
+            setEarnedBonus(Math.max(1, Math.floor(price * 0.01)));
+          }
         }
 
         const drv = o?.driver || o?.assigned_driver || o?.assignedDriver;
@@ -1744,6 +1767,44 @@ export default function ClientTaxiPage() {
       {WishesModal}
       {ScheduleModal}
       {ShareModal}
+
+      {/* Reyting modal — safar yakunlangandan keyin avtomatik ochiladi */}
+      <RatingModal
+        visible={ratingVisible}
+        order={completedOrderForRating}
+        onFinish={() => {
+          setRatingVisible(false);
+          setCompletedOrderForRating(null);
+          // Cashback widgetini ko'rsatish (reyting yopilgandan keyin)
+          if (earnedBonus > 0) {
+            setTimeout(() => setBonusVisible(true), 300);
+          } else {
+            setTimeout(() => {
+              setOrderId(null);
+              setOrderStatus(null);
+              setAssignedDriver(null);
+              setStep("main");
+            }, 500);
+          }
+        }}
+      />
+
+      {/* Cashback bonus widget */}
+      <ClientBonusWidget
+        userId={completedOrderForRating?.client_user_id || null}
+        earnedPoints={earnedBonus}
+        visible={bonusVisible}
+        onClose={() => {
+          setBonusVisible(false);
+          setEarnedBonus(0);
+          setTimeout(() => {
+            setOrderId(null);
+            setOrderStatus(null);
+            setAssignedDriver(null);
+            setStep("main");
+          }, 500);
+        }}
+      />
     </div>
   );
 }

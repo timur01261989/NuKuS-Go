@@ -22,7 +22,5 @@ export const supabase = createClient(supabaseUrl || "", supabaseAnonKey || "", {
   },
 });
 
-// Debug uchun (ixtiyoriy): console'da tekshirish oson bo'ladi
-if (typeof window !== "undefined") {
-  window.supabase = supabase;
-}
+// window.supabase olib tashlandi — production xavfsizligi uchun
+// (har kim console'dan supabase client'ga kira olmasligi kerak)

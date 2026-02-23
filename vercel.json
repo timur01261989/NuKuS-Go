@@ -1,28 +1,50 @@
 {
+  "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "installCommand": "npm install",
+  "framework": "vite",
+  "functions": {
+    "api/**/*.js": {
+      "memory": 512,
+      "maxDuration": 30
+    }
+  },
   "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index.js" },
     {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
+      "source": "/((?!api|assets|icons|sounds|config|sw.js|manifest.webmanifest|vite.svg).*)",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/sw.js",
+      "headers": [
+        { "key": "Service-Worker-Allowed", "value": "/" },
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+      ]
     },
     {
       "source": "/manifest.webmanifest",
-      "destination": "/manifest.webmanifest"
+      "headers": [
+        { "key": "Content-Type", "value": "application/manifest+json" },
+        { "key": "Cache-Control", "value": "public, max-age=86400" }
+      ]
     },
     {
-      "source": "/sw.js",
-      "destination": "/sw.js"
-    },
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, PUT, DELETE, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization" }
+      ]
+    }
+  ],
+  "crons": [
     {
-      "source": "/icons/(.*)",
-      "destination": "/icons/$1"
-    },
-    {
-      "source": "/assets/(.*)",
-      "destination": "/assets/$1"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "path": "/api/cron_dispatch",
+      "schedule": "* * * * *"
     }
   ]
 }

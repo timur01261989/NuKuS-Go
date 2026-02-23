@@ -2,6 +2,8 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import api from "@/utils/apiHelper";
+import { setupNotifications } from "@/services/notifications";
+import { supabase } from "@/lib/supabase";
 
 // ✅ Ant Design reset
 import "antd/dist/reset.css";
@@ -122,9 +124,17 @@ if (typeof window !== "undefined" && "serviceWorker" in navigator) {
         window.location.reload();
       });
 
-      console.log("Nukus Go offline ready");
+      // SW muvaffaqiyatli ro'yxatdan o'tdi
+      // Push notifications ni yoqish (userId bilan saqlash uchun)
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        const userId = authData?.user?.id || null;
+        await setupNotifications(userId);
+      } catch {
+        // push setup ilovaga ta'sir qilmaydi
+      }
     } catch (e) {
-      console.log("SW error:", e);
+      // SW xatosi — ilovaga ta'sir qilmaydi, jimgina o'tib ketadi
     }
   });
 }

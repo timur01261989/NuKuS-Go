@@ -13,6 +13,9 @@ import walletHandler from "./wallet.js";
 import sosHandler from "./sos.js";
 import presenceHandler from "./presence.js";
 import cronDispatchHandler from "./cron_dispatch.js";
+import notificationsHandler from "./notifications.js";
+import gamificationHandler from "./gamification.js";
+import pricingHandler from "./pricing.js";
 
 function getRouteKey(path) {
   // path is already without leading /api/
@@ -102,6 +105,18 @@ export default async function handler(req, res) {
 
     if (path.startsWith("sos")) {
       return await sosHandler(req, res);
+    }
+
+    if (path.startsWith("notifications")) {
+      return await notificationsHandler(req, res);
+    }
+
+    if (path.startsWith("gamification")) {
+      return await gamificationHandler(req, res);
+    }
+
+    if (path.startsWith("pricing")) {
+      return await pricingHandler(req, res);
     }
 
     res.statusCode = 404;

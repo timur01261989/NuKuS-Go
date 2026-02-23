@@ -1,19 +1,49 @@
-// Hozircha fake. Keyin supabase / api / websocketga ulaysiz.
+import { supabase } from '@lib/supabase';
+
+/**
+ * searchDriversNearby
+ * Supabase driver_presence jadvalidan haqiqiy online haydovchilarni qidiradi.
+ *
+ * @param {Object} params
+ * @param {[number, number]} params.center - [lat, lng]
+ * @param {number} params.radiusMeters - radius in meters
+ * @returns {Promise<Array<{id: string, lat: number, lng: number}>>}
+ */
 export async function searchDriversNearby({ center, radiusMeters }) {
   const [lat, lng] = center || [];
   if (lat == null || lng == null) return [];
 
-  // TODO: real query
-  // masalan: supabase: drivers where online=true and distance < radiusMeters
+  // So'nggi 2 daqiqada yangilangan online haydovchilar
+  const since = new Date(Date.now() - 2 * 60 * 1000).toISOString();
 
-  // Fake demo:
-  await new Promise((r) => setTimeout(r, 150));
+  const { data, error } = await supabase
+    .from('driver_presence')
+    .select('driver_user_id, lat, lng')
+    .eq('is_online', true)
+    .gte('updated_at', since)
+    .limit(200);
 
-  // random 0-3 drivers
-  const count = Math.floor(Math.random() * 4);
-  return Array.from({ length: count }).map((_, i) => ({
-    id: `${Date.now()}-${i}`,
-    lat: lat + (Math.random() - 0.5) * 0.01,
-    lng: lng + (Math.random() - 0.5) * 0.01
-  }));
+  if (error) {
+    console.error('[driverSearchService] Supabase error:', error.message);
+    return [];
+  }
+
+  if (!data || data.length === 0) return [];
+
+  // Haversine formula bilan radius ichidagilarni filter qilish
+  const radiusKm = radiusMeters / 1000;
+
+  return data
+    .filter(d => {
+      if (d.lat == null || d.lng == null) return false;
+      const dLat = (d.lat - lat) * 111;
+      const dLng = (d.lng - lng) * 111 * Math.cos((lat * Math.PI) / 180);
+      const distKm = Math.sqrt(dLat * dLat + dLng * dLng);
+      return distKm <= radiusKm;
+    })
+    .map(d => ({
+      id: d.driver_user_id,
+      lat: d.lat,
+      lng: d.lng,
+    }));
 }

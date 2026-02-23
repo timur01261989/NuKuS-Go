@@ -1,38 +1,123 @@
-import React, { useState } from 'react';
-import { Modal, Rate, Input, Button, Typography, message } from 'antd';
-import { StarFilled } from '@ant-design/icons';
-import { supabase } from '@/lib/supabase';
+/**
+ * RatingModal.jsx
+ * Safar tugagandan keyin mijozdan haydovchini baholashni so'raydi.
+ *
+ * Qanday ishlaydi:
+ *  1. Yulduzcha tanlaydi (1-5)
+ *  2. Tez tanlash teglari (Yandex Go uslubi)
+ *  3. Ixtiyoriy matn izoh
+ *  4. Submit: order_ratings jadvaliga yozadi
+ *  5. Supabase Trigger (supabase_new_tables.sql) driver_stats.rating_avg'ni yangilaydi
+ *
+ * Props:
+ *  - visible: boolean
+ *  - order: { id, driver_user_id, client_user_id }
+ *  - onFinish: () => void  — yopish / keyingi qadam
+ */
+import React, { useState } from "react";
+import { Modal, Rate, Input, Button, Typography, Space, Tag, message } from "antd";
+import { StarFilled, SmileOutlined, MehOutlined, FrownOutlined } from "@ant-design/icons";
+import { supabase } from "@/lib/supabase";
 
 const { Title, Text } = Typography;
+const { TextArea } = Input;
+
+// Yaxshi baho (4-5) uchun teg'lar
+const GOOD_TAGS = [
+  { label: "Tozalik", emoji: "🧼" },
+  { label: "Yoqimli muloqot", emoji: "😊" },
+  { label: "Tez keldi", emoji: "⚡" },
+  { label: "Xavfsiz haydash", emoji: "🛡️" },
+  { label: "Muzika yoqdi", emoji: "🎵" },
+  { label: "Yo'l bildi", emoji: "🗺️" },
+];
+
+// Yomon baho (1-3) uchun teg'lar
+const BAD_TAGS = [
+  { label: "Kech keldi", emoji: "⏰" },
+  { label: "Qo'pol muloqot", emoji: "😤" },
+  { label: "Tez haydadi", emoji: "💨" },
+  { label: "Mashina yoqimli emas", emoji: "🚗" },
+];
 
 export default function RatingModal({ visible, order, onFinish }) {
-  const [rating, setRating] = useState(5);
+  const [stars, setStars] = useState(5);
   const [comment, setComment] = useState("");
+  const [selectedTags, setSelectedTags] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const submitRating = async () => {
+  const isGood = stars >= 4;
+  const tags = isGood ? GOOD_TAGS : BAD_TAGS;
+
+  const toggleTag = (label) => {
+    setSelectedTags((prev) =>
+      prev.includes(label) ? prev.filter((t) => t !== label) : [...prev, label]
+    );
+  };
+
+  // Yulduz o'zgarsa — teg'larni tozalash
+  const handleStarsChange = (val) => {
+    setStars(val);
+    setSelectedTags([]);
+  };
+
+  const handleSubmit = async () => {
+    if (!order?.id) {
+      onFinish?.();
+      return;
+    }
     setLoading(true);
     try {
-      // 1. Reytingni ratings jadvaliga yozish
-      const { error: ratingError } = await supabase.from('ratings').insert([{
-        order_id: order.id,
-        client_id: order.client_id,
-        driver_id: order.driver_id,
-        rating_value: rating,
-        comment: comment
-      }]);
+      const fullComment = [
+        selectedTags.length ? selectedTags.join(", ") : null,
+        comment.trim() || null,
+      ]
+        .filter(Boolean)
+        .join(" | ");
 
-      if (ratingError) throw ratingError;
+      const { error } = await supabase.from("order_ratings").insert([
+        {
+          order_id: order.id,
+          from_user_id: order.client_user_id || null,
+          to_user_id: order.driver_user_id || null,
+          role: "client_rates_driver",
+          stars,
+          comment: fullComment || null,
+        },
+      ]);
 
-      // 2. Haydovchining umumiy reytingini yangilash mantiqi (Siz yuklagan rating_update kabi)
+      if (error) {
+        // Duplicate reyting — foydalanuvchi qayta ko'rsatganida
+        if (error.code === "23505") {
+          message.info("Siz allaqachon baholagan edingiz");
+          onFinish?.();
+          return;
+        }
+        throw error;
+      }
+
       message.success("Bahoingiz uchun rahmat!");
-      onFinish();
+      onFinish?.();
     } catch (err) {
-      message.error("Xatolik: " + err.message);
+      message.error("Xatolik: " + (err.message || "Baholash saqlanmadi"));
     } finally {
       setLoading(false);
     }
   };
+
+  const handleSkip = () => {
+    onFinish?.();
+  };
+
+  // Yuz ikonkasi — reytingga qarab
+  const FaceIcon =
+    stars >= 4 ? (
+      <SmileOutlined style={{ fontSize: 48, color: "#52c41a" }} />
+    ) : stars >= 3 ? (
+      <MehOutlined style={{ fontSize: 48, color: "#faad14" }} />
+    ) : (
+      <FrownOutlined style={{ fontSize: 48, color: "#ff4d4f" }} />
+    );
 
   return (
     <Modal
@@ -40,38 +125,90 @@ export default function RatingModal({ visible, order, onFinish }) {
       footer={null}
       closable={false}
       centered
-      bodyStyle={{ textAlign: 'center', padding: '30px' }}
+      bodyStyle={{ textAlign: "center", padding: "28px 24px" }}
     >
-      <StarFilled style={{ fontSize: 50, color: '#FFD700', marginBottom: 20 }} />
-      <Title level={3}>Safar qanday o'tdi?</Title>
+      <div style={{ marginBottom: 16 }}>{FaceIcon}</div>
+
+      <Title level={3} style={{ marginBottom: 4 }}>
+        Safar qanday o'tdi?
+      </Title>
       <Text type="secondary">Haydovchining xizmatini baholang</Text>
 
-      <div style={{ margin: '25px 0' }}>
-        <Rate 
-          allowHalf={false} 
-          value={rating} 
-          onChange={setRating} 
-          style={{ fontSize: 40, color: '#FFD700' }} 
+      {/* Yulduzchalar */}
+      <div style={{ margin: "20px 0 16px" }}>
+        <Rate
+          allowHalf={false}
+          value={stars}
+          onChange={handleStarsChange}
+          style={{ fontSize: 44, color: "#FFD700" }}
         />
       </div>
 
-      <Input.TextArea 
-        placeholder="Fikringizni qoldiring (ixtiyoriy)..." 
-        rows={3} 
+      {/* Tez tanlash teglari */}
+      {stars > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <Space wrap size={[8, 8]} style={{ justifyContent: "center" }}>
+            {tags.map((tag) => (
+              <Tag
+                key={tag.label}
+                onClick={() => toggleTag(tag.label)}
+                style={{
+                  cursor: "pointer",
+                  borderRadius: 20,
+                  padding: "4px 14px",
+                  fontSize: 13,
+                  background: selectedTags.includes(tag.label) ? "#111" : "#f5f5f5",
+                  color: selectedTags.includes(tag.label) ? "#fff" : "#333",
+                  border: "none",
+                  userSelect: "none",
+                  transition: "all 0.15s",
+                }}
+              >
+                {tag.emoji} {tag.label}
+              </Tag>
+            ))}
+          </Space>
+        </div>
+      )}
+
+      {/* Ixtiyoriy matn */}
+      <TextArea
+        placeholder="Fikringizni qoldiring (ixtiyoriy)..."
+        rows={2}
         value={comment}
-        onChange={e => setComment(e.target.value)}
-        style={{ borderRadius: 12, marginBottom: 20 }}
+        onChange={(e) => setComment(e.target.value)}
+        style={{ borderRadius: 12, marginBottom: 16, resize: "none" }}
+        maxLength={300}
       />
 
-      <Button 
-        type="primary" 
-        block 
-        size="large" 
+      {/* Yuborish tugmasi */}
+      <Button
+        type="primary"
+        block
+        size="large"
         loading={loading}
-        onClick={submitRating}
-        style={{ background: 'black', height: 55, borderRadius: 15, fontWeight: 'bold' }}
+        disabled={stars === 0}
+        onClick={handleSubmit}
+        style={{
+          background: "#111",
+          height: 52,
+          borderRadius: 14,
+          fontWeight: 800,
+          fontSize: 16,
+          border: "none",
+        }}
       >
         YUBORISH
+      </Button>
+
+      {/* O'tkazib yuborish */}
+      <Button
+        type="text"
+        block
+        onClick={handleSkip}
+        style={{ marginTop: 10, color: "#999", fontSize: 13 }}
+      >
+        O'tkazib yuborish
       </Button>
     </Modal>
   );

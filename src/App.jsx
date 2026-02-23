@@ -16,8 +16,7 @@ const SearchOnRoutePage = lazy(() => import("./pages/SuperPro/SearchOnRoutePage"
 const Auth = lazy(() => import("./features/auth/pages/Auth"));
 const Register = lazy(() => import("./features/auth/pages/Register"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const MainPage = lazy(() => import("./pages/MainPage"));
+// Dashboard va MainPage import qilinmaydi — route'da ishlatilmaydi
 const RootRedirect = lazy(() => import("./pages/RootRedirect"));
 const Logout = lazy(() => import("./pages/Logout"));
 const Support = lazy(() => import("./pages/Support"));
