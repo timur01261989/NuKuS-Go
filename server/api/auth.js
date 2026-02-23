@@ -2,8 +2,8 @@
 // Combined auth: OTP request + OTP verify
 
 import crypto from 'crypto';
-// import { json, badRequest, nowIso, uid } from '../_shared/cors.js'; // disabled duplicate import to avoid build error
-import { json, badRequest, nowIso, uid, isPhone } from '../_shared/cors.js';
+import { json, badRequest, nowIso, uid } from './_shared/cors.js';
+import { json, badRequest, nowIso, uid, isPhone } from './_shared/cors.js';
 
 
 export async function auth_otp_request_handler(req, res) {

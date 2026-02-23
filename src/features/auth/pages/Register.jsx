@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Form, Input, Button, Typography, Card, message, ConfigProvider } from "antd";
 import { useNavigate } from "react-router-dom";
-import { UserOutlined, PhoneOutlined, ArrowLeftOutlined, LockOutlined } from "@ant-design/icons";
+import { UserOutlined, PhoneOutlined, ArrowLeftOutlined, LockOutlined, CheckCircleOutlined, SafetyCertificateOutlined } from "@ant-design/icons";
 import { supabase } from "@/lib/supabase";
-import { requestOtp, verifyOtp } from "@/services/authSupabase"; // YANGI IMPORT (Yo'lni to'g'rilang)
 
 const { Title, Text } = Typography;
 
@@ -29,7 +28,7 @@ export default function Register() {
     }
   }, [step]);
 
-  // 1-QADAM: SMS YUBORISH (O'ZGARTIRILDI)
+  // 1-QADAM: SMS YUBORISH
   const onGetOtp = async (values) => {
     setLoading(true);
     try {
@@ -37,57 +36,41 @@ export default function Register() {
       if (!formattedPhone.startsWith("998")) formattedPhone = "998" + formattedPhone;
       formattedPhone = "+" + formattedPhone;
 
-      // ESKI (Xato berayotgan qism):
-      // const { error } = await supabase.auth.signInWithOtp({ phone: formattedPhone });
+      const { error } = await supabase.auth.signInWithOtp({
+        phone: formattedPhone,
+      });
 
-      // YANGI (To'g'rilangan qism):
-      // Biz endi to'g'ridan-to'g'ri Supabase-ga emas, o'zimizning API-ga murojaat qilamiz
-      const response = await requestOtp(formattedPhone);
-      
-      if (!response.ok) {
-         throw new Error("SMS yuborishda xatolik yuz berdi");
-      }
-
+      if (error) throw error;
       message.success("SMS kod yuborildi!");
-      setFormData({ ...values, fullPhone: formattedPhone, session_id: response.session_id });
+      setFormData({ ...values, fullPhone: formattedPhone });
       setStep(2);
     } catch (err) {
-      console.error(err);
-      message.error("Xatolik: " + (err.message || "Noma'lum xato"));
+      message.error("Xatolik: " + err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // 2-QADAM: KODNI TASDIQLASH (O'ZGARTIRILDI)
+  // 2-QADAM: KODNI TASDIQLASH (Professional mantiq qo'shildi)
   const onVerifyOtp = async (values) => {
     setLoading(true);
     try {
-      // ESKI (Supabase verify):
-      // const { data, error } = await supabase.auth.verifyOtp({ ... });
+      const { data, error } = await supabase.auth.verifyOtp({
+        phone: formData.fullPhone,
+        token: values.otp,
+        type: 'sms',
+      });
 
-      // YANGI (API verify):
-      const verifyResponse = await verifyOtp(formData.fullPhone, values.otp);
+      if (error) throw error;
 
-      if (!verifyResponse.ok) {
-        throw new Error("Kod noto'g'ri!");
-      }
-
-      // Agar API bizga user ma'lumotlarini qaytarsa
-      const user = verifyResponse.user;
-
-      if (user) {
-        // --- TIMESTAMP VA DURATION ---
+      if (data.user) {
+        // --- TIMESTAMP VA DURATION (Aniq vaqtni yozish) ---
         const registrationTime = new Date().toISOString(); 
 
-        // Parolni yangilash (agar API buni avtomatik qilmasa, qo'lda qilish kerak bo'lishi mumkin)
-        // Eslatma: Bizning API hozircha faqat "login" qiladi, parolni o'zgartirmaydi.
-        // Lekin xavfsizlik uchun, agar user yangi bo'lsa, parolni update qilishimiz mumkin:
-        if (formData.password) {
-             await supabase.auth.updateUser({ password: formData.password });
-        }
+        await supabase.auth.updateUser({ password: formData.password });
 
-        // --- PROFILNI SAQLASH ---
+        // --- FIELD_MASK VA WRAPPERS (Faqat kerakli va xavfsiz yozish) ---
+        // Foydalanuvchi ism-familiyasi bo'sh bo'lsa, 'Noma'lum' deb yozish (Wrappers mantiqi)
         const safeName = formData.name || "Noma'lum";
         const safeSurname = formData.surname || "Foydalanuvchi";
 
@@ -95,11 +78,11 @@ export default function Register() {
             .from('profiles')
             .upsert([
                 { 
-                    id: user.id, 
+                    id: data.user.id, 
                     full_name: `${safeName} ${safeSurname}`,
                     phone: formData.fullPhone,
                     role: 'client',
-                    created_at: registrationTime,
+                    created_at: registrationTime, // Aniq vaqt
                     last_login: registrationTime
                 }
             ]);
@@ -107,13 +90,11 @@ export default function Register() {
         if (profileError) throw profileError;
 
         message.success("Muvaffaqiyatli ro'yxatdan o'tdingiz!");
+        // Let RootRedirect (/) decide the correct start page.
         navigate("/", { replace: true });
-      } else {
-          throw new Error("Foydalanuvchi aniqlanmadi");
       }
     } catch (err) {
-      console.error(err);
-      message.error("Xatolik: " + (err.message || "Tasdiqlashda xato"));
+      message.error("Xatolik: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -132,7 +113,7 @@ export default function Register() {
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", background: "#f0f2f5", padding: 20 }}>
         <Card style={{ width: 400, borderRadius: 28, boxShadow: "0 15px 35px rgba(0,0,0,0.08)", border: 'none' }}>
 
-          {/* HEADER QISMI */}
+          {/* HEADER QISMI (Yango uslubida) */}
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 25 }}>
              <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/login')} type="text" shape="circle" />
              <Title level={4} className="yango-title" style={{ margin: '0 0 0 10px' }}>Ro'yxatdan o'tish</Title>
