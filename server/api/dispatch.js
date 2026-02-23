@@ -163,7 +163,7 @@ export async function dispatch_handler(req, res) {
       .limit(2000);
     if (pe) throw pe;
 
-    const ranked = (pres || [])
+    const ranked = filteredPresence
       .filter(p => p.lat != null && p.lng != null)
       .map(p => ({ ...p, dist_km: haversineKm(Number(p.lat), Number(p.lng), pickup.lat, pickup.lng) }))
       .filter(p => p.dist_km <= radius_km)
@@ -252,7 +252,7 @@ export async function dispatch_smart_handler(req, res) {
       .limit(4000);
     if (pe) throw pe;
 
-    const driverIds = (pres || []).map(p => p.driver_user_id);
+    const driverIds = filteredPresence.map(p => p.driver_user_id);
     const { data: stats, error: se } = await sb.from('driver_stats')
       .select('driver_user_id,rating_avg,acceptance_rate,completed_count')
       .in('driver_user_id', driverIds.length ? driverIds : ['00000000-0000-0000-0000-000000000000'])
@@ -260,7 +260,7 @@ export async function dispatch_smart_handler(req, res) {
     if (se) throw se;
     const statsMap = new Map((stats || []).map(s => [s.driver_user_id, s]));
 
-    const ranked = (pres || []).filter(p => p.lat != null && p.lng != null).map(p => {
+    const ranked = filteredPresence.filter(p => p.lat != null && p.lng != null).map(p => {
       const dist_km = haversineKm(Number(p.lat), Number(p.lng), pickup.lat, pickup.lng);
       const st = statsMap.get(p.driver_user_id) || {};
       const s = score({ dist_km, rating_avg: st.rating_avg ?? 5, acceptance_rate: st.acceptance_rate ?? 1, completed_count: st.completed_count ?? 0 });
