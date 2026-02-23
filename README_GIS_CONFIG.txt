@@ -1,6 +1,6 @@
 GIS LEVEL CONFIG SYSTEM (safe)
 ============================
-Bular qo'shildi va APP ishlash prinsipini o'zgartirmaydi.
+Bular qo'shildi va APP ishlash prinsipini o'zgartirmaydii.
 
 Public config (runtime, rebuildsiz o'zgartiriladi):
 - public/config/routing.json
