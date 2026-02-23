@@ -55,15 +55,40 @@ export default async function handler(req, res) {
       const seconds = Number(url.searchParams.get('seconds') || 60);
       const since = new Date(Date.now() - Math.max(5, seconds) * 1000).toISOString();
 
-      const { data, error } = await sb
+      const approved = String(url.searchParams.get('approved') || '').trim(); // "1" | "true"
+      const limit = Math.min(5000, Math.max(1, Number(url.searchParams.get('limit') || 5000)));
+
+      // Optional: return only approved drivers (joins driver_applications on user_id)
+      // NOTE: This is opt-in to avoid breaking existing callers.
+      let q = sb
         .from('driver_presence')
-        .select('driver_id,last_seen_at,is_online,state,updated_at,lat,lng')
+        .select(
+          approved ? 'driver_id,last_seen_at,is_online,state,updated_at,lat,lng,driver_applications!inner(status)'
+                   : 'driver_id,last_seen_at,is_online,state,updated_at,lat,lng'
+        )
         .eq('is_online', true)
         .gte('last_seen_at', since)
-        .limit(5000);
+        .limit(limit);
+
+      if (approved === '1' || approved.toLowerCase() === 'true') {
+        q = q.eq('driver_applications.status', 'approved');
+      }
+
+      const { data, error } = await q;
       if (error) throw error;
 
-      return json(res, 200, { ok: true, online: data || [] });
+      // Strip join payload for frontend simplicity
+      const online = (data || []).map((row) => ({
+        driver_id: row.driver_id,
+        last_seen_at: row.last_seen_at,
+        is_online: row.is_online,
+        state: row.state,
+        updated_at: row.updated_at,
+        lat: row.lat,
+        lng: row.lng,
+      }));
+
+      return json(res, 200, { ok: true, online });
     }
 
     return json(res, 405, { ok: false, error: 'Method not allowed' });

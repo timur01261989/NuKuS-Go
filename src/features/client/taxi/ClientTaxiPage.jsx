@@ -878,35 +878,100 @@ export default function ClientTaxiPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId, pickup.latlng?.[0], pickup.latlng?.[1], orderStatus, step]);
 
-  /** searching state: simulate nearby cars + dispatch cycling (visual only, backend dispatch can be added later) */
+    /** searching state: show nearby real approved drivers (fallback to demo cars only on localhost) */
   useEffect(() => {
     if (step !== "searching") return;
     if (!pickup.latlng) return;
 
-    // create fake cars around pickup if backend not returning
+    let t = null;
+    let cancelled = false;
+
     const baseLat = pickup.latlng[0];
     const baseLng = pickup.latlng[1];
 
-    const cars = Array.from({ length: 6 }).map((_, i) => {
-      const ang = (i / 6) * Math.PI * 2;
-      const r = 0.006 + Math.random() * 0.01;
-      return {
-        id: "c" + i,
-        lat: baseLat + Math.cos(ang) * r,
-        lng: baseLng + Math.sin(ang) * r,
-        bearing: Math.random() * 360,
-      };
-    });
+    const isLocalhost =
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
 
-    setNearCars(cars);
-    setDispatchIdx(0);
+    const toCars = (rows) => {
+      return (rows || [])
+        .map((r) => ({
+          id: r.driver_id || r.id || r.driver_user_id || r.driverId,
+          lat: Number(r.lat),
+          lng: Number(r.lng),
+          bearing: Number.isFinite(Number(r.heading)) ? Number(r.heading) : Number(r.bearing) || 0,
+        }))
+        .filter((c) => c.id && Number.isFinite(c.lat) && Number.isFinite(c.lng));
+    };
 
-    let t = null;
-    t = setInterval(() => {
-      setDispatchIdx((x) => (x + 1) % cars.length);
-    }, 1800);
+    const makeDemoCars = () => {
+      const cars = Array.from({ length: 6 }).map((_, i) => {
+        const ang = (i / 6) * Math.PI * 2;
+        const r = 0.006 + Math.random() * 0.01;
+        return {
+          id: "demo_c" + i,
+          lat: baseLat + Math.cos(ang) * r,
+          lng: baseLng + Math.sin(ang) * r,
+          bearing: Math.random() * 360,
+        };
+      });
+      return cars;
+    };
+
+    const load = async () => {
+      try {
+        // Fetch real online + approved drivers (prevents “fake cars” in production)
+        const resp = await api.get("/api/presence/online", {
+          query: { seconds: 45, approved: 1, limit: 24 },
+          timeoutMs: 12_000,
+          responseType: "json",
+        });
+
+        const cars = toCars(resp?.online || resp?.data?.online || []);
+        if (cancelled) return;
+
+        if (cars.length > 0) {
+          setNearCars(cars);
+          setDispatchIdx(0);
+          t = setInterval(() => {
+            setDispatchIdx((x) => (x + 1) % cars.length);
+          }, 1800);
+          return;
+        }
+
+        // Fallback demo only on localhost (dev). On Vercel production we show zero.
+        if (isLocalhost) {
+          const demo = makeDemoCars();
+          setNearCars(demo);
+          setDispatchIdx(0);
+          t = setInterval(() => {
+            setDispatchIdx((x) => (x + 1) % demo.length);
+          }, 1800);
+        } else {
+          setNearCars([]);
+          setDispatchIdx(0);
+        }
+      } catch (e) {
+        if (cancelled) return;
+        // If fetch fails, never show demo on production. Keep it strict.
+        if (isLocalhost) {
+          const demo = makeDemoCars();
+          setNearCars(demo);
+          setDispatchIdx(0);
+          t = setInterval(() => {
+            setDispatchIdx((x) => (x + 1) % demo.length);
+          }, 1800);
+        } else {
+          setNearCars([]);
+          setDispatchIdx(0);
+        }
+      }
+    };
+
+    load();
 
     return () => {
+      cancelled = true;
       if (t) clearInterval(t);
     };
   }, [step, pickup.latlng]);
