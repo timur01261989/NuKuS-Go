@@ -45,7 +45,7 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
     });
   }, [allow]);
 
-  const withTimeout = (promise, ms = 10000) =>
+  const withTimeout = (promise, ms = 30000) =>
     Promise.race([
       promise,
       new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms)),
