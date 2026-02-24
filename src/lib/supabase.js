@@ -12,7 +12,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-export const supabase = createClient(supabaseUrl  "", supabaseAnonKey  "", {
+// TUZATILDI: || (yoki) belgisi qo'yildi
+export const supabase = createClient(supabaseUrl || "", supabaseAnonKey || "", {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
