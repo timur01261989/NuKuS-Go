@@ -17,7 +17,6 @@ import notificationsHandler from "../server/api/notifications.js";
 import gamificationHandler from "../server/api/gamification.js";
 import pricingHandler from "../server/api/pricing.js";
 
-
 function normalizePath(rawPath) {
   // Supports both direct path (/api/order) and rewritten query (?path=order)
   let p = String(rawPath || "");
@@ -116,7 +115,6 @@ export default async function handler(req, res) {
     if (path.startsWith("cron_dispatch")) {
       return await cronDispatchHandler(req, res);
     }
-
 
     if (path.startsWith("offer")) {
       return await offerHandler(req, res);
