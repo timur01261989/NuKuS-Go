@@ -166,7 +166,8 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
 
         // 3) Derive effective role
         // Role is always taken from profiles.role.
-        const effectiveRole = profileRole;
+        // IMPORTANT: must be mutable because we may auto-create a profile below.
+        let effectiveRole = profileRole;
 
         // 4) Auto-create client profile if accessing client-only route and profile missing
         if (!effectiveRole && a.client && !a.driver) {
@@ -188,10 +189,17 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
             // ignore
           }
 
+          // Prevent login<->home redirect loops: assume the intended role locally,
+          // then best-effort confirm it from DB.
+          effectiveRole = "client";
+
           const { data: p2 } = await withTimeout(
             supabase.from("profiles").select("role").eq("id", userId).maybeSingle()
           );
-          if (p2?.role) profileRole = p2.role;
+          if (p2?.role) {
+            profileRole = p2.role;
+            effectiveRole = p2.role;
+          }
         }
 
         // 5) Decide allow
