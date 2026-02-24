@@ -90,11 +90,22 @@ export function useSessionProfile(options = {}) {
 
       try {
         // Profile (best-effort)
-        const { data: p, error: pErr } = await supabase
+        let { data: p, error: pErr } = await supabase
           .from("profiles")
           .select("role,is_admin,updated_at")
           .eq("id", uid)
           .maybeSingle();
+
+        // Fallback: some schemas use profiles.user_id instead of profiles.id
+        if (pErr && (pErr.code === "42703" || /column\s+\"id\"\s+does\s+not\s+exist/i.test(pErr.message || ""))) {
+          const retry = await supabase
+            .from("profiles")
+            .select("role,is_admin,updated_at")
+            .eq("user_id", uid)
+            .maybeSingle();
+          p = retry.data;
+          pErr = retry.error;
+        }
 
         // Drivers row (Variant A, best-effort)
         let drv = null;

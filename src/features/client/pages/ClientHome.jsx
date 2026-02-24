@@ -48,11 +48,22 @@ export default function ClientHome() {
         let avatarUrl = user.user_metadata?.avatar_url || "";
 
         try {
-          const { data: p } = await supabase
+          let pRes = await supabase
             .from("profiles")
-            .select("full_name, avatar_url")
+            .select("role,is_admin")
             .eq("id", user.id)
-            .single();
+            .maybeSingle();
+
+          // Fallback: some schemas use profiles.user_id instead of profiles.id
+          if (pRes.error && (pRes.error.code === "42703" || /column\s+\"id\"\s+does\s+not\s+exist/i.test(pRes.error.message || ""))) {
+            pRes = await supabase
+              .from("profiles")
+              .select("role,is_admin")
+              .eq("user_id", user.id)
+              .maybeSingle();
+          }
+
+          const p = pRes.data;
 
           if (p?.full_name) fullName = p.full_name;
           if (p?.avatar_url) avatarUrl = p.avatar_url;

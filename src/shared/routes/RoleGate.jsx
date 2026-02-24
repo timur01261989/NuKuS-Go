@@ -45,7 +45,7 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
     });
   }, [allow]);
 
-  const withTimeout = (promise, ms = 30000) =>
+  const withTimeout = (promise, ms = 10000) =>
     Promise.race([
       promise,
       new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms)),
@@ -99,7 +99,23 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         // 2) Parallel so'rovlar: profile + driver_applications + drivers (agar kerak bo'lsa)
         // Bu ketma-ket so'rovlar o'rniga parallel ishlaydi — ~2x tez
         const profilePromise = withTimeout(
-          supabase.from("profiles").select("role").eq("id", userId).maybeSingle()
+          (async () => {
+            let res = await supabase
+              .from("profiles")
+              .select("role")
+              .eq("id", userId)
+              .maybeSingle();
+
+            // Fallback: some schemas use profiles.user_id instead of profiles.id
+            if (res.error && (res.error.code === "42703" || /column\s+\"id\"\s+does\s+not\s+exist/i.test(res.error.message || ""))) {
+              res = await supabase
+                .from("profiles")
+                .select("role")
+                .eq("user_id", userId)
+                .maybeSingle();
+            }
+            return res;
+          })()
         );
 
         const appPromise = withTimeout(
