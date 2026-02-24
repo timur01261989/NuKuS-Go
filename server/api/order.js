@@ -462,7 +462,7 @@ async function createInterDistrict(req, res, body) {
  * - create / create_taxi / create_city / new : create taxi order (in "orders")
  * - cancel_taxi / cancel_order : cancel taxi order
  * - get_taxi / get_order : get taxi order by id
- * - active_taxi : get active taxi order for client_id (best-effort)
+ * - active_taxi : get active taxi order for passenger_id (best-effort)
  *
  * Notes:
  * - We keep a "best-effort" insertion strategy so DB column differences
@@ -543,9 +543,9 @@ function resolvePickupDropoff(body) {
 }
 
 async function createTaxiOrder(req, res, body) {
-  const client_id =
-    (body.client_id || body.passenger_id || body.user_id || body.clientId || getAuthUid(req) || "").toString();
-  if (!client_id) return sendJson(res, 400, { error: "client_id (yoki passenger_id) shart" });
+  const passenger_id =
+    (body.passenger_id || body.passenger_id || body.user_id || body.clientId || getAuthUid(req) || "").toString();
+  if (!passenger_id) return sendJson(res, 400, { error: "passenger_id (yoki passenger_id) shart" });
 
   const { pickup, dropoff } = resolvePickupDropoff(body);
   if (!pickup) return sendJson(res, 400, { error: "pickup koordinata shart" });
@@ -561,7 +561,7 @@ async function createTaxiOrder(req, res, body) {
 
   // Preferred schema (based on your "orders" table snapshot):
   const baseInsert = {
-    client_id,
+    passenger_id,
     driver_id: body.driver_id || body.driverId || null,
     status: body.status || "created",
     pickup,
@@ -643,8 +643,8 @@ async function getTaxiOrder(req, res, body) {
 }
 
 async function activeTaxiOrder(req, res, body) {
-  const client_id = (req.query?.client_id || body?.client_id || body?.passenger_id || "").toString();
-  if (!client_id) return sendJson(res, 400, { error: "client_id/passenger_id shart" });
+  const passenger_id = (req.query?.passenger_id || body?.passenger_id || body?.passenger_id || "").toString();
+  if (!passenger_id) return sendJson(res, 400, { error: "passenger_id/passenger_id shart" });
 
   // Try common "active" statuses; adjust later if your enum differs.
   const activeStatuses = ["created", "searching", "accepted", "arrived", "started", "in_progress"];
@@ -652,7 +652,7 @@ async function activeTaxiOrder(req, res, body) {
   const { data, error } = await supabase
     .from("orders")
     .select("*")
-    .eq("client_id", client_id)
+    .eq("passenger_id", passenger_id)
     .in("status", activeStatuses)
     .order("created_at", { ascending: false })
     .limit(1);

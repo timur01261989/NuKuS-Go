@@ -17,8 +17,8 @@ export async function searchDriversNearby({ center, radiusMeters }) {
   const since = new Date(Date.now() - 2 * 60 * 1000).toISOString();
 
   const { data, error } = await supabase
-    .from('driver_presence')
-    .select('driver_user_id, lat, lng')
+    .from('drivers')
+    .select('user_id, lat, lng')
     .eq('is_online', true)
     .gte('updated_at', since)
     .limit(200);
@@ -42,7 +42,7 @@ export async function searchDriversNearby({ center, radiusMeters }) {
       return distKm <= radiusKm;
     })
     .map(d => ({
-      id: d.driver_user_id,
+      id: d.user_id,
       lat: d.lat,
       lng: d.lng,
     }));

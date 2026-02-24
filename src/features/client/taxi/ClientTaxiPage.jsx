@@ -811,11 +811,11 @@ export default function ClientTaxiPage() {
           // Safar yakunlandi — reyting modalini ochish
           if (st === "completed" || st === "done") {
             speak("Safar yakunlandi. Rahmat!");
-            const drvId = o?.driver?.id || o?.driver_user_id || o?.assigned_driver_id || null;
+            const drvId = o?.driver?.id || o?.driver_id || o?.assigned_driver_id || null;
             const clientId = o?.client_user_id || o?.user_id || null;
             setCompletedOrderForRating({
               id: orderId,
-              driver_user_id: drvId,
+              driver_id: drvId,
               client_user_id: clientId,
             });
             setRatingVisible(true);

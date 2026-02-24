@@ -55,7 +55,7 @@ async function getDriverStatus(sb, userId) {
   if (!userId) return badRequest(null, "user_id kerak");
 
   const [{ data: gamif }, { data: missions }, { data: levels }] = await Promise.all([
-    sb.from("driver_gamification").select("*").eq("driver_user_id", userId).maybeSingle(),
+    sb.from("driver_gamification").select("*").eq("driver_id", userId).maybeSingle(),
     sb.from("daily_missions")
       .select("id,title,description,target_type,target_value,bonus_uzs,bonus_points,level_name")
       .eq("is_active", true)
@@ -70,7 +70,7 @@ async function getDriverStatus(sb, userId) {
     const { data: pr } = await sb
       .from("mission_progress")
       .select("mission_id,current_value,completed,rewarded")
-      .eq("driver_user_id", userId)
+      .eq("driver_id", userId)
       .eq("date", today)
       .in("mission_id", missionIds);
     progressRows = pr || [];
@@ -94,7 +94,7 @@ async function getDriverStatus(sb, userId) {
   return {
     ok: true,
     gamification: gamif || {
-      driver_user_id: userId,
+      driver_id: userId,
       level_name: "Yangi",
       total_trips: 0,
       total_earnings_uzs: 0,

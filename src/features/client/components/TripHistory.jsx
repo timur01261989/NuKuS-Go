@@ -23,7 +23,7 @@ export default function TripHistory({ onBack }) {
       const { data, error } = await supabase
         .from('orders')
         .select('*')
-        .eq('client_id', user.id)
+        .eq('passenger_id', user.id)
         .eq('status', 'completed')
         .order('created_at', { ascending: false });
 

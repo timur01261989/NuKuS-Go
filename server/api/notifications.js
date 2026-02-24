@@ -5,7 +5,7 @@
  * Endpoints:
  *   POST /api/notifications
  *   body: { user_id, title, body, url?, tag? }
- *        yoki { driver_user_id, title, body, url?, tag? }  (haydovchiga)
+ *        yoki { driver_id, title, body, url?, tag? }  (haydovchiga)
  *
  * Muhit o'zgaruvchilari (.env):
  *   VAPID_SUBJECT      mailto:admin@nukusgo.uz
@@ -57,13 +57,13 @@ export default async function handler(req, res) {
   if (!hasEnv()) return serverError(res, "VAPID yoki Supabase env sozlamalari yetishmayapti");
 
   const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
-  const userId = String(body.user_id || body.driver_user_id || "").trim();
+  const userId = String(body.user_id || body.driver_id || "").trim();
   const title = String(body.title || "Nukus Go").trim();
   const notifBody = String(body.body || "").trim();
   const url = String(body.url || "/").trim();
   const tag = String(body.tag || "nukusgo").trim();
 
-  if (!userId) return badRequest(res, "user_id yoki driver_user_id kerak");
+  if (!userId) return badRequest(res, "user_id yoki driver_id kerak");
   if (!title && !notifBody) return badRequest(res, "title yoki body kerak");
 
   const sb = getSupabaseAdmin();

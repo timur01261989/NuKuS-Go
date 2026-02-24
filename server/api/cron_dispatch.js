@@ -113,10 +113,10 @@ export default async function handler(req, res) {
     for (const o of orders || []) {
       const { data: existingOffers } = await sb
         .from("order_offers")
-        .select("driver_user_id")
+        .select("driver_id")
         .eq("order_id", o.id)
         .eq("status", "sent");
-      offersBefore[o.id] = new Set((existingOffers || []).map((x) => x.driver_user_id));
+      offersBefore[o.id] = new Set((existingOffers || []).map((x) => x.driver_id));
     }
 
     // Dispatch qilish
@@ -137,13 +137,13 @@ export default async function handler(req, res) {
       // Yangi offer qo'shildi? — Push yuborish
       const { data: newOffers } = await sb
         .from("order_offers")
-        .select("driver_user_id")
+        .select("driver_id")
         .eq("order_id", o.id)
         .eq("status", "sent");
 
       for (const offer of newOffers || []) {
-        if (!offersBefore[o.id]?.has(offer.driver_user_id)) {
-          await notifyDriverPush(sb, offer.driver_user_id, o.id);
+        if (!offersBefore[o.id]?.has(offer.driver_id)) {
+          await notifyDriverPush(sb, offer.driver_id, o.id);
           pushed++;
         }
       }

@@ -145,23 +145,23 @@ export default function DriverHome({ onLogout }) {
     return j;
   };
 
-  const sendDriverState = async (driver_user_id, nextOnline) => {
+  const sendDriverState = async (driver_id, nextOnline) => {
     const state = nextOnline ? "online" : "offline";
     try {
       if (API_BASE) {
-         await postJson("/api/driver-state", { driver_user_id, state });
+         await postJson("/api/driver-state", { driver_id, state });
       }
     } catch {
       // ignore
     }
   };
 
-  const sendHeartbeat = async (driver_user_id, nextOnline) => {
+  const sendHeartbeat = async (driver_id, nextOnline) => {
     const { lat, lng, bearing } = lastGeoRef.current || {};
     try {
       if (API_BASE) {
           await postJson("/api/driver-heartbeat", {
-            driver_user_id,
+            driver_id,
             is_online: !!nextOnline,
             lat: lat ?? undefined,
             lng: lng ?? undefined,

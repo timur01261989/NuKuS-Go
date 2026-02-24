@@ -126,11 +126,11 @@ export default function DriverMap() {
       try {
         const [lat, lng] = lastLocRef.current;
         const { data: ses } = await supabase.auth.getSession();
-        const driver_user_id = ses?.session?.user?.id;
-        if (!driver_user_id) return;
+        const driver_id = ses?.session?.user?.id;
+        if (!driver_id) return;
         const res = await api.post("/api/dispatch", {
           action: "driver_ping",
-          driver_user_id,
+          driver_id,
           lat,
           lng,
           status: "searching"

@@ -29,16 +29,16 @@ export async function createOrder({ pickup, dropoff }) {
   return postJson('/api/orders', { pickup, dropoff });
 }
 
-export async function updateOrderStatus({ order_id, status, driver_user_id }) {
-  return postJson('/api/order-status', { order_id, status, driver_user_id });
+export async function updateOrderStatus({ order_id, status, driver_id }) {
+  return postJson('/api/order-status', { order_id, status, driver_id });
 }
 
-export async function upsertDriverLocation({ order_id, driver_user_id, lat, lng, bearing, speed }) {
-  const key = `${String(driver_user_id||'')}:${String(order_id||'')}`;
+export async function upsertDriverLocation({ order_id, driver_id, lat, lng, bearing, speed }) {
+  const key = `${String(driver_id||'')}:${String(order_id||'')}`;
   if (!shouldSendLoc(key, 6000)) {
     return { ok: true, skipped: true };
   }
-  return postJson('/api/driver-location', { order_id, driver_user_id, lat, lng, bearing, speed });
+  return postJson('/api/driver-location', { order_id, driver_id, lat, lng, bearing, speed });
 }
 
 

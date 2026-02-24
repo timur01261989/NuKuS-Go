@@ -15,11 +15,11 @@ export default function RideHistory({ userId, role, onBack }) {
       let data = null;
 
       if (role === 'driver') {
-        // Support schema variants: orders.driver_user_id or orders.driver_id
+        // Support schema variants: orders.driver_id or orders.driver_id
         let r = await supabase
           .from('orders')
           .select('*')
-          .eq('driver_user_id', userId)
+          .eq('driver_id', userId)
           .order('created_at', { ascending: false });
 
         if (r.error) {
@@ -35,7 +35,7 @@ export default function RideHistory({ userId, role, onBack }) {
         const r = await supabase
           .from('orders')
           .select('*')
-          .eq('client_id', userId)
+          .eq('passenger_id', userId)
           .order('created_at', { ascending: false });
 
         data = r.data || [];

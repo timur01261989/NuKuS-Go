@@ -11,7 +11,7 @@
  *
  * Props:
  *  - visible: boolean
- *  - order: { id, driver_user_id, client_user_id }
+ *  - order: { id, driver_id, client_user_id }
  *  - onFinish: () => void  — yopish / keyingi qadam
  */
 import React, { useState } from "react";
@@ -79,7 +79,7 @@ export default function RatingModal({ visible, order, onFinish }) {
         {
           order_id: order.id,
           from_user_id: order.client_user_id || null,
-          to_user_id: order.driver_user_id || null,
+          to_user_id: order.driver_id || null,
           role: "client_rates_driver",
           stars,
           comment: fullComment || null,

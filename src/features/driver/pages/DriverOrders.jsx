@@ -20,10 +20,10 @@ let DefaultIcon = L.icon({
 L.Marker.prototype.options.icon = DefaultIcon;
 
 async function trySelectOrdersByDriver(sb, userId) {
-  // Support schema variants: orders.driver_user_id or orders.driver_id
+  // Support schema variants: orders.driver_id or orders.driver_id
   let q = sb.from('orders').select('*');
-  // Prefer driver_user_id
-  let res = await q.eq('driver_user_id', userId).order('created_at', { ascending: false });
+  // Prefer driver_id
+  let res = await q.eq('driver_id', userId).order('created_at', { ascending: false });
   if (!res.error) return res;
   // Fallback to driver_id
   res = await sb.from('orders').select('*').eq('driver_id', userId).order('created_at', { ascending: false });
@@ -32,10 +32,10 @@ async function trySelectOrdersByDriver(sb, userId) {
 
 async function tryAcceptOrder(sb, orderId, userId) {
   // Atomic-ish accept with schema variant support.
-  // Prefer driver_user_id column.
+  // Prefer driver_id column.
   let res = await sb
     .from('orders')
-    .update({ status: 'accepted', driver_user_id: userId, accepted_at: new Date().toISOString() })
+    .update({ status: 'accepted', driver_id: userId, accepted_at: new Date().toISOString() })
     .eq('id', orderId)
     .eq('status', 'offered')
     .is('driver_id', null)
@@ -104,7 +104,7 @@ export default function DriverOrderFeed() {
       const { data } = await supabase
         .from('orders')
         .select('*')
-        .eq('driver_user_id', user.id)
+        .eq('driver_id', user.id)
         .in('status', ['accepted', 'arrived', 'in_progress'])
         .limit(1);
 

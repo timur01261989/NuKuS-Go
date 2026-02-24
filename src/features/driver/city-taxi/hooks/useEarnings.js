@@ -34,7 +34,7 @@ export function useEarnings() {
       const { data: todayData, error: todayErr } = await supabase
         .from("orders")
         .select("id, price, amount, priceUzs")
-        .eq("driver_user_id", userId)
+        .eq("driver_id", userId)
         .eq("status", "completed")
         .gte("created_at", todayStart.toISOString());
 
@@ -44,7 +44,7 @@ export function useEarnings() {
       const { data: weekData, error: weekErr } = await supabase
         .from("orders")
         .select("id, price, amount, priceUzs")
-        .eq("driver_user_id", userId)
+        .eq("driver_id", userId)
         .eq("status", "completed")
         .gte("created_at", weekStart.toISOString());
 

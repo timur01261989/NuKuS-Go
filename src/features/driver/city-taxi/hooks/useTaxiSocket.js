@@ -83,7 +83,7 @@ export function useTaxiSocket({ enabled }) {
             event: "INSERT",
             schema: "public",
             table: "order_offers",
-            // driver_user_id bilan filter — faqat shu haydovchiga kelgan offerlar
+            // driver_id bilan filter — faqat shu haydovchiga kelgan offerlar
           },
           async (payload) => {
             if (!alive) return;
@@ -92,7 +92,7 @@ export function useTaxiSocket({ enabled }) {
 
             // Faqat shu haydovchiga kelgan offerlar
             const myId = driverUserIdRef.current;
-            if (myId && row.driver_user_id !== myId) return;
+            if (myId && row.driver_id !== myId) return;
             if (row.status !== "sent") return;
 
             // Offer muddati o'tmagan bo'lsa
@@ -132,7 +132,7 @@ export function useTaxiSocket({ enabled }) {
             const row = payload?.new;
             if (!row) return;
             const myId = driverUserIdRef.current;
-            if (myId && row.driver_user_id !== myId) return;
+            if (myId && row.driver_id !== myId) return;
 
             // Offer bekor qilindi yoki muddati o'tdi — incoming ni tozalash
             if (row.status === "expired" || row.status === "rejected") {

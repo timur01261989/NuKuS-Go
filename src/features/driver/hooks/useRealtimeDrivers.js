@@ -1,6 +1,6 @@
 
 // FIX: normalize driver id safely (keeps existing logic)
-const normalizeDriverId = (row) => row?.driver_id ?? row?.driver_user_id ?? row?.user_id ?? row?.id;
+const normalizeDriverId = (row) => row?.driver_id ?? row?.driver_id ?? row?.user_id ?? row?.id;
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
@@ -26,7 +26,7 @@ export default function useRealtimeDrivers({ enabled, center, radiusMeters = 200
   const [status, setStatus] = useState("idle"); // idle|loading|live|error
 
   const getDriverKey = (row) => row?.user_id || row?.id || null;
-  const getLocKey = (row) => row?.driver_user_id || row?.driver_id || row?.user_id || row?.id || null;
+  const getLocKey = (row) => row?.driver_id || row?.driver_id || row?.user_id || row?.id || null;
 
   // initial load
   useEffect(() => {

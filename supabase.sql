@@ -244,3 +244,121 @@ drop policy if exists "order_offers_select_driver" on public.order_offers;
 create policy "order_offers_select_driver" on public.order_offers
 for select to authenticated
 using (driver_id = auth.uid() or driver_user_id = auth.uid());
+
+
+-- ============================================================
+-- Idempotent schema fixes (safe to re-run)
+-- Ensures columns exist even if tables were created earlier
+-- ============================================================
+
+-- orders: ensure expected columns exist
+alter table if exists public.orders
+  add column if not exists passenger_id uuid,
+  add column if not exists driver_id uuid,
+  add column if not exists pickup jsonb,
+  add column if not exists dropoff jsonb,
+  add column if not exists price numeric,
+  add column if not exists status text,
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists accepted_at timestamptz;
+
+-- driver_presence: ensure expected columns exist
+alter table if exists public.driver_presence
+  add column if not exists driver_id uuid,
+  add column if not exists lat double precision,
+  add column if not exists lng double precision,
+  add column if not exists is_online boolean default false,
+  add column if not exists updated_at timestamptz default now();
+
+-- drivers: compatibility table used by UI (driver dashboard)
+create table if not exists public.drivers (
+  user_id uuid primary key references public.profiles(id) on delete cascade,
+  is_online boolean not null default false,
+  lat double precision,
+  lng double precision,
+  last_seen_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+alter table public.drivers enable row level security;
+
+-- ============================================================
+-- RLS POLICY FIXES
+-- ============================================================
+
+-- PROFILES: allow users to read their own profile + allow everyone authenticated to read driver profiles
+drop policy if exists "profiles_select_own" on public.profiles;
+create policy "profiles_select_own"
+on public.profiles for select
+to authenticated
+using (id = auth.uid());
+
+drop policy if exists "profiles_select_drivers_public" on public.profiles;
+create policy "profiles_select_drivers_public"
+on public.profiles for select
+to authenticated
+using (role = 'driver');
+
+-- DRIVER_PRESENCE: allow passengers to see online drivers (read-only)
+drop policy if exists "driver_presence_select_own" on public.driver_presence;
+create policy "driver_presence_select_own"
+on public.driver_presence for select
+to authenticated
+using (driver_id = auth.uid());
+
+drop policy if exists "driver_presence_select_online" on public.driver_presence;
+create policy "driver_presence_select_online"
+on public.driver_presence for select
+to authenticated
+using (is_online = true);
+
+-- DRIVERS: driver can read/update own row; passengers can read online drivers
+drop policy if exists "drivers_select_own" on public.drivers;
+create policy "drivers_select_own"
+on public.drivers for select
+to authenticated
+using (user_id = auth.uid());
+
+drop policy if exists "drivers_upsert_own" on public.drivers;
+create policy "drivers_upsert_own"
+on public.drivers for insert
+to authenticated
+with check (user_id = auth.uid());
+
+drop policy if exists "drivers_update_own" on public.drivers;
+create policy "drivers_update_own"
+on public.drivers for update
+to authenticated
+using (user_id = auth.uid())
+with check (user_id = auth.uid());
+
+drop policy if exists "drivers_select_online" on public.drivers;
+create policy "drivers_select_online"
+on public.drivers for select
+to authenticated
+using (is_online = true);
+
+-- ORDERS: keep strict: passenger sees own orders; driver sees assigned orders
+drop policy if exists "orders_select_own_or_assigned" on public.orders;
+create policy "orders_select_own_or_assigned"
+on public.orders for select
+to authenticated
+using (passenger_id = auth.uid() or driver_id = auth.uid());
+
+drop policy if exists "orders_insert_own" on public.orders;
+create policy "orders_insert_own"
+on public.orders for insert
+to authenticated
+with check (passenger_id = auth.uid());
+
+drop policy if exists "orders_update_passenger_or_driver" on public.orders;
+create policy "orders_update_passenger_or_driver"
+on public.orders for update
+to authenticated
+using (passenger_id = auth.uid() or driver_id = auth.uid())
+with check (passenger_id = auth.uid() or driver_id = auth.uid());
+
+
+-- drivers: ensure last_seen_at exists
+alter table if exists public.drivers add column if not exists last_seen_at timestamptz default now();
