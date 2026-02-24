@@ -1,15 +1,11 @@
-// Single source of truth: src/lib/supabase.js
-import {
-  supabase,
-  getSessionOrNull,
-  requireSession,
-  onAuthStateChange,
-} from '../lib/supabase.js';
+// NOTE: Keep ONE browser Supabase client for the whole app.
+// This file re-exports the shared client from src/lib/supabase.js
+// so existing imports keep working.
 
-export function assertSupabaseReady() {
-  if (!supabase) throw new Error('Supabase client is not initialized');
-  if (!supabase.auth) throw new Error('Supabase auth is not available');
-  return supabase;
-}
+import { supabase as sharedSupabase, assertSupabase } from '../lib/supabase';
 
-export { supabase, getSessionOrNull, requireSession, onAuthStateChange };
+export const supabase = sharedSupabase;
+export { assertSupabase };
+
+// Optional helper for legacy code that expects default export
+export default supabase;

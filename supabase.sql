@@ -362,3 +362,31 @@ with check (passenger_id = auth.uid() or driver_id = auth.uid());
 
 -- drivers: ensure last_seen_at exists
 alter table if exists public.drivers add column if not exists last_seen_at timestamptz default now();
+
+
+
+-- ------------------------------------------------------------
+-- GRANTS (IMPORTANT)
+-- If you create tables via SQL, PostgREST needs explicit privileges.
+-- Without these GRANTs you will see 401/403 in the browser (Forbidden).
+-- ------------------------------------------------------------
+
+grant usage on schema public to anon, authenticated;
+
+grant select, insert, update, delete on all tables in schema public to authenticated;
+grant select on all tables in schema public to anon;
+
+grant usage, select, update on all sequences in schema public to authenticated;
+grant usage, select on all sequences in schema public to anon;
+
+alter default privileges in schema public
+grant select, insert, update, delete on tables to authenticated;
+
+alter default privileges in schema public
+grant select on tables to anon;
+
+alter default privileges in schema public
+grant usage, select, update on sequences to authenticated;
+
+alter default privileges in schema public
+grant usage, select on sequences to anon;
