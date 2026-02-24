@@ -2,6 +2,13 @@ import { json, badRequest, serverError, nowIso } from '../_shared/cors.js';
 import { getSupabaseAdmin } from '../_shared/supabase.js';
 import { haversineKm } from '../_shared/geo.js';
 
+
+function normalizeDriverId(body) {
+  // Frontend historically sends driver_user_id; DB uses driver_id.
+  return String(body.driver_id || body.driver_user_id || '').trim();
+}
+
+
 function hasSupabaseEnv() {
   return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
@@ -46,13 +53,14 @@ export async function driver_ping_handler(req, res) {
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Method not allowed' });
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
 
-    const driver_user_id = String(body.driver_user_id || '').trim();
+    const driver_id = normalizeDriverId(body);
+    const driver_user_id = driver_id; // backward compatibility
     const lat = Number(body.lat);
     const lng = Number(body.lng);
     const bearing = body.bearing === undefined ? null : Number(body.bearing);
     const is_online = true;
 
-    if (!driver_user_id) return badRequest(res, 'driver_user_id kerak');
+    if (!driver_id) return badRequest(res, 'driver_id kerak');
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return badRequest(res, "lat/lng noto'g'ri");
 
     if (!hasSupabaseEnv()) {
@@ -64,7 +72,7 @@ export async function driver_ping_handler(req, res) {
     // update presence
     const { error: pe } = await sb
       .from('driver_presence')
-      .upsert([{ driver_user_id, is_online, lat, lng, bearing, updated_at: nowIso() }], { onConflict: 'driver_user_id' });
+      .upsert([{ driver_id, driver_user_id, is_online, lat, lng, bearing, updated_at: nowIso() }], { onConflict: 'driver_id' });
     if (pe) throw pe;
 
     // check for active offers
@@ -72,7 +80,7 @@ export async function driver_ping_handler(req, res) {
     const { data: offer, error: oe } = await sb
       .from('order_offers')
       .select('order_id,status,expires_at,sent_at')
-      .eq('driver_user_id', driver_user_id)
+      .or(`driver_id.eq.${driver_id},driver_user_id.eq.${driver_id}`)
       .eq('status', 'sent')
       .gt('expires_at', now)
       .order('sent_at', { ascending: false })
@@ -134,7 +142,7 @@ export async function dispatch_handler(req, res) {
 
     // if there is still an active offer, do not send a new one yet
     const { data: activeOffer, error: aoe } = await sb.from('order_offers')
-      .select('driver_user_id,expires_at')
+      .select('driver_id,driver_user_id,expires_at')
       .eq('order_id', order_id)
       .eq('status', 'sent')
       .gt('expires_at', nowTs)
@@ -142,40 +150,39 @@ export async function dispatch_handler(req, res) {
       .limit(1)
       .maybeSingle();
     if (aoe) throw aoe;
-    if (activeOffer?.driver_user_id) {
+    if (activeOffer?.driver_id || activeOffer?.driver_user_id) {
       return json(res, 200, { ok: true, offered: 0, active_offer: activeOffer });
     }
 
     // avoid re-offering to drivers who already got an offer recently
     const { data: already, error: ale } = await sb.from('order_offers')
-      .select('driver_user_id')
+      .select('driver_id,driver_user_id')
       .eq('order_id', order_id)
       .in('status', ['sent', 'rejected', 'expired', 'accepted'])
       .limit(5000);
     if (ale) throw ale;
-    const alreadySet = new Set((already || []).map(r => r.driver_user_id).filter(Boolean));
+    const alreadySet = new Set((already || []).map(r => r.driver_id || r.driver_user_id).filter(Boolean));
 
-    const since = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-    const { data: pres, error: pe } = await sb.from('driver_presence')
-      .select('driver_user_id,lat,lng,is_online,updated_at')
-      .eq('is_online', true)
-      .gte('updated_at', since)
-      .limit(2000);
-    if (pe) throw pe;
+    // Fetch nearest approved, fresh online drivers from DB (scales to 10k+ online drivers)
+    const exclude_driver_ids = Array.from(alreadySet).slice(0, 5000);
+    const { data: candidates, error: ce } = await sb.rpc('find_nearby_drivers', {
+      p_lat: pickup.lat,
+      p_lng: pickup.lng,
+      p_radius_km: radius_km,
+      p_limit: 25,
+      p_exclude_driver_ids: exclude_driver_ids,
+    });
+    if (ce) throw ce;
 
-    const ranked = filteredPresence
-      .filter(p => p.lat != null && p.lng != null)
-      .map(p => ({ ...p, dist_km: haversineKm(Number(p.lat), Number(p.lng), pickup.lat, pickup.lng) }))
-      .filter(p => p.dist_km <= radius_km)
-      .filter(p => !alreadySet.has(p.driver_user_id))
-      .sort((a, b) => a.dist_km - b.dist_km)
+    const ranked = (candidates || [])
+      .filter(d => d && d.driver_id)
       .slice(0, 1);
 
     const expires_at = new Date(Date.now() + 15 * 1000).toISOString();
-    const rows = ranked.map((p) => ({ order_id, driver_user_id: p.driver_user_id, status: 'sent', sent_at: nowIso(), expires_at }));
+    const rows = ranked.map((p) => ({ order_id, driver_id: p.driver_id, driver_user_id: p.driver_id, status: 'sent', sent_at: nowIso(), expires_at }));
 
     if (rows.length) {
-      const { error: oe } = await sb.from('order_offers').upsert(rows, { onConflict: 'order_id,driver_user_id' });
+      const { error: oe } = await sb.from('order_offers').upsert(rows, { onConflict: 'order_id,driver_id' });
       if (oe) throw oe;
       await logOrderEvent(sb, { order_id, event: 'offer_sent', actor_role: 'system', actor_id: String(rows[0]?.driver_user_id || '') });
     }
@@ -224,7 +231,7 @@ export async function dispatch_smart_handler(req, res) {
     await logOrderEvent(sb, { order_id, event: 'offer_expired', actor_role: 'system' });
 
     const { data: activeOffer, error: aoe } = await sb.from('order_offers')
-      .select('driver_user_id,expires_at')
+      .select('driver_id,driver_user_id,expires_at')
       .eq('order_id', order_id)
       .eq('status', 'sent')
       .gt('expires_at', nowTs)
@@ -232,52 +239,39 @@ export async function dispatch_smart_handler(req, res) {
       .limit(1)
       .maybeSingle();
     if (aoe) throw aoe;
-    if (activeOffer?.driver_user_id) {
+    if (activeOffer?.driver_id || activeOffer?.driver_user_id) {
       return json(res, 200, { ok: true, offered: 0, active_offer: activeOffer });
     }
 
     const { data: already, error: ale } = await sb.from('order_offers')
-      .select('driver_user_id')
+      .select('driver_id,driver_user_id')
       .eq('order_id', order_id)
       .in('status', ['sent', 'rejected', 'expired', 'accepted'])
       .limit(5000);
     if (ale) throw ale;
-    const alreadySet = new Set((already || []).map(r => r.driver_user_id).filter(Boolean));
+    const alreadySet = new Set((already || []).map(r => r.driver_id || r.driver_user_id).filter(Boolean));
 
-    const since = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-    const { data: pres, error: pe } = await sb.from('driver_presence')
-      .select('driver_user_id,lat,lng,is_online,updated_at')
-      .eq('is_online', true)
-      .gte('updated_at', since)
-      .limit(4000);
-    if (pe) throw pe;
+    // Fetch nearest approved, fresh online drivers from DB (scales to 10k+ online drivers)
+    const exclude_driver_ids = Array.from(alreadySet).slice(0, 5000);
+    const { data: candidates, error: ce } = await sb.rpc('find_nearby_drivers', {
+      p_lat: pickup.lat,
+      p_lng: pickup.lng,
+      p_radius_km: radius_km,
+      p_limit: 25,
+      p_exclude_driver_ids: exclude_driver_ids,
+    });
+    if (ce) throw ce;
 
-    const driverIds = filteredPresence.map(p => p.driver_user_id);
-    const { data: stats, error: se } = await sb.from('driver_stats')
-      .select('driver_user_id,rating_avg,acceptance_rate,completed_count')
-      .in('driver_user_id', driverIds.length ? driverIds : ['00000000-0000-0000-0000-000000000000'])
-      .limit(4000);
-    if (se) throw se;
-    const statsMap = new Map((stats || []).map(s => [s.driver_user_id, s]));
+    const ranked = (candidates || []).slice(0, 1);
 
-    const ranked = filteredPresence.filter(p => p.lat != null && p.lng != null).map(p => {
-      const dist_km = haversineKm(Number(p.lat), Number(p.lng), pickup.lat, pickup.lng);
-      const st = statsMap.get(p.driver_user_id) || {};
-      const s = score({ dist_km, rating_avg: st.rating_avg ?? 5, acceptance_rate: st.acceptance_rate ?? 1, completed_count: st.completed_count ?? 0 });
-      return { ...p, dist_km, score: s };
-    }).filter(p => p.dist_km <= radius_km)
-      .filter(p => !alreadySet.has(p.driver_user_id))
-      .sort((a, b) => a.score - b.score)
-      .slice(0, 1);
-
-    const expires_at = new Date(Date.now() + 15 * 1000).toISOString();
-    const rows = ranked.map((p) => ({ order_id, driver_user_id: p.driver_user_id, status: 'sent', sent_at: nowIso(), expires_at }));
+    const expires_at = new Date(Date.now() + 15 * 1000).toISOString();(Date.now() + 15 * 1000).toISOString();
+    const rows = ranked.map((p) => ({ order_id, driver_id: p.driver_id, driver_user_id: p.driver_id, status: 'sent', sent_at: nowIso(), expires_at }));
     if (rows.length) {
-      const { error: oe } = await sb.from('order_offers').upsert(rows, { onConflict: 'order_id,driver_user_id' });
+      const { error: oe } = await sb.from('order_offers').upsert(rows, { onConflict: 'order_id,driver_id' });
       if (oe) throw oe;
       await logOrderEvent(sb, { order_id, event: 'offer_sent', actor_role: 'system', actor_id: String(rows[0]?.driver_user_id || '') });
     }
-    return json(res, 200, { ok: true, offered: rows.length, drivers: ranked.map(r => ({ driver_user_id: r.driver_user_id, dist_km: r.dist_km, score: r.score })) });
+    return json(res, 200, { ok: true, offered: rows.length, drivers: ranked.map(r => ({ driver_id: r.driver_id, dist_km: r.dist_km })) });
   } catch (e) {
     return serverError(res, e);
   }

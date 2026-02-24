@@ -4,6 +4,11 @@
 import { getSupabaseAdmin } from '../_shared/supabase.js';
 import { json, badRequest, serverError, nowIso, store, hit } from '../_shared/cors.js';
 
+function normalizeDriverId(body) {
+  return String(body.driver_id || body.driver_user_id || body.user_id || '').trim();
+}
+
+
 function hasSupabaseEnv() {
   return !!(
     process.env.SUPABASE_URL &&
@@ -22,7 +27,8 @@ export async function driver_location_handler(req, res) {
 
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
     const order_id = String(body.order_id || '').trim();
-    const driver_user_id = String(body.driver_user_id || '').trim();
+    const driver_id = normalizeDriverId(body);
+    const driver_user_id = driver_id; // backward compatibility
     const lat = Number(body.lat);
     const lng = Number(body.lng);
     const bearing = body.bearing === undefined ? null : Number(body.bearing);
@@ -87,7 +93,7 @@ try {
 
 /**
  * POST /api/driver/state  (or /api/driver-state)
- * body: { driver_user_id, state: offline|online|busy|on_trip|pause }
+ * body: { driver_id, driver_user_id, state: offline|online|busy|on_trip|pause }
  * Updates driver_presence.is_online (basic)
  */
 const ALLOWED_STATE = new Set(['offline','online','busy','on_trip','pause']);
@@ -96,7 +102,8 @@ export async function driver_state_handler(req, res) {
     if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Method not allowed' });
 
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-    const driver_user_id = String(body.driver_user_id || '').trim();
+    const driver_id = normalizeDriverId(body);
+    const driver_user_id = driver_id; // backward compatibility
     const state = String(body.state || '').trim().toLowerCase();
 
     if (!driver_user_id) return badRequest(res, 'driver_user_id kerak');
@@ -115,7 +122,7 @@ export async function driver_state_handler(req, res) {
           driver_user_id,
           is_online,
           updated_at: nowIso()
-        }], { onConflict: 'driver_user_id' })
+        }], { onConflict: 'driver_id' })
         .select('*')
         .single();
       if (error) throw error;
@@ -124,7 +131,7 @@ export async function driver_state_handler(req, res) {
 
     const db = store();
     db.driver_presence = db.driver_presence || {};
-    db.driver_presence[driver_user_id] = { driver_user_id, is_online, updated_at: nowIso() };
+    db.driver_presence[driver_user_id] = { driver_id, driver_user_id, is_online, updated_at: nowIso() };
     return json(res, 200, { ok:true, presence: db.driver_presence[driver_user_id], state, demo:true });
   } catch (e) {
     return serverError(res, e);
@@ -133,7 +140,7 @@ export async function driver_state_handler(req, res) {
 
 /**
  * POST /api/driver/heartbeat (or /api/driver-heartbeat)
- * body: { driver_user_id, is_online, lat?, lng?, bearing? }
+ * body: { driver_id, driver_user_id, is_online, lat?, lng?, bearing? }
  * Updates driver_presence with location
  */
 export async function driver_heartbeat_handler(req, res) {
@@ -141,7 +148,8 @@ export async function driver_heartbeat_handler(req, res) {
     if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Method not allowed' });
 
     const body = typeof req.body === 'string' ? JSON.parse(req.body||'{}') : (req.body||{});
-    const driver_user_id = String(body.driver_user_id||'').trim();
+    const driver_id = normalizeDriverId(body);
+    const driver_user_id = driver_id; // backward compatibility
     const is_online = body.is_online === undefined ? true : !!body.is_online;
     const lat = body.lat === undefined ? null : Number(body.lat);
     const lng = body.lng === undefined ? null : Number(body.lng);
@@ -163,7 +171,7 @@ export async function driver_heartbeat_handler(req, res) {
           lng,
           bearing,
           updated_at: nowIso()
-        }], { onConflict: 'driver_user_id' })
+        }], { onConflict: 'driver_id' })
         .select('*')
         .single();
       if (error) throw error;
@@ -172,7 +180,7 @@ export async function driver_heartbeat_handler(req, res) {
 
     const db = store();
     db.driver_presence = db.driver_presence || {};
-    db.driver_presence[driver_user_id] = { driver_user_id, is_online, lat, lng, bearing, updated_at: nowIso() };
+    db.driver_presence[driver_user_id] = { driver_id, driver_user_id, is_online, lat, lng, bearing, updated_at: nowIso() };
     return json(res, 200, { ok:true, presence: db.driver_presence[driver_user_id], demo:true });
   } catch (e) {
     return serverError(res, e);

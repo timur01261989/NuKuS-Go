@@ -1,6 +1,11 @@
 import { json, badRequest, serverError, nowIso } from '../_shared/cors.js';
 import { getSupabaseAdmin } from '../_shared/supabase.js';
 
+function normalizeDriverId(body) {
+  return String(body.driver_id || body.driver_user_id || '').trim();
+}
+
+
 function hasSupabaseEnv() {
   return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
@@ -28,7 +33,8 @@ export async function offer_respond_handler(req, res) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body||'{}') : (req.body||{});
 
     const order_id = String(body.order_id||'').trim();
-    const driver_user_id = String(body.driver_user_id||'').trim();
+    const driver_id = normalizeDriverId(body);
+    const driver_user_id = driver_id; // backward compatibility
     const action = String(body.action||'').trim();
 
     if (!order_id) return badRequest(res, 'order_id kerak');
@@ -42,7 +48,7 @@ export async function offer_respond_handler(req, res) {
     const { data: off, error: oe } = await sb.from('order_offers')
       .update({ status, responded_at: nowIso() })
       .eq('order_id', order_id)
-      .eq('driver_user_id', driver_user_id)
+      .or(`driver_id.eq.${driver_id},driver_user_id.eq.${driver_id}`)
       .select('*')
       .single();
     if (oe) throw oe;
