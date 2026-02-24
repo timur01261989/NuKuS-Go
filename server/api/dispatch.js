@@ -54,7 +54,6 @@ export async function driver_ping_handler(req, res) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
 
     const driver_id = normalizeDriverId(body);
-    const driver_id = driver_id; // backward compatibility
     const lat = Number(body.lat);
     const lng = Number(body.lng);
     const bearing = body.bearing === undefined ? null : Number(body.bearing);

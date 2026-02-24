@@ -34,7 +34,6 @@ export async function offer_respond_handler(req, res) {
 
     const order_id = String(body.order_id||'').trim();
     const driver_id = normalizeDriverId(body);
-    const driver_id = driver_id; // backward compatibility
     const action = String(body.action||'').trim();
 
     if (!order_id) return badRequest(res, 'order_id kerak');
