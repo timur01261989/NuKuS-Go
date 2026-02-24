@@ -12,15 +12,16 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-export const supabase = createClient(supabaseUrl || "", supabaseAnonKey || "", {
+export const supabase = createClient(supabaseUrl  "", supabaseAnonKey  "", {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    // SSR/build paytida localStorage bo'lmaydi — shuning uchun himoya
     storage: typeof window !== "undefined" ? window.localStorage : undefined,
   },
 });
 
-// window.supabase olib tashlandi — production xavfsizligi uchun
-// (har kim console'dan supabase client'ga kira olmasligi kerak)
+// DEVda tekshirish uchun xohlasang ochib qo‘yasan, PRODda yopiq tursin
+if (import.meta.env.DEV && typeof window !== "undefined") {
+  window.supabase = supabase;
+}
