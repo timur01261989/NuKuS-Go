@@ -1,281 +1,89 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { Spin } from "antd";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "../../services/supabaseClient";
+import { useAuth } from "../auth/AuthProvider";
 
-/**
- * RoleGate
- * allow:
- *  - client: true/false
- *  - driver: true/false
- *  - requireDriverApproved: true/false
- *
- * IMPORTANT:
- *  Role truth source MUST be `profiles.role`.
- *  `drivers` table row existence is ONLY for driver registration/approval state,
- *  and must NOT override a user's role.
- *
- *  Why: if you treat "drivers row exists" as role=driver, then any client who once
- *  created a drivers row (or has a leftover row) gets forced into driver routes.
- *
- *  PERFORMANCE: profile, driver_applications va drivers so'rovlari
- *  parallel (Promise.all) yuboriladi — sahifa ochilish 2x tez bo'ladi.
- */
-export default function RoleGate({ children, allow, redirectTo = "/login" }) {
-  if (!supabase) {
-    return (
-      <div style={{ padding: 16 }}>
-        Supabase konfiguratsiya topilmadi: <code>VITE_SUPABASE_URL</code> va <code>VITE_SUPABASE_ANON_KEY</code> ni tekshiring.
-      </div>
-    );
-  }
+export default function RoleGate({ allowedRoles, children }) {
+  const { authReady, user, isAuthed } = useAuth();
+  const [role, setRole] = useState(null);
+  const [roleReady, setRoleReady] = useState(false);
+  const loc = useLocation();
 
-  const location = useLocation();
-
-  const [loading, setLoading] = useState(true);
-  const [ok, setOk] = useState(false);
-  const [reason, setReason] = useState(null);
-
-  const allowKey = useMemo(() => {
-    const a = allow || {};
-    return JSON.stringify({
-      client: !!a.client,
-      driver: !!a.driver,
-      requireDriverApproved: !!a.requireDriverApproved,
-    });
-  }, [allow]);
-
-  const withTimeout = (promise, ms = 10000) =>
-    Promise.race([
-      promise,
-      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms)),
-    ]);
-
-  const deriveDriverApproved = (drv) => {
-    if (!drv) return false;
-
-    // Schema variant A: drivers.approved boolean
-    if (Object.prototype.hasOwnProperty.call(drv, "approved") && typeof drv.approved === "boolean") {
-      return drv.approved;
-    }
-
-    // Schema variant B: drivers.status text
-    if (Object.prototype.hasOwnProperty.call(drv, "status") && typeof drv.status === "string") {
-      const s = drv.status.trim().toLowerCase();
-      // "active" ham "approved" bilan teng (admin tasdiqlash natijasi)
-      return ["approved", "active", "verified", "enabled", "ok"].includes(s);
-    }
-
-    // Older variants without approval gating
-    return true;
-  };
+  const lastUserIdRef = useRef(null);
 
   useEffect(() => {
-    let mounted = true;
+    let alive = true;
 
-    const finish = (nextOk, nextReason = null) => {
-      if (!mounted) return;
-      setOk(nextOk);
-      setReason(nextReason);
-      setLoading(false);
-    };
+    async function loadRole() {
+      if (!authReady) return;
+      if (!isAuthed || !user?.id) {
+        setRole(null);
+        setRoleReady(true);
+        return;
+      }
 
-    const run = async () => {
-      try {
-        setLoading(true);
-        setReason(null);
+      if (lastUserIdRef.current === user.id && roleReady) return;
+      lastUserIdRef.current = user.id;
 
-        const a = allow || {};
+      setRoleReady(false);
 
-        // 1) session
-        const { data: s, error: sessionErr } = await withTimeout(supabase.auth.getSession());
-        if (sessionErr) return finish(false, "session-error");
+      const { data: prof, error } = await supabase
+        .from("profiles")
+        .select("id, role")
+        .eq("id", user.id)
+        .maybeSingle();
 
-        const session = s?.session;
-        if (!session) return finish(false, "no-session");
+      if (!alive) return;
 
-        const userId = session.user.id;
+      if (error) {
+        console.error("profiles select error:", error);
+        setRole(null);
+        setRoleReady(true);
+        return;
+      }
 
-        // 2) Parallel so'rovlar: profile + driver_applications + drivers (agar kerak bo'lsa)
-        // Bu ketma-ket so'rovlar o'rniga parallel ishlaydi — ~2x tez
-        const profilePromise = withTimeout(
-          (async () => {
-            let res = await supabase
-              .from("profiles")
-              .select("role")
-              .eq("id", userId)
-              .maybeSingle();
-
-            // Fallback: some schemas use profiles.user_id instead of profiles.id
-            if (res.error && (res.error.code === "42703" || /column\s+\"id\"\s+does\s+not\s+exist/i.test(res.error.message || ""))) {
-              res = await supabase
-                .from("profiles")
-                .select("role")
-                .eq("user_id", userId)
-                .maybeSingle();
-            }
-            return res;
-          })()
+      if (!prof) {
+        const { error: upErr } = await supabase.from("profiles").upsert(
+          { id: user.id, role: "client" },
+          { onConflict: "id" }
         );
 
-        const appPromise = withTimeout(
-          supabase
-            .from("driver_applications")
-            .select("status")
-            .eq("user_id", userId)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle()
-        ).catch(() => ({ data: null, error: null }));
+        if (!alive) return;
 
-        const drvPromise = a.driver
-          ? withTimeout(
-              supabase.from("drivers").select("*").eq("user_id", userId).maybeSingle()
-            ).catch(() => ({ data: null, error: null }))
-          : Promise.resolve({ data: null, error: null });
-
-        // Barcha so'rovlarni parallel yuborish
-        const [profileRes, appRes, drvRes] = await Promise.all([profilePromise, appPromise, drvPromise]);
-
-        // Profile
-        let profileRole = null;
-        let profileExists = false;
-        let profileErr = null;
-
-        if (!profileRes.error && profileRes.data?.role) {
-          profileExists = true;
-          profileRole = profileRes.data.role;
-        }
-        profileErr = profileRes.error;
-
-        // Driver application
-        let applicationStatus = null;
-        if (!appRes.error && appRes.data) {
-          if (typeof appRes.data.status === "string") {
-            applicationStatus = appRes.data.status.trim().toLowerCase();
-          }
+        if (upErr) {
+          console.error("profiles upsert error:", upErr);
+          setRole(null);
+          setRoleReady(true);
+          return;
         }
 
-        // Driver row
-        let driverRowExists = false;
-        let approved = false;
-        if (!drvRes.error && drvRes.data) {
-          driverRowExists = true;
-          approved = deriveDriverApproved(drvRes.data);
-        }
-
-        // 3) Derive effective role
-        // Role is always taken from profiles.role.
-        // IMPORTANT: must be mutable because we may auto-create a profile below.
-        let effectiveRole = profileRole;
-
-        // 4) Auto-create client profile if accessing client-only route and profile missing
-        if (!effectiveRole && a.client && !a.driver) {
-          try {
-            await withTimeout(
-              supabase
-                .from("profiles")
-                .upsert(
-                  {
-                    id: userId,
-                    role: "client",
-                    phone: session.user.phone ?? null,
-                    updated_at: new Date().toISOString(),
-                  },
-                  { onConflict: "id" }
-                )
-            );
-          } catch {
-            // ignore
-          }
-
-          // Prevent login<->home redirect loops: assume the intended role locally,
-          // then best-effort confirm it from DB.
-          effectiveRole = "client";
-
-          const { data: p2 } = await withTimeout(
-            supabase.from("profiles").select("role").eq("id", userId).maybeSingle()
-          );
-          if (p2?.role) {
-            profileRole = p2.role;
-            effectiveRole = p2.role;
-          }
-        }
-
-        // 5) Decide allow
-        if (effectiveRole === "client") {
-          // If a client has a pending driver application, allow driver pending page,
-          // and redirect any driver-only pages to pending (prevents register<->pending loops).
-          if (applicationStatus === "pending") {
-            if (location.pathname === "/driver/pending") return finish(true, null);
-            if (!!a.driver && !a.client) return finish(false, "driver-not-approved");
-          }
-
-          if (!!a.client) return finish(true, null);
-
-          // Client trying to access driver-only route
-          if (!!a.driver && !a.client) return finish(false, "not-driver");
-
-          return finish(false, "not-allowed");
-        }
-
-        if (effectiveRole === "driver") {
-          // Drivers should still be allowed to open client pages.
-          if (!a.driver && a.client) return finish(true, null);
-          if (!a.driver) return finish(false, "driver-not-allowed");
-
-          if (!driverRowExists) {
-            // Variant A: driver access is based on `drivers` row.
-            // If application exists (pending/approved), keep user on pending instead of bouncing to register.
-            if (applicationStatus && ["pending", "submitted", "waiting", "review", "approved"].includes(applicationStatus)) {
-              return finish(false, "driver-not-approved");
-            }
-            return finish(false, "driver-not-registered");
-          }
-
-          // approval gating (driver dashboard/orders)
-          if (a.requireDriverApproved) {
-            if (!approved) return finish(false, "driver-not-approved");
-          }
-
-          return finish(true, null);
-        }
-
-        // No role at all
-        // For driver routes: send to register. For others: login.
-        if (a.driver && !a.client) {
-          if (applicationStatus === "pending") return finish(false, "driver-not-approved");
-          return finish(false, "driver-not-registered");
-        }
-
-        if (!profileExists && profileErr) return finish(false, "profile-error");
-        return finish(false, "no-profile");
-      } catch (e) {
-        return finish(false, e?.message === "timeout" ? "timeout" : "error");
+        setRole("client");
+        setRoleReady(true);
+        return;
       }
-    };
 
-    run();
+      setRole(prof.role ?? "client");
+      setRoleReady(true);
+    }
+
+    loadRole();
 
     return () => {
-      mounted = false;
+      alive = false;
     };
-  }, [allowKey, location.pathname]);
+  }, [authReady, isAuthed, user?.id]);
 
-  if (loading) {
-    return (
-      <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <Spin size="large" />
-      </div>
-    );
+  if (!authReady) return <div style={{ padding: 24 }}>Loading...</div>;
+
+  if (!isAuthed) {
+    return <Navigate to="/login" replace state={{ from: loc.pathname }} />;
   }
 
-  if (!ok) {
-    if (reason === "driver-not-approved") return <Navigate to="/driver/pending" replace />;
-    if (reason === "driver-not-registered" || reason === "not-driver") return <Navigate to="/driver/register" replace />;
+  if (!roleReady) return <div style={{ padding: 24 }}>Loading...</div>;
 
-    return <Navigate to={redirectTo} replace state={{ from: location.pathname, reason }} />;
+  if (allowedRoles?.length && !allowedRoles.includes(role)) {
+    return <Navigate to="/client/home" replace />;
   }
 
-  return <>{children}</>;
+  return children;
 }

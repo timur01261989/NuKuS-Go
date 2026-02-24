@@ -1,8 +1,17 @@
-// BUTUN APP UCHUN BIRTA SUPABASE CLIENT.
-// Bu fayl yangi client yaratmaydi — faqat lib/supabase.js dagisini export qiladi.
+import { createClient } from "@supabase/supabase-js";
 
-import { supabase as sharedSupabase, assertSupabase } from "../lib/supabase";
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = sharedSupabase;
-export { assertSupabase };
-export default supabase;
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error("Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY");
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storageKey: "nukus_go_auth",
+  },
+});
