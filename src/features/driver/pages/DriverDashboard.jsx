@@ -26,7 +26,7 @@ import {
   StopOutlined
 } from "@ant-design/icons";
 import { useLocation, useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "../../../lib/supabase"; 
 import { useLanguage } from "../../../shared/i18n/useLanguage"; 
 import { startTracking } from "../components/services/locationService";
 import DriverHome from "../components/DriverHome";
@@ -44,30 +44,29 @@ export default function DriverDashboard() {
   const navigate = useNavigate();
 
   // Gate: driver must have an application before accessing dashboard
-  const [gateLoading, setGateLoading] = useState(false);
-  const [gateAllowed, setGateAllowed] = useState(true);
+  const [gateLoading, setGateLoading] = useState(true);
+  const [gateAllowed, setGateAllowed] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
 
     // RoleGate already enforces driver access.
-    // This check is best-effort only and MUST NOT redirect (prevents loops).
-    const withTimeout = (promise, ms = 8000) =>
-      Promise.race([
-        promise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms)),
-      ]);
-
+    // Dashboard should not perform extra redirects (prevents redirect loops).
     const run = async () => {
       try {
-        setGateLoading(true);
-        const { data: authData } = await withTimeout(supabase.auth.getUser());
-        const userId = authData?.user?.id;
+        const { data: authData, error: authErr } = await supabase.auth.getUser();
+        if (authErr) throw authErr;
 
-        // If session is temporarily missing (hydration), don't redirect here.
-        if (isMounted) setGateAllowed(!!userId || true);
+        const userId = authData?.user?.id;
+        if (!userId) {
+          navigate("/login", { replace: true });
+          return;
+        }
+
+        if (isMounted) setGateAllowed(true);
       } catch (e) {
-        console.warn("Driver dashboard gate warning:", e?.message || e);
+        console.error("Driver dashboard gate error:", e);
+        navigate("/login", { replace: true });
       } finally {
         if (isMounted) setGateLoading(false);
       }
@@ -78,7 +77,7 @@ export default function DriverDashboard() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [navigate]);
   const location = useLocation();
   const { t } = useLanguage(); 
 
