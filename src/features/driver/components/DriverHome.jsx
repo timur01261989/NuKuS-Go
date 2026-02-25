@@ -445,16 +445,12 @@ export default function DriverHome({ onLogout }) {
             // Agar history mavjud bo'lsa, oddiy ortga qaytamiz; bo'lmasa driver dashboardga.
             try {
               if (typeof window !== "undefined" && window.history && window.history.length > 1) {
-                navigate(-1);
+                navigate("/client/home", { replace: true });
               } else {
-                try { window.localStorage?.setItem("app_mode", "driver"); } catch {}
-                try { window.localStorage?.setItem("app_mode","driver"); } catch {}
                 navigate("/driver/dashboard", { replace: true });
               }
             } catch {
-              try { window.localStorage?.setItem("app_mode", "driver"); } catch {}
-              try { window.localStorage?.setItem("app_mode","driver"); } catch {}
-                navigate("/driver/dashboard", { replace: true });
+              navigate("/driver/dashboard", { replace: true });
             }
           }}
           icon={<ArrowLeftOutlined />}

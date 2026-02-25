@@ -60,9 +60,3 @@ export function useAuth() {
   if (!v) throw new Error("useAuth must be used inside AuthProvider");
   return v;
 }
-
-
-// Optional hook: returns null if used outside provider
-export function useAuthOptional() {
-  return useContext(AuthCtx);
-}

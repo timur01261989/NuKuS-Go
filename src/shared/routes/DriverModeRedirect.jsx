@@ -4,31 +4,31 @@ import { Spin } from "antd";
 
 /**
  * DriverModeRedirect
- * This route is an INTENT switch:
- * - persist app_mode="driver"
- * - then send user to "/" so RootRedirect can decide:
- *   - approved -> /driver/dashboard
- *   - not approved -> /driver/pending (or /driver/register)
- *   - not logged in -> /login
+ * /driver-mode route: user explicitly switches to driver mode
  */
 export default function DriverModeRedirect() {
   const navigate = useNavigate();
   const location = useLocation();
 
   React.useEffect(() => {
+    // user explicitly wants driver mode
+    try {
+      localStorage.setItem("app_mode", "driver");
+    } catch (e) {
+      // ignore storage errors
+    }
+
     const fromPath = location.state?.from;
 
-    try {
-      if (typeof window !== "undefined") {
-        window.localStorage?.setItem("app_mode", "driver");
-      }
-    } catch {}
-
-    navigate("/", {
+    // Go to protected driver dashboard:
+    // - if approved => dashboard
+    // - if not approved => RoleGate will redirect to /driver/pending
+    // - if not a driver => RoleGate will redirect to /driver/register
+    navigate("/driver/dashboard", {
       replace: true,
       state: { from: fromPath },
     });
-  }, [navigate, location.state]);
+  }, [navigate, location]);
 
   return (
     <div
@@ -39,7 +39,7 @@ export default function DriverModeRedirect() {
         justifyContent: "center",
       }}
     >
-      <Spin size="large" />
+      <Spin size="large" tip="Yuklanmoqda..." />
     </div>
   );
 }

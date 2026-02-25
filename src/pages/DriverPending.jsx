@@ -35,6 +35,14 @@ export default function DriverPending() {
         setChecking(false);
         return;
       }
+
+      if (!user) {
+        setLoading(false);
+        setChecking(false);
+        navigate("/login", { replace: true });
+        return;
+      }
+
             // 2) Driver row is the SOURCE OF TRUTH for driver access (Variant A)
       //    We ONLY redirect to dashboard when the drivers row is approved.
       //    This prevents redirect loops where RoleGate checks `drivers` but this page checks something else.
@@ -76,7 +84,7 @@ export default function DriverPending() {
         }
       }
 
-const appStatus = (appRow?.status ? String(appRow.status).trim().toLowerCase() : null);
+const appStatus = appRow?.status || null;
 
       // Decide final status for this page
       // Approved if role is driver OR app status is approved
@@ -90,7 +98,6 @@ const appStatus = (appRow?.status ? String(appRow.status).trim().toLowerCase() :
 
         // Important: only redirect once we are sure approved,
         // and let RoleGate / dashboard routes see the updated profile role.
-        try { window.localStorage?.setItem("app_mode","driver"); } catch {}
         navigate("/driver/dashboard", { replace: true });
         return;
       }
@@ -134,30 +141,14 @@ const appStatus = (appRow?.status ? String(appRow.status).trim().toLowerCase() :
 
   if (loading) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "#f5f5f5",
-          padding: 16,
-        }}
-      >
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 16, color: "#111827", marginBottom: 8 }}>
-            Yuklanmoqda...
-          </div>
-          <div style={{ fontSize: 12, color: "#6b7280" }}>
-            Agar 5 soniyadan ko‘p tursa, Console’da xatolik bor.
-          </div>
-        </div>
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f9fafb", color: "#111827" }}>
+        <div style={{ color: "#111827" }}>Yuklanmoqda...</div>
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, background: "#f9fafb", color: "#111827" }}>
       <div
         style={{
           width: "100%",
@@ -166,7 +157,7 @@ const appStatus = (appRow?.status ? String(appRow.status).trim().toLowerCase() :
           borderRadius: 16,
           padding: 18,
           boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
-          color: "#fff",
+          color: "#111827",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
@@ -201,7 +192,7 @@ const appStatus = (appRow?.status ? String(appRow.status).trim().toLowerCase() :
               borderRadius: 12,
               border: "none",
               background: "#374151",
-              color: "#fff",
+              color: "#111827",
               cursor: "pointer",
               fontWeight: 600,
             }}
@@ -210,7 +201,7 @@ const appStatus = (appRow?.status ? String(appRow.status).trim().toLowerCase() :
           </button>
 
           <button
-            onClick={() => { try { window.localStorage?.setItem("app_mode","client"); } catch {} navigate("/client/home", { replace: true }); }}
+            onClick={() => { try { localStorage.setItem("app_mode","client"); } catch(e) {} navigate("/client/home", { replace: true }); }}
             style={{
               height: 42,
               borderRadius: 12,

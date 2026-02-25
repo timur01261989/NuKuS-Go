@@ -40,7 +40,10 @@ export default function Auth() {
       const { data } = await supabase.auth.getSession();
       // Don't hardcode client redirect here.
       // RootRedirect (/) decides correctly based on drivers table/profile role.
-      if (data?.session) navigate("/", { replace: true });
+      if (data?.session) {
+        try { localStorage.setItem("app_mode","client"); } catch(e) {}
+        navigate("/client/home", { replace: true });
+      }
     };
     checkSession();
   }, [navigate]);
@@ -72,7 +75,8 @@ export default function Auth() {
 
       message.success(t?.greeting || "Xush kelibsiz!");
       // Let RootRedirect pick the correct home (client vs driver).
-      navigate("/", { replace: true });
+      try { localStorage.setItem("app_mode","client"); } catch(e) {}
+      navigate("/client/home", { replace: true });
     } catch {
       message.error("Telefon raqam yoki parol noto'g'ri!");
     } finally {

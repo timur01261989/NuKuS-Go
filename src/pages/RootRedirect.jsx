@@ -9,14 +9,15 @@ import { useSessionProfile } from "../shared/auth/useSessionProfile";
 import { pickHomeForRole } from "../shared/routes/RoleGate";
 
 // Single source of truth for "after login, where do we land?"
-// Key requirement for this project:
-// - If a user has a driver_application, we treat them as a driver flow (pending/approved) even if profiles.role was never set.
-// - We ALSO try to auto-fix profiles.role='driver' so protected /driver routes won't bounce them to client.
+// RULES for this project:
+// - Default after login is ALWAYS client home.
+// - Driver flow is entered only when user explicitly switches mode (app_mode="driver").
+// - Approved driver can still use client pages anytime (client mode).
 export default function RootRedirect() {
   const navigate = useNavigate();
   const didRun = useRef(false);
 
-  const { session, profile, driverRow: driver, application: driverApp, loading, refetch } = useSessionProfile({
+  const { session, profile, driver, driverApp, loading, refetch } = useSessionProfile({
     includeDriver: true,
     includeApplication: true,
   });
@@ -34,37 +35,41 @@ export default function RootRedirect() {
         return;
       }
 
-      const role = profile?.role || "client";
+      const mode = (localStorage.getItem("app_mode") || "client").toLowerCase();
 
-      // Resolve persisted mode (driver can intentionally use client screens).
-      const storedMode =
-        typeof window !== "undefined"
-          ? window.localStorage?.getItem("app_mode")
-          : null;
-
-      // If mode is not set yet, choose a sane default.
-      // - If they have any driver intent (application or driver row), default to driver mode.
-      // - Otherwise default to client mode.
-      if (typeof window !== "undefined") {
-        if (storedMode !== "client" && storedMode !== "driver") {
-          const hasDriverIntent = !!driverApp || !!driver || role === "driver";
-          window.localStorage?.setItem("app_mode", hasDriverIntent ? "driver" : "client");
-        }
+      // Default: client home
+      if (mode !== "driver") {
+        navigate("/client/home", { replace: true });
+        return;
       }
 
-      // If driver application exists, best-effort ensure profile.role='driver' so other guards don't misread.
-      if (driverApp && role !== "driver") {
-        try {
-          const uid = session.user.id;
+      // Driver mode requested:
+      // We need profiles.role="driver" for protected driver routes.
+      let role = (profile?.role || "client").toLowerCase();
 
-          let upd = await supabase.from("profiles").update({ role: "driver" }).eq("id", uid);
-          if (upd.error && /column\s+\"id\"\s+does\s+not\s+exist/i.test(upd.error.message || "")) {
-            upd = await supabase.from("profiles").update({ role: "driver" }).eq("user_id", uid);
+      // If user is not a driver yet, take them to registration.
+      // (Approved drivers will have role="driver" already or we auto-fix below.)
+      if (role !== "driver") {
+        // If driver records exist, try best-effort to promote role to "driver"
+        // so RoleGate won't bounce them back to client.
+        if (driverApp || driver) {
+          try {
+            const uid = session.user.id;
+
+            // Try both profiles.id and profiles.user_id schema patterns.
+            let upd = await supabase.from("profiles").update({ role: "driver" }).eq("id", uid);
+            if (upd.error && /column\s+\"id\"\s+does\s+not\s+exist/i.test(upd.error.message || "")) {
+              upd = await supabase.from("profiles").update({ role: "driver" }).eq("user_id", uid);
+            }
+
+            await refetch();
+            role = "driver";
+          } catch (e) {
+            console.warn("RootRedirect: failed to auto-set role=driver", e);
           }
-
-          await refetch();
-        } catch (e) {
-          console.warn("RootRedirect: failed to auto-set role=driver", e);
+        } else {
+          navigate("/driver/register", { replace: true });
+          return;
         }
       }
 

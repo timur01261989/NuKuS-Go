@@ -5,62 +5,36 @@ import { supabase } from "@/lib/supabase";
 
 // Shared helper: role → home route (exported for RootRedirect)
 // Keep it deterministic: only uses already-fetched records.
-export function pickHomeForRole(input) {
-  // Backward compatible: allow passing a string role or an object.
-  const cfg =
-    typeof input === "string"
-      ? { role: input }
-      : (input || {});
-
-  const role = cfg.role;
-  const driverRow = cfg.driverRow ?? cfg.driver;
-  const driverApplication = cfg.driverApplication ?? cfg.driverApp ?? cfg.application;
-
+export function pickHomeForRole({ role, driverRow, driverApplication }) {
   const r = (role || "client").toLowerCase();
-
-  // Persisted UI mode: approved drivers can still use client screens on purpose.
-  // Values: "client" | "driver"
-  const storedMode =
-    typeof window !== "undefined"
-      ? window.localStorage?.getItem("app_mode")
-      : null;
-
-  const hasDriverIntent =
-    !!driverApplication || r === "driver";
-
-  const mode =
-    cfg.mode ||
-    (storedMode === "client" || storedMode === "driver"
-      ? storedMode
-      : hasDriverIntent
-        ? "driver"
-        : "client");
+  const mode = (localStorage.getItem("app_mode") || "client").toLowerCase();
 
   if (r === "admin") return "/admin";
 
-  const driverApproved =
-    !!driverRow &&
-    (
-      String(driverRow.status || "").toLowerCase() === "approved" ||
-      driverRow.is_approved === true ||
-      driverRow.approved === true
-    );
+  // Default after login is client home.
+  // Driver flow is entered only when app_mode="driver".
+  if (mode !== "driver") return "/client/home";
 
-  const appStatus = (driverApplication?.status || "").toLowerCase();
+  if (r === "driver") {
+    const appStatus = (driverApplication?.status || "").toLowerCase();
 
-  // Client mode always wins (driver can intentionally be a passenger).
-  if (mode === "client") {
-    return "/client/home";
+    const driverApproved =
+      !!driverRow &&
+      (String(driverRow.status || "").toLowerCase() === "approved" ||
+        String(driverRow.status || "").toLowerCase() === "active" ||
+        driverRow.is_approved === true ||
+        driverRow.approved === true);
+
+    if (driverApproved) return "/driver/dashboard";
+    if (appStatus === "approved") return "/driver/dashboard";
+    if (appStatus === "rejected") return "/driver/register";
+
+    // pending/submitted/review/unknown
+    return "/driver/pending";
   }
 
-  // Driver mode:
-  if (driverApproved) return "/driver/dashboard";
-  if (appStatus === "approved") return "/driver/dashboard"; // optimistic (waiting driver row)
-  if (appStatus === "rejected") return "/driver/register";
-  if (hasDriverIntent) return "/driver/pending";
-
-  // Fallback
-  return "/client/home";
+  // In driver mode, but role isn't driver → go to registration
+  return "/driver/register";
 }
 
 /**
