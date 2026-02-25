@@ -26,7 +26,7 @@ import {
   StopOutlined
 } from "@ant-design/icons";
 import { useLocation, useNavigate } from "react-router-dom";
-import { supabase } from "../../../lib/supabase"; 
+import { supabase } from "@/lib/supabase";
 import { useLanguage } from "../../../shared/i18n/useLanguage"; 
 import { startTracking } from "../components/services/locationService";
 import DriverHome from "../components/DriverHome";
@@ -44,29 +44,30 @@ export default function DriverDashboard() {
   const navigate = useNavigate();
 
   // Gate: driver must have an application before accessing dashboard
-  const [gateLoading, setGateLoading] = useState(true);
-  const [gateAllowed, setGateAllowed] = useState(false);
+  const [gateLoading, setGateLoading] = useState(false);
+  const [gateAllowed, setGateAllowed] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
 
     // RoleGate already enforces driver access.
-    // Dashboard should not perform extra redirects (prevents redirect loops).
+    // This check is best-effort only and MUST NOT redirect (prevents loops).
+    const withTimeout = (promise, ms = 8000) =>
+      Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms)),
+      ]);
+
     const run = async () => {
       try {
-        const { data: authData, error: authErr } = await supabase.auth.getUser();
-        if (authErr) throw authErr;
-
+        setGateLoading(true);
+        const { data: authData } = await withTimeout(supabase.auth.getUser());
         const userId = authData?.user?.id;
-        if (!userId) {
-          navigate("/login", { replace: true });
-          return;
-        }
 
-        if (isMounted) setGateAllowed(true);
+        // If session is temporarily missing (hydration), don't redirect here.
+        if (isMounted) setGateAllowed(!!userId || true);
       } catch (e) {
-        console.error("Driver dashboard gate error:", e);
-        navigate("/login", { replace: true });
+        console.warn("Driver dashboard gate warning:", e?.message || e);
       } finally {
         if (isMounted) setGateLoading(false);
       }
@@ -77,7 +78,7 @@ export default function DriverDashboard() {
     return () => {
       isMounted = false;
     };
-  }, [navigate]);
+  }, []);
   const location = useLocation();
   const { t } = useLanguage(); 
 
