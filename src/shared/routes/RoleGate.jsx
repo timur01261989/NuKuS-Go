@@ -268,9 +268,22 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
 
           if (!driverRowExists) {
             // Variant A: driver access is based on `drivers` row.
-            // If application exists (pending/approved), keep user on pending instead of bouncing to register.
+            // ⭐ FIXED: If route allows clients (a.client=true), let them through
+            // even if they have pending driver application.
+            // Only deny if accessing driver-only routes (a.driver=true && a.client=false)
             if (applicationStatus && ["pending", "submitted", "waiting", "review", "approved"].includes(applicationStatus)) {
-              return finish(false, "driver-not-approved");
+              // If this route is client-friendly, allow it
+              if (a.client && !a.driver) {
+                return finish(true, null);
+              }
+              // If route is driver-only and they're pending, deny
+              if (a.driver && !a.client) {
+                return finish(false, "driver-not-approved");
+              }
+              // If route allows both, allow (client home, taxi, etc. which allow both)
+              if (a.driver && a.client) {
+                return finish(true, null);
+              }
             }
             return finish(false, "driver-not-registered");
           }
