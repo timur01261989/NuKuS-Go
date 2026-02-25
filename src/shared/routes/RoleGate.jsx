@@ -18,18 +18,12 @@ export function pickHomeForRole({ role, driverRow, driverApplication }) {
   if (r === "driver") {
     const appStatus = (driverApplication?.status || "").toLowerCase();
 
-    // FIX: Build xatosini oldini olish uchun statusni alohida o'zgaruvchiga olamiz
-    // Bu yerda "Expected ':' but found '||'" xatosini tuzatish uchun mantiq soddalashtirildi
-    let drvStatus = "";
-    if (driverRow && driverRow.status) {
-      drvStatus = String(driverRow.status).toLowerCase();
-    }
-
-    const isApprovedBool =
-      driverRow?.is_approved === true || driverRow?.approved === true;
-    const isApprovedStatus = drvStatus === "approved" || drvStatus === "active";
-
-    const driverApproved = !!driverRow && (isApprovedStatus || isApprovedBool);
+    const driverApproved =
+      !!driverRow &&
+      (String(driverRow.status || "").toLowerCase() === "approved" ||
+        String(driverRow.status || "").toLowerCase() === "active" ||
+        driverRow.is_approved === true ||
+        driverRow.approved === true);
 
     if (driverApproved) return "/driver/dashboard";
     if (appStatus === "approved") return "/driver/dashboard";
@@ -46,27 +40,26 @@ export function pickHomeForRole({ role, driverRow, driverApplication }) {
 /**
  * RoleGate
  * allow:
- * - client: true/false
- * - driver: true/false
- * - requireDriverApproved: true/false
+ *  - client: true/false
+ *  - driver: true/false
+ *  - requireDriverApproved: true/false
  *
  * IMPORTANT:
- * Role truth source MUST be profiles.role.
- * drivers table row existence is ONLY for driver registration/approval state,
- * and must NOT override a user's role.
+ *  Role truth source MUST be `profiles.role`.
+ *  `drivers` table row existence is ONLY for driver registration/approval state,
+ *  and must NOT override a user's role.
  *
- * Why: if you treat "drivers row exists" as role=driver, then any client who once
- * created a drivers row (or has a leftover row) gets forced into driver routes.
+ *  Why: if you treat "drivers row exists" as role=driver, then any client who once
+ *  created a drivers row (or has a leftover row) gets forced into driver routes.
  *
- * PERFORMANCE: profile, driver_applications va drivers so'rovlari
- * parallel (Promise.all) yuboriladi — sahifa ochilish 2x tez bo'ladi.
+ *  PERFORMANCE: profile, driver_applications va drivers so'rovlari
+ *  parallel (Promise.all) yuboriladi — sahifa ochilish 2x tez bo'ladi.
  */
 export default function RoleGate({ children, allow, redirectTo = "/login" }) {
   if (!supabase) {
     return (
       <div style={{ padding: 16 }}>
-        Supabase konfiguratsiya topilmadi: <code>VITE_SUPABASE_URL</code> va{" "}
-        <code>VITE_SUPABASE_ANON_KEY</code> ni tekshiring.
+        Supabase konfiguratsiya topilmadi: <code>VITE_SUPABASE_URL</code> va <code>VITE_SUPABASE_ANON_KEY</code> ni tekshiring.
       </div>
     );
   }
@@ -76,11 +69,6 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
   const [loading, setLoading] = useState(true);
   const [ok, setOk] = useState(false);
   const [reason, setReason] = useState(null);
-
-  // FIX: appMode va wantsDriverPath ni useMemo tashqarisiga oldik,
-  // chunki ular useEffect ichida ham kerak bo'ladi.
-  const appMode = (localStorage.getItem("app_mode") || "client").toLowerCase();
-  const wantsDriverPath = location.pathname.startsWith("/driver");
 
   const allowKey = useMemo(() => {
     const a = allow || {};
@@ -94,27 +82,19 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
   const withTimeout = (promise, ms = 10000) =>
     Promise.race([
       promise,
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("timeout")), ms)
-      ),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms)),
     ]);
 
   const deriveDriverApproved = (drv) => {
     if (!drv) return false;
 
     // Schema variant A: drivers.approved boolean
-    if (
-      Object.prototype.hasOwnProperty.call(drv, "approved") &&
-      typeof drv.approved === "boolean"
-    ) {
+    if (Object.prototype.hasOwnProperty.call(drv, "approved") && typeof drv.approved === "boolean") {
       return drv.approved;
     }
 
     // Schema variant B: drivers.status text
-if (
-      Object.prototype.hasOwnProperty.call(drv, "status") &&
-      typeof drv.status === "string"
-    ) {
+    if (Object.prototype.hasOwnProperty.call(drv, "status") && typeof drv.status === "string") {
       const s = drv.status.trim().toLowerCase();
       // "active" ham "approved" bilan teng (admin tasdiqlash natijasi)
       return ["approved", "active", "verified", "enabled", "ok"].includes(s);
@@ -142,21 +122,13 @@ if (
         const a = allow || {};
 
         // 1) session
-        const { data: s, error: sessionErr } = await withTimeout(
-          supabase.auth.getSession()
-        );
+        const { data: s, error: sessionErr } = await withTimeout(supabase.auth.getSession());
         if (sessionErr) return finish(false, "session-error");
 
         const session = s?.session;
         if (!session) return finish(false, "no-session");
 
         const userId = session.user.id;
-
-        // If user is in client mode, never force them into driver flow.
-        // Visiting /driver/* while not in driver mode should bounce back to client home.
-        if (wantsDriverPath && appMode !== "driver") {
-          return finish(false, "driver-mode-off");
-        }
 
         // 2) Parallel so'rovlar: profile + driver_applications + drivers (agar kerak bo'lsa)
         // Bu ketma-ket so'rovlar o'rniga parallel ishlaydi — ~2x tez
@@ -169,13 +141,7 @@ if (
               .maybeSingle();
 
             // Fallback: some schemas use profiles.user_id instead of profiles.id
-            if (
-              res.error &&
-              (res.error.code === "42703" ||
-                /column\s+\"id\"\s+does\s+not\s+exist/i.test(
-                  res.error.message || ""
-                ))
-            ) {
+            if (res.error && (res.error.code === "42703" || /column\s+\"id\"\s+does\s+not\s+exist/i.test(res.error.message || ""))) {
               res = await supabase
                 .from("profiles")
                 .select("role")
@@ -198,20 +164,12 @@ if (
 
         const drvPromise = a.driver
           ? withTimeout(
-              supabase
-                .from("drivers")
-                .select("*")
-                .eq("user_id", userId)
-                .maybeSingle()
+              supabase.from("drivers").select("*").eq("user_id", userId).maybeSingle()
             ).catch(() => ({ data: null, error: null }))
           : Promise.resolve({ data: null, error: null });
 
         // Barcha so'rovlarni parallel yuborish
-        const [profileRes, appRes, drvRes] = await Promise.all([
-          profilePromise,
-          appPromise,
-          drvPromise,
-        ]);
+        const [profileRes, appRes, drvRes] = await Promise.all([profilePromise, appPromise, drvPromise]);
 
         // Profile
         let profileRole = null;
@@ -239,7 +197,8 @@ if (
           driverRowExists = true;
           approved = deriveDriverApproved(drvRes.data);
         }
-// 3) Derive effective role
+
+        // 3) Derive effective role
         // Role is always taken from profiles.role.
         // IMPORTANT: must be mutable because we may auto-create a profile below.
         let effectiveRole = profileRole;
@@ -248,15 +207,17 @@ if (
         if (!effectiveRole && a.client && !a.driver) {
           try {
             await withTimeout(
-              supabase.from("profiles").upsert(
-                {
-                  id: userId,
-                  role: "client",
-                  phone: session.user.phone ?? null,
-                  updated_at: new Date().toISOString(),
-                },
-                { onConflict: "id" }
-              )
+              supabase
+                .from("profiles")
+                .upsert(
+                  {
+                    id: userId,
+                    role: "client",
+                    phone: session.user.phone ?? null,
+                    updated_at: new Date().toISOString(),
+                  },
+                  { onConflict: "id" }
+                )
             );
           } catch {
             // ignore
@@ -267,11 +228,7 @@ if (
           effectiveRole = "client";
 
           const { data: p2 } = await withTimeout(
-            supabase
-              .from("profiles")
-              .select("role")
-              .eq("id", userId)
-              .maybeSingle()
+            supabase.from("profiles").select("role").eq("id", userId).maybeSingle()
           );
           if (p2?.role) {
             profileRole = p2.role;
@@ -281,23 +238,19 @@ if (
 
         // 5) Decide allow
         if (effectiveRole === "client") {
-          // IMPORTANT (policy for this project):
-          // A user may have a driver application, but we should NOT force them into driver flow.
-          // Driver routes are allowed only when app_mode="driver".
-          if (
-            appMode === "driver" &&
-            (applicationStatus === "pending" || applicationStatus === "approved")
-          ) {
-            if (location.pathname === "/driver/pending")
-              return finish(true, null);
+          // IMPORTANT:
+          // This project historically forgets to set profiles.role='driver'.
+          // If the user has a driver application (pending/approved), we must still
+          // allow driver routes (pending/home) instead of bouncing them back to client.
+          if (applicationStatus === "pending" || applicationStatus === "approved") {
+            if (location.pathname === "/driver/pending") return finish(true, null);
             if (location.pathname === "/driver/home") {
               // If driver row exists → allow; otherwise send to pending.
               if (driverRowExists) return finish(true, null);
               return finish(false, "driver-not-approved");
             }
             // Any other driver-only route should redirect to pending.
-            if (!!a.driver && !a.client)
-              return finish(false, "driver-not-approved");
+            if (!!a.driver && !a.client) return finish(false, "driver-not-approved");
           }
 
           if (!!a.client) return finish(true, null);
@@ -314,14 +267,9 @@ if (
           if (!a.driver) return finish(false, "driver-not-allowed");
 
           if (!driverRowExists) {
-            // Variant A: driver access is based on drivers row.
+            // Variant A: driver access is based on `drivers` row.
             // If application exists (pending/approved), keep user on pending instead of bouncing to register.
-            if (
-              applicationStatus &&
-              ["pending", "submitted", "waiting", "review", "approved"].includes(
-                applicationStatus
-              )
-            ) {
+            if (applicationStatus && ["pending", "submitted", "waiting", "review", "approved"].includes(applicationStatus)) {
               return finish(false, "driver-not-approved");
             }
             return finish(false, "driver-not-registered");
@@ -338,8 +286,7 @@ if (
         // No role at all
         // For driver routes: send to register. For others: login.
         if (a.driver && !a.client) {
-          if (applicationStatus === "pending")
-            return finish(false, "driver-not-approved");
+          if (applicationStatus === "pending") return finish(false, "driver-not-approved");
           return finish(false, "driver-not-registered");
         }
 
@@ -350,41 +297,26 @@ if (
       }
     };
 
-    run();return () => {
+    run();
+
+    return () => {
       mounted = false;
     };
-  }, [allowKey, location.pathname, appMode, wantsDriverPath]);
+  }, [allowKey, location.pathname]);
 
   if (loading) {
     return (
-      <div
-        style={{
-          minHeight: "60vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
+      <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <Spin size="large" />
       </div>
     );
   }
 
   if (!ok) {
-    if (reason === "driver-mode-off")
-      return <Navigate to="/client/home" replace />;
-    if (reason === "driver-not-approved")
-      return <Navigate to="/driver/pending" replace />;
-    if (reason === "driver-not-registered" || reason === "not-driver")
-      return <Navigate to="/driver/register" replace />;
+    if (reason === "driver-not-approved") return <Navigate to="/driver/pending" replace />;
+    if (reason === "driver-not-registered" || reason === "not-driver") return <Navigate to="/driver/register" replace />;
 
-    return (
-      <Navigate
-        to={redirectTo}
-        replace
-        state={{ from: location.pathname, reason }}
-      />
-    );
+    return <Navigate to={redirectTo} replace state={{ from: location.pathname, reason }} />;
   }
 
   return <>{children}</>;

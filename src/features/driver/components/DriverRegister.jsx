@@ -533,8 +533,21 @@ export default function DriverRegister() {
 
           <Row gutter={12}>
             <Col xs={24} md={8}>
-              <Button block disabled={step === 0 || loading} onClick={goBack}>
-                Orqaga
+              <Button 
+                block 
+                disabled={loading}
+                onClick={() => {
+                  if (step === 0) {
+                    // If on first step, go back to client/home
+                    try { localStorage.setItem("app_mode", "client"); } catch(e) {}
+                    navigate("/client/home", { replace: true });
+                  } else {
+                    // Otherwise go to previous step
+                    goBack();
+                  }
+                }}
+              >
+                {step === 0 ? "Orqaga" : "Orqaga"}
               </Button>
             </Col>
 
