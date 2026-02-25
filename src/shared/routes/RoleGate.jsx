@@ -164,7 +164,7 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
 
         const drvPromise = a.driver
           ? withTimeout(
-              supabase.from("drivers").select("*").eq("user_id", userId).maybeSingle()
+              supabase.from("drivers").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(1).maybeSingle()
             ).catch(() => ({ data: null, error: null }))
           : Promise.resolve({ data: null, error: null });
 
