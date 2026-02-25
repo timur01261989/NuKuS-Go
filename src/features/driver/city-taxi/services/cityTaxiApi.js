@@ -31,13 +31,31 @@ export const cityTaxiApi = {
     }
   },
 
-  async accept(id) {
-    const res = await api.post("/api/order", { action: "accept", id });
+  async accept(id, driver_id) {
+    let did = driver_id;
+    if (!did) {
+      try {
+        const { data } = await supabase.auth.getUser();
+        did = data?.user?.id || null;
+      } catch (e) {
+        did = null;
+      }
+    }
+    const res = await api.post("/api/offer", { action: "accept", order_id: id, driver_id: did });
     return pickData(res);
   },
 
-  async decline(id) {
-    const res = await api.post("/api/order", { action: "decline", id });
+  async decline(id, driver_id) {
+    let did = driver_id;
+    if (!did) {
+      try {
+        const { data } = await supabase.auth.getUser();
+        did = data?.user?.id || null;
+      } catch (e) {
+        did = null;
+      }
+    }
+    const res = await api.post("/api/offer", { action: "reject", order_id: id, driver_id: did });
     return pickData(res);
   },
 

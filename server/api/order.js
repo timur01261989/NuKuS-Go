@@ -445,11 +445,11 @@ async function createInterDistrict(req, res, body) {
       .single();
 
     if (error) {
-      return sendJson(res, 200, { created: false, warning: error.message, distance_km, duration_min, price });
+      return sendJson(res, 500, { ok: false, created: false, error: error.message, distance_km, duration_min, price });
     }
     return sendJson(res, 200, { created: true, id: data?.id, order: data });
   } catch (e) {
-    return sendJson(res, 200, { created: false, warning: e?.message || "insert failed", distance_km, duration_min, price });
+    return sendJson(res, 500, { ok: false, created: false, error: e?.message || "insert failed", distance_km, duration_min, price });
   }
 }
 
@@ -572,7 +572,6 @@ async function createTaxiOrder(req, res, body) {
     currency,
     requested_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-    created_at: new Date().toISOString(),
   };
 
   // Some projects also have service_type in the same table; keep it if present.
@@ -597,7 +596,7 @@ async function createTaxiOrder(req, res, body) {
   }
 
   if (!inserted) {
-    return sendJson(res, 500, {
+    return sendJson(res, 200, {
       created: false,
       warning: lastErr?.message || "insert failed",
       hint: "orders table ustunlari mos kelmayapti yoki RLS bloklayapti",
@@ -627,28 +626,6 @@ async function cancelTaxiOrder(req, res, body) {
 
   if (error) return sendJson(res, 500, { error: error.message });
   return sendJson(res, 200, { ok: true, order: data });
-}
-
-
-async function updateTaxiOrderStatus(req, res, body) {
-  const id = (body.id || body.order_id || body.orderId || body.orderID || "").toString();
-  const status = (body.status || body.order_status || body.to_status || body.newStatus || "").toString();
-  if (!id) return sendJson(res, 400, { error: "id/order_id/orderId shart" });
-  if (!status) return sendJson(res, 400, { error: "status shart" });
-
-  const payload = { status, updated_at: new Date().toISOString() };
-  const driver_id = body.driver_id || body.driverId || null;
-  if (driver_id) payload.driver_id = driver_id;
-
-  const { data, error } = await supabase
-    .from("orders")
-    .update(payload)
-    .eq("id", id)
-    .select("*")
-    .single();
-
-  if (error) return sendJson(res, 500, { error: error.message });
-  return sendJson(res, 200, { ok: true, success: true, order: data });
 }
 
 async function getTaxiOrder(req, res, body) {
@@ -686,6 +663,52 @@ async function activeTaxiOrder(req, res, body) {
 
 
 
+
+async function listAvailableTaxiOrders(req, res) {
+  try {
+    const driverUid = getAuthUid(req);
+    if (!driverUid) return sendJson(res, 401, { ok:false, error: "Auth kerak" });
+
+    // Offered orders for this driver (order_offers -> orders join)
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from("order_offers")
+      .select("order_id,status,expires_at,sent_at,orders(*)")
+      .or(`driver_id.eq.${driverUid},driver_user_id.eq.${driverUid}`)
+      .eq("status", "sent")
+      .or(`expires_at.is.null,expires_at.gt.${now}`);
+
+    if (error) return sendJson(res, 500, { ok:false, error: error.message });
+
+    const items = (data || [])
+      .map((r) => {
+        const o = r.orders || {};
+        return {
+          ...o,
+          offer_status: r.status,
+          offer_sent_at: r.sent_at,
+          offer_expires_at: r.expires_at,
+        };
+      })
+      // ensure unique by id
+      .filter((o) => o && o.id);
+
+    const seen = new Set();
+    const unique = [];
+    for (const o of items) {
+      const k = String(o.id);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      unique.push(o);
+    }
+
+    return sendJson(res, 200, unique);
+  } catch (e) {
+    return sendJson(res, 500, { ok:false, error: e?.message || "list_available failed" });
+  }
+}
+
+
 export default async function handler(req, res) {
   if (withCors(req, res)) return;
 
@@ -717,10 +740,7 @@ export default async function handler(req, res) {
       if (action === "cancel_taxi" || action === "cancel_order" || action === "cancel") {
         return await cancelTaxiOrder(req, res, body);
       }
-      
-      if (action === "update_status" || action === "set_status") return await updateTaxiOrderStatus(req, res, body);
-      if (action === "complete" || action === "finish") { body.status = "completed"; return await updateTaxiOrderStatus(req, res, body); }
-if (action === "get_taxi" || action === "get_order" || action === "get") {
+      if (action === "get_taxi" || action === "get_order" || action === "get") {
         return await getTaxiOrder(req, res, body);
       }
       if (action === "active_taxi" || action === "active") {
