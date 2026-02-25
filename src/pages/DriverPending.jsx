@@ -44,7 +44,7 @@ export default function DriverPending() {
       //    This prevents redirect loops where RoleGate checks `drivers` but this page checks something else.
       const { data: drvRow, error: drvErr } = await supabase
         .from("drivers")
-        .select("approved, status, updated_at")
+        .select("*")
         .eq("user_id", userId)
         .maybeSingle();
 
@@ -84,7 +84,7 @@ const appStatus = (typeof appRow?.status === "string" ? appRow.status.trim().toL
 
       // Decide final status for this page
       // Approved if role is driver OR app status is approved
-      const isApproved = isDriverApproved;
+      const isApproved = isDriverApproved || appStatus === "approved";
       const isRejected = appStatus === "rejected";
 
       if (isApproved) {
