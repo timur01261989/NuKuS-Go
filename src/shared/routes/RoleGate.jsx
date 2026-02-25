@@ -3,6 +3,33 @@ import { Navigate, useLocation } from "react-router-dom";
 import { Spin } from "antd";
 import { supabase } from "@/lib/supabase";
 
+// Shared helper: role → home route (exported for RootRedirect)
+// Keep it deterministic: only uses already-fetched records.
+export function pickHomeForRole({ role, driverRow, driverApplication }) {
+  const r = (role || "client").toLowerCase();
+
+  if (r === "admin") return "/admin";
+
+  if (r === "driver") {
+    const appStatus = (driverApplication?.status || "").toLowerCase();
+
+    const driverApproved =
+      !!driverRow &&
+      (
+        String(driverRow.status || "").toLowerCase() === "approved" ||
+        driverRow.is_approved === true ||
+        driverRow.approved === true
+      );
+
+    if (driverApproved) return "/driver";
+    if (appStatus === "approved") return "/driver";
+    if (appStatus === "rejected") return "/driver/register";
+    return "/driver/pending"; // pending/submitted/review/unknown
+  }
+
+  return "/client";
+}
+
 /**
  * RoleGate
  * allow:
