@@ -70,11 +70,18 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
   const [ok, setOk] = useState(false);
   const [reason, setReason] = useState(null);
 
-  const a = allow || {};
+  const allowKey = useMemo(() => {
+    const a = allow || {};
 
-  // IMPORTANT: `allow` is often passed as an inline object literal in routes.
-  // Using it directly as a dependency causes infinite re-check loops.
-  const allowKey = `${!!a.client}-${!!a.driver}-${!!a.requireDriverApproved}`;
+        // Driver routes are entered only when user explicitly switches to driver mode.
+        const appMode = (localStorage.getItem("app_mode") || "client").toLowerCase();
+        const wantsDriverPath = location.pathname.startsWith("/driver");
+    return JSON.stringify({
+      client: !!a.client,
+      driver: !!a.driver,
+      requireDriverApproved: !!a.requireDriverApproved,
+    });
+  }, [allow?.client, allow?.driver, allow?.requireDriverApproved]);
 
   const withTimeout = (promise, ms = 10000) =>
     Promise.race([
@@ -126,6 +133,11 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         if (!session) return finish(false, "no-session");
 
         const userId = session.user.id;
+
+        // If user is in client mode, do NOT allow /driver/* routes here.
+        if (wantsDriverPath && appMode !== "driver") {
+          return finish(false, "driver-mode-off");
+        }
 
         // 2) Parallel so'rovlar: profile + driver_applications + drivers (agar kerak bo'lsa)
         // Bu ketma-ket so'rovlar o'rniga parallel ishlaydi — ~2x tez
@@ -239,7 +251,7 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
           // This project historically forgets to set profiles.role='driver'.
           // If the user has a driver application (pending/approved), we must still
           // allow driver routes (pending/home) instead of bouncing them back to client.
-          if (applicationStatus === "pending" || applicationStatus === "approved") {
+          if (appMode === "driver" && (applicationStatus === "pending" || applicationStatus === "approved")) {
             if (location.pathname === "/driver/pending") return finish(true, null);
             if (location.pathname === "/driver/home") {
               // If driver row exists → allow; otherwise send to pending.
@@ -310,6 +322,7 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
   }
 
   if (!ok) {
+    if (reason === "driver-mode-off") return <Navigate to="/client/home" replace />;
     if (reason === "driver-not-approved") return <Navigate to="/driver/pending" replace />;
     if (reason === "driver-not-registered" || reason === "not-driver") return <Navigate to="/driver/register" replace />;
 

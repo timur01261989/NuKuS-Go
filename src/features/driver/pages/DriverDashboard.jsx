@@ -26,7 +26,7 @@ import {
   StopOutlined
 } from "@ant-design/icons";
 import { useLocation, useNavigate } from "react-router-dom";
-import { supabase } from "../../../lib/supabase"; 
+import { supabase } from "@/lib/supabase";
 import { useLanguage } from "../../../shared/i18n/useLanguage"; 
 import { startTracking } from "../components/services/locationService";
 import DriverHome from "../components/DriverHome";
@@ -50,7 +50,8 @@ export default function DriverDashboard() {
   useEffect(() => {
     let isMounted = true;
 
-    // RoleGate already enforces access. This gate is best-effort only and must NOT block UI.
+    // RoleGate already enforces driver access.
+    // This check is best-effort only and MUST NOT redirect (prevents loops).
     const withTimeout = (promise, ms = 8000) =>
       Promise.race([
         promise,
@@ -63,14 +64,10 @@ export default function DriverDashboard() {
         const { data: authData } = await withTimeout(supabase.auth.getUser());
         const userId = authData?.user?.id;
 
-        // If session is missing temporarily (hydration), do NOT redirect here.
-        // Let RoleGate handle real auth redirects.
-        if (!userId) return;
-
-        if (isMounted) setGateAllowed(true);
+        // If session is temporarily missing (hydration), don't redirect here.
+        if (isMounted) setGateAllowed(!!userId || true);
       } catch (e) {
-        // Do not redirect from here (prevents dashboard↔pending/login loops).
-        console.warn("Driver dashboard gate (non-blocking) warning:", e?.message || e);
+        console.warn("Driver dashboard gate warning:", e?.message || e);
       } finally {
         if (isMounted) setGateLoading(false);
       }
