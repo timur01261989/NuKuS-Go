@@ -73,8 +73,14 @@ export default function Auth() {
       if (error) throw error;
 
       message.success(t?.greeting || "Xush kelibsiz!");
-      // Navigate to RootRedirect (/) which will decide the correct destination
-      // based on app_mode and user's profile/driver status.
+      
+      // Default: app_mode ni "client" ga reset qil agar belgilanmagan bo'lsa
+      // Agar user haydovchi bo'lishni xohlasa, /driver-mode tugmasini bosganda app_mode="driver" bo'ladi
+      try { localStorage.setItem("app_mode", "client"); } catch(e) {}
+      
+      // RootRedirect (/) quyidagilni tekshiradi:
+      // - app_mode="client" → /client/home
+      // - app_mode="driver" → /driver/register, /driver/pending, yoki /driver/dashboard
       navigate("/", { replace: true });
     } catch {
       message.error("Telefon raqam yoki parol noto'g'ri!");
