@@ -1,81 +1,81 @@
-import React, { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Spin } from "antd";
-import { supabase } from "@/lib/supabase";
 
-/**
- * RootRedirect:
- *  - No session => /login
- *  - Session => role/status based landing
- *
- * Why this exists:
- *  In production, many users remain profiles.role='client' even after driver application is submitted/approved.
- *  If we always redirect to /client/home, drivers get pulled back to client pages right after login.
- */
+import { supabase } from "../services/supabaseClient";
+import { useSessionProfile } from "../shared/auth/useSessionProfile";
+import { pickHomeForRole } from "../shared/routes/roleRouting";
+
+// Single source of truth for "after login, where do we land?"
+// Key requirement for this project:
+// - If a user has a driver_application, we treat them as a driver flow (pending/approved) even if profiles.role was never set.
+// - We ALSO try to auto-fix profiles.role='driver' so protected /driver routes won't bounce them to client.
 export default function RootRedirect() {
-  const [loading, setLoading] = useState(true);
-  const [to, setTo] = useState("/login");
+  const navigate = useNavigate();
+  const didRun = useRef(false);
+
+  const { session, profile, driver, driverApp, loading, refetch } = useSessionProfile({
+    includeDriver: true,
+    includeApplication: true,
+  });
 
   useEffect(() => {
-    let mounted = true;
+    if (loading) return;
 
-    const run = async () => {
-      try {
-        const { data: s, error: sessionErr } = await supabase.auth.getSession();
-        if (sessionErr || !s?.session) {
-          if (!mounted) return;
-          setTo("/login");
-          setLoading(false);
+    // Prevent double navigation in React strict mode.
+    if (didRun.current) return;
+    didRun.current = true;
+
+    const go = async () => {
+      if (!session) {
+        navigate("/login", { replace: true });
+        return;
+      }
+
+      const role = profile?.role || "client";
+
+      // If driver application exists, force driver flow.
+      if (driverApp) {
+        // Attempt to fix role once (best-effort). If RLS blocks it, we still route using driverApp.
+        if (role !== "driver") {
+          try {
+            // Try both profiles.id and profiles.user_id schema patterns.
+            const uid = session.user.id;
+            let upd = await supabase.from("profiles").update({ role: "driver" }).eq("id", uid);
+            if (upd.error && /column\s+\"id\"\s+does\s+not\s+exist/i.test(upd.error.message || "")) {
+              upd = await supabase.from("profiles").update({ role: "driver" }).eq("user_id", uid);
+            }
+
+            // Refresh cached profile so RoleGate won't bounce.
+            await refetch();
+          } catch (e) {
+            console.warn("RootRedirect: failed to auto-set role=driver", e);
+          }
+        }
+
+        const status = (driverApp.status || "pending").toLowerCase();
+        const hasDriverRow = !!driver;
+
+        if (status === "approved" && hasDriverRow) {
+          navigate("/driver/home", { replace: true });
           return;
         }
 
-        const userId = s.session.user.id;
-
-        // Fetch profile role
-        const { data: profile } = await supabase.from("profiles").select("role").eq("id", userId).maybeSingle();
-        const role = profile?.role || "client";
-
-        // Fetch driver application status (used even when role is still 'client')
-        const { data: driverApp } = await supabase
-          .from("driver_applications")
-          .select("status")
-          .eq("user_id", userId)
-          .maybeSingle();
-        const status = driverApp?.status || null;
-
-        // Decide landing
-        if (role === "admin") {
-          setTo("/superpro");
-        } else if (status === "pending" || status === "submitted" || status === "waiting" || status === "review") {
-          setTo("/driver/pending");
-        } else if (status === "approved" || role === "driver") {
-          setTo("/driver/dashboard");
-        } else {
-          setTo("/client/home");
-        }
-
-        if (!mounted) return;
-        setLoading(false);
-      } catch {
-        if (!mounted) return;
-        setTo("/login");
-        setLoading(false);
+        // pending / approved-without-driver-row / rejected → pending screen
+        navigate("/driver/pending", { replace: true });
+        return;
       }
+
+      // No driver application: normal role routing
+      navigate(pickHomeForRole(role), { replace: true });
     };
 
-    run();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    go();
+  }, [loading, session, profile, driver, driverApp, navigate, refetch]);
 
-  if (loading) {
-    return (
-      <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <Spin size="large" />
-      </div>
-    );
-  }
-
-  return <Navigate to={to} replace />;
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "70vh" }}>
+      <Spin size="large" tip="Yuklanmoqda..." />
+    </div>
+  );
 }

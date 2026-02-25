@@ -89,23 +89,31 @@ export function useSessionProfile(options = {}) {
       }
 
       try {
-        // Profile (best-effort)
-        let { data: p, error: pErr } = await supabase
-          .from("profiles")
-          .select("role,is_admin,updated_at")
-          .eq("id", uid)
-          .maybeSingle();
+        // Profile (best-effort) — be resilient to schema differences.
+        // Some DBs don't have profiles.is_admin; some use profiles.user_id instead of profiles.id.
+        const selectWithKey = async (key, cols) => {
+          const res = await supabase.from("profiles").select(cols).eq(key, uid).maybeSingle();
+          return { data: res.data ?? null, error: res.error ?? null };
+        };
 
-        // Fallback: some schemas use profiles.user_id instead of profiles.id
-        if (pErr && (pErr.code === "42703" || /column\s+\"id\"\s+does\s+not\s+exist/i.test(pErr.message || ""))) {
-          const retry = await supabase
-            .from("profiles")
-            .select("role,is_admin,updated_at")
-            .eq("user_id", uid)
-            .maybeSingle();
-          p = retry.data;
-          pErr = retry.error;
+        // 1) Try id + role,is_admin
+        let { data: p, error: pErr } = await selectWithKey("id", "role,is_admin,updated_at");
+
+        // 2) If id column missing, retry user_id
+        if (pErr && /column\s+\"id\"\s+does\s+not\s+exist/i.test(pErr.message || "")) {
+          ({ data: p, error: pErr } = await selectWithKey("user_id", "role,is_admin,updated_at"));
         }
+
+        // 3) If is_admin column missing, retry without it (same key)
+        if (pErr && /column\s+\"is_admin\"\s+does\s+not\s+exist/i.test(pErr.message || "")) {
+          // try id first
+          ({ data: p, error: pErr } = await selectWithKey("id", "role,updated_at"));
+          if (pErr && /column\s+\"id\"\s+does\s+not\s+exist/i.test(pErr.message || "")) {
+            ({ data: p, error: pErr } = await selectWithKey("user_id", "role,updated_at"));
+          }
+        }
+
+        if (p && !p.role) p.role = "client";
 
         // Drivers row (Variant A, best-effort)
         let drv = null;

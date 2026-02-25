@@ -48,17 +48,18 @@ export default function ClientHome() {
         let avatarUrl = user.user_metadata?.avatar_url || "";
 
         try {
+          // Be resilient: some schemas don't have is_admin; some use user_id instead of id.
           let pRes = await supabase
             .from("profiles")
-            .select("role,is_admin")
+            .select("full_name,avatar_url,role")
             .eq("id", user.id)
             .maybeSingle();
 
           // Fallback: some schemas use profiles.user_id instead of profiles.id
-          if (pRes.error && (pRes.error.code === "42703" || /column\s+\"id\"\s+does\s+not\s+exist/i.test(pRes.error.message || ""))) {
+          if (pRes.error && /column\s+\"id\"\s+does\s+not\s+exist/i.test(pRes.error.message || "")) {
             pRes = await supabase
               .from("profiles")
-              .select("role,is_admin")
+              .select("full_name,avatar_url,role")
               .eq("user_id", user.id)
               .maybeSingle();
           }

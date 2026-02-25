@@ -204,17 +204,19 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
 
         // 5) Decide allow
         if (effectiveRole === "client") {
-          // If a client has a pending driver application, allow driver pending page,
-          // and redirect any driver-only pages to pending (prevents register<->pending loops).
-          if (applicationStatus === "pending") {
+          // IMPORTANT:
+          // This project historically forgets to set profiles.role='driver'.
+          // If the user has a driver application (pending/approved), we must still
+          // allow driver routes (pending/home) instead of bouncing them back to client.
+          if (applicationStatus === "pending" || applicationStatus === "approved") {
             if (location.pathname === "/driver/pending") return finish(true, null);
+            if (location.pathname === "/driver/home") {
+              // If driver row exists → allow; otherwise send to pending.
+              if (driverRowExists) return finish(true, null);
+              return finish(false, "driver-not-approved");
+            }
+            // Any other driver-only route should redirect to pending.
             if (!!a.driver && !a.client) return finish(false, "driver-not-approved");
-          }
-
-          // If driver application is approved, the profile role might still be 'client'.
-          // Allow driver routes (dashboard/orders/etc) in that case.
-          if (applicationStatus === "approved") {
-            if (!!a.driver && !a.client) return finish(true, null);
           }
 
           if (!!a.client) return finish(true, null);
