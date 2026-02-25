@@ -6,11 +6,11 @@ import { supabase } from "@/lib/supabase";
 /**
  * RootRedirect:
  *  - No session => /login
- *  - Session => /client/home (default).
+ *  - Session => role/status based landing
  *
- * NOTE:
- *  Even if user is a driver, they should still be able to stay on client side.
- *  Driver routes are accessed only when user explicitly navigates to /driver/*.
+ * Why this exists:
+ *  In production, many users remain profiles.role='client' even after driver application is submitted/approved.
+ *  If we always redirect to /client/home, drivers get pulled back to client pages right after login.
  */
 export default function RootRedirect() {
   const [loading, setLoading] = useState(true);
@@ -29,9 +29,30 @@ export default function RootRedirect() {
           return;
         }
 
-        // Default landing after login: client home.
-        // Driver dashboard is accessed only from explicit /driver/* navigation.
-        setTo("/client/home");
+        const userId = s.session.user.id;
+
+        // Fetch profile role
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", userId).maybeSingle();
+        const role = profile?.role || "client";
+
+        // Fetch driver application status (used even when role is still 'client')
+        const { data: driverApp } = await supabase
+          .from("driver_applications")
+          .select("status")
+          .eq("user_id", userId)
+          .maybeSingle();
+        const status = driverApp?.status || null;
+
+        // Decide landing
+        if (role === "admin") {
+          setTo("/superpro");
+        } else if (status === "pending" || status === "submitted" || status === "waiting" || status === "review") {
+          setTo("/driver/pending");
+        } else if (status === "approved" || role === "driver") {
+          setTo("/driver/dashboard");
+        } else {
+          setTo("/client/home");
+        }
 
         if (!mounted) return;
         setLoading(false);
