@@ -36,10 +36,14 @@ export default function DriverPending() {
         return;
       }
 
-      // NOTE: do not redirect just because hook `user` is not ready yet.
-      // We already confirmed authUser/userId above via supabase.auth.getUser().
+      if (!user) {
+        setLoading(false);
+        setChecking(false);
+        navigate("/login", { replace: true });
+        return;
+      }
 
-      // 2) Driver row is the SOURCE OF TRUTH for driver access (Variant A)
+            // 2) Driver row is the SOURCE OF TRUTH for driver access (Variant A)
       //    We ONLY redirect to dashboard when the drivers row is approved.
       //    This prevents redirect loops where RoleGate checks `drivers` but this page checks something else.
       const { data: drvRow, error: drvErr } = await supabase
@@ -80,7 +84,7 @@ export default function DriverPending() {
         }
       }
 
-const appStatus = (typeof appRow?.status === "string" ? appRow.status.trim().toLowerCase() : null);
+const appStatus = appRow?.status || null;
 
       // Decide final status for this page
       // Approved if role is driver OR app status is approved
@@ -149,11 +153,11 @@ const appStatus = (typeof appRow?.status === "string" ? appRow.status.trim().toL
         style={{
           width: "100%",
           maxWidth: 520,
-          background: "#111827",
+          background: "#1f2937",
           borderRadius: 16,
           padding: 18,
           boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
-          color: "#f9fafb",
+          color: "#111827",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
@@ -188,7 +192,7 @@ const appStatus = (typeof appRow?.status === "string" ? appRow.status.trim().toL
               borderRadius: 12,
               border: "none",
               background: "#374151",
-              color: "#f9fafb",
+              color: "#111827",
               cursor: "pointer",
               fontWeight: 600,
             }}
@@ -203,7 +207,7 @@ const appStatus = (typeof appRow?.status === "string" ? appRow.status.trim().toL
               borderRadius: 12,
               border: "none",
               background: "#e5e7eb",
-              color: "#f9fafb",
+              color: "#111827",
               cursor: "pointer",
               fontWeight: 700,
             }}

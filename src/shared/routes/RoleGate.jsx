@@ -237,6 +237,12 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         }
 
         // 5) Decide allow
+        // ⭐ CRITICAL: allowPending applies to ALL roles
+        // This is the /driver/pending route - allow immediately regardless of role
+        if (a.allowPending) {
+          return finish(true, null); // ✅ ALLOW /driver/pending FOR ANYONE WITH PENDING STATUS
+        }
+
         if (effectiveRole === "client") {
           // IMPORTANT:
           // This project historically forgets to set profiles.role='driver'.
