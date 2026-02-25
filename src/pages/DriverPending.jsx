@@ -1,33 +1,48 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-import { useSessionProfile } from "@shared/auth/useSessionProfile";
 
+/**
+ * DriverPending
+ *
+ * Project policy:
+ * - Pending page is shown when a user intentionally enters driver mode but is not yet approved.
+ * - Approval source of truth in THIS schema is driver_applications.status ('approved').
+ * - `drivers` table in this project stores live driver location/online data and may or may not have an approval field.
+ *
+ * Therefore:
+ * - If driver_applications.status === 'approved' -> go to /driver/dashboard (even if drivers row is missing).
+ * - If rejected -> show message and allow re-register.
+ * - If pending -> show pending UI.
+ */
 export default function DriverPending() {
   const navigate = useNavigate();
+
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState("pending"); // pending | approved | rejected | none
-  const [message, setMessage] = useState("");
   const [checking, setChecking] = useState(false);
 
-  const { loading: authLoading, user } = useSessionProfile({ includeDriver: true, includeApplication: true });
+  const [status, setStatus] = useState("pending"); // pending | approved | rejected | none
+  const [message, setMessage] = useState("");
 
-  const fetchDriverStatus = async () => {
+  const resetToClient = () => {
+    try {
+      localStorage.setItem("app_mode", "client");
+    } catch {}
+    navigate("/client/home", { replace: true });
+  };
+
+  const fetchStatus = async () => {
     if (checking) return;
     setChecking(true);
 
     try {
-      setMessage("");
-
-      // 1) Auth user (prefer hook)
-      const hookUser = user;
-      let authUser = hookUser;
-      if (!authUser) {
-        const { data: authData, error: authError } = await supabase.auth.getUser();
-        if (authError) console.error("Auth error:", authError);
-        authUser = authData?.user ?? null;
+      // 1) get user id
+      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      if (authErr) {
+        console.error("auth getUser error:", authErr);
       }
-      const userId = authUser?.id ?? null;
+      const userId = authData?.user?.id;
+
       if (!userId) {
         setStatus("none");
         setMessage("Login qiling.");
@@ -36,27 +51,10 @@ export default function DriverPending() {
         return;
       }
 
-      // NOTE: do not redirect just because hook `user` is not ready yet.
-      // We already confirmed authUser/userId above via supabase.auth.getUser().
-
-      // 2) Driver row is the SOURCE OF TRUTH for driver access (Variant A)
-      //    We ONLY redirect to dashboard when the drivers row is approved.
-      //    This prevents redirect loops where RoleGate checks `drivers` but this page checks something else.
-      const { data: drvRow, error: drvErr } = await supabase
-        .from("drivers")
-        .select("approved, status, updated_at")
-        .eq("user_id", userId)
-        .maybeSingle();
-
-      if (drvErr) {
-        console.error("drivers select error:", drvErr);
-      }
-
-      // 3) Check latest driver application status (for messaging ONLY)
-      //    (driver_applications row is created when user submits registration)
+      // 2) read latest application status (SOURCE OF TRUTH)
       const { data: appRow, error: appErr } = await supabase
         .from("driver_applications")
-        .select("id, status, created_at")
+        .select("id, status, created_at, updated_at, reviewed_at, rejection_reason")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -66,168 +64,146 @@ export default function DriverPending() {
         console.error("driver_applications select error:", appErr);
       }
 
-      // Derive approval from drivers row (schema supports `approved` boolean or `status` text)
-      let isDriverApproved = false;
-      if (drvRow) {
-        if (typeof drvRow.approved === "boolean") {
-          isDriverApproved = drvRow.approved;
-        } else if (typeof drvRow.status === "string") {
-          const s = drvRow.status.trim().toLowerCase();
-          isDriverApproved = ["approved", "active", "verified", "enabled", "ok"].includes(s);
-        } else {
-          // If schema has no explicit approval fields, treat existence as approved (legacy)
-          isDriverApproved = true;
-        }
-      }
+      const appStatus = String(appRow?.status || "pending").trim().toLowerCase();
 
-const appStatus = (typeof appRow?.status === "string" ? appRow.status.trim().toLowerCase() : null);
-
-      // Decide final status for this page
-      // Approved if role is driver OR app status is approved
-      const isApproved = isDriverApproved;
-      const isRejected = appStatus === "rejected";
-
-      if (isApproved) {
+      // 3) approved -> go dashboard immediately
+      if (appStatus === "approved") {
         setStatus("approved");
         setLoading(false);
         setChecking(false);
-
-        // Important: only redirect once we are sure approved,
-        // and let RoleGate / dashboard routes see the updated profile role.
         navigate("/driver/dashboard", { replace: true });
         return;
       }
 
-      if (isRejected) {
+      // 4) rejected -> show message
+      if (appStatus === "rejected") {
         setStatus("rejected");
-        setMessage("Arizangiz rad etilgan. Qayta ro‘yxatdan o‘ting.");
+        setMessage(appRow?.rejection_reason || "Arizangiz rad etilgan. Qayta ro‘yxatdan o‘ting.");
         setLoading(false);
         setChecking(false);
         return;
       }
 
-      if (!appRow) {
-        // User has no application yet
-        setStatus("none");
-        setMessage("Siz hali haydovchi arizasini yubormagansiz.");
-        setLoading(false);
-        setChecking(false);
-        return;
-      }
-
-      // Otherwise: still pending
+      // 5) pending / submitted / review -> pending UI
       setStatus("pending");
-      setMessage("");
+      setMessage("Arizangiz ko‘rib chiqilmoqda. Tasdiqlangandan keyin haydovchi rejimiga avtomatik kirasiz.");
       setLoading(false);
       setChecking(false);
     } catch (e) {
-      console.error("DriverPending error:", e);
-      setMessage("Xatolik yuz berdi. Keyinroq qayta urinib ko‘ring.");
+      console.error("DriverPending fetchStatus error:", e);
+      setStatus("pending");
+      setMessage("Xatolik yuz berdi. Qayta urinib ko‘ring.");
       setLoading(false);
       setChecking(false);
     }
   };
 
   useEffect(() => {
-    fetchDriverStatus();
-    const interval = setInterval(fetchDriverStatus, 3000);
-    return () => clearInterval(interval);
+    fetchStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Visible loading UI (avoid white-on-white)
   if (loading) {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f9fafb", color: "#111827" }}>
-        <div style={{ color: "#111827" }}>Yuklanmoqda...</div>
+      <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div
+          style={{
+            width: 420,
+            maxWidth: "92vw",
+            borderRadius: 16,
+            padding: 18,
+            background: "#111827",
+            color: "#f9fafb",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.18)",
+          }}
+        >
+          <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 8 }}>⏳ Tekshirilmoqda...</div>
+          <div style={{ opacity: 0.9, fontSize: 13 }}>Iltimos, bir oz kuting.</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, background: "#f9fafb", color: "#111827" }}>
+    <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div
         style={{
-          width: "100%",
-          maxWidth: 520,
-          background: "#111827",
+          width: 520,
+          maxWidth: "92vw",
           borderRadius: 16,
           padding: 18,
-          boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
+          background: "#111827",
           color: "#f9fafb",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.18)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
           <span style={{ fontSize: 18 }}>⏳</span>
-          <h2 style={{ margin: 0, fontSize: 18, letterSpacing: 0.2 }}>HAYDOVCHI TASDIQLANMAGAN</h2>
-        </div>
-
-        <p style={{ marginTop: 8, marginBottom: 14, opacity: 0.9, lineHeight: 1.35 }}>
-          Sizning haydovchi profilingiz tekshiruvda. Tasdiqlangandan keyin haydovchi rejimga avtomatik kirish amalga oshadi.
-        </p>
-
-        {message ? (
-          <div
-            style={{
-              background: "rgba(255,255,255,0.06)",
-              border: "1px solid rgba(255,255,255,0.12)",
-              padding: 10,
-              borderRadius: 12,
-              marginBottom: 12,
-              fontSize: 14,
-            }}
-          >
-            {message}
+          <div style={{ fontWeight: 800, fontSize: 16 }}>
+            {status === "rejected" ? "HAYDOVCHI RAD ETILGAN" : "HAYDOVCHI TASDIQLANMAGAN"}
           </div>
-        ) : null}
-
-        <div style={{ display: "grid", gap: 10 }}>
-          <button
-            onClick={fetchDriverStatus}
-            style={{
-              height: 42,
-              borderRadius: 12,
-              border: "none",
-              background: "#374151",
-              color: "#f9fafb",
-              cursor: "pointer",
-              fontWeight: 600,
-            }}
-          >
-            QAYTA TEKSHIR
-          </button>
-
-          <button
-            onClick={() => { try { localStorage.setItem("app_mode","client"); } catch(e) {} navigate("/client/home", { replace: true }); }}
-            style={{
-              height: 42,
-              borderRadius: 12,
-              border: "none",
-              background: "#e5e7eb",
-              color: "#f9fafb",
-              cursor: "pointer",
-              fontWeight: 700,
-            }}
-          >
-            YO‘LOVCHI REJIMGA QAYTISH
-          </button>
-
-          {status === "none" ? (
-            <button
-              onClick={() => navigate("/driver/register", { replace: true })}
-              style={{
-                height: 42,
-                borderRadius: 12,
-                border: "none",
-                background: "#60a5fa",
-                color: "#0b1220",
-                cursor: "pointer",
-                fontWeight: 800,
-              }}
-            >
-              HAYDOVCHI ARIZASINI YUBORISH
-            </button>
-          ) : null}
         </div>
+
+        <div style={{ fontSize: 13, opacity: 0.92, lineHeight: 1.35, marginBottom: 12 }}>
+          {message ||
+            "Sizning haydovchi profilingiz tekshirilmoqda. Tasdiqlangandan keyin haydovchi rejimiga avtomatik kirish amalga oshadi."}
+        </div>
+
+        <button
+          onClick={fetchStatus}
+          disabled={checking}
+          style={{
+            width: "100%",
+            height: 42,
+            borderRadius: 12,
+            border: "none",
+            cursor: checking ? "not-allowed" : "pointer",
+            background: "#2563eb",
+            color: "#ffffff",
+            fontWeight: 800,
+            letterSpacing: 0.3,
+            marginBottom: 10,
+            opacity: checking ? 0.7 : 1,
+          }}
+        >
+          {checking ? "TEKSHIRILMOQDA..." : "QAYTA TEKSHIR"}
+        </button>
+
+        <button
+          onClick={resetToClient}
+          style={{
+            width: "100%",
+            height: 42,
+            borderRadius: 12,
+            border: "none",
+            cursor: "pointer",
+            background: "#e5e7eb",
+            color: "#111827",
+            fontWeight: 800,
+          }}
+        >
+          YO‘LOVCHI REJIMGA QAYTISH
+        </button>
+
+        {status === "rejected" ? (
+          <button
+            onClick={() => navigate("/driver/register", { replace: true })}
+            style={{
+              width: "100%",
+              height: 42,
+              borderRadius: 12,
+              border: "none",
+              cursor: "pointer",
+              background: "#60a5fa",
+              color: "#0b1220",
+              fontWeight: 800,
+              marginTop: 10,
+            }}
+          >
+            QAYTA RO‘YXATDAN O‘TISH
+          </button>
+        ) : null}
       </div>
     </div>
   );
