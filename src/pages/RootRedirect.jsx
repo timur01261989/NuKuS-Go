@@ -43,9 +43,18 @@ export default function RootRedirect() {
         return;
       }
 
-      // Driver mode requested:
-      // We need profiles.role="driver" for protected driver routes.
+      // Driver mode requested, but check if user has actual driver records
       let role = (profile?.role || "client").toLowerCase();
+
+      // ⭐ YANADA SODDA & ISHONCHLI:
+      // Agar user hali driver arizasini yubormagan bo'lsa (driverApp yo'q, driver yo'q),
+      // app_mode="driver" ni IGNORE qilib client home ga ketamiz.
+      // Bu prevent qiladi shunga: localStorage da qadim "driver" qolgan → login → pending deb xato yo'nat
+      if (role !== "driver" && !driverApp && !driver) {
+        // User hali driver nomzod emas, app_mode ni ignore qil
+        navigate("/client/home", { replace: true });
+        return;
+      }
 
       // If user is not a driver yet, take them to registration.
       // (Approved drivers will have role="driver" already or we auto-fix below.)
