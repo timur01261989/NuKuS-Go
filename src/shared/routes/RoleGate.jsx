@@ -262,14 +262,19 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         }
 
         if (effectiveRole === "driver") {
-          // Drivers should still be allowed to open client pages.
+          // ⭐ FIRST CHECK: If route allows BOTH client and driver, 
+          // ALWAYS allow (even pending drivers on client routes)
+          if (a.driver && a.client) {
+            return finish(true, null); // ✅ ALLOW PENDING ON CLIENT ROUTES
+          }
+
+          // Drivers should still be allowed to open client-only pages.
           if (!a.driver && a.client) return finish(true, null);
           if (!a.driver) return finish(false, "driver-not-allowed");
 
-          // ⭐ CRITICAL FIX: If route allows BOTH client and driver, 
-          // ALWAYS allow pending drivers to access
-          if (a.driver && a.client) {
-            return finish(true, null);
+          // ⭐ EXPLICIT: If still pending and accessing /client/home, allow
+          if (applicationStatus === "pending" && a.client) {
+            return finish(true, null); // ✅ ALLOW PENDING DRIVERS ON CLIENT ROUTES
           }
 
           if (!driverRowExists) {
