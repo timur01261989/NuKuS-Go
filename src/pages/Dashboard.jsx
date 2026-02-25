@@ -91,7 +91,7 @@ export default function Dashboard() {
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) navigate("/");
+      if (!session) navigate("/login");
     };
     checkSession();
 
@@ -110,7 +110,7 @@ export default function Dashboard() {
   const logout = async () => {
     await supabase.auth.signOut();
     message.success(t.loggedOut);
-    navigate("/");
+    navigate("/login");
   };
 
   const menuItems = [
