@@ -2,7 +2,7 @@ import { json, badRequest, serverError, nowIso } from '../_shared/cors.js';
 import { getSupabaseAdmin } from '../_shared/supabase.js';
 
 function normalizeDriverId(body) {
-  return String(body.driver_id || body.driver_user_id || '').trim();
+  return String(body.driver_id || body.driver_id || '').trim();
 }
 
 
@@ -47,7 +47,7 @@ export async function offer_respond_handler(req, res) {
     const { data: off, error: oe } = await sb.from('order_offers')
       .update({ status, responded_at: nowIso() })
       .eq('order_id', order_id)
-      .or(`driver_id.eq.${driver_id},driver_user_id.eq.${driver_id}`)
+      .or(`driver_id.eq.${driver_id},driver_id.eq.${driver_id}`)
       .select('*')
       .single();
     if (oe) throw oe;

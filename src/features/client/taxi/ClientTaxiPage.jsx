@@ -713,16 +713,6 @@ export default function ClientTaxiPage() {
 
       setOrderId(String(id));
       localStorage.setItem("activeOrderId", String(id));
-
-      // Backend dispatch: order_offers yaratish (driver realtime uchun)
-      try {
-        // eslint-disable-next-line no-await-in-loop
-        await api.post("/api/dispatch", { order_id: String(id) });
-      } catch (e) {
-        // dispatch yiqilsa ham client flow davom etadi (fallback polling/cron)
-        console.warn("Dispatch error:", e);
-      }
-
       setOrderStatus("searching");
       setStep("searching");
       speak("Haydovchi qidirilmoqda");
