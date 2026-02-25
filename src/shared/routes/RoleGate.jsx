@@ -77,7 +77,7 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
       driver: !!a.driver,
       requireDriverApproved: !!a.requireDriverApproved,
     });
-  }, [allow]);
+  }, [allow?.client, allow?.driver, allow?.requireDriverApproved]);
 
   const withTimeout = (promise, ms = 10000) =>
     Promise.race([
