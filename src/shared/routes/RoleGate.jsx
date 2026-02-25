@@ -77,11 +77,7 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
       driver: !!a.driver,
       requireDriverApproved: !!a.requireDriverApproved,
     });
-  }, [
-    !!(allow && allow.client),
-    !!(allow && allow.driver),
-    !!(allow && allow.requireDriverApproved),
-  ]);
+  }, [allow]);
 
   const withTimeout = (promise, ms = 10000) =>
     Promise.race([
@@ -133,8 +129,6 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         if (!session) return finish(false, "no-session");
 
         const userId = session.user.id;
-
-        const appMode = (localStorage.getItem("app_mode") || "client").toLowerCase();
 
         // 2) Parallel so'rovlar: profile + driver_applications + drivers (agar kerak bo'lsa)
         // Bu ketma-ket so'rovlar o'rniga parallel ishlaydi — ~2x tez
@@ -245,9 +239,10 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         // 5) Decide allow
         if (effectiveRole === "client") {
           // IMPORTANT:
-          // Having a driver application must NOT force the user into driver flow.
-          // Driver flow is entered only when app_mode="driver".
-          if (appMode === "driver" && (applicationStatus === "pending" || applicationStatus === "approved")) {
+          // This project historically forgets to set profiles.role='driver'.
+          // If the user has a driver application (pending/approved), we must still
+          // allow driver routes (pending/home) instead of bouncing them back to client.
+          if (applicationStatus === "pending" || applicationStatus === "approved") {
             if (location.pathname === "/driver/pending") return finish(true, null);
             if (location.pathname === "/driver/home") {
               // If driver row exists → allow; otherwise send to pending.
@@ -267,15 +262,35 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         }
 
         if (effectiveRole === "driver") {
-          // Drivers should still be allowed to open client pages.
+          // ⭐ CRITICAL: allowPending takes PRIORITY
+          // This is for /driver/pending route - allow ALL pending drivers
+          if (a.allowPending) {
+            return finish(true, null); // ✅ ALLOW PENDING DRIVERS ON /driver/pending
+          }
+
+          // ⭐ FIRST CHECK: If route allows BOTH client and driver, 
+          // ALWAYS allow (even pending drivers on client routes)
+          if (a.driver && a.client) {
+            return finish(true, null); // ✅ ALLOW PENDING ON CLIENT ROUTES
+          }
+
+          // Drivers should still be allowed to open client-only pages.
           if (!a.driver && a.client) return finish(true, null);
           if (!a.driver) return finish(false, "driver-not-allowed");
 
+          // ⭐ EXPLICIT: If still pending and accessing /client/home, allow
+          if (applicationStatus === "pending" && a.client) {
+            return finish(true, null); // ✅ ALLOW PENDING DRIVERS ON CLIENT ROUTES
+          }
+
           if (!driverRowExists) {
             // Variant A: driver access is based on `drivers` row.
-            // If application exists (pending/approved), keep user on pending instead of bouncing to register.
             if (applicationStatus && ["pending", "submitted", "waiting", "review", "approved"].includes(applicationStatus)) {
-              return finish(false, "driver-not-approved");
+              // If route is driver-only and they're pending, deny
+              if (a.driver && !a.client) {
+                return finish(false, "driver-not-approved");
+              }
+              // Route allows both would have been caught above
             }
             return finish(false, "driver-not-registered");
           }
