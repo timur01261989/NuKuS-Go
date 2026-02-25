@@ -70,14 +70,11 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
   const [ok, setOk] = useState(false);
   const [reason, setReason] = useState(null);
 
-  const allowKey = useMemo(() => {
-    const a = allow || {};
-    return JSON.stringify({
-      client: !!a.client,
-      driver: !!a.driver,
-      requireDriverApproved: !!a.requireDriverApproved,
-    });
-  }, [allow?.client, allow?.driver, allow?.requireDriverApproved]);
+  const a = allow || {};
+
+  // IMPORTANT: `allow` is often passed as an inline object literal in routes.
+  // Using it directly as a dependency causes infinite re-check loops.
+  const allowKey = `${!!a.client}-${!!a.driver}-${!!a.requireDriverApproved}`;
 
   const withTimeout = (promise, ms = 10000) =>
     Promise.race([
@@ -164,7 +161,7 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
 
         const drvPromise = a.driver
           ? withTimeout(
-              supabase.from("drivers").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(1).maybeSingle()
+              supabase.from("drivers").select("*").eq("user_id", userId).maybeSingle()
             ).catch(() => ({ data: null, error: null }))
           : Promise.resolve({ data: null, error: null });
 
@@ -262,35 +259,15 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         }
 
         if (effectiveRole === "driver") {
-          // ⭐ CRITICAL: allowPending takes PRIORITY
-          // This is for /driver/pending route - allow ALL pending drivers
-          if (a.allowPending) {
-            return finish(true, null); // ✅ ALLOW PENDING DRIVERS ON /driver/pending
-          }
-
-          // ⭐ FIRST CHECK: If route allows BOTH client and driver, 
-          // ALWAYS allow (even pending drivers on client routes)
-          if (a.driver && a.client) {
-            return finish(true, null); // ✅ ALLOW PENDING ON CLIENT ROUTES
-          }
-
-          // Drivers should still be allowed to open client-only pages.
+          // Drivers should still be allowed to open client pages.
           if (!a.driver && a.client) return finish(true, null);
           if (!a.driver) return finish(false, "driver-not-allowed");
 
-          // ⭐ EXPLICIT: If still pending and accessing /client/home, allow
-          if (applicationStatus === "pending" && a.client) {
-            return finish(true, null); // ✅ ALLOW PENDING DRIVERS ON CLIENT ROUTES
-          }
-
           if (!driverRowExists) {
             // Variant A: driver access is based on `drivers` row.
+            // If application exists (pending/approved), keep user on pending instead of bouncing to register.
             if (applicationStatus && ["pending", "submitted", "waiting", "review", "approved"].includes(applicationStatus)) {
-              // If route is driver-only and they're pending, deny
-              if (a.driver && !a.client) {
-                return finish(false, "driver-not-approved");
-              }
-              // Route allows both would have been caught above
+              return finish(false, "driver-not-approved");
             }
             return finish(false, "driver-not-registered");
           }
