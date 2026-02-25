@@ -262,6 +262,12 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         }
 
         if (effectiveRole === "driver") {
+          // ⭐ CRITICAL: allowPending takes PRIORITY
+          // This is for /driver/pending route - allow ALL pending drivers
+          if (a.allowPending) {
+            return finish(true, null); // ✅ ALLOW PENDING DRIVERS ON /driver/pending
+          }
+
           // ⭐ FIRST CHECK: If route allows BOTH client and driver, 
           // ALWAYS allow (even pending drivers on client routes)
           if (a.driver && a.client) {

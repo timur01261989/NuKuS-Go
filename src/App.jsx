@@ -175,7 +175,7 @@ export default function App() {
               <Route
                 path="/driver/pending"
                 element={
-                  <RoleGate allow={{ client: false, driver: true, requireDriverApproved: false }}>
+                  <RoleGate allow={{ client: false, driver: true, requireDriverApproved: false, allowPending: true }}>
                     <DriverPending />
                   </RoleGate>
                 }
