@@ -120,7 +120,6 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
 
   useEffect(() => {
     let mounted = true;
-
 const finish = (nextOk, nextReason = null) => {
       if (!mounted) return;
       setOk(nextOk);
@@ -240,7 +239,6 @@ const finish = (nextOk, nextReason = null) => {
         let effectiveRole = profileRole;
 
         // 4) Auto-create client profile if accessing client-only route and profile missing
-
 if (!effectiveRole && a.client && !a.driver) {
           try {
             await withTimeout(
@@ -352,7 +350,6 @@ if (!effectiveRole && a.client && !a.driver) {
       mounted = false;
     };
   }, [allowKey, location.pathname, appMode, wantsDriverPath]);
-
 if (loading) {
     return (
       <div
