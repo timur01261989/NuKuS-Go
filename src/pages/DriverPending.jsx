@@ -35,14 +35,6 @@ export default function DriverPending() {
         setChecking(false);
         return;
       }
-
-      if (!user) {
-        setLoading(false);
-        setChecking(false);
-        navigate("/login", { replace: true });
-        return;
-      }
-
             // 2) Driver row is the SOURCE OF TRUTH for driver access (Variant A)
       //    We ONLY redirect to dashboard when the drivers row is approved.
       //    This prevents redirect loops where RoleGate checks `drivers` but this page checks something else.
@@ -84,7 +76,7 @@ export default function DriverPending() {
         }
       }
 
-const appStatus = appRow?.status || null;
+const appStatus = (appRow?.status ? String(appRow.status).trim().toLowerCase() : null);
 
       // Decide final status for this page
       // Approved if role is driver OR app status is approved
@@ -142,8 +134,24 @@ const appStatus = appRow?.status || null;
 
   if (loading) {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ color: "#fff" }}>Yuklanmoqda...</div>
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f5f5f5",
+          padding: 16,
+        }}
+      >
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 16, color: "#111827", marginBottom: 8 }}>
+            Yuklanmoqda...
+          </div>
+          <div style={{ fontSize: 12, color: "#6b7280" }}>
+            Agar 5 soniyadan ko‘p tursa, Console’da xatolik bor.
+          </div>
+        </div>
       </div>
     );
   }
