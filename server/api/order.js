@@ -572,6 +572,7 @@ async function createTaxiOrder(req, res, body) {
     currency,
     requested_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
   };
 
   // Some projects also have service_type in the same table; keep it if present.
@@ -596,7 +597,7 @@ async function createTaxiOrder(req, res, body) {
   }
 
   if (!inserted) {
-    return sendJson(res, 200, {
+    return sendJson(res, 500, {
       created: false,
       warning: lastErr?.message || "insert failed",
       hint: "orders table ustunlari mos kelmayapti yoki RLS bloklayapti",
@@ -626,6 +627,28 @@ async function cancelTaxiOrder(req, res, body) {
 
   if (error) return sendJson(res, 500, { error: error.message });
   return sendJson(res, 200, { ok: true, order: data });
+}
+
+
+async function updateTaxiOrderStatus(req, res, body) {
+  const id = (body.id || body.order_id || body.orderId || body.orderID || "").toString();
+  const status = (body.status || body.order_status || body.to_status || body.newStatus || "").toString();
+  if (!id) return sendJson(res, 400, { error: "id/order_id/orderId shart" });
+  if (!status) return sendJson(res, 400, { error: "status shart" });
+
+  const payload = { status, updated_at: new Date().toISOString() };
+  const driver_id = body.driver_id || body.driverId || null;
+  if (driver_id) payload.driver_id = driver_id;
+
+  const { data, error } = await supabase
+    .from("orders")
+    .update(payload)
+    .eq("id", id)
+    .select("*")
+    .single();
+
+  if (error) return sendJson(res, 500, { error: error.message });
+  return sendJson(res, 200, { ok: true, success: true, order: data });
 }
 
 async function getTaxiOrder(req, res, body) {
@@ -694,7 +717,10 @@ export default async function handler(req, res) {
       if (action === "cancel_taxi" || action === "cancel_order" || action === "cancel") {
         return await cancelTaxiOrder(req, res, body);
       }
-      if (action === "get_taxi" || action === "get_order" || action === "get") {
+      
+      if (action === "update_status" || action === "set_status") return await updateTaxiOrderStatus(req, res, body);
+      if (action === "complete" || action === "finish") { body.status = "completed"; return await updateTaxiOrderStatus(req, res, body); }
+if (action === "get_taxi" || action === "get_order" || action === "get") {
         return await getTaxiOrder(req, res, body);
       }
       if (action === "active_taxi" || action === "active") {

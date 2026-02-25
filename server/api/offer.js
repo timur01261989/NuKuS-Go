@@ -1,6 +1,26 @@
 import { json, badRequest, serverError, nowIso } from '../_shared/cors.js';
 import { getSupabaseAdmin } from '../_shared/supabase.js';
 
+
+function getAuthUid(req) {
+  try {
+    const auth = req.headers?.authorization || req.headers?.Authorization;
+    if (!auth || typeof auth !== "string") return null;
+    const m = auth.match(/Bearer\s+(.+)/i);
+    if (!m) return null;
+    const token = m[1].trim();
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const payloadB64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const pad = "=".repeat((4 - (payloadB64.length % 4)) % 4);
+    const payloadJson = Buffer.from(payloadB64 + pad, "base64").toString("utf-8");
+    const payload = JSON.parse(payloadJson);
+    return payload?.sub || payload?.user_id || payload?.id || null;
+  } catch {
+    return null;
+  }
+}
+
 function normalizeDriverId(body) {
   return String(body.driver_id || body.driver_id || '').trim();
 }
@@ -32,17 +52,18 @@ export async function offer_respond_handler(req, res) {
     if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Method not allowed' });
     const body = typeof req.body === 'string' ? JSON.parse(req.body||'{}') : (req.body||{});
 
-    const order_id = String(body.order_id||'').trim();
-    const driver_id = normalizeDriverId(body);
+    const order_id = String(body.order_id || body.orderId || body.id || '').trim();
+    const driver_id = normalizeDriverId(body) || String(getAuthUid(req) || '').trim();
     const action = String(body.action||'').trim();
 
     if (!order_id) return badRequest(res, 'order_id kerak');
     if (!driver_id) return badRequest(res, 'driver_id kerak');
-    if (!['accept','reject'].includes(action)) return badRequest(res, 'action accept|reject');
+    const act = action === 'decline' ? 'reject' : action;
+    if (!['accept','reject'].includes(act)) return badRequest(res, 'action accept|reject');
     if (!hasSupabaseEnv()) return serverError(res, 'SUPABASE_URL va service role key (SUPABASE_SERVICE_ROLE_KEY) server envda yo\'q');
 
     const sb = getSupabaseAdmin();
-    const status = action === 'accept' ? 'accepted' : 'rejected';
+    const status = act === 'accept' ? 'accepted' : 'rejected';
 
     const { data: off, error: oe } = await sb.from('order_offers')
       .update({ status, responded_at: nowIso() })
@@ -52,7 +73,7 @@ export async function offer_respond_handler(req, res) {
       .single();
     if (oe) throw oe;
 
-    if (action === 'accept') {
+    if (act === 'accept') {
       const { data: od, error: uerr } = await sb.from('orders')
         .update({ driver_id: driver_id, status:'accepted', accepted_at: nowIso() })
         .eq('id', order_id)
