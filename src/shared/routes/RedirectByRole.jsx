@@ -1,37 +1,43 @@
-import React, { useMemo } from "react";
+import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Spin } from "antd";
-
 import { useSessionProfile } from "@shared/auth/useSessionProfile";
-import { pickHomeForRole } from "@shared/routes/RoleGate";
+import { pickHomeForRole } from "./RoleGate";
 
 /**
  * RedirectByRole
- * Kechki legacy komponent: hozir asosan "/" uchun ishlatilgan.
- * RootRedirect bilan bir xil qoidaga bo'ysunadi (single source of truth).
+ * Legacy root redirect helper.
+ *
+ * IMPORTANT: it must not create its own truth table.
+ * It defers to pickHomeForRole (same logic used by RootRedirect/RoleGate),
+ * which also respects persisted app_mode ("client" vs "driver").
  */
 export default function RedirectByRole() {
-  const { loading, session, role, isAdmin, driverRow, application } = useSessionProfile({
+  const [target, setTarget] = useState(null);
+
+  const { loading, session, profile, driverRow, application } = useSessionProfile({
     includeDriver: true,
     includeApplication: true,
   });
 
-  const target = useMemo(() => {
-    if (!session) return "/login";
+  useEffect(() => {
+    if (loading) return;
 
-    let r = (role || "client").toLowerCase();
-    if (isAdmin) r = "admin";
+    if (!session) {
+      setTarget("/login");
+      return;
+    }
 
-    return pickHomeForRole({ role: r, driverRow, driverApplication: application });
-  }, [session, role, isAdmin, driverRow, application]);
+    const role = profile?.role || "client";
 
-  if (loading) {
-    return (
-      <div style={{ minHeight: "40vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <Spin size="large" />
-      </div>
-    );
-  }
+    const home = pickHomeForRole({
+      role,
+      driverRow,
+      driverApplication: application,
+    });
 
+    setTarget(home);
+  }, [loading, session, profile, driverRow, application]);
+
+  if (loading || !target) return null;
   return <Navigate to={target} replace />;
 }

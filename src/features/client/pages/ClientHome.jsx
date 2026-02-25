@@ -316,9 +316,10 @@ export default function ClientHome() {
             style={{ height: 44, borderRadius: 12, textAlign: "left" }}
             onClick={() => {
               close();
-              navigate("/driver/dashboard", { 
+              try { window.localStorage?.setItem("app_mode", "driver"); } catch {}
+              navigate("/driver-mode", {
                 replace: true,
-                state: { from: location.pathname }
+                state: { from: location.pathname },
               });
             }}
           >

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useAuthOptional } from "./AuthProvider";
 
 /**
  * useSessionProfile
@@ -26,6 +27,10 @@ export function useSessionProfile(options = {}) {
   const [application, setApplication] = useState(null);
 
   const mountedRef = useRef(true);
+
+  const auth = useAuthOptional();
+  const externalSession = auth?.session ?? null;
+  const externalReady = auth ? auth.authReady : false;
 
   const user = session?.user ?? null;
   const userId = user?.id ?? null;
@@ -60,26 +65,23 @@ export function useSessionProfile(options = {}) {
   useEffect(() => {
     mountedRef.current = true;
 
-    if (!supabase) {
-      setLoading(false);
-      return () => {
-        mountedRef.current = false;
-      };
-    }
+    let alive = true;
 
     const setSafe = (fn) => {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || !alive) return;
       fn();
     };
 
     const fetchAll = async (nextSession) => {
-      setSafe(() => setLoading(true));
+      setSafe(() => {
+        setSession(nextSession ?? null);
+        setLoading(true);
+      });
 
       const uid = nextSession?.user?.id ?? null;
 
       if (!uid) {
         setSafe(() => {
-          setSession(nextSession ?? null);
           setProfile(null);
           setDriverRow(null);
           setApplication(null);
@@ -89,70 +91,54 @@ export function useSessionProfile(options = {}) {
       }
 
       try {
-        // Profile (best-effort) — be resilient to schema differences.
-        // Some DBs don't have profiles.is_admin; some use profiles.user_id instead of profiles.id.
-        const selectWithKey = async (key, cols) => {
-          const res = await supabase.from("profiles").select(cols).eq(key, uid).maybeSingle();
-          return { data: res.data ?? null, error: res.error ?? null };
-        };
+        const [profRes, drvRes, appRes] = await Promise.all([
+          supabase.from("profiles").select("*").eq("user_id", uid).maybeSingle(),
+          includeDriver
+            ? supabase.from("drivers").select("*").eq("user_id", uid).maybeSingle()
+            : Promise.resolve({ data: null, error: null }),
+          includeApplication
+            ? supabase
+                .from("driver_applications")
+                .select("*")
+                .eq("user_id", uid)
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle()
+            : Promise.resolve({ data: null, error: null }),
+        ]);
 
-        // 1) Try id + role,is_admin
-        let { data: p, error: pErr } = await selectWithKey("id", "role,is_admin,updated_at");
-
-        // 2) If id column missing, retry user_id
-        if (pErr && /column\s+\"id\"\s+does\s+not\s+exist/i.test(pErr.message || "")) {
-          ({ data: p, error: pErr } = await selectWithKey("user_id", "role,is_admin,updated_at"));
-        }
-
-        // 3) If is_admin column missing, retry without it (same key)
-        if (pErr && /column\s+\"is_admin\"\s+does\s+not\s+exist/i.test(pErr.message || "")) {
-          // try id first
-          ({ data: p, error: pErr } = await selectWithKey("id", "role,updated_at"));
-          if (pErr && /column\s+\"id\"\s+does\s+not\s+exist/i.test(pErr.message || "")) {
-            ({ data: p, error: pErr } = await selectWithKey("user_id", "role,updated_at"));
-          }
-        }
-
-        if (p && !p.role) p.role = "client";
-
-        // Drivers row (Variant A, best-effort)
-        let drv = null;
-        if (includeDriver) {
-          const { data: d, error: dErr } = await supabase.from("drivers").select("*").eq("user_id", uid).maybeSingle();
-          if (!dErr) drv = d ?? null;
-        }
-
-        // Latest application status (best-effort)
-        let app = null;
-        if (includeApplication) {
-          const { data: a, error: aErr } = await supabase
-            .from("driver_applications")
-            .select("status,created_at,updated_at")
-            .eq("user_id", uid)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          if (!aErr) app = a ?? null;
-        }
+        if (profRes?.error) console.error("profiles select error:", profRes.error);
+        if (drvRes?.error) console.error("drivers select error:", drvRes.error);
+        if (appRes?.error) console.error("driver_applications select error:", appRes.error);
 
         setSafe(() => {
-          setSession(nextSession ?? null);
-          setProfile(!pErr && p ? p : null);
-          setDriverRow(drv);
-          setApplication(app);
+          setProfile(profRes?.data ?? null);
+          setDriverRow(drvRes?.data ?? null);
+          setApplication(appRes?.data ?? null);
           setLoading(false);
         });
       } catch (e) {
-        console.error("useSessionProfile error:", e);
-        setSafe(() => {
-          setSession(nextSession ?? null);
-          setProfile(null);
-          setDriverRow(null);
-          setApplication(null);
-          setLoading(false);
-        });
+        console.error("useSessionProfile fetchAll error:", e);
+        setSafe(() => setLoading(false));
       }
     };
+
+    // When AuthProvider is present, we rely on its session + readiness to avoid double subscriptions.
+    if (auth) {
+      if (!externalReady) {
+        setSafe(() => setLoading(true));
+      } else {
+        fetchAll(externalSession);
+      }
+
+      return () => {
+        alive = false;
+        mountedRef.current = false;
+      };
+    }
+
+    // Standalone mode (no AuthProvider): subscribe ourselves.
+    let unsub = null;
 
     const init = async () => {
       const { data, error } = await supabase.auth.getSession();
@@ -161,20 +147,24 @@ export function useSessionProfile(options = {}) {
         setSafe(() => setLoading(false));
         return;
       }
+
       await fetchAll(data?.session ?? null);
+
+      const { data: sub } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+        await fetchAll(nextSession);
+      });
+
+      unsub = () => sub?.subscription?.unsubscribe?.();
     };
 
     init();
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
-      await fetchAll(nextSession);
-    });
-
     return () => {
+      alive = false;
       mountedRef.current = false;
-      sub?.subscription?.unsubscribe?.();
+      if (typeof unsub === "function") unsub();
     };
-  }, [includeDriver, includeApplication]);
+  }, [includeDriver, includeApplication, auth, externalSession, externalReady]);
 
   return {
     loading,

@@ -59,14 +59,16 @@ export default function DriverDashboard() {
 
         const userId = authData?.user?.id;
         if (!userId) {
-          navigate("/login", { replace: true });
+          if (isMounted) setGateAllowed(false);
+          return;
           return;
         }
 
         if (isMounted) setGateAllowed(true);
       } catch (e) {
         console.error("Driver dashboard gate error:", e);
-        navigate("/login", { replace: true });
+        if (isMounted) setGateAllowed(false);
+          return;
       } finally {
         if (isMounted) setGateLoading(false);
       }
@@ -94,7 +96,8 @@ export default function DriverDashboard() {
     } finally {
       // Logoutdan keyin client home'ga yuborish "rol aralashuvi" va redirect loop keltirib chiqarishi mumkin.
       // Eng toza oqim: login sahifasiga qaytish.
-      navigate("/login", { replace: true });
+      if (isMounted) setGateAllowed(false);
+          return;
     }
   };
 
@@ -135,7 +138,6 @@ export default function DriverDashboard() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
-          navigate("/login");
           return;
         }
 

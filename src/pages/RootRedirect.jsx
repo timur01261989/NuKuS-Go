@@ -2,24 +2,21 @@ import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Spin } from "antd";
 
-import { supabase } from "@/lib/supabase";
-import { useSessionProfile } from "@shared/auth/useSessionProfile";
-import { pickHomeForRole } from "@shared/routes/RoleGate";
+import { supabase } from "../services/supabaseClient";
+import { useSessionProfile } from "../shared/auth/useSessionProfile";
+// NOTE: keep helper close to routing guards.
+// RootRedirect and RoleGate must agree on the same role → home mapping.
+import { pickHomeForRole } from "../shared/routes/RoleGate";
 
-/**
- * RootRedirect ("/")
- * One job: after app loads, send user to the correct home.
- *
- * Rules:
- * - Not logged in -> /login
- * - If driver_application exists -> driver flow (pending/approved/rejected)
- * - Otherwise -> client/admin home based on profile role
- */
+// Single source of truth for "after login, where do we land?"
+// Key requirement for this project:
+// - If a user has a driver_application, we treat them as a driver flow (pending/approved) even if profiles.role was never set.
+// - We ALSO try to auto-fix profiles.role='driver' so protected /driver routes won't bounce them to client.
 export default function RootRedirect() {
   const navigate = useNavigate();
   const didRun = useRef(false);
 
-  const { loading, session, profile, role, isAdmin, driverRow, application, refetch } = useSessionProfile({
+  const { session, profile, driverRow: driver, application: driverApp, loading, refetch } = useSessionProfile({
     includeDriver: true,
     includeApplication: true,
   });
@@ -27,7 +24,7 @@ export default function RootRedirect() {
   useEffect(() => {
     if (loading) return;
 
-    // Prevent double navigation in React strict mode
+    // Prevent double navigation in React strict mode.
     if (didRun.current) return;
     didRun.current = true;
 
@@ -37,45 +34,55 @@ export default function RootRedirect() {
         return;
       }
 
-      // Determine role
-      let nextRole = (role || profile?.role || "client").toLowerCase();
-      if (isAdmin) nextRole = "admin";
+      const role = profile?.role || "client";
 
-      // If driver application exists, enforce driver flow and best-effort fix profile.role=driver
-      if (application && nextRole !== "driver" && nextRole !== "admin") {
+      // Resolve persisted mode (driver can intentionally use client screens).
+      const storedMode =
+        typeof window !== "undefined"
+          ? window.localStorage?.getItem("app_mode")
+          : null;
+
+      // If mode is not set yet, choose a sane default.
+      // - If they have any driver intent (application or driver row), default to driver mode.
+      // - Otherwise default to client mode.
+      if (typeof window !== "undefined") {
+        if (storedMode !== "client" && storedMode !== "driver") {
+          const hasDriverIntent = !!driverApp || !!driver || role === "driver";
+          window.localStorage?.setItem("app_mode", hasDriverIntent ? "driver" : "client");
+        }
+      }
+
+      // If driver application exists, best-effort ensure profile.role='driver' so other guards don't misread.
+      if (driverApp && role !== "driver") {
         try {
           const uid = session.user.id;
 
-          // Try both schemas: profiles.id or profiles.user_id
           let upd = await supabase.from("profiles").update({ role: "driver" }).eq("id", uid);
-
           if (upd.error && /column\s+\"id\"\s+does\s+not\s+exist/i.test(upd.error.message || "")) {
             upd = await supabase.from("profiles").update({ role: "driver" }).eq("user_id", uid);
           }
 
-          // Refresh cached profile so RoleGate won't bounce
-          await refetch?.();
-          nextRole = "driver";
+          await refetch();
         } catch (e) {
           console.warn("RootRedirect: failed to auto-set role=driver", e);
         }
       }
 
       const home = pickHomeForRole({
-        role: nextRole,
-        driverRow,
-        driverApplication: application,
+        role,
+        driverRow: driver,
+        driverApplication: driverApp,
       });
 
       navigate(home, { replace: true });
     };
 
     go();
-  }, [loading, session, profile, role, isAdmin, driverRow, application, navigate, refetch]);
+  }, [loading, session, profile, driver, driverApp, navigate, refetch]);
 
   return (
-    <div style={{ minHeight: "50vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <Spin size="large" />
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "70vh" }}>
+      <Spin size="large" tip="Yuklanmoqda..." />
     </div>
   );
 }

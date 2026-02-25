@@ -98,6 +98,7 @@ const appStatus = appRow?.status || null;
 
         // Important: only redirect once we are sure approved,
         // and let RoleGate / dashboard routes see the updated profile role.
+        try { window.localStorage?.setItem("app_mode","driver"); } catch {}
         navigate("/driver/dashboard", { replace: true });
         return;
       }
@@ -201,7 +202,7 @@ const appStatus = appRow?.status || null;
           </button>
 
           <button
-            onClick={() => navigate("/", { replace: true })}
+            onClick={() => { try { window.localStorage?.setItem("app_mode","client"); } catch {} navigate("/client/home", { replace: true }); }}
             style={{
               height: 42,
               borderRadius: 12,
