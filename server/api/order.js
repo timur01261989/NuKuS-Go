@@ -21,12 +21,26 @@
 import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
-  auth: { persistSession: false },
-});
+function getSupabase(req) {
+  if (!SUPABASE_URL) throw new Error("SUPABASE_URL topilmadi");
+  // Prefer service role (bypasses RLS) for server API routes
+  if (SUPABASE_SERVICE_ROLE_KEY) {
+    return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+  }
+  // Fallback: anon key + forward user JWT so RLS policies can use auth.uid()
+  if (!SUPABASE_ANON_KEY) throw new Error("SUPABASE_ANON_KEY topilmadi");
+  const authHeader = req?.headers?.authorization || req?.headers?.Authorization || "";
+  if (!authHeader) throw new Error("Authorization header topilmadi (RLS uchun kerak)");
+  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
 
 function sendJson(res, status, body) {
   res.status(status).setHeader("Content-Type", "application/json; charset=utf-8");
@@ -148,6 +162,7 @@ async function listMyBookings(req, res) {
 }
 
 async function bookInterProv(req, res, body) {
+  const supabase = getSupabase(req);
   const orderId = body.orderId || body.adId || body.order_id;
   const passenger_id = body.passenger_id || body.passengerId;
   const seats = Number(body.seats || 1);
@@ -262,6 +277,7 @@ async function cancelBooking(req, res, body) {
 }
 
 async function markCancelRequested(req, res, body) {
+  const supabase = getSupabase(req);
   const booking_id = body.booking_id || body.id;
   if (!booking_id) return sendJson(res, 400, { error: "booking_id shart" });
 
@@ -401,6 +417,7 @@ function makeDistrictOffers({ fromDistrict, toDistrict, filters = {} }) {
 }
 
 async function districtOffers(req, res, body) {
+  const supabase = getSupabase(req);
   const fromDistrict = (req.query?.fromDistrict || body?.fromDistrict || "Nukus").toString();
   const toDistrict = (req.query?.toDistrict || body?.toDistrict || "").toString();
   const filters = body?.filters || {};
@@ -411,6 +428,7 @@ async function districtOffers(req, res, body) {
 }
 
 async function createInterDistrict(req, res, body) {
+  const supabase = getSupabase(req);
   const fromDistrict = (body?.fromDistrict || "Nukus").toString();
   const toDistrict = (body?.toDistrict || "").toString();
   const seats = Number(body?.seats || 1);
@@ -445,11 +463,11 @@ async function createInterDistrict(req, res, body) {
       .single();
 
     if (error) {
-      return sendJson(res, 500, { ok: false, created: false, error: error.message, distance_km, duration_min, price });
+      return sendJson(res, 200, { created: false, warning: error.message, distance_km, duration_min, price });
     }
     return sendJson(res, 200, { created: true, id: data?.id, order: data });
   } catch (e) {
-    return sendJson(res, 500, { ok: false, created: false, error: e?.message || "insert failed", distance_km, duration_min, price });
+    return sendJson(res, 200, { created: false, warning: e?.message || "insert failed", distance_km, duration_min, price });
   }
 }
 
@@ -543,6 +561,7 @@ function resolvePickupDropoff(body) {
 }
 
 async function createTaxiOrder(req, res, body) {
+  const supabase = getSupabase(req);
   const passenger_id =
     (body.passenger_id || body.passenger_id || body.user_id || body.clientId || getAuthUid(req) || "").toString();
   if (!passenger_id) return sendJson(res, 400, { error: "passenger_id (yoki passenger_id) shart" });
@@ -596,10 +615,10 @@ async function createTaxiOrder(req, res, body) {
   }
 
   if (!inserted) {
-    return sendJson(res, 200, {
-      created: false,
-      warning: lastErr?.message || "insert failed",
-      hint: "orders table ustunlari mos kelmayapti yoki RLS bloklayapti",
+    return sendJson(res, 500, {
+      error: lastErr?.message || "insert failed",
+      hint: "orders insert: schema mos kelmayapti yoki RLS bloklayapti. Service role env qo‘ying yoki Authorization header forwarded bo‘lsin.",
+      details: lastErr || null,
     });
   }
 
@@ -607,6 +626,7 @@ async function createTaxiOrder(req, res, body) {
 }
 
 async function cancelTaxiOrder(req, res, body) {
+  const supabase = getSupabase(req);
   const id = (body.id || body.order_id || body.orderId || "").toString();
   if (!id) return sendJson(res, 400, { error: "id/order_id shart" });
 
@@ -629,6 +649,7 @@ async function cancelTaxiOrder(req, res, body) {
 }
 
 async function getTaxiOrder(req, res, body) {
+  const supabase = getSupabase(req);
   const id = (req.query?.id || body?.id || body?.order_id || body?.orderId || "").toString();
   if (!id) return sendJson(res, 400, { error: "id/order_id shart" });
 
@@ -643,6 +664,7 @@ async function getTaxiOrder(req, res, body) {
 }
 
 async function activeTaxiOrder(req, res, body) {
+  const supabase = getSupabase(req);
   const passenger_id = (req.query?.passenger_id || body?.passenger_id || body?.passenger_id || "").toString();
   if (!passenger_id) return sendJson(res, 400, { error: "passenger_id/passenger_id shart" });
 
@@ -661,52 +683,6 @@ async function activeTaxiOrder(req, res, body) {
   return sendJson(res, 200, { order: (data && data[0]) || null });
 }
 
-
-
-
-async function listAvailableTaxiOrders(req, res) {
-  try {
-    const driverUid = getAuthUid(req);
-    if (!driverUid) return sendJson(res, 401, { ok:false, error: "Auth kerak" });
-
-    // Offered orders for this driver (order_offers -> orders join)
-    const now = new Date().toISOString();
-    const { data, error } = await supabase
-      .from("order_offers")
-      .select("order_id,status,expires_at,sent_at,orders(*)")
-      .or(`driver_id.eq.${driverUid},driver_user_id.eq.${driverUid}`)
-      .eq("status", "sent")
-      .or(`expires_at.is.null,expires_at.gt.${now}`);
-
-    if (error) return sendJson(res, 500, { ok:false, error: error.message });
-
-    const items = (data || [])
-      .map((r) => {
-        const o = r.orders || {};
-        return {
-          ...o,
-          offer_status: r.status,
-          offer_sent_at: r.sent_at,
-          offer_expires_at: r.expires_at,
-        };
-      })
-      // ensure unique by id
-      .filter((o) => o && o.id);
-
-    const seen = new Set();
-    const unique = [];
-    for (const o of items) {
-      const k = String(o.id);
-      if (seen.has(k)) continue;
-      seen.add(k);
-      unique.push(o);
-    }
-
-    return sendJson(res, 200, unique);
-  } catch (e) {
-    return sendJson(res, 500, { ok:false, error: e?.message || "list_available failed" });
-  }
-}
 
 
 export default async function handler(req, res) {
