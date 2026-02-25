@@ -18,12 +18,18 @@ export function pickHomeForRole({ role, driverRow, driverApplication }) {
   if (r === "driver") {
     const appStatus = (driverApplication?.status || "").toLowerCase();
 
-    const driverApproved =
-      !!driverRow &&
-      (String(driverRow.status  "").toLowerCase() === "approved" 
-        String(driverRow.status  "").toLowerCase() === "active" 
-        driverRow.is_approved === true ||
-        driverRow.approved === true);
+    // FIX: Build xatosini oldini olish uchun statusni alohida o'zgaruvchiga olamiz
+    // Bu yerda "Expected ':' but found '||'" xatosini tuzatish uchun mantiq soddalashtirildi
+    let drvStatus = "";
+    if (driverRow && driverRow.status) {
+      drvStatus = String(driverRow.status).toLowerCase();
+    }
+
+    const isApprovedBool =
+      driverRow?.is_approved === true || driverRow?.approved === true;
+    const isApprovedStatus = drvStatus === "approved" || drvStatus === "active";
+
+    const driverApproved = !!driverRow && (isApprovedStatus || isApprovedBool);
 
     if (driverApproved) return "/driver/dashboard";
     if (appStatus === "approved") return "/driver/dashboard";
@@ -105,7 +111,7 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
     }
 
     // Schema variant B: drivers.status text
-    if (
+if (
       Object.prototype.hasOwnProperty.call(drv, "status") &&
       typeof drv.status === "string"
     ) {
@@ -120,7 +126,8 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
 
   useEffect(() => {
     let mounted = true;
-const finish = (nextOk, nextReason = null) => {
+
+    const finish = (nextOk, nextReason = null) => {
       if (!mounted) return;
       setOk(nextOk);
       setReason(nextReason);
@@ -232,14 +239,13 @@ const finish = (nextOk, nextReason = null) => {
           driverRowExists = true;
           approved = deriveDriverApproved(drvRes.data);
         }
-
-        // 3) Derive effective role
+// 3) Derive effective role
         // Role is always taken from profiles.role.
         // IMPORTANT: must be mutable because we may auto-create a profile below.
         let effectiveRole = profileRole;
 
         // 4) Auto-create client profile if accessing client-only route and profile missing
-if (!effectiveRole && a.client && !a.driver) {
+        if (!effectiveRole && a.client && !a.driver) {
           try {
             await withTimeout(
               supabase.from("profiles").upsert(
@@ -344,13 +350,12 @@ if (!effectiveRole && a.client && !a.driver) {
       }
     };
 
-    run();
-
-    return () => {
+    run();return () => {
       mounted = false;
     };
   }, [allowKey, location.pathname, appMode, wantsDriverPath]);
-if (loading) {
+
+  if (loading) {
     return (
       <div
         style={{
