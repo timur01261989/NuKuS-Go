@@ -4,7 +4,7 @@ import { Spin } from "antd";
 
 import { supabase } from "../services/supabaseClient";
 import { useSessionProfile } from "../shared/auth/useSessionProfile";
-import { pickHomeForRole } from "../shared/routes/roleRouting";
+import { pickHomeForRole } from "../shared/routes/RoleGate";
 
 // Single source of truth for "after login, where do we land?"
 // Key requirement for this project:
