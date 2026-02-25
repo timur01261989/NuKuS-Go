@@ -4,9 +4,10 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error("Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY");
+  throw new Error("Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY");
 }
 
+/* ✅ CLIENT AVVAL YARATILADI */
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
@@ -15,3 +16,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storageKey: "nukus_go_auth",
   },
 });
+
+/* ✅ KEYIN ASSERT */
+export function assertSupabase() {
+  return supabase;
+}
