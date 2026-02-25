@@ -44,8 +44,8 @@ export default function DriverDashboard() {
   const navigate = useNavigate();
 
   // Gate: driver must have an application before accessing dashboard
-  const [gateLoading, setGateLoading] = useState(true);
-  const [gateAllowed, setGateAllowed] = useState(false);
+  const [gateLoading, setGateLoading] = useState(false);
+  const [gateAllowed, setGateAllowed] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -59,14 +59,16 @@ export default function DriverDashboard() {
 
         const userId = authData?.user?.id;
         if (!userId) {
-          navigate("/login", { replace: true });
+      // NOTE: RoleGate handles auth redirects. Avoid redirect loops here.
+      // navigate("/login", { replace: true });
           return;
         }
 
         if (isMounted) setGateAllowed(true);
       } catch (e) {
         console.error("Driver dashboard gate error:", e);
-        navigate("/login", { replace: true });
+      // NOTE: RoleGate handles auth redirects. Avoid redirect loops here.
+      // navigate("/login", { replace: true });
       } finally {
         if (isMounted) setGateLoading(false);
       }
@@ -94,7 +96,8 @@ export default function DriverDashboard() {
     } finally {
       // Logoutdan keyin client home'ga yuborish "rol aralashuvi" va redirect loop keltirib chiqarishi mumkin.
       // Eng toza oqim: login sahifasiga qaytish.
-      navigate("/login", { replace: true });
+      // NOTE: RoleGate handles auth redirects. Avoid redirect loops here.
+      // navigate("/login", { replace: true });
     }
   };
 
@@ -135,7 +138,8 @@ export default function DriverDashboard() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
-          navigate("/login");
+      // NOTE: RoleGate handles auth redirects. Avoid redirect loops here.
+      // navigate("/login", { replace: true });
           return;
         }
 
@@ -230,7 +234,7 @@ export default function DriverDashboard() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     localStorage.clear();
-    navigate("/login");
+    // navigate("/login");
   };
 
   // =========================

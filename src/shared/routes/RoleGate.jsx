@@ -77,7 +77,11 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
       driver: !!a.driver,
       requireDriverApproved: !!a.requireDriverApproved,
     });
-  }, [allow]);
+  }, [
+    !!(allow && allow.client),
+    !!(allow && allow.driver),
+    !!(allow && allow.requireDriverApproved),
+  ]);
 
   const withTimeout = (promise, ms = 10000) =>
     Promise.race([
@@ -284,8 +288,14 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
           }
 
           if (!driverRowExists) {
+            // Some schemas create a drivers row only after the driver starts using the app.
+            // If the application itself is approved, allow driver routes even without a drivers row.
+            if (applicationStatus === "approved") {
+              return finish(true, null);
+            }
+
             // Variant A: driver access is based on `drivers` row.
-            if (applicationStatus && ["pending", "submitted", "waiting", "review", "approved"].includes(applicationStatus)) {
+            if (applicationStatus && ["pending", "submitted", "waiting", "review"].includes(applicationStatus)) {
               // If route is driver-only and they're pending, deny
               if (a.driver && !a.client) {
                 return finish(false, "driver-not-approved");
@@ -297,7 +307,7 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
 
           // approval gating (driver dashboard/orders)
           if (a.requireDriverApproved) {
-            if (!approved) return finish(false, "driver-not-approved");
+            if (!approved && applicationStatus !== "approved") return finish(false, "driver-not-approved");
           }
 
           return finish(true, null);
