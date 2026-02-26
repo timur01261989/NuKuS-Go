@@ -1,4 +1,4 @@
-# NUKUS GO — Topilgan Xatolar va Yechimlar
+# UNIGO — Topilgan Xatolar va Yechimlar
 
 ## ✅ Bajariladgan Tekshiruvlar
 

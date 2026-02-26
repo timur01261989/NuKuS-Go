@@ -1,13 +1,17 @@
-import gamificationHandler from './gamification.js';
-import pricingHandler from './pricing.js';
-
 /**
- * misc.js
- * Unified misc handler to keep server/api module count <= 10.
- * It dispatches to legacy pricing.js and gamification.js based on req._unigo_route.
+ * server/api/misc.js
+ * Combines pricing + gamification APIs under one router (to keep Vercel API routes <= 10)
  */
+import pricingHandler from "./pricing.js";
+import gamificationHandler from "./gamification.js";
+
 export default async function miscHandler(req, res) {
-  const route = String(req._unigo_route || req.url || '');
-  if (route.includes('pricing')) return pricingHandler(req, res);
-  return gamificationHandler(req, res);
+  const raw = (req.query?.path || req.url || "").toString().toLowerCase();
+  const path = (req.query?.__subpath || "").toString().toLowerCase();
+  const p = path || raw;
+
+  if (p.includes("game") || p.includes("bonus") || p.includes("ref") || p.includes("reward") || p.includes("spin")) {
+    return gamificationHandler(req, res);
+  }
+  return pricingHandler(req, res);
 }

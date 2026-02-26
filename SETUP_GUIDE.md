@@ -1,8 +1,8 @@
-# NUKUS GO — Toliq O'rnatish va Deployment Qo'llanmasi
+# UNIGO — Toliq O'rnatish va Deployment Qo'llanmasi
 
 ## 📦 Nima Bu?
 
-**NUKUS GO** — O'zbekiston uchun multi-platform taksi, yuk tashish, va inter-shahar sayohat platformasi.
+**UNIGO** — O'zbekiston uchun multi-platform taksi, yuk tashish, va inter-shahar sayohat platformasi.
 
 **Texnologiya Stack:**
 - **Frontend:** React 18 + Vite + TailwindCSS + Ant Design

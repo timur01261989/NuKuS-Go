@@ -13,11 +13,10 @@ import authHandler from "../server/api/auth.js";
 import driverHandler from "../server/api/driver.js";
 import dispatchHandler from "../server/api/dispatch.js";
 import billingHandler from "../server/api/billing.js";
-import miscHandler from "../server/api/misc.js";
 import sosHandler from "../server/api/sos.js";
 import presenceHandler from "../server/api/presence.js";
-import cronDispatchHandler from "../server/api/cron_dispatch.js";
 import notificationsHandler from "../server/api/notifications.js";
+import miscHandler from "../server/api/misc.js";
 
 function normalizePath(rawPath) {
   // Supports both direct path (/api/order) and rewritten query (?path=order)
@@ -62,9 +61,14 @@ function getRouteKey(path) {
 
   if (base === "order") return "order";
   if (base === "auth") return "auth";
-  if (base === "offer") return "offer";
-  if (base === "wallet") return "wallet";
+  if (base === "offer") return "billing-offer";
+  if (base === "wallet") return "billing-wallet";
+  if (base === "billing") return "billing";
   if (base === "sos") return "sos";
+  if (base === "pricing") return "misc-pricing";
+  if (base === "gamification") return "misc-gamification";
+  if (base === "misc") return "misc";
+  if (base === "cron_dispatch") return "dispatch-cron";
 
   // Older flat paths still used by frontend in a few places:
   if (base === "driver-state") return "driver-state";
@@ -172,7 +176,9 @@ export default async function handler(req, res) {
       return await driverHandler(req, res, req.routeKey || "driver");
     }
 
-    if (path.startsWith("dispatch")) {
+    if (path.startsWith("dispatch") || path.startsWith("cron_dispatch")) {
+      req.query = req.query || {};
+      req.query.__subpath = path;
       return await dispatchHandler(req, res);
     }
 
@@ -183,15 +189,10 @@ export default async function handler(req, res) {
     if (path.startsWith("cron_dispatch")) {
       return await cronDispatchHandler(req, res);
     }
-
-    if (path.startsWith("offer") || path.startsWith("wallet")) {
-      req._unigo_route = path;
+    if (path.startsWith("offer") || path.startsWith("wallet") || path.startsWith("billing")) {
+      req.query = req.query || {};
+      req.query.__subpath = path;
       return await billingHandler(req, res);
-    }
-
-    if (path.startsWith("pricing") || path.startsWith("gamification")) {
-      req._unigo_route = path;
-      return await miscHandler(req, res);
     }
 
     if (path.startsWith("sos")) {
@@ -201,8 +202,12 @@ export default async function handler(req, res) {
     if (path.startsWith("notifications")) {
       return await notificationsHandler(req, res);
     }
+    if (path.startsWith("gamification") || path.startsWith("pricing") || path.startsWith("misc")) {
+      req.query = req.query || {};
+      req.query.__subpath = path;
+      return await miscHandler(req, res);
+    }
 
-    
     res.statusCode = 404;
     res.setHeader("Content-Type", "application/json");
     res.end(JSON.stringify({ error: "API route topilmadi", path }));

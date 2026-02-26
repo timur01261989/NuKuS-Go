@@ -1,6 +1,7 @@
 import { json, badRequest, serverError, nowIso } from '../_shared/cors.js';
 import { getSupabaseAdmin } from '../_shared/supabase.js';
 import { haversineKm } from '../_shared/geo.js';
+import cronDispatchHandler from "./cron_dispatch.js";
 
 
 function normalizeDriverId(body) {
