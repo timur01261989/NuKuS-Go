@@ -1,7 +1,11 @@
 /**
  * api/index.js
- * Universal router for compact API structure
+ * Universal router for compact API structure (Vercel-friendly)
  * Routes all /api/* requests to corresponding module
+ *
+ * FIXES:
+ *  - Robust request body parsing for Vercel single-function router (req.body was often undefined)
+ *  - Keeps backward compatibility with existing handlers (order/auth/driver/dispatch/...)
  */
 
 import orderHandler from "../server/api/order.js";
@@ -39,9 +43,9 @@ function getRouteKey(path) {
     // Also accept older names: /api/driver-state etc via base matching below
     const map = {
       "": "driver",
-      "location": "driver-location",
-      "state": "driver-state",
-      "heartbeat": "driver-heartbeat",
+      location: "driver-location",
+      state: "driver-state",
+      heartbeat: "driver-heartbeat",
     };
     return map[sub] || "driver";
   }
@@ -50,10 +54,10 @@ function getRouteKey(path) {
     // /api/dispatch, /api/dispatch/smart, /api/dispatch/eta, /api/dispatch/traffic, /api/dispatch/heatmap
     const map = {
       "": "dispatch",
-      "smart": "dispatch-smart",
-      "eta": "eta",
-      "traffic": "traffic-eta",
-      "heatmap": "heatmap",
+      smart: "dispatch-smart",
+      eta: "eta",
+      traffic: "traffic-eta",
+      heatmap: "heatmap",
     };
     return map[sub] || "dispatch";
   }
@@ -72,6 +76,68 @@ function getRouteKey(path) {
   return "";
 }
 
+function readStream(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on("data", (c) => chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c)));
+    req.on("end", () => resolve(Buffer.concat(chunks)));
+    req.on("error", reject);
+    // Safety: in case the platform doesn't emit properly
+    req.on("aborted", () => reject(new Error("Request aborted")));
+  });
+}
+
+function parseBodyFromBuffer(buf, contentType) {
+  const ct = String(contentType || "").toLowerCase();
+
+  if (!buf || buf.length === 0) return undefined;
+
+  const text = buf.toString("utf-8");
+
+  if (ct.includes("application/json")) {
+    try {
+      return JSON.parse(text);
+    } catch {
+      // Keep raw text if JSON parse fails
+      return text;
+    }
+  }
+
+  if (ct.includes("application/x-www-form-urlencoded")) {
+    const params = new URLSearchParams(text);
+    const obj = {};
+    for (const [k, v] of params.entries()) obj[k] = v;
+    return obj;
+  }
+
+  // multipart/form-data: do not parse here (handlers should handle it if needed)
+  // default: return raw text
+  return text;
+}
+
+async function ensureParsedBody(req) {
+  // If some runtime already parsed it (e.g., Next.js pages/api), keep it.
+  if (req.body !== undefined && req.body !== null) return req.body;
+
+  // Avoid parsing twice
+  if (req.__bodyParsed) return req.body;
+
+  req.__bodyParsed = true;
+
+  const method = String(req.method || "GET").toUpperCase();
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS") return undefined;
+
+  const contentType = req.headers?.["content-type"] || "";
+
+  // Read raw stream (Vercel single function often gives raw IncomingMessage with no body parsing)
+  const raw = await readStream(req);
+  req.rawBody = raw;
+
+  const parsed = parseBodyFromBuffer(raw, contentType);
+  req.body = parsed;
+  return parsed;
+}
+
 export default async function handler(req, res) {
   try {
     const url = new URL(req.url, "http://localhost");
@@ -88,6 +154,10 @@ export default async function handler(req, res) {
       res.statusCode = 204;
       return res.end();
     }
+
+    // Ensure body parsing ONCE for all downstream handlers
+    // (This is the key fix when using a single /api entrypoint on Vercel)
+    await ensureParsedBody(req);
 
     // routeKey for subroutes (used by dispatch/driver modules)
     req.routeKey = getRouteKey(path);
@@ -142,7 +212,7 @@ export default async function handler(req, res) {
 
     res.statusCode = 404;
     res.setHeader("Content-Type", "application/json");
-    res.end(JSON.stringify({ error: "API route topilmadi" }));
+    res.end(JSON.stringify({ error: "API route topilmadi", path }));
   } catch (e) {
     const isProd = String(process.env.NODE_ENV || "").toLowerCase() === "production";
     res.statusCode = 500;
