@@ -20,11 +20,11 @@
 
 import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-function getSupabase(req) {
+function getSupabase(req, { requireAuth = false } = {}) {
   if (!SUPABASE_URL) throw new Error("SUPABASE_URL topilmadi");
   // Prefer service role (bypasses RLS) for server API routes
   if (SUPABASE_SERVICE_ROLE_KEY) {
@@ -32,14 +32,20 @@ function getSupabase(req) {
       auth: { persistSession: false, autoRefreshToken: false },
     });
   }
-  // Fallback: anon key + forward user JWT so RLS policies can use auth.uid()
+
+  // Fallback: anon key (RLS ishlaydi). Agar Authorization bo‘lsa forward qilamiz.
   if (!SUPABASE_ANON_KEY) throw new Error("SUPABASE_ANON_KEY topilmadi");
   const authHeader = req?.headers?.authorization || req?.headers?.Authorization || "";
-  if (!authHeader) throw new Error("Authorization header topilmadi (RLS uchun kerak)");
-  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: authHeader } },
+  if (!authHeader && requireAuth) {
+    throw new Error("Authorization header topilmadi (auth kerak)");
+  }
+  const opts = {
     auth: { persistSession: false, autoRefreshToken: false },
-  });
+  };
+  if (authHeader) {
+    opts.global = { headers: { Authorization: authHeader } };
+  }
+  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, opts);
 }
 
 function sendJson(res, status, body) {
@@ -99,7 +105,9 @@ function toISODateRange(dateStr) {
   }
 }
 
-async function listInterProv(req, res) {
+async async function listInterProv(req, res) {
+  const supabase = getSupabase(req, { requireAuth: false });
+
   const {
     from_region,
     from_district = "",
@@ -226,7 +234,9 @@ async function bookInterProv(req, res, body) {
   return sendJson(res, 200, { booking });
 }
 
-async function restoreSeatsForBooking(bookingRow) {
+async async function restoreSeatsForBooking(req, booking_id) {
+  const supabase = getSupabase(req, { requireAuth: true });
+
   if (!bookingRow?.order_id) return;
   const seats = Number(bookingRow.seats_requested || 1);
 
@@ -248,7 +258,9 @@ async function restoreSeatsForBooking(bookingRow) {
     .eq("id", bookingRow.order_id);
 }
 
-async function cancelBooking(req, res, body) {
+async async function cancelBooking(req, res, body) {
+  const supabase = getSupabase(req, { requireAuth: true });
+
   const booking_id = body.booking_id || body.id;
   const passenger_id = body.passenger_id || body.passengerId;
 
@@ -290,7 +302,9 @@ async function markCancelRequested(req, res, body) {
   return sendJson(res, 200, { ok: true });
 }
 
-async function editBookingSeats(req, res, body) {
+async async function editBookingSeats(req, res, body) {
+  const supabase = getSupabase(req, { requireAuth: true });
+
   const booking_id = body.booking_id || body.id;
   const seats_requested = Number(body.seats_requested || body.seats || 1);
   if (!booking_id) return sendJson(res, 400, { error: "booking_id shart" });
