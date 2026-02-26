@@ -1,233 +1,216 @@
-import React, { useState, useEffect } from "react";
-import { Form, Input, Button, message } from "antd";
-import { useNavigate } from "react-router-dom";
-import { UserOutlined, PhoneOutlined, ArrowLeftOutlined, LockOutlined, ReloadOutlined } from "@ant-design/icons";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { message } from "antd";
 import { supabase } from "@/lib/supabase";
-
-import { BRAND } from "@/shared/config/brand";
+import { useLanguage } from "@shared/i18n/useLanguage";
 
 export default function Register() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState(1); 
-  const [formData, setFormData] = useState(null); 
-  const [form] = Form.useForm();
+  const { t } = useLanguage();
 
-  // --- 1. AVTOMATIK SMS O‘QISH (WebOTP API) ---
+  const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState(1);
+
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [otp, setOtp] = useState("");
+
+  const [fullPhone, setFullPhone] = useState("");
+
+  // WebOTP auto-read (best effort)
   useEffect(() => {
-    if ('OTPCredential' in window && step === 2) {
-      const ac = new AbortController();
-      navigator.credentials.get({
-        otp: { transport: ['sms'] },
-        signal: ac.signal
-      }).then(otp => {
-        form.setFieldsValue({ otp: otp.code });
-        onVerifyOtp({ otp: otp.code });
-      }).catch(err => console.log("SMS o'qish rad etildi"));
-      return () => ac.abort();
-    }
+    if (!("OTPCredential" in window)) return;
+    if (step !== 2) return;
+
+    const ac = new AbortController();
+    navigator.credentials
+      .get({
+        otp: { transport: ["sms"] },
+        signal: ac.signal,
+      })
+      .then((cred) => {
+        if (!cred?.code) return;
+        setOtp(cred.code);
+        // auto verify
+        onVerifyOtp(cred.code);
+      })
+      .catch(() => {});
+    return () => ac.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
-  // 1-QADAM: SMS YUBORISH
-  const onGetOtp = async (values) => {
+  const formatUzPhone = (rawPhone) => {
+    let digits = String(rawPhone || "").replace(/\D/g, "");
+    if (digits.length === 9) digits = "998" + digits;
+    if (!digits.startsWith("998")) digits = "998" + digits;
+    digits = digits.slice(0, 12);
+    return "+" + digits;
+  };
+
+  const onSendOtp = async (e) => {
+    e.preventDefault();
     setLoading(true);
     try {
-      let formattedPhone = values.phone.replace(/\D/g, ''); 
-      if (!formattedPhone.startsWith("998")) formattedPhone = "998" + formattedPhone;
-      formattedPhone = "+" + formattedPhone;
-
-      const { error } = await supabase.auth.signInWithOtp({
-        phone: formattedPhone,
-      });
-
+      const p = formatUzPhone(phone);
+      const { error } = await supabase.auth.signInWithOtp({ phone: p });
       if (error) throw error;
-      message.success("SMS kod yuborildi!");
-      setFormData({ ...values, fullPhone: formattedPhone });
+
+      setFullPhone(p);
       setStep(2);
+      message.success(t("otp_sent") || "SMS kod yuborildi!");
     } catch (err) {
-      message.error("Xatolik: " + err.message);
+      message.error((err && err.message) || "Xatolik");
     } finally {
       setLoading(false);
     }
   };
 
-  const onResend = async () => {
-    if (!formData?.fullPhone) return;
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithOtp({ phone: formData.fullPhone });
-      if (error) throw error;
-      message.success("SMS kod qayta yuborildi!");
-    } catch (err) {
-      message.error("Xatolik: " + (err?.message || ""));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 2-QADAM: KODNI TASDIQLASH (Professional mantiq qo'shildi)
-  const onVerifyOtp = async (values) => {
+  const onVerifyOtp = async (codeOverride) => {
+    const code = String(codeOverride ?? otp ?? "").trim();
+    if (!code) return message.warning("Kod kiriting");
     setLoading(true);
     try {
       const { data, error } = await supabase.auth.verifyOtp({
-        phone: formData.fullPhone,
-        token: values.otp,
-        type: 'sms',
+        phone: fullPhone,
+        token: code,
+        type: "sms",
       });
-
       if (error) throw error;
 
-      if (data.user) {
-        // --- TIMESTAMP VA DURATION (Aniq vaqtni yozish) ---
-        const registrationTime = new Date().toISOString(); 
+      // Update profile metadata (keeps your existing flow: profiles table may exist or not)
+      try {
+        await supabase.auth.updateUser({
+          data: { full_name: fullName || "" },
+        });
+      } catch {}
 
-        await supabase.auth.updateUser({ password: formData.password });
-
-        // --- FIELD_MASK VA WRAPPERS (Faqat kerakli va xavfsiz yozish) ---
-        // Foydalanuvchi ism-familiyasi bo'sh bo'lsa, 'Noma'lum' deb yozish (Wrappers mantiqi)
-        const safeName = formData.name || "Noma'lum";
-        const safeSurname = formData.surname || "Foydalanuvchi";
-
-        const { error: profileError } = await supabase
-            .from('profiles')
-            .upsert([
-                { 
-                    id: data.user.id, 
-                    full_name: `${safeName} ${safeSurname}`,
-                    phone: formData.fullPhone,
-                    role: 'client',
-                    created_at: registrationTime, // Aniq vaqt
-                    last_login: registrationTime
-                }
-            ]);
-
-        if (profileError) throw profileError;
-
-        message.success("Muvaffaqiyatli ro'yxatdan o'tdingiz!");
-        // Let RootRedirect (/) decide the correct start page.
-        navigate("/", { replace: true });
-      }
+      message.success(t("register_success") || "Ro'yxatdan o'tish yakunlandi!");
+      navigate("/", { replace: true });
+      return data;
     } catch (err) {
-      message.error("Xatolik: " + err.message);
+      message.error((err && err.message) || "Xatolik");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-start p-6" style={{ background: "#E3EDF7" }}>
-      <div className="w-full max-w-md">
-        {/* Brand */}
-        <div className="flex flex-col items-center mb-10">
-          <div
-            className="mb-6 inline-flex items-center justify-center w-20 h-20 rounded-2xl shadow-lg"
-            style={{ background: BRAND.primary }}
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-neutral-50 via-orange-50 to-amber-50 p-4">
+      <main className="w-full max-w-sm">
+        <header className="mb-6">
+          <button
+            type="button"
+            onClick={() => (step === 1 ? navigate("/auth") : setStep(1))}
+            className="text-sm text-gray-600 hover:text-gray-900"
           >
-            <span className="text-white text-3xl font-black">{BRAND.short}</span>
-          </div>
-          <h1 className="text-5xl font-bold tracking-tight" style={{ color: "#1e293b" }}>{BRAND.name}</h1>
-          <p className="font-medium mt-1 text-base" style={{ color: "#ec5b13" }}>{BRAND.slogan}</p>
-        </div>
+            ← {t("back") || "Orqaga"}
+          </button>
+        </header>
 
-        <div className="rounded-3xl p-6 shadow-xl border border-white/60" style={{ background: "rgba(255,255,255,0.7)" }}>
-          <div className="flex items-center mb-6">
-            <Button icon={<ArrowLeftOutlined />} onClick={() => navigate("/login")} type="text" shape="circle" />
-            <div className="flex-1 text-center pr-10">
-              <div className="text-xl font-bold" style={{ color: "#1e293b" }}>Ro'yxatdan o'tish</div>
-              <div className="text-xs text-slate-500">1 daqiqada tugaydi</div>
-            </div>
+        <section className="rounded-3xl p-8 shadow-xl bg-white/95 backdrop-blur border border-white/30">
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-bold text-gray-900">
+              {step === 1 ? (t("register_title") || "Ro'yxatdan o'tish") : (t("otp_title") || "SMS tasdiqlash")}
+            </h1>
+            <p className="text-gray-600 text-sm mt-1">
+              {step === 1
+                ? (t("register_sub") || "Telefon raqamingizni kiriting")
+                : (t("otp_sub") || "SMS orqali kelgan kodni kiriting")}
+            </p>
           </div>
 
           {step === 1 ? (
-            <Form form={form} layout="vertical" onFinish={onGetOtp} size="large">
-              <Form.Item
-                label={<span className="text-sm font-medium text-slate-500">Ism</span>}
-                name="name"
-                rules={[{ required: true, message: "Ismingiz?" }]}
-              >
-                <Input prefix={<UserOutlined />} placeholder="Ismingiz" />
-              </Form.Item>
-
-              <Form.Item
-                label={<span className="text-sm font-medium text-slate-500">Familiya</span>}
-                name="surname"
-                rules={[{ required: true, message: "Familiyangiz?" }]}
-              >
-                <Input prefix={<UserOutlined />} placeholder="Familiyangiz" />
-              </Form.Item>
-
-              <Form.Item
-                label={<span className="text-sm font-medium text-slate-500">Telefon raqam</span>}
-                name="phone"
-                rules={[{ required: true, message: "Telefon?" }]}
-              >
-                <Input prefix={<PhoneOutlined />} addonBefore="+998" placeholder="90 123 45 67" />
-              </Form.Item>
-
-              <Form.Item
-                label={<span className="text-sm font-medium text-slate-500">Parol</span>}
-                name="password"
-                rules={[{ required: true, min: 6, message: "Kamida 6 ta belgi" }]}
-              >
-                <Input.Password prefix={<LockOutlined />} placeholder="Yangi parol" />
-              </Form.Item>
-
-              <Button
-                htmlType="submit"
-                loading={loading}
-                block
-                className="!h-14 !rounded-2xl !font-extrabold"
-                style={{ background: BRAND.dark, borderColor: BRAND.dark, color: "#fff" }}
-              >
-                SMS KOD OLISH
-              </Button>
-            </Form>
-          ) : (
-            <Form form={form} layout="vertical" onFinish={onVerifyOtp} size="large">
-              <div className="rounded-xl p-4 text-center border" style={{ background: "#FFFBEB", borderColor: "#fde68a" }}>
-                <div className="text-xs font-bold tracking-wide uppercase opacity-70 mb-1">Kod yuborildi:</div>
-                <div className="text-lg font-mono font-bold tracking-wider text-black">{formData?.fullPhone}</div>
-              </div>
-
-              <Form.Item
-                label={<span className="text-sm font-medium text-slate-500">SMS kod</span>}
-                name="otp"
-                rules={[{ required: true, len: 6, message: "6 xonali kod" }]}
-                style={{ marginTop: 16 }}
-              >
-                <Input
-                  inputMode="numeric"
-                  placeholder="· · · · · ·"
-                  maxLength={6}
-                  style={{
-                    textAlign: "center",
-                    letterSpacing: "10px",
-                    fontSize: 22,
-                    fontWeight: 800,
-                    height: 60,
-                  }}
+            <form onSubmit={onSendOtp} className="space-y-5">
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-gray-500 uppercase ml-1">
+                  {t("full_name") || "Ism familiya"}
+                </label>
+                <input
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="w-full px-4 py-3.5 bg-gray-50 border-none rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all text-gray-700"
+                  placeholder="Abdiev Timur"
+                  autoComplete="name"
+                  required
                 />
-              </Form.Item>
-
-              <div className="flex justify-end -mt-2 mb-4">
-                <Button type="text" icon={<ReloadOutlined />} onClick={onResend} disabled={loading}>
-                  Kodni qayta yuborish
-                </Button>
               </div>
 
-              <Button
-                htmlType="submit"
-                loading={loading}
-                block
-                className="!h-14 !rounded-2xl !font-extrabold"
-                style={{ background: BRAND.dark, borderColor: BRAND.dark, color: "#fff" }}
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-gray-500 uppercase ml-1">
+                  {t("phone") || "Telefon raqam"}
+                </label>
+                <div className="relative flex items-center">
+                  <span className="absolute left-4 text-gray-400 font-medium">+998</span>
+                  <input
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="w-full pl-16 pr-4 py-3.5 bg-gray-50 border-none rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all text-gray-700"
+                    placeholder="90 123 45 67"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    required
+                  />
+                </div>
+              </div>
+
+              <button
+                disabled={loading}
+                className="w-full py-3.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-semibold shadow-lg disabled:opacity-60"
+                type="submit"
               >
-                TASDIQLASH
-              </Button>
-            </Form>
+                {loading ? (t("loading") || "Kutilmoqda...") : (t("send_sms") || "SMS yuborish")}
+              </button>
+
+              <p className="text-center text-gray-600 text-sm">
+                {t("have_account") || "Akkauntingiz bormi?"}{" "}
+                <Link to="/auth" className="text-blue-600 font-semibold hover:underline">
+                  {t("login") || "Kirish"}
+                </Link>
+              </p>
+            </form>
+          ) : (
+            <div className="space-y-5">
+              <div className="rounded-xl bg-gray-50 p-4 text-sm text-gray-700">
+                <div className="font-semibold">{t("sent_to") || "Yuborildi:"}</div>
+                <div className="mt-1">{fullPhone}</div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-gray-500 uppercase ml-1">
+                  {t("sms_code") || "SMS kodi"}
+                </label>
+                <input
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  className="w-full px-4 py-3.5 bg-gray-50 border-none rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all text-gray-700 tracking-widest text-center text-lg"
+                  placeholder="000000"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  required
+                />
+              </div>
+
+              <button
+                disabled={loading}
+                className="w-full py-3.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold shadow-lg disabled:opacity-60"
+                type="button"
+                onClick={() => onVerifyOtp()}
+              >
+                {loading ? (t("loading") || "Kutilmoqda...") : (t("confirm") || "Tasdiqlash")}
+              </button>
+
+              <button
+                type="button"
+                className="w-full py-3.5 rounded-xl bg-white border border-gray-200 text-gray-800 font-semibold hover:bg-gray-50"
+                onClick={() => onSendOtp({ preventDefault: () => {} })}
+              >
+                {t("resend") || "Qayta yuborish"}
+              </button>
+            </div>
           )}
-        </div>
-      </div>
+        </section>
+      </main>
     </div>
   );
 }

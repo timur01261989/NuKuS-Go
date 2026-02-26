@@ -1,186 +1,138 @@
-/**
- * /api/order
- * Vercel Serverless Function (Node.js)
- *
- * What this endpoint does:
- * - Accepts an order payload from the client (Vite app)
- * - Validates only the truly required fields
- * - Maps client field names to DB-friendly names
- * - Inserts into Supabase "orders" table using SERVICE_ROLE key (if present)
- *
- * REQUIRED env vars (Vercel Project Settings -> Environment Variables):
- *   - SUPABASE_URL
- *   - SUPABASE_SERVICE_ROLE_KEY   (recommended for server-side insert)
- * Optional:
- *   - SUPABASE_ANON_KEY           (fallback if service role not set)
- *
- * NOTE:
- * Do NOT expose SERVICE_ROLE key to the browser. It's safe only on server-side.
- */
+// api/order.js  (Vercel Serverless Function for a Vite SPA)
+// Creates an order in Supabase.
+//
+// ENV expected on Vercel (Project Settings -> Environment Variables):
+//   SUPABASE_URL
+//   SUPABASE_SERVICE_ROLE_KEY   (recommended for server-side insert)
+// Optional fallbacks (if you already used these names):
+//   SUPABASE_ANON_KEY
+//   VITE_SUPABASE_URL
+//   VITE_SUPABASE_ANON_KEY
+//   NEXT_PUBLIC_SUPABASE_URL
+//   NEXT_PUBLIC_SUPABASE_ANON_KEY
+//
+// IMPORTANT: never expose SUPABASE_SERVICE_ROLE_KEY in client code.
 
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from '@supabase/supabase-js'
 
-/** Basic CORS */
-function setCors(res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-}
-
-/** Safely parse JSON body */
-function parseBody(req) {
-  if (req.body && typeof req.body === "object") return req.body;
-  try {
-    return JSON.parse(req.body || "{}");
-  } catch {
-    return {};
+function pickEnv(...names) {
+  for (const n of names) {
+    const v = process.env[n]
+    if (v && String(v).trim().length > 0) return v
   }
+  return ''
 }
 
-function isNumber(x) {
-  return typeof x === "number" && Number.isFinite(x);
+function setCors(res) {
+  // Change * to your domain if you want to lock it down
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 }
 
-function normalizeNullableString(v) {
-  if (v === undefined || v === null) return null;
-  const s = String(v).trim();
-  return s.length ? s : null;
+function safeJson(res, status, payload) {
+  res.statusCode = status
+  res.setHeader('Content-Type', 'application/json; charset=utf-8')
+  res.end(JSON.stringify(payload))
 }
 
-function normalizeNullableNumber(v) {
-  if (v === undefined || v === null || v === "") return null;
-  const n = typeof v === "number" ? v : Number(v);
-  return Number.isFinite(n) ? n : null;
-}
-
-function errorJson(res, status, message, extra = {}) {
-  res.status(status).json({
-    code: status,
-    message,
-    ...extra,
-  });
+async function readBody(req) {
+  // Vercel sometimes parses JSON automatically, but handle raw body too
+  if (req.body && typeof req.body === 'object') return req.body
+  const chunks = []
+  for await (const chunk of req) chunks.push(chunk)
+  const raw = Buffer.concat(chunks).toString('utf8')
+  if (!raw) return {}
+  try { return JSON.parse(raw) } catch { return { raw } }
 }
 
 export default async function handler(req, res) {
-  setCors(res);
+  setCors(res)
 
-  if (req.method === "OPTIONS") {
-    return res.status(204).end();
+  if (req.method === 'OPTIONS') return res.end()
+  if (req.method !== 'POST') return safeJson(res, 405, { error: 'Method not allowed' })
+
+  const SUPABASE_URL = pickEnv('SUPABASE_URL', 'VITE_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL')
+  const SERVICE_ROLE = pickEnv('SUPABASE_SERVICE_ROLE_KEY')
+  const ANON_KEY = pickEnv('SUPABASE_ANON_KEY', 'VITE_SUPABASE_ANON_KEY', 'NEXT_PUBLIC_SUPABASE_ANON_KEY')
+
+  if (!SUPABASE_URL) {
+    return safeJson(res, 500, {
+      code: 500,
+      message: 'Server misconfigured: SUPABASE_URL is missing',
+      hint: 'Add SUPABASE_URL in Vercel Environment Variables'
+    })
   }
 
-  if (req.method !== "POST") {
-    return errorJson(res, 405, "Method not allowed. Use POST.");
+  // Choose key:
+  // - If client sent Authorization: Bearer <jwt>, use ANON_KEY and forward the header (RLS applies).
+  // - Otherwise, use SERVICE_ROLE if available (bypasses RLS; server-only).
+  const authHeader = req.headers.authorization || req.headers.Authorization || ''
+  const useAnonWithAuth = Boolean(authHeader && authHeader.toLowerCase().startsWith('bearer '))
+  const supabaseKey = useAnonWithAuth ? ANON_KEY : (SERVICE_ROLE || ANON_KEY)
+
+  if (!supabaseKey) {
+    return safeJson(res, 500, {
+      code: 500,
+      message: 'Server misconfigured: no Supabase key found',
+      hint: 'Set SUPABASE_SERVICE_ROLE_KEY (recommended) or SUPABASE_ANON_KEY in Vercel'
+    })
   }
-
-  const body = parseBody(req);
-
-  // ---- Accept BOTH client styles:
-  // Vite client sends: pickup_location, dropoff_location, from_lat, from_lng, to_lat, to_lng, price, status, service_type, ...
-  // Some older code may send: from_location / to_location
-  const pickupLocation =
-    normalizeNullableString(body.pickup_location) ||
-    normalizeNullableString(body.from_location) ||
-    normalizeNullableString(body.fromLocation);
-
-  const dropoffLocation =
-    normalizeNullableString(body.dropoff_location) ||
-    normalizeNullableString(body.to_location) ||
-    normalizeNullableString(body.toLocation);
-
-  const fromLat = normalizeNullableNumber(body.from_lat);
-  const fromLng = normalizeNullableNumber(body.from_lng);
-
-  // Destination is OPTIONAL (user may order "start" without destination)
-  const toLat = normalizeNullableNumber(body.to_lat);
-  const toLng = normalizeNullableNumber(body.to_lng);
-
-  const price = normalizeNullableNumber(body.price);
-  const status = normalizeNullableString(body.status) || "new";
-  const serviceType = normalizeNullableString(body.service_type);
-
-  // Hard requirement: pickup location + coords + price.
-  // If your DB has different NOT NULL constraints, change here (not in the client!).
-  const missing = [];
-  if (!pickupLocation) missing.push("pickup_location");
-  if (!isNumber(fromLat)) missing.push("from_lat");
-  if (!isNumber(fromLng)) missing.push("from_lng");
-  if (!isNumber(price)) missing.push("price");
-
-  if (missing.length) {
-    return errorJson(res, 400, "Missing required fields", { missing });
-  }
-
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const anonKey = process.env.SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || (!serviceRoleKey && !anonKey)) {
-    return errorJson(
-      res,
-      500,
-      "Supabase env vars are not configured on the server",
-      {
-        required_env: ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_ANON_KEY)"],
-      }
-    );
-  }
-
-  const supabase = createClient(supabaseUrl, serviceRoleKey || anonKey);
-
-  // Build insert object:
-  // IMPORTANT: Keep keys aligned with your "orders" table columns.
-  // If your table uses different column names, rename them here.
-  const orderRow = {
-    // Locations
-    pickup_location: pickupLocation,
-    dropoff_location: dropoffLocation,
-
-    // Coordinates
-    from_lat: fromLat,
-    from_lng: fromLng,
-    to_lat: toLat,
-    to_lng: toLng,
-
-    // Core fields
-    price,
-    status,
-    service_type: serviceType,
-
-    // Optional fields the client may send
-    action: normalizeNullableString(body.action),
-    comment: normalizeNullableString(body.comment),
-    distance_km: normalizeNullableNumber(body.distance_km),
-    order_for: normalizeNullableString(body.order_for),
-    other_phone: normalizeNullableString(body.other_phone),
-    pickup_entrance: normalizeNullableString(body.pickup_entrance),
-    scheduled_time: body.scheduled_time ?? null,
-    waypoints: Array.isArray(body.waypoints) ? body.waypoints : [],
-    wishes: typeof body.wishes === "object" && body.wishes !== null ? body.wishes : null,
-  };
 
   try {
-    const { data, error } = await supabase
-      .from("orders")
-      .insert(orderRow)
-      .select("*")
-      .single();
+    const body = await readBody(req)
 
-    if (error) {
-      return errorJson(res, 500, "Supabase insert failed", {
-        supabase_error: error.message,
-        hint:
-          "Check your 'orders' table columns + NOT NULL constraints. If a column is required in DB, send it or set a default.",
-      });
+    // Map fields from your client (keep both old/new names)
+    const from_location = body.from_location ?? body.from ?? body.fromLocation ?? body.from_address ?? null
+    const to_location = body.to_location ?? body.to ?? body.toLocation ?? body.to_address ?? null
+    const passenger_id = body.passenger_id ?? body.user_id ?? body.passengerId ?? null
+    const price = Number(body.price ?? body.fare ?? 0) || 0
+
+    if (!from_location || !to_location) {
+      return safeJson(res, 400, {
+        code: 400,
+        message: 'Missing required fields',
+        details: 'from_location and to_location are required'
+      })
     }
 
-    // Always return an id so the client doesn't crash
-    return res.status(200).json({
-      id: data?.id ?? data?.order_id ?? null,
-      order: data,
-    });
-  } catch (e) {
-    return errorJson(res, 500, "Server error", {
-      details: e instanceof Error ? e.message : String(e),
-    });
+    const supabase = createClient(SUPABASE_URL, supabaseKey, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      global: useAnonWithAuth ? { headers: { Authorization: authHeader } } : undefined
+    })
+
+    const insertPayload = {
+      passenger_id,
+      from_location,
+      to_location,
+      price,
+      status: body.status ?? 'pending'
+      // created_at: let DB default handle it if column has default now()
+    }
+
+    const { data, error } = await supabase
+      .from('orders')
+      .insert(insertPayload)
+      .select()
+      .single()
+
+    if (error) {
+      return safeJson(res, 500, {
+        code: 500,
+        message: error.message,
+        details: error.details || null,
+        hint: error.code === '42501'
+          ? 'RLS blocked insert. Either send Authorization header with a logged-in user + correct RLS policy, or use SUPABASE_SERVICE_ROLE_KEY on server.'
+          : null
+      })
+    }
+
+    return safeJson(res, 200, { success: true, order: data })
+  } catch (err) {
+    return safeJson(res, 500, {
+      code: 500,
+      message: 'A server error has occurred',
+      details: String(err?.message || err)
+    })
   }
 }

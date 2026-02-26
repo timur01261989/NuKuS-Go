@@ -8,8 +8,16 @@
  *  - Keeps backward compatibility with existing handlers (order/auth/driver/dispatch/...)
  */
 
-import { ROUTES, AUTH_REQUIRED } from "../server/api/_registry.js";
-import { requireAuth } from "../server/middleware/auth.js";
+import orderHandler from "../server/api/order.js";
+import authHandler from "../server/api/auth.js";
+import driverHandler from "../server/api/driver.js";
+import dispatchHandler from "../server/api/dispatch.js";
+import billingHandler from "../server/api/billing.js";
+import miscHandler from "../server/api/misc.js";
+import sosHandler from "../server/api/sos.js";
+import presenceHandler from "../server/api/presence.js";
+import cronDispatchHandler from "../server/api/cron_dispatch.js";
+import notificationsHandler from "../server/api/notifications.js";
 
 function normalizePath(rawPath) {
   // Supports both direct path (/api/order) and rewritten query (?path=order)
@@ -152,28 +160,49 @@ export default async function handler(req, res) {
     // routeKey for subroutes (used by dispatch/driver modules)
     req.routeKey = getRouteKey(path);
 
-    // Auth middleware (production-safe): attach req.user if required.
-    // Public: /api/auth/* and /api/pricing/*
-    const top = String(path || "").split("/").filter(Boolean)[0] || "";
-    if (AUTH_REQUIRED.has(top)) {
-      req.user = await requireAuth(req);
+    if (path.startsWith("order")) {
+      return await orderHandler(req, res);
     }
 
-    // Route dispatch
-    if (path.startsWith("order")) return await ROUTES.order(req, res);
-    if (path.startsWith("auth")) return await ROUTES.auth(req, res);
-    if (path.startsWith("driver") || path.startsWith("driver-"))
-      return await ROUTES.driver(req, res, req.routeKey || "driver");
-    if (path.startsWith("dispatch")) return await ROUTES.dispatch(req, res);
-    if (path.startsWith("presence")) return await ROUTES.presence(req, res);
-    if (path.startsWith("cron_dispatch")) return await ROUTES.cron_dispatch(req, res);
-    if (path.startsWith("offer")) return await ROUTES.offer(req, res);
-    if (path.startsWith("wallet")) return await ROUTES.wallet(req, res);
-    if (path.startsWith("sos")) return await ROUTES.sos(req, res);
-    if (path.startsWith("notifications")) return await ROUTES.notifications(req, res);
-    if (path.startsWith("gamification")) return await ROUTES.gamification(req, res);
-    if (path.startsWith("pricing")) return await ROUTES.pricing(req, res);
+    if (path.startsWith("auth")) {
+      return await authHandler(req, res);
+    }
 
+    if (path.startsWith("driver") || path.startsWith("driver-")) {
+      return await driverHandler(req, res, req.routeKey || "driver");
+    }
+
+    if (path.startsWith("dispatch")) {
+      return await dispatchHandler(req, res);
+    }
+
+    if (path.startsWith("presence")) {
+      return await presenceHandler(req, res);
+    }
+
+    if (path.startsWith("cron_dispatch")) {
+      return await cronDispatchHandler(req, res);
+    }
+
+    if (path.startsWith("offer") || path.startsWith("wallet")) {
+      req._unigo_route = path;
+      return await billingHandler(req, res);
+    }
+
+    if (path.startsWith("pricing") || path.startsWith("gamification")) {
+      req._unigo_route = path;
+      return await miscHandler(req, res);
+    }
+
+    if (path.startsWith("sos")) {
+      return await sosHandler(req, res);
+    }
+
+    if (path.startsWith("notifications")) {
+      return await notificationsHandler(req, res);
+    }
+
+    
     res.statusCode = 404;
     res.setHeader("Content-Type", "application/json");
     res.end(JSON.stringify({ error: "API route topilmadi", path }));

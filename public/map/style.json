@@ -1,6 +1,6 @@
 {
   "version": 8,
-  "name": "NukusGo Basic",
+  "name": "UniGo Basic",
   "sources": {
     "osm": {
       "type": "raster",
