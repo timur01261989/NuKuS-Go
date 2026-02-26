@@ -40,7 +40,7 @@ export function subscribeToMyNotifications(userId) {
         const row = payload?.new;
         if (!row) return;
         showLocalNotification(
-          row.title || "Nukus Go",
+          row.title || "UniGo",
           row.body || "",
           { data: { url: row.action_url || "/" } }
         );

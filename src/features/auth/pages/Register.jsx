@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Form, Input, Button, Typography, Card, message, ConfigProvider } from "antd";
+import { Form, Input, Button, message } from "antd";
 import { useNavigate } from "react-router-dom";
-import { UserOutlined, PhoneOutlined, ArrowLeftOutlined, LockOutlined, CheckCircleOutlined, SafetyCertificateOutlined } from "@ant-design/icons";
+import { UserOutlined, PhoneOutlined, ArrowLeftOutlined, LockOutlined, ReloadOutlined } from "@ant-design/icons";
 import { supabase } from "@/lib/supabase";
 
-const { Title, Text } = Typography;
+import { BRAND } from "@/shared/config/brand";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -46,6 +46,20 @@ export default function Register() {
       setStep(2);
     } catch (err) {
       message.error("Xatolik: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onResend = async () => {
+    if (!formData?.fullPhone) return;
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({ phone: formData.fullPhone });
+      if (error) throw error;
+      message.success("SMS kod qayta yuborildi!");
+    } catch (err) {
+      message.error("Xatolik: " + (err?.message || ""));
     } finally {
       setLoading(false);
     }
@@ -101,59 +115,119 @@ export default function Register() {
   };
 
   return (
-    <ConfigProvider 
-      theme={{ 
-        token: { 
-          colorPrimary: '#FFD700',
-          borderRadius: 16,
-          fontFamily: 'YangoHeadline, -apple-system, sans-serif' 
-        } 
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", background: "#f0f2f5", padding: 20 }}>
-        <Card style={{ width: 400, borderRadius: 28, boxShadow: "0 15px 35px rgba(0,0,0,0.08)", border: 'none' }}>
+    <div className="min-h-screen flex flex-col items-center justify-start p-6" style={{ background: "#E3EDF7" }}>
+      <div className="w-full max-w-md">
+        {/* Brand */}
+        <div className="flex flex-col items-center mb-10">
+          <div
+            className="mb-6 inline-flex items-center justify-center w-20 h-20 rounded-2xl shadow-lg"
+            style={{ background: BRAND.primary }}
+          >
+            <span className="text-white text-3xl font-black">{BRAND.short}</span>
+          </div>
+          <h1 className="text-5xl font-bold tracking-tight" style={{ color: "#1e293b" }}>{BRAND.name}</h1>
+          <p className="font-medium mt-1 text-base" style={{ color: "#ec5b13" }}>{BRAND.slogan}</p>
+        </div>
 
-          {/* HEADER QISMI (Yango uslubida) */}
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 25 }}>
-             <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/login')} type="text" shape="circle" />
-             <Title level={4} className="yango-title" style={{ margin: '0 0 0 10px' }}>Ro'yxatdan o'tish</Title>
+        <div className="rounded-3xl p-6 shadow-xl border border-white/60" style={{ background: "rgba(255,255,255,0.7)" }}>
+          <div className="flex items-center mb-6">
+            <Button icon={<ArrowLeftOutlined />} onClick={() => navigate("/login")} type="text" shape="circle" />
+            <div className="flex-1 text-center pr-10">
+              <div className="text-xl font-bold" style={{ color: "#1e293b" }}>Ro'yxatdan o'tish</div>
+              <div className="text-xs text-slate-500">1 daqiqada tugaydi</div>
+            </div>
           </div>
 
           {step === 1 ? (
             <Form form={form} layout="vertical" onFinish={onGetOtp} size="large">
-                <Form.Item name="name" rules={[{ required: true, message: 'Ismingiz?' }]}>
-                   <Input prefix={<UserOutlined />} placeholder="Ism" />
-                </Form.Item>
-                <Form.Item name="surname" rules={[{ required: true, message: 'Familiyangiz?' }]}>
-                   <Input prefix={<UserOutlined />} placeholder="Familiya" />
-                </Form.Item>
-                <Form.Item name="phone" rules={[{ required: true, message: 'Telefon?' }]}>
-                   <Input prefix={<PhoneOutlined />} addonBefore="+998" placeholder="90 123 45 67" type="number" />
-                </Form.Item>
-                <Form.Item name="password" rules={[{ required: true, min: 6 }]}>
-                   <Input.Password prefix={<LockOutlined />} placeholder="Yangi parol" />
-                </Form.Item>
-                <Button type="primary" htmlType="submit" loading={loading} block style={{ height: 55, borderRadius: 18, fontWeight: "800", background: '#000' }}>
-                   SMS KOD OLISH
-                </Button>
+              <Form.Item
+                label={<span className="text-sm font-medium text-slate-500">Ism</span>}
+                name="name"
+                rules={[{ required: true, message: "Ismingiz?" }]}
+              >
+                <Input prefix={<UserOutlined />} placeholder="Ismingiz" />
+              </Form.Item>
+
+              <Form.Item
+                label={<span className="text-sm font-medium text-slate-500">Familiya</span>}
+                name="surname"
+                rules={[{ required: true, message: "Familiyangiz?" }]}
+              >
+                <Input prefix={<UserOutlined />} placeholder="Familiyangiz" />
+              </Form.Item>
+
+              <Form.Item
+                label={<span className="text-sm font-medium text-slate-500">Telefon raqam</span>}
+                name="phone"
+                rules={[{ required: true, message: "Telefon?" }]}
+              >
+                <Input prefix={<PhoneOutlined />} addonBefore="+998" placeholder="90 123 45 67" />
+              </Form.Item>
+
+              <Form.Item
+                label={<span className="text-sm font-medium text-slate-500">Parol</span>}
+                name="password"
+                rules={[{ required: true, min: 6, message: "Kamida 6 ta belgi" }]}
+              >
+                <Input.Password prefix={<LockOutlined />} placeholder="Yangi parol" />
+              </Form.Item>
+
+              <Button
+                htmlType="submit"
+                loading={loading}
+                block
+                className="!h-14 !rounded-2xl !font-extrabold"
+                style={{ background: BRAND.dark, borderColor: BRAND.dark, color: "#fff" }}
+              >
+                SMS KOD OLISH
+              </Button>
             </Form>
           ) : (
-             <Form form={form} layout="vertical" onFinish={onVerifyOtp} size="large">
-                <div style={{ textAlign: 'center', marginBottom: 20, background: '#fffbe6', padding: 15, borderRadius: 12 }}>
-                    <Text type="secondary">Kod yuborildi: </Text>
-                    <Text strong>{formData?.fullPhone}</Text>
-                </div>
-                <Form.Item name="otp" rules={[{ required: true, len: 6 }]}>
-                    <Input placeholder="· · · · · ·" style={{ textAlign: 'center', letterSpacing: '8px', fontSize: '24px', fontWeight: 'bold', height: 60 }} maxLength={6} />
-                </Form.Item>
-                <Button type="primary" htmlType="submit" loading={loading} block style={{ height: 55, borderRadius: 18, fontWeight: "800", background: '#000' }}>
-                   TASDIQLASH
+            <Form form={form} layout="vertical" onFinish={onVerifyOtp} size="large">
+              <div className="rounded-xl p-4 text-center border" style={{ background: "#FFFBEB", borderColor: "#fde68a" }}>
+                <div className="text-xs font-bold tracking-wide uppercase opacity-70 mb-1">Kod yuborildi:</div>
+                <div className="text-lg font-mono font-bold tracking-wider text-black">{formData?.fullPhone}</div>
+              </div>
+
+              <Form.Item
+                label={<span className="text-sm font-medium text-slate-500">SMS kod</span>}
+                name="otp"
+                rules={[{ required: true, len: 6, message: "6 xonali kod" }]}
+                style={{ marginTop: 16 }}
+              >
+                <Input
+                  inputMode="numeric"
+                  placeholder="· · · · · ·"
+                  maxLength={6}
+                  style={{
+                    textAlign: "center",
+                    letterSpacing: "10px",
+                    fontSize: 22,
+                    fontWeight: 800,
+                    height: 60,
+                  }}
+                />
+              </Form.Item>
+
+              <div className="flex justify-end -mt-2 mb-4">
+                <Button type="text" icon={<ReloadOutlined />} onClick={onResend} disabled={loading}>
+                  Kodni qayta yuborish
                 </Button>
-             </Form>
+              </div>
+
+              <Button
+                htmlType="submit"
+                loading={loading}
+                block
+                className="!h-14 !rounded-2xl !font-extrabold"
+                style={{ background: BRAND.dark, borderColor: BRAND.dark, color: "#fff" }}
+              >
+                TASDIQLASH
+              </Button>
+            </Form>
           )}
-        </Card>
+        </div>
       </div>
-      <style>{`.yango-title { font-family: 'YangoHeadline', sans-serif !important; letter-spacing: -1px; }`}</style>
-    </ConfigProvider>
+    </div>
   );
 }

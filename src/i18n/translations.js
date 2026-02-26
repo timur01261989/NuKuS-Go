@@ -1,6 +1,8 @@
 export const translations = {
   uz_lotin: {
     // LOGIN & RO'YXATDAN O'TISH
+    appName: "UniGo",
+    loginTitle: "Tizimga kirish",
     greeting: "Xayrli kun!", appSubtitle: "Haydovchi va yo'lovchilar uchun",
     phonePlaceholder: "90 123 45 67", password: "Parol",
     remember: "Eslab qolish", forgot: "Parolni unutdingizmi?",
@@ -81,6 +83,8 @@ export const translations = {
   },
 
   uz_kirill: {
+    appName: "UniGo",
+    loginTitle: "Тизимга кириш",
     greeting: "Хайрли кун!", appSubtitle: "Ҳайдовчи ва йўловчилар учун",
     phonePlaceholder: "90 123 45 67", password: "Пароль",
     remember: "Эслаб қолиш", forgot: "Паролни унутдингизми?",
@@ -146,6 +150,8 @@ export const translations = {
   },
 
   qq_lotin: {
+    appName: "UniGo",
+    loginTitle: "Sistemaǵa kiriw",
     greeting: "Xayrli kún!", appSubtitle: "Aydawshı hám jolawshılar ushın",
     phonePlaceholder: "90 123 45 67", password: "Parol",
     remember: "Este saqlaw", forgot: "Paroldi umıttıńızba?",
@@ -210,6 +216,8 @@ export const translations = {
   },
 
   qq_kirill: {
+    appName: "UniGo",
+    loginTitle: "Системаға кирив",
     greeting: "Хайрлы күн!", appSubtitle: "Айдаўшы ҳәм жолаўшылар ушын",
     phonePlaceholder: "90 123 45 67", password: "Пароль",
     remember: "Эсте сақлаў", forgot: "Парольди умыттыңызба?",
@@ -274,6 +282,8 @@ export const translations = {
   },
 
   ru: {
+    appName: "UniGo",
+    loginTitle: "Вход в систему",
     greeting: "Добрый день!", appSubtitle: "Для водителей и пассажиров",
     phonePlaceholder: "90 123 45 67", password: "Пароль",
     remember: "Запомнить меня", forgot: "Забыли пароль?",
@@ -337,6 +347,8 @@ export const translations = {
   },
 
   en: {
+    appName: "UniGo",
+    loginTitle: "Sign in",
     greeting: "Good day!", appSubtitle: "For drivers and passengers",
     phonePlaceholder: "90 123 45 67", password: "Password",
     remember: "Remember me", forgot: "Forgot password?",

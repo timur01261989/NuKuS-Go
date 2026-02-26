@@ -3,6 +3,7 @@ import { Button, Input, Form, Card, Typography, Space, message, ConfigProvider, 
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeftOutlined, PhoneOutlined, LockOutlined, CheckCircleOutlined, SafetyOutlined } from '@ant-design/icons';
 import { translations } from "@i18n/translations"; 
+import { BRAND } from "@/shared/config/brand";
 
 const { Title, Text } = Typography;
 
@@ -83,7 +84,7 @@ export default function ResetPassword() {
           <div style={{ background: 'rgba(255,255,255,0.2)', padding: 15, borderRadius: '50%', marginBottom: 15, backdropFilter: 'blur(5px)' }}>
              <SafetyOutlined style={{ fontSize: 40, color: '#000' }} />
           </div>
-          <Title level={2} style={{ margin: 0, fontWeight: 900, color: '#000' }}>Nukus Go</Title>
+          <Title level={2} style={{ margin: 0, fontWeight: 900, color: '#000' }}>{BRAND.name}</Title>
           <Text style={{ opacity: 0.7, fontWeight: 600, color: '#000' }}>{t.resetTitle?.toUpperCase()}</Text>
         </div>
 
