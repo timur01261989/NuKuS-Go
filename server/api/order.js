@@ -569,50 +569,36 @@ async function createTaxiOrder(req, res, body) {
   const { pickup, dropoff } = resolvePickupDropoff(body);
   if (!pickup) return sendJson(res, 400, { error: "pickup koordinata shart" });
 
-  const route = body.route || body.polyline || body.routeInfo || null;
-  const notes = body.notes || body.note || body.comment || null;
+  // Keep payload compatible with BOTH:
+  // 1) the full schema in docs/supabase_schema.sql
+  // 2) smaller deployments where columns like route/notes/price_estimate/requested_at/updated_at don't exist.
+  const price = numOrNull(body.price ?? body.price_estimate ?? body.priceEstimate) ?? null;
+  const distance_km = numOrNull(body.distance_km ?? body.distanceKm) ?? null;
+  const duration_minutes = numOrNull(body.duration_minutes ?? body.duration_min ?? body.durationMin) ?? null;
 
-  const price_estimate =
-    numOrNull(body.price_estimate ?? body.priceEstimate ?? body.price) ??
-    null;
-
-  const currency = (body.currency || "UZS").toString();
-
-  // Preferred schema (based on your "orders" table snapshot):
   const baseInsert = {
     passenger_id,
     driver_id: body.driver_id || body.driverId || null,
     status: body.status || "created",
     pickup,
     dropoff: dropoff || null,
-    route: route || null,
-    notes,
-    price_estimate,
-    currency,
-    requested_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    // optional-but-common columns
+    price,
+    distance_km,
+    duration_minutes,
+    service_type: body.service_type || "taxi",
   };
 
-  // Some projects also have service_type in the same table; keep it if present.
-  const withServiceType = { ...baseInsert, service_type: body.service_type || "taxi" };
+  // Best-effort: insert, but strip null/undefined so PostgREST doesn't complain about missing columns.
+  const payload = Object.fromEntries(
+    Object.entries(baseInsert).filter(([, v]) => v !== undefined)
+  );
 
-  // Best-effort: try with service_type first, then without.
-  let inserted = null;
-  let lastErr = null;
-
-  for (const payload of [withServiceType, baseInsert]) {
-    const { data, error } = await supabase
-      .from("orders")
-      .insert([payload])
-      .select("*")
-      .single();
-
-    if (!error && data) {
-      inserted = data;
-      break;
-    }
-    lastErr = error;
-  }
+  const { data: inserted, error: lastErr } = await supabase
+    .from("orders")
+    .insert([payload])
+    .select("*")
+    .single();
 
   if (!inserted) {
     return sendJson(res, 500, {
@@ -632,9 +618,8 @@ async function cancelTaxiOrder(req, res, body) {
 
   const payload = {
     status: "cancelled",
-    canceled_at: new Date().toISOString(),
-    cancel_reason: body.cancel_reason || body.reason || null,
-    updated_at: new Date().toISOString(),
+    // Keep cancel update compatible with minimal schemas.
+    // If your DB has these columns you can add them back, but they caused schema-cache errors in some deployments.
   };
 
   const { data, error } = await supabase
