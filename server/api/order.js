@@ -443,6 +443,16 @@ async function districtOffers(req, res, body) {
 
 async function createInterDistrict(req, res, body) {
   const supabase = getSupabase(req);
+
+  const authUid = await getAuthUid(req);
+  const passenger_id_raw = body?.passenger_id ?? body?.client_id ?? body?.passengerId ?? null;
+  const passenger_id = authUid || passenger_id_raw || null;
+
+  // With RLS, we must act as an authenticated user OR use service role on the server.
+  if (!passenger_id) {
+    return sendJson(res, 401, { error: "Login required (passenger_id missing)" });
+  }
+
   const fromDistrict = (body?.fromDistrict || "Nukus").toString();
   const toDistrict = (body?.toDistrict || "").toString();
   const seats = Number(body?.seats || 1);
@@ -454,124 +464,39 @@ async function createInterDistrict(req, res, body) {
   const duration_min = Number(body?.duration_min || result.durationMin);
   const price = Number(body?.price || estimateDistrictPrice(distance_km));
 
-  // Create order row (best-effort). If table/columns differ, return created=false but still 200.
   try {
+    const insertRow = {
+      service_type: "inter_district",
+      status: "pending",
+      passenger_id: authUid || passenger_id, // if auth exists, force it
+      from_region: body?.from_region || null,
+      to_region: body?.to_region || null,
+      from_district: fromDistrict,
+      to_district: toDistrict,
+      seats_requested: seats,
+      seats_available: 0,
+      distance_km,
+      duration_min,
+      price,
+      filters,
+      scheduled_at: new Date().toISOString(),
+    };
+
     const { data, error } = await supabase
       .from("orders")
-      .insert([{
-        service_type: "inter_district",
-        status: "pending",
-        from_region: body?.from_region || null,
-        to_region: body?.to_region || null,
-        from_district: fromDistrict,
-        to_district: toDistrict,
-        seats_requested: seats,
-        seats_available: 0,
-        distance_km,
-        duration_min,
-        price,
-        filters,
-        scheduled_at: new Date().toISOString(),
-      }])
+      .insert([insertRow])
       .select("*")
       .single();
 
     if (error) {
-      return sendJson(res, 200, { created: false, warning: error.message, distance_km, duration_min, price });
+      const status = error.code === "42501" ? 403 : 400;
+      return sendJson(res, status, { error: error.message, code: error.code, details: error.details, hint: error.hint });
     }
+
     return sendJson(res, 200, { created: true, id: data?.id, order: data });
   } catch (e) {
-    return sendJson(res, 200, { created: false, warning: e?.message || "insert failed", distance_km, duration_min, price });
+    return sendJson(res, 500, { error: e?.message || "insert failed" });
   }
-}
-
-
-
-/* ============================================================
- * TAXI / CITY TAXI
- * ------------------------------------------------------------
- * New actions (POST):
- * - create / create_taxi / create_city / new : create taxi order (in "orders")
- * - cancel_taxi / cancel_order : cancel taxi order
- * - get_taxi / get_order : get taxi order by id
- * - active_taxi : get active taxi order for passenger_id (best-effort)
- *
- * Notes:
- * - We keep a "best-effort" insertion strategy so DB column differences
- *   won't break the client flow during rollout.
- * ============================================================ */
-
-
-function getAuthUid(req) {
-  try {
-    const auth = req.headers?.authorization || req.headers?.Authorization;
-    if (!auth || typeof auth !== "string") return null;
-    const m = auth.match(/Bearer\s+(.+)/i);
-    if (!m) return null;
-    const token = m[1].trim();
-    const parts = token.split(".");
-    if (parts.length < 2) return null;
-    const payloadB64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const pad = "=".repeat((4 - (payloadB64.length % 4)) % 4);
-    const payloadJson = Buffer.from(payloadB64 + pad, "base64").toString("utf8");
-    const payload = JSON.parse(payloadJson);
-    return payload.sub || payload.user_id || payload.uid || null;
-  } catch {
-    return null;
-  }
-}
-
-function numOrNull(v) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-}
-
-function pickLatLng(obj) {
-  if (!obj) return null;
-  const lat = numOrNull(obj.lat ?? obj.latitude ?? obj.pickup_lat ?? obj.from_lat);
-  const lng = numOrNull(obj.lng ?? obj.lon ?? obj.longitude ?? obj.pickup_lng ?? obj.from_lng);
-  if (lat == null || lng == null) return null;
-  return { lat, lng };
-}
-
-function buildPoint({ lat, lng, address, extra }) {
-  if (lat == null || lng == null) return null;
-  const p = { lat, lng };
-  if (address) p.address = address;
-  if (extra && typeof extra === "object") Object.assign(p, extra);
-  return p;
-}
-
-function resolvePickupDropoff(body) {
-  // Accept multiple payload shapes without changing frontend behavior.
-  const pickupObj = body.pickup || body.from || body.pickup_point || null;
-  const dropoffObj = body.dropoff || body.to || body.dropoff_point || null;
-
-  const pLL =
-    pickLatLng(pickupObj) ||
-    pickLatLng({ lat: body.pickup_lat, lng: body.pickup_lng }) ||
-    pickLatLng({ lat: body.from_lat, lng: body.from_lng });
-
-  const dLL =
-    pickLatLng(dropoffObj) ||
-    pickLatLng({ lat: body.dropoff_lat, lng: body.dropoff_lng }) ||
-    pickLatLng({ lat: body.to_lat, lng: body.to_lng });
-
-  const pickup = buildPoint({
-    lat: pLL?.lat,
-    lng: pLL?.lng,
-    address: body.pickup_address || pickupObj?.address || pickupObj?.label || null,
-    extra: pickupObj && typeof pickupObj === "object" ? pickupObj : null,
-  });
-
-  const dropoff = buildPoint({
-    lat: dLL?.lat,
-    lng: dLL?.lng,
-    address: body.dropoff_address || dropoffObj?.address || dropoffObj?.label || null,
-    extra: dropoffObj && typeof dropoffObj === "object" ? dropoffObj : null,
-  });
-
-  return { pickup, dropoff };
 }
 
 async function createTaxiOrder(req, res, body) {

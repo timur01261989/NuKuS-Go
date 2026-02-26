@@ -311,9 +311,12 @@ const api = {
         }
 
         if (!res.ok) {
-          const msg =
+          let msg =
             (parsed && (parsed.message || parsed.error || parsed.detail)) ||
             `HTTP ${res.status} ${res.statusText}`;
+          if (msg && typeof msg !== "string") {
+            try { msg = JSON.stringify(msg); } catch { msg = String(msg); }
+          }
           throw new ApiError(msg, {
             status: res.status,
             url,
