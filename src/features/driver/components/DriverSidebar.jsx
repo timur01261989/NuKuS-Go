@@ -1,133 +1,108 @@
 import React from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { supabase } from "@lib/supabase";
-
-function Item({ icon, label, active, onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        "w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left transition",
-        active ? "bg-white/70 shadow-sm" : "hover:bg-white/50",
-      ].join(" ")}
-    >
-      <span className="material-symbols-outlined text-[22px] text-slate-700">{icon}</span>
-      <span className="text-[15px] font-semibold text-slate-800">{label}</span>
-    </button>
-  );
-}
+import { useNavigate } from "react-router-dom";
+import { supabase } from "../../../lib/supabase";
 
 export default function DriverSidebar({ open, onClose, onLogout }) {
-  const nav = useNavigate();
-  const loc = useLocation();
+  const navigate = useNavigate();
 
-  const go = (to) => {
+  const go = (path) => {
     onClose?.();
-    nav(to);
+    navigate(path);
   };
 
   const logout = async () => {
     try {
       await supabase.auth.signOut();
-    } catch (e) {
-      // ignore; still continue
-    } finally {
-      onClose?.();
-      onLogout?.();
-      nav("/login");
+    } catch {
+      // ignore
     }
+    onClose?.();
+    onLogout?.();
+    navigate("/login");
   };
 
   if (!open) return null;
 
-  const path = loc.pathname;
-
   return (
-    <div className="fixed inset-0 z-[60]">
-      {/* overlay */}
-      <button
-        type="button"
+    <>
+      {/* Overlay */}
+      <div
+        className="fixed inset-0 z-[60] bg-black/30 backdrop-blur-sm"
         onClick={onClose}
-        className="absolute inset-0 bg-black/40 backdrop-blur-[1px]"
-        aria-label="Yopish"
+        aria-hidden="true"
       />
 
-      {/* drawer */}
-      <aside className="absolute inset-y-0 left-0 w-[78%] max-w-[320px] bg-[#f3f7ff] shadow-2xl rounded-r-[28px] p-4 flex flex-col">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-[14px] text-slate-500">Haydovchi menyusi</div>
-            <div className="text-[20px] font-extrabold text-slate-900">Nukus Go</div>
+      {/* Drawer */}
+      <aside className="fixed inset-y-0 left-0 z-[70] w-[86%] max-w-[360px] bg-backgroundLightDriver text-slate-900 shadow-2xl">
+        <div className="h-full flex flex-col">
+          {/* Header */}
+          <div className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-2xl font-extrabold text-primarySidebar leading-none">Nukus Go</div>
+                <div className="text-sm text-slate-500 mt-1">Haydovchi menyusi</div>
+              </div>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-2 rounded-xl neumorphic-pop text-slate-700"
+                aria-label="Yopish"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-xl bg-white/70 hover:bg-white shadow-sm"
-            aria-label="Yopish"
-          >
-            <span className="material-symbols-outlined">close</span>
-          </button>
-        </div>
 
-        <div className="mt-4 space-y-2">
-          <Item
-            icon="person"
-            label="Yolovchi sahifasi"
-            active={path.startsWith("/client")}
-            onClick={() => go("/client/home")}
-          />
-          <Item
-            icon="history"
-            label="Buyurtmalar tarixi"
-            active={path.startsWith("/driver/orders")}
-            onClick={() => go("/driver/orders")}
-          />
-          <Item
-            icon="account_balance_wallet"
-            label="Hisobni to‘ldirish"
-            active={path.startsWith("/driver/wallet")}
-            onClick={() => go("/driver/wallet")}
-          />
-          <Item
-            icon="settings"
-            label="Sozlamalar"
-            active={path.startsWith("/driver/settings")}
-            onClick={() => go("/driver/settings")}
-          />
-          <Item
-            icon="local_activity"
-            label="Promokodlar"
-            active={path.startsWith("/driver/promo")}
-            onClick={() => go("/driver/promo")}
-          />
-          <Item
-            icon="help"
-            label="Qo‘llanma"
-            active={path.startsWith("/driver/guide")}
-            onClick={() => go("/driver/guide")}
-          />
-        </div>
+          {/* Menu */}
+          <div className="px-4 pb-4 flex-1 overflow-auto">
+            <div className="space-y-3">
+              <MenuItem icon="person" title="Yolovchi sahifasi" onClick={() => go("/client/home")} />
+              <MenuItem icon="history" title="Buyurtmalar tarixi" onClick={() => go("/driver/orders")} />
+              <MenuItem icon="account_balance_wallet" title="Hisobni to'ldirish" onClick={() => go("/driver/wallet")} />
+              <MenuItem icon="settings" title="Sozlamalar" onClick={() => go("/driver/settings")} />
+              <MenuItem icon="confirmation_number" title="Promokodlar" onClick={() => go("/driver/promo")} />
+              <MenuItem icon="help" title="Qo'llanma" onClick={() => go("/driver/guide")} />
+            </div>
+          </div>
 
-        <div className="mt-auto pt-4">
-          <button
-            type="button"
-            onClick={logout}
-            className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-white/80 hover:bg-white shadow-sm"
-          >
-            <span className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-[22px] text-red-600">logout</span>
-              <span className="text-[15px] font-extrabold text-slate-900">Chiqish</span>
-            </span>
-            <span className="material-symbols-outlined text-slate-400">chevron_right</span>
-          </button>
+          {/* Footer */}
+          <div className="p-4 border-t border-slate-200/70 bg-white/40 backdrop-blur">
+            <button
+              type="button"
+              onClick={logout}
+              className="w-full neumorphic-pop rounded-2xl px-4 py-3 flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3 text-red-600">
+                <span className="material-symbols-outlined">logout</span>
+                <span className="font-bold">Chiqish</span>
+              </div>
+              <span className="material-symbols-outlined text-red-600">arrow_forward</span>
+            </button>
 
-          <div className="mt-4 text-center">
-            <div className="text-[14px] font-extrabold text-slate-900">Nukus Go</div>
-            <div className="text-[12px] font-semibold text-slate-500">UniGo</div>
+            <div className="mt-4 text-center">
+              <div className="text-sm font-extrabold text-slate-800">Nukus Go</div>
+              <div className="text-xs text-slate-500">UniGo</div>
+            </div>
           </div>
         </div>
       </aside>
-    </div>
+    </>
+  );
+}
+
+function MenuItem({ icon, title, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full neumorphic-pop rounded-2xl px-4 py-3 flex items-center justify-between"
+    >
+      <div className="flex items-center gap-3">
+        <span className="material-symbols-outlined text-primarySidebar">{icon}</span>
+        <span className="font-bold text-slate-800">{title}</span>
+      </div>
+      <span className="material-symbols-outlined text-slate-400">chevron_right</span>
+    </button>
   );
 }
