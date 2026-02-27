@@ -60,21 +60,7 @@ function getRouteKey(path) {
     return map[sub] || "dispatch";
   }
 
-  // Versioned API used by BASE project:
-if (base === "v1") {
-  const v1sub = parts[1] || "";
-  if (v1sub === "auth") return "auth";
-  if (v1sub === "users") return "misc";
-  if (v1sub === "intercity") return "misc";
-  return "";
-}
-
-// Unversioned endpoints:
-if (base === "regions") return "misc";
-if (base === "intercity") return "misc";
-if (base === "users") return "misc";
-
-if (base === "order") return "order";
+  if (base === "order") return "order";
   if (base === "auth") return "auth";
   if (base === "offer") return "offer";
   if (base === "wallet") return "wallet";
@@ -204,17 +190,9 @@ export default async function handler(req, res) {
     if (path.startsWith("sos") || path.startsWith("notifications")) {
       return await sosNotificationsHandler(req, res);
     }
-    if (path.startsWith("gamification") || path.startsWith("pricing")) {
+    if (path.startsWith("gamification") || path.startsWith("pricing") || path.startsWith("regions") || path.startsWith("intercity") || path.startsWith("users")) {
       return await miscHandler(req, res);
     }
-
-// BASE project versioned endpoints:
-if (path.startsWith("v1/auth") || path.startsWith("auth")) {
-  return await authHandler(req, res);
-}
-if (path.startsWith("v1/users") || path.startsWith("v1/intercity") || path.startsWith("regions") || path.startsWith("users") || path.startsWith("intercity")) {
-  return await miscHandler(req, res);
-}
 res.statusCode = 404;
     res.setHeader("Content-Type", "application/json");
     res.end(JSON.stringify({ error: "API route topilmadi", path }));

@@ -1,0 +1,72 @@
+{
+  "brands": [
+    "Chevrolet",
+    "Kia",
+    "Hyundai",
+    "Toyota",
+    "Volkswagen",
+    "Lada"
+  ],
+  "modelsByBrand": {
+    "Chevrolet": [
+      "Cobalt",
+      "Gentra",
+      "Nexia 3",
+      "Tracker",
+      "Onix"
+    ],
+    "Kia": [
+      "K5",
+      "Sportage",
+      "Rio"
+    ],
+    "Hyundai": [
+      "Elantra",
+      "Sonata",
+      "Tucson"
+    ],
+    "Toyota": [
+      "Camry",
+      "Corolla",
+      "RAV4"
+    ],
+    "Volkswagen": [
+      "Polo",
+      "Jetta",
+      "Passat"
+    ],
+    "Lada": [
+      "Vesta",
+      "Granta",
+      "Niva"
+    ]
+  },
+  "fuel": [
+    "Benzin",
+    "Dizel",
+    "Gaz",
+    "Benzin/Gaz",
+    "Elektr",
+    "Gibrid"
+  ],
+  "gearbox": [
+    "Mexanika",
+    "Avtomat",
+    "Robot",
+    "Variator"
+  ],
+  "cities": [
+    "Nukus",
+    "Xo‘jayli",
+    "Beruniy",
+    "Taxiatosh",
+    "Qo‘ng‘irot",
+    "Mang‘it"
+  ],
+  "sort": [
+    "newest",
+    "price_asc",
+    "price_desc",
+    "year_desc"
+  ]
+}
