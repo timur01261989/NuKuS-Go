@@ -1,0 +1,13 @@
+{
+  "language_default": "uz",
+  "units": "km",
+  "features": {
+    "offlineTiles": true,
+    "telemetry": true,
+    "lottie": true,
+    "garage": true,
+    "payments": true,
+    "searchOnRoute": true,
+    "chat": true
+  }
+}

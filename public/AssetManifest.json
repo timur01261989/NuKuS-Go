@@ -1,0 +1,17 @@
+{
+  "files": {
+    "main.js": "/static/js/main.js",
+    "index.html": "/index.html",
+    "yango_font": "/assets/fonts/yango-headline-multi.woff",
+    "arrived_sound": "/sounds/arrived.mp3",
+    "car_icon": "/assets/icons/car_marker.svg"
+  },
+  "entrypoints": [
+    "static/js/main.js"
+  ],
+  "metadata": {
+    "app_name": "Nukus Go",
+    "version": "1.0.0",
+    "theme_color": "#FFD700"
+  }
+}
