@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Button, Card, Drawer, Space, Typography, Divider } from "antd";
-import UniSidebar from "@/shared/components/UniSidebar";
 import {
   MenuOutlined,
   CarOutlined,
@@ -269,9 +268,128 @@ export default function ClientHome() {
         width={300}
         bodyStyle={{ padding: 0 }}
       >
-        
-      <UniSidebar onClose={() => setDrawerOpen(false)} />
+        <div
+          style={{
+            padding: 16,
+            background: "var(--card-bg-strong)",
+            color: "var(--card-text)",
+            borderBottom: "1px solid var(--card-border)",
+          }}
+        >
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 12,
+                background: "var(--brand)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontWeight: 900,
+                color: "#111",
+                overflow: "hidden",
+              }}
+            >
+              {profile.avatarUrl ? (
+                <img
+                  alt="avatar"
+                  src={profile.avatarUrl}
+                  style={{ width: "100%", height: "100%", borderRadius: 12, objectFit: "cover" }}
+                />
+              ) : (
+                initials(profile.fullName)
+              )}
+            </div>
 
+            <div>
+              <div style={{ fontWeight: 900 }}>{profile.fullName || "Foydalanuvchi"}</div>
+              <div style={{ opacity: 0.85, fontSize: 12 }}>{t?.client || "Yolovchi"}</div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ padding: 12, position: "relative", minHeight: "calc(100vh - 80px)" }}>
+          <Button
+            block
+            icon={<UserOutlined />}
+            style={{ height: 44, borderRadius: 12, textAlign: "left" }}
+            onClick={() => {
+              close();
+              navigate("/driver-mode", { 
+                replace: true,
+                state: { from: location.pathname }
+              });
+            }}
+          >
+            {t?.workAsDriver || "Haydovchi bo‘lib ishlash"}
+          </Button>
+
+          <Divider style={{ margin: "12px 0" }} />
+
+          <Button
+            block
+            icon={<EnvironmentOutlined />}
+            style={{ height: 44, borderRadius: 12, textAlign: "left" }}
+            onClick={() => {
+              close();
+              navigate("/addresses");
+            }}
+          >
+            {t?.myAddresses || "Mening manzillarim"}
+          </Button>
+
+          <Button
+            block
+            icon={<SettingOutlined />}
+            style={{ height: 44, borderRadius: 12, textAlign: "left", marginTop: 8 }}
+            onClick={() => {
+              close();
+              navigate("/settings");
+            }}
+          >
+            {t?.settings || "Sozlamalar"}
+          </Button>
+
+          <Button
+            block
+            icon={<HistoryOutlined />}
+            style={{ height: 44, borderRadius: 12, textAlign: "left", marginTop: 8 }}
+            onClick={() => {
+              close();
+              navigate("/orders");
+            }}
+          >
+            {t?.orderHistory || "Buyurtmalar tarixi"}
+          </Button>
+
+          <div style={{ position: "absolute", left: 12, right: 12, bottom: 12 }}>
+            <Button
+              block
+              icon={<CustomerServiceOutlined />}
+              style={{ height: 44, borderRadius: 12, textAlign: "left" }}
+              onClick={() => {
+                close();
+                navigate("/support");
+              }}
+            >
+              {t?.support || "Qo‘llab-quvvatlash"}
+            </Button>
+
+            <Button
+              danger
+              block
+              icon={<LogoutOutlined />}
+              style={{ height: 44, borderRadius: 12, textAlign: "left", marginTop: 8 }}
+              onClick={() => {
+                close();
+                navigate("/logout");
+              }}
+            >
+              {t?.logout || "Chiqish"}
+            </Button>
+          </div>
+        </div>
       </Drawer>
     </div>
   );

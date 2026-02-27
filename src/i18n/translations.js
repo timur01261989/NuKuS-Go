@@ -1,8 +1,5 @@
 export const translations = {
   uz_lotin: {
-    appName: "UniGo",
-    language: "Til", theme: "Rejim", themeAuto: "Avto", themeNight: "Tun", themeDay: "Kun",
-    history: "Tarix", settings: "Sozlamalar", support: "Admin bilan aloqa", logout: "Chiqish",
     // LOGIN & RO'YXATDAN O'TISH
     greeting: "Xayrli kun!", appSubtitle: "Haydovchi va yo'lovchilar uchun",
     phonePlaceholder: "90 123 45 67", password: "Parol",
@@ -84,9 +81,6 @@ export const translations = {
   },
 
   uz_kirill: {
-    appName: "UniGo",
-    language: "Тил", theme: "Режим", themeAuto: "Авто", themeNight: "Тун", themeDay: "Кун",
-    history: "Тарих", settings: "Созламалар", support: "Админ билан алоқа", logout: "Чиқиш",
     greeting: "Хайрли кун!", appSubtitle: "Ҳайдовчи ва йўловчилар учун",
     phonePlaceholder: "90 123 45 67", password: "Пароль",
     remember: "Эслаб қолиш", forgot: "Паролни унутдингизми?",
@@ -152,9 +146,6 @@ export const translations = {
   },
 
   qq_lotin: {
-    appName: "UniGo",
-    language: "Til", theme: "Rejim", themeAuto: "Avto", themeNight: "Tun", themeDay: "Kun",
-    history: "Tarix", settings: "Sozlamalar", support: "Admin menen baylanıs", logout: "Shıǵıw",
     greeting: "Xayrli kún!", appSubtitle: "Aydawshı hám jolawshılar ushın",
     phonePlaceholder: "90 123 45 67", password: "Parol",
     remember: "Este saqlaw", forgot: "Paroldi umıttıńızba?",
@@ -219,9 +210,6 @@ export const translations = {
   },
 
   qq_kirill: {
-    appName: "UniGo",
-    language: "Til", theme: "Rejim", themeAuto: "Avto", themeNight: "Tun", themeDay: "Kun",
-    history: "Tarix", settings: "Sozlamalar", support: "Admin menen baylanıs", logout: "Shıǵıw",
     greeting: "Хайрлы күн!", appSubtitle: "Айдаўшы ҳәм жолаўшылар ушын",
     phonePlaceholder: "90 123 45 67", password: "Пароль",
     remember: "Эсте сақлаў", forgot: "Парольди умыттыңызба?",
@@ -286,9 +274,6 @@ export const translations = {
   },
 
   ru: {
-    appName: "UniGo",
-    language: "Язык", theme: "Тема", themeAuto: "Авто", themeNight: "Ночь", themeDay: "День",
-    history: "История", settings: "Настройки", support: "Связаться с админом", logout: "Выйти",
     greeting: "Добрый день!", appSubtitle: "Для водителей и пассажиров",
     phonePlaceholder: "90 123 45 67", password: "Пароль",
     remember: "Запомнить меня", forgot: "Забыли пароль?",
@@ -352,9 +337,6 @@ export const translations = {
   },
 
   en: {
-    appName: "UniGo",
-    language: "Language", theme: "Theme", themeAuto: "Auto", themeNight: "Night", themeDay: "Day",
-    history: "History", settings: "Settings", support: "Contact admin", logout: "Log out",
     greeting: "Good day!", appSubtitle: "For drivers and passengers",
     phonePlaceholder: "90 123 45 67", password: "Password",
     remember: "Remember me", forgot: "Forgot password?",
