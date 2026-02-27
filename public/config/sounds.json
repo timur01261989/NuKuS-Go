@@ -1,8 +1,0 @@
-{
-  "enabled": true,
-  "events": {
-    "order_received": "/audio/order_received.mp3",
-    "order_cancelled": "/audio/order_cancelled.mp3",
-    "arrived": "/audio/arrived.mp3"
-  }
-}

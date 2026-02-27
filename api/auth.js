@@ -1,72 +1,149 @@
-// api/auth.js
-// Combined auth: OTP request + OTP verify
+/**
+ * api/auth.js (Vercel serverless)
+ *
+ * Keeps the BASE project's auth working principle (Supabase Auth):
+ *  - POST /api/v1/auth/register
+ *  - POST /api/v1/auth/login
+ *  - POST /api/v1/auth/verify-otp
+ *  - POST /api/v1/auth/logout
+ *  - POST /api/v1/auth/refresh
+ *
+ * Also supports shorter paths used by some screens:
+ *  - POST /api/auth/login
+ *  - POST /api/auth/register
+ *  - POST /api/auth/verify-otp
+ *  - POST /api/auth/refresh
+ */
+import { json, badRequest } from './_shared/cors.js';
+import { getSupabaseAdmin } from './_shared/supabase.js';
 
-import crypto from 'crypto';
-import { json, badRequest, nowIso, uid, isPhone } from './_shared/cors.js';
-
-
-export async function auth_otp_request_handler(req, res) {
-  if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Method not allowed' });
-
-  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-  const phone = String(body.phone || '').trim();
-
-  if (!isPhone(phone)) return badRequest(res, 'Telefon raqam noto\'g\'ri', { field:'phone' });
-
-  // DEMO: return fixed OTP and session id
-  const session_id = uid('otp');
-  const otp_code = '1111'; // demo only
-  return json(res, 200, { ok:true, session_id, otp_code, sent_at: nowIso() });
+async function readBody(req) {
+  if (req.body && typeof req.body === 'object') return req.body;
+  const chunks = [];
+  for await (const c of req) chunks.push(c);
+  const raw = Buffer.concat(chunks).toString('utf-8') || '{}';
+  try { return JSON.parse(raw); } catch { return {}; }
 }
 
-
-function sign(payload, secret) {
-  const data = JSON.stringify(payload);
-  const sig = crypto.createHmac('sha256', secret).update(data).digest('hex');
-  return Buffer.from(data).toString('base64url') + '.' + sig;
+function phoneE164(phone) {
+  const p = String(phone || '').trim();
+  if (!p) return '';
+  if (p.startsWith('+')) return p;
+  // default Uzbekistan if user passes 9 digits
+  if (/^\d{9}$/.test(p)) return `+998${p}`;
+  if (/^998\d{9}$/.test(p)) return `+${p}`;
+  return p;
 }
 
-export async function auth_otp_verify_handler(req, res) {
-  if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Method not allowed' });
-
-  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-  const { session_id, otp_code, phone } = body;
-
-  if (!session_id) return badRequest(res, 'session_id kerak');
-  if (String(otp_code||'') !== '1111') return badRequest(res, 'OTP noto\'g\'ri');
-
-  const secret = process.env.AUTH_SECRET || 'dev-secret-change-me';
-  const user = { id: uid('u'), phone: String(phone||'').trim(), created_at: nowIso() };
-  const token = sign({ user, exp: Date.now() + 1000*60*60*24 }, secret); // 24h
-
-  return json(res, 200, { ok:true, token, user });
-}
-
-export default async function auth(req, res, routeKey = 'auth') {
-  // Backward compatible route keys:
-  // - auth-otp-request
-  // - auth-otp-verify
-  // New consolidated key:
-  // - auth  (action via query/body)
+function pathAfterApi(req) {
   const url = new URL(req.url, 'http://localhost');
-  const action = url.searchParams.get('action') || (typeof req.body === 'object' && req.body?.action) || (typeof req.body === 'string' ? (()=>{try{return JSON.parse(req.body||'{}').action}catch{return null}})() : null);
+  const p = url.pathname || '';
+  // "/api/v1/auth/login" -> "v1/auth/login"
+  const idx = p.indexOf('/api/');
+  if (idx === -1) return p.replace(/^\/+/, '');
+  return p.slice(idx + 5).replace(/^\/+/, '');
+}
 
-  switch (routeKey) {
-    case 'auth-otp-request':
-      return await auth_otp_request_handler(req, res);
-    case 'auth-otp-verify':
-      return await auth_otp_verify_handler(req, res);
-    case 'auth':
-    default:
-      if (action === 'otp-request') return await auth_otp_request_handler(req, res);
-      if (action === 'otp-verify') return await auth_otp_verify_handler(req, res);
-      // default: if client calls /api/auth without action, infer by body fields
+export default async function auth(req, res) {
+  if (req.method === 'OPTIONS') return json(res, 200, { ok: true });
+
+  const sb = getSupabaseAdmin();
+  const body = await readBody(req);
+
+  const subpath = pathAfterApi(req); // v1/auth/login
+  const parts = subpath.split('/').filter(Boolean);
+  const action = parts.slice(-1)[0] || '';
+
+  // normalize when using "/api/auth/login"
+  const last = action;
+
+  try {
+    if (req.method !== 'POST') return json(res, 405, { success:false, message:'Method not allowed' });
+
+    if (last === 'register') {
+      const { phone, password, fullName, role = 'client' } = body || {};
+      if (!phone || !password) return badRequest(res, 'Phone and password are required');
+      const e164 = phoneE164(phone);
+
+      const { data: authData, error: authError } = await sb.auth.signUp({
+        phone: e164,
+        password,
+        options: {
+          data: { full_name: fullName, role }
+        }
+      });
+      if (authError) return json(res, 400, { success:false, message: authError.message });
+
+      // Create user row (BASE expects users table)
+      const { data: userRow, error: userError } = await sb
+        .from('users')
+        .insert({
+          id: authData.user?.id,
+          phone,
+          full_name: fullName,
+          role
+        })
+        .select()
+        .maybeSingle();
+
+      if (userError) return json(res, 500, { success:false, message: userError.message });
+
+      // Create wallet row if table exists
       try {
-        const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-        if (body.code) return await auth_otp_verify_handler(req, res);
-        return await auth_otp_request_handler(req, res);
-      } catch {
-        return await auth_otp_request_handler(req, res);
-      }
+        await sb.from('wallets').insert({ user_id: userRow?.id, balance: 0 });
+      } catch {}
+
+      return json(res, 201, { success:true, data: { user: userRow, session: authData.session } });
+    }
+
+    if (last === 'login') {
+      const { phone, password } = body || {};
+      if (!phone || !password) return badRequest(res, 'Phone and password are required');
+      const e164 = phoneE164(phone);
+
+      const { data, error } = await sb.auth.signInWithPassword({ phone: e164, password });
+      if (error) return json(res, 401, { success:false, message:'Invalid credentials' });
+
+      const { data: userRow } = await sb.from('users').select('*').eq('id', data.user.id).maybeSingle();
+      return json(res, 200, { success:true, data: { user: userRow, session: data.session } });
+    }
+
+    if (last === 'verify-otp') {
+      const { phone, token } = body || {};
+      if (!phone || !token) return badRequest(res, 'Phone and token are required');
+      const e164 = phoneE164(phone);
+
+      const { data, error } = await sb.auth.verifyOtp({ phone: e164, token, type: 'sms' });
+      if (error) return json(res, 400, { success:false, message:'Invalid OTP' });
+
+      return json(res, 200, { success:true, data });
+    }
+
+    if (last === 'logout') {
+      // Supabase server-side signOut is session-based; keep compatibility response
+      return json(res, 200, { success:true, message:'Logged out successfully' });
+    }
+
+    if (last === 'refresh') {
+      const { refresh_token } = body || {};
+      if (!refresh_token) return badRequest(res, 'Refresh token required');
+
+      const { data, error } = await sb.auth.refreshSession({ refresh_token });
+      if (error) return json(res, 401, { success:false, message:'Invalid refresh token' });
+
+      return json(res, 200, { success:true, data });
+    }
+
+    // Fallback: allow /api/auth?action=login style
+    const url = new URL(req.url, 'http://localhost');
+    const qAction = url.searchParams.get('action') || body?.action;
+    if (qAction === 'login') {
+      req.url = '/api/v1/auth/login';
+      return await auth(req, res);
+    }
+
+    return json(res, 404, { success:false, message:'Auth endpoint not found' });
+  } catch (e) {
+    return json(res, 500, { success:false, message: e?.message || 'Server error' });
   }
 }

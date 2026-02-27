@@ -30,271 +30,10 @@
  *  5. Eng yuqori multiplier'ni tanlaydi (max_multiplier ga qadar)
  *  6. Narxni hisoblaydi va qaytaradi
  */
-import { json, badRequest, serverError } from "./_shared/cors.js";
+
+import { json, badRequest, serverError, nowIso } from "./_shared/cors.js";
 import { getSupabaseAdmin } from "./_shared/supabase.js";
-
-// ----------------------------
-// Added: regions + intercity + users (ported from legacy express server)
-// NOTE: kept inside misc.js to keep API file count <= 10
-// ----------------------------
-
-
-async function getUserIdFromAuth(req, supabase) {
-  const auth = req.headers?.authorization || req.headers?.Authorization || "";
-  const m = String(auth).match(/Bearer\s+(.+)/i);
-  if (!m) return null;
-  const token = m[1];
-  try {
-    const { data, error } = await supabase.auth.getUser(token);
-    if (error) return null;
-    return data?.user?.id || null;
-  } catch {
-    return null;
-  }
-}
-
-async function handleRegions(req, res, path) {
-  const supabase = getSupabaseAdmin();
-
-  // GET /api/regions
-  if ((req.method || "GET").toUpperCase() === "GET" && (path === "regions" || path === "regions/")) {
-    const { data, error } = await supabase.from("regions").select("*").order("name_uz_latn");
-    if (error) return json(res, 500, { success: false, error: error.message });
-    return json(res, 200, { success: true, data });
-  }
-
-  // GET /api/regions/:regionId/districts
-  const m = path.match(/^regions\/(.+?)\/districts\/?$/);
-  if ((req.method || "GET").toUpperCase() === "GET" && m) {
-    const regionId = m[1];
-    const { data, error } = await supabase
-      .from("districts")
-      .select("*")
-      .eq("region_id", regionId)
-      .order("name_uz_latn");
-    if (error) return json(res, 500, { success: false, error: error.message });
-    return json(res, 200, { success: true, data });
-  }
-
-  return false;
-}
-
-async function resolveRegionIdByName(supabase, title) {
-  if (!title) return null;
-  const q = String(title).trim();
-  if (!q) return null;
-
-  // Try exact-ish match by name_uz_latn
-  const { data, error } = await supabase
-    .from("regions")
-    .select("id,name_uz_latn")
-    .ilike("name_uz_latn", `%${q}%`)
-    .limit(1);
-
-  if (error) return null;
-  return data?.[0]?.id || null;
-}
-
-async function handleIntercity(req, res, path) {
-  if (!path.startsWith("intercity")) return false;
-
-  const supabase = getSupabaseAdmin();
-  const method = (req.method || "POST").toUpperCase();
-
-  // This endpoint is action-based: POST /api/intercity { action: ... }
-  if (method !== "POST") return json(res, 405, { success: false, error: "Method not allowed" });
-
-  const body = req.body || {};
-  const action = body.action;
-
-  if (action === "list_offers") {
-    const fromCity = body.from_city || body.fromCity;
-    const toCity = body.to_city || body.toCity;
-    const date = body.date || body.departure_date || null;
-    const passengers = Number(body.passengers || body.seats_needed || 1);
-
-    const fromRegionId = await resolveRegionIdByName(supabase, fromCity);
-    const toRegionId = await resolveRegionIdByName(supabase, toCity);
-
-    // If cities are unknown, return empty list (do not error the UI)
-    if (!fromRegionId || !toRegionId) {
-      return json(res, 200, { success: true, data: [] });
-    }
-
-    let q = supabase
-      .from("intercity_routes")
-      .select(
-        `id, departure_date, departure_time, available_seats, price_per_seat, full_car_price,
-         pickup_from_home_price, delivery_to_home_price, car_class, notes,
-         driver:users!driver_id(id, full_name, phone, avatar_url, rating),
-         driver_profile:driver_profiles!driver_id(car_model, car_number, car_color)`
-      )
-      .eq("status", "active")
-      .eq("from_region_id", fromRegionId)
-      .eq("to_region_id", toRegionId)
-      .gte("available_seats", passengers);
-
-    if (date) q = q.eq("departure_date", date);
-
-    const { data, error } = await q.order("departure_date").order("departure_time");
-    if (error) return json(res, 500, { success: false, error: error.message });
-
-    const shaped = (data || []).map((r) => ({
-      id: r.id,
-      price: Number(r.price_per_seat || 0),
-      price_sum: Number(r.price_per_seat || 0) * passengers,
-      seats_left: r.available_seats,
-      pickup_type: "default",
-      driver_name: r.driver?.full_name || "Driver",
-      rating: r.driver?.rating || null,
-      car_model: r.driver_profile?.car_model || null,
-      car_plate: r.driver_profile?.car_number || null,
-      raw: r,
-    }));
-
-    return json(res, 200, { success: true, data: shaped });
-  }
-
-  if (action === "request_booking") {
-    const userId = await getUserIdFromAuth(req, supabase);
-    if (!userId) return json(res, 401, { success: false, error: "Unauthorized" });
-
-    const routeId = body.offer_id || body.route_id || body.id;
-    const seats = Number(body.seats || 1);
-
-    if (!routeId || !Number.isFinite(seats) || seats <= 0) {
-      return json(res, 400, { success: false, error: "Invalid request" });
-    }
-
-    // 1) Ensure route has seats
-    const { data: route, error: routeErr } = await supabase
-      .from("intercity_routes")
-      .select("id, available_seats, status, price_per_seat")
-      .eq("id", routeId)
-      .single();
-
-    if (routeErr || !route) return json(res, 404, { success: false, error: "Offer not found" });
-    if (route.status !== "active") return json(res, 400, { success: false, error: "Offer is not active" });
-    if (route.available_seats < seats) return json(res, 400, { success: false, error: "Not enough seats" });
-
-    // 2) Insert booking
-    const totalPrice = Number(route.price_per_seat || 0) * seats;
-    const { data: booking, error: bookErr } = await supabase
-      .from("intercity_bookings")
-      .insert({
-        route_id: routeId,
-        client_id: userId,
-        seats_booked: seats,
-        total_price: totalPrice,
-        status: "pending",
-      })
-      .select("*")
-      .single();
-
-    if (bookErr) return json(res, 500, { success: false, error: bookErr.message });
-
-    // 3) Decrement seats safely
-    const { error: updErr } = await supabase
-      .from("intercity_routes")
-      .update({ available_seats: route.available_seats - seats })
-      .eq("id", routeId)
-      .gte("available_seats", seats);
-
-    if (updErr) {
-      // Rollback booking if seats update failed
-      await supabase.from("intercity_bookings").update({ status: "cancelled" }).eq("id", booking.id);
-      return json(res, 409, { success: false, error: "Seat update conflict" });
-    }
-
-    return json(res, 200, { success: true, data: booking });
-  }
-
-  if (action === "my_bookings") {
-    const userId = await getUserIdFromAuth(req, supabase);
-    if (!userId) return json(res, 401, { success: false, error: "Unauthorized" });
-
-    const { data, error } = await supabase
-      .from("intercity_bookings")
-      .select(
-        `*, route:intercity_routes(*,
-           from_region:regions!from_region_id(name_uz_latn),
-           to_region:regions!to_region_id(name_uz_latn)
-         )`
-      )
-      .eq("client_id", userId)
-      .order("created_at", { ascending: false });
-
-    if (error) return json(res, 500, { success: false, error: error.message });
-    return json(res, 200, { success: true, data: data || [] });
-  }
-
-  if (action === "cancel_booking") {
-    const userId = await getUserIdFromAuth(req, supabase);
-    if (!userId) return json(res, 401, { success: false, error: "Unauthorized" });
-
-    const bookingId = body.booking_id || body.id;
-    if (!bookingId) return json(res, 400, { success: false, error: "Invalid request" });
-
-    const { data: booking, error: bErr } = await supabase
-      .from("intercity_bookings")
-      .select("id, route_id, seats_booked, status, client_id")
-      .eq("id", bookingId)
-      .single();
-
-    if (bErr || !booking) return json(res, 404, { success: false, error: "Booking not found" });
-    if (booking.client_id !== userId) return json(res, 403, { success: false, error: "Forbidden" });
-    if (booking.status === "cancelled") return json(res, 200, { success: true, data: booking });
-
-    const { error: updB } = await supabase
-      .from("intercity_bookings")
-      .update({ status: "cancelled" })
-      .eq("id", bookingId);
-
-    if (updB) return json(res, 500, { success: false, error: updB.message });
-
-    // restore seats
-    const { data: route, error: rErr } = await supabase
-      .from("intercity_routes")
-      .select("available_seats")
-      .eq("id", booking.route_id)
-      .single();
-
-    if (!rErr && route) {
-      await supabase
-        .from("intercity_routes")
-        .update({ available_seats: Number(route.available_seats || 0) + Number(booking.seats_booked || 0) })
-        .eq("id", booking.route_id);
-    }
-
-    return json(res, 200, { success: true, data: { ...booking, status: "cancelled" } });
-  }
-
-  return json(res, 400, { success: false, error: "Unknown action" });
-}
-
-async function handleUsers(req, res, path) {
-  if (!path.startsWith("users")) return false;
-  const supabase = getSupabaseAdmin();
-
-  // Minimal safe endpoints that frontend may expect
-  // GET /api/users/me
-  if ((req.method || "GET").toUpperCase() === "GET" && (path === "users/me" || path === "users/me/")) {
-    const userId = await getUserIdFromAuth(req, supabase);
-    if (!userId) return json(res, 401, { success: false, error: "Unauthorized" });
-
-    const { data, error } = await supabase
-      .from("users")
-      .select("*")
-      .eq("id", userId)
-      .single();
-
-    if (error) return json(res, 500, { success: false, error: error.message });
-    return json(res, 200, { success: true, data });
-  }
-
-  return false;
-}
-
+import { requireAuth, requireVerifiedDriver } from "./_shared/auth.js";
 
 function hasEnv() {
   return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -601,7 +340,6 @@ async function pricingHandler(req, res) {
  * POST /api/gamification  { action: "admin_create_mission", data: {...} }
  *      → admin yangi missiya yaratish
  */
-import { json, badRequest, serverError, nowIso } from "./_shared/cors.js";
 
 function hasEnv() {
   return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -843,19 +581,292 @@ async function gamificationHandler(req, res) {
   }
 }
 
+
+
+function logicalPath(req){
+  const url = new URL(req.url, "http://localhost");
+  const qp = url.searchParams.get("path");
+  if (qp) return String(qp).replace(/^\/+/, "");
+  return (url.pathname || "").replace(/^\/api\//, "").replace(/^\/+/, "");
+}
+
+// ───────────────────────────────────────────────────────────────
+// REGIONS (BASE server/api/regions.js)
+async function regionsHandler(req, res) {
+  const sb = getSupabaseAdmin();
+  const p = logicalPath(req);
+  const parts = p.split("/").filter(Boolean);
+
+  if (req.method === "GET" && parts.length === 1) {
+    const { data, error } = await sb.from("regions").select("*").order("name_uz_latn");
+    if (error) return serverError(res, error);
+    return json(res, 200, { success: true, data });
+  }
+
+  if (req.method === "GET" && parts.length === 3 && parts[2] === "districts") {
+    const regionId = parts[1];
+    const { data, error } = await sb.from("districts").select("*").eq("region_id", regionId).order("name_uz_latn");
+    if (error) return serverError(res, error);
+    return json(res, 200, { success: true, data });
+  }
+
+  return json(res, 404, { success:false, message:"Regions endpoint not found" });
+}
+
+// USERS (BASE server/api/users.js)
+async function usersHandler(req, res) {
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+
+  const sb = getSupabaseAdmin();
+  const p = logicalPath(req);
+  const parts = p.split("/").filter(Boolean);
+
+  if (req.method === "GET" && parts[0]==="v1" && parts[1]==="users" && parts[2]==="me") {
+    return json(res, 200, { success:true, data: auth.userRow });
+  }
+
+  if (req.method === "PUT" && parts[0]==="v1" && parts[1]==="users" && parts[2]==="me") {
+    const body = await readBody(req);
+    const updates = { ...(body||{}) };
+    delete updates.id; delete updates.role; delete updates.created_at;
+
+    const { data, error } = await sb.from("users").update(updates).eq("id", auth.userId).select().maybeSingle();
+    if (error) return serverError(res, error);
+
+    return json(res, 200, { success:true, data });
+  }
+
+  return json(res, 404, { success:false, message:"Users endpoint not found" });
+}
+
+// INTERCITY (BASE server/api/intercity.js)
+async function intercityHandler(req, res) {
+  const sb = getSupabaseAdmin();
+  const p = logicalPath(req);
+  const parts = p.split("/").filter(Boolean);
+
+  // GET /api/v1/intercity/search
+  if (req.method === "GET" && parts[0]==="v1" && parts[1]==="intercity" && parts[2]==="search") {
+    const url = new URL(req.url, "http://localhost");
+    const q = url.searchParams;
+    const from_region_id = q.get("from_region_id");
+    const to_region_id = q.get("to_region_id");
+    const from_district_id = q.get("from_district_id");
+    const to_district_id = q.get("to_district_id");
+    const departure_date = q.get("departure_date");
+    const seats_needed = Number(q.get("seats_needed") || 1);
+
+    let query = sb
+      .from("intercity_routes")
+      .select(`
+        *,
+        driver:users!driver_id(id, full_name, phone, avatar_url, rating),
+        from_region:regions!from_region_id(name_uz_latn, name_ru, name_en),
+        to_region:regions!to_region_id(name_uz_latn, name_ru, name_en),
+        from_district:districts!from_district_id(name_uz_latn, name_ru, name_en),
+        to_district:districts!to_district_id(name_uz_latn, name_ru, name_en)
+      `)
+      .eq("status", "active")
+      .gte("available_seats", seats_needed);
+
+    if (from_region_id) query = query.eq("from_region_id", from_region_id);
+    if (to_region_id) query = query.eq("to_region_id", to_region_id);
+    if (from_district_id) query = query.eq("from_district_id", from_district_id);
+    if (to_district_id) query = query.eq("to_district_id", to_district_id);
+    if (departure_date) query = query.eq("departure_date", departure_date);
+
+    const { data, error } = await query.order("departure_date").order("departure_time");
+    if (error) return serverError(res, error);
+    return json(res, 200, { success:true, data });
+  }
+
+  // GET /api/v1/intercity/:id
+  if (req.method === "GET" && parts[0]==="v1" && parts[1]==="intercity" && parts.length===3) {
+    const id = parts[2];
+    const { data, error } = await sb
+      .from("intercity_routes")
+      .select(`
+        *,
+        driver:users!driver_id(id, full_name, phone, avatar_url, rating, created_at),
+        driver_profile:driver_profiles!driver_id(car_model, car_color, car_number, car_year),
+        from_region:regions!from_region_id(*),
+        to_region:regions!to_region_id(*),
+        from_district:districts!from_district_id(*),
+        to_district:districts!to_district_id(*),
+        bookings:intercity_bookings(id, seats_booked, status, client:users!client_id(full_name, avatar_url))
+      `)
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error || !data) return json(res, 404, { success:false, message:"Route not found" });
+    return json(res, 200, { success:true, data });
+  }
+
+  // POST /api/v1/intercity (driver)
+  if (req.method === "POST" && parts[0]==="v1" && parts[1]==="intercity" && parts.length===2) {
+    const auth = await requireAuth(req, res);
+    if (!auth) return;
+    const driverCtx = await requireVerifiedDriver(req, res, auth);
+    if (!driverCtx) return;
+
+    const body = await readBody(req);
+    const {
+      from_region_id, from_district_id, to_region_id, to_district_id,
+      departure_location, departure_address,
+      arrival_location, arrival_address,
+      departure_date, departure_time,
+      total_seats, price_per_seat,
+      full_car_price, pickup_from_home_price, delivery_to_home_price,
+      car_features, car_class, notes
+    } = body || {};
+
+    if (!from_region_id || !to_region_id || !departure_date || !departure_time || !total_seats || !price_per_seat) {
+      return badRequest(res, "Missing required fields");
+    }
+
+    const { data, error } = await sb
+      .from("intercity_routes")
+      .insert({
+        driver_id: driverCtx.userId,
+        from_region_id,
+        from_district_id,
+        to_region_id,
+        to_district_id,
+        departure_location,
+        departure_address,
+        arrival_location,
+        arrival_address,
+        departure_date,
+        departure_time,
+        total_seats,
+        available_seats: total_seats,
+        price_per_seat,
+        full_car_price,
+        pickup_from_home_price,
+        delivery_to_home_price,
+        car_features,
+        car_class,
+        notes,
+        status: "active"
+      })
+      .select()
+      .maybeSingle();
+
+    if (error) return serverError(res, error);
+    return json(res, 201, { success:true, data });
+  }
+
+  // PUT /api/v1/intercity/:id (driver)
+  if (req.method === "PUT" && parts[0]==="v1" && parts[1]==="intercity" && parts.length===3) {
+    const auth = await requireAuth(req, res);
+    if (!auth) return;
+    const driverCtx = await requireVerifiedDriver(req, res, auth);
+    if (!driverCtx) return;
+
+    const id = parts[2];
+    const body = await readBody(req);
+
+    const { data, error } = await sb
+      .from("intercity_routes")
+      .update(body || {})
+      .eq("id", id)
+      .eq("driver_id", driverCtx.userId)
+      .select()
+      .maybeSingle();
+
+    if (error) return serverError(res, error);
+    if (!data) return json(res, 404, { success:false, message:"Route not found" });
+    return json(res, 200, { success:true, data });
+  }
+
+  // DELETE /api/v1/intercity/:id (driver)
+  if (req.method === "DELETE" && parts[0]==="v1" && parts[1]==="intercity" && parts.length===3) {
+    const auth = await requireAuth(req, res);
+    if (!auth) return;
+    const driverCtx = await requireVerifiedDriver(req, res, auth);
+    if (!driverCtx) return;
+
+    const id = parts[2];
+    const { data, error } = await sb
+      .from("intercity_routes")
+      .update({ status: "cancelled" })
+      .eq("id", id)
+      .eq("driver_id", driverCtx.userId)
+      .select()
+      .maybeSingle();
+
+    if (error) return serverError(res, error);
+    if (!data) return json(res, 404, { success:false, message:"Route not found" });
+    return json(res, 200, { success:true, data });
+  }
+
+  // POST /api/v1/intercity/:id/book (client)
+  if (req.method === "POST" && parts[0]==="v1" && parts[1]==="intercity" && parts.length===4 && parts[3]==="book") {
+    const auth = await requireAuth(req, res);
+    if (!auth) return;
+
+    const id = parts[2];
+    const body = await readBody(req);
+    const seats_booked = Number(body?.seats_booked || 1);
+
+    const { data: route, error: rErr } = await sb.from("intercity_routes").select("available_seats,status").eq("id", id).maybeSingle();
+    if (rErr || !route) return json(res, 404, { success:false, message:"Route not found" });
+    if (route.status !== "active") return badRequest(res, "Route not active");
+    if ((route.available_seats || 0) < seats_booked) return badRequest(res, "Not enough seats");
+
+    const { data: booking, error } = await sb
+      .from("intercity_bookings")
+      .insert({
+        route_id: id,
+        client_id: auth.userId,
+        seats_booked,
+        status: "pending"
+      })
+      .select()
+      .maybeSingle();
+    if (error) return serverError(res, error);
+
+    await sb.from("intercity_routes").update({ available_seats: (route.available_seats - seats_booked) }).eq("id", id);
+
+    return json(res, 201, { success:true, data: booking });
+  }
+
+  // GET /api/v1/intercity/my/routes (driver)
+  if (req.method === "GET" && parts[0]==="v1" && parts[1]==="intercity" && parts[2]==="my" && parts[3]==="routes") {
+    const auth = await requireAuth(req, res);
+    if (!auth) return;
+    const driverCtx = await requireVerifiedDriver(req, res, auth);
+    if (!driverCtx) return;
+
+    const { data, error } = await sb
+      .from("intercity_routes")
+      .select("*")
+      .eq("driver_id", driverCtx.userId)
+      .order("departure_date", { ascending: true })
+      .order("departure_time", { ascending: true });
+
+    if (error) return serverError(res, error);
+    return json(res, 200, { success:true, data });
+  }
+
+  return json(res, 404, { success:false, message:"Intercity endpoint not found" });
+}
+
 export default async function handler(req,res){
-  
-  const path = (req.url || "").replace(/^.*\/api\//, "").replace(/^\//, "").split("?")[0];
-  // Fast-path for merged endpoints
-  if (await handleRegions(req, res, path)) return;
-  if (await handleIntercity(req, res, path)) return;
-  if (await handleUsers(req, res, path)) return;
-const key=req.__routeKey||'';
+  const key=req.__routeKey||'';
+  const p=logicalPath(req);
+
   if(key==='pricing') return pricingHandler(req,res);
   if(key==='gamification') return gamificationHandler(req,res);
-  const p=String(req.url||'');
-  if(p.includes('/pricing')) return pricingHandler(req,res);
-  if(p.includes('/gamification')) return gamificationHandler(req,res);
+
+  if(p.startsWith('pricing') || p.includes('/pricing')) return pricingHandler(req,res);
+  if(p.startsWith('gamification') || p.includes('/gamification')) return gamificationHandler(req,res);
+
+  if(p.startsWith('regions')) return regionsHandler(req,res);
+  if(p.startsWith('v1/users') || p.startsWith('users')) return usersHandler(req,res);
+  if(p.startsWith('v1/intercity') || p.startsWith('intercity')) return intercityHandler(req,res);
+
   res.statusCode=404;
-  return res.end(JSON.stringify({error:'Unknown misc route', key}));
+  return res.end(JSON.stringify({error:'Unknown misc route', path:p, key}));
 }
