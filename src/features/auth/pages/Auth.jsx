@@ -20,7 +20,6 @@ import { supabase } from "@/lib/supabase";
 const { Title, Text } = Typography;
 
 export default function Auth() {
-  const [form] = Form.useForm();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
@@ -90,25 +89,6 @@ export default function Auth() {
     }
   };
 
-  const onSms = async () => {
-    setLoading(true);
-    try {
-      const values = await form.validateFields(["phone"]);
-      const phone = formatUzPhone(values.phone);
-      const { error } = await supabase.auth.signInWithOtp({ phone });
-      if (error) throw error;
-      message.success(t?.smsSent || "SMS kod yuborildi");
-      navigate(`/otp?phone=${encodeURIComponent(phone)}`);
-    } catch (e) {
-      // validateFields throws array sometimes
-      if (Array.isArray(e)) return;
-      message.error(e?.message || "Xatolik");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-
   return (
     <ConfigProvider theme={{ token: { colorPrimary: "#FFD700" } }}>
       <div
@@ -156,7 +136,7 @@ export default function Auth() {
             <Text type="secondary">Kirish</Text>
           </div>
 
-          <Form form={form} name="login_form" onFinish={onFinish} size="large">
+          <Form name="login_form" onFinish={onFinish} size="large">
             <Form.Item name="phone" rules={[{ required: true, message: "Telefon raqam!" }]}>
               <Input
                 prefix={<PhoneOutlined />}
@@ -195,11 +175,6 @@ export default function Auth() {
               >
                 KIRISH
               </Button>
-
-          <Button onClick={onSms} loading={loading} block style={{ marginTop: 8 }}>
-            {t?.smsLogin || "SMS orqali kirish"}
-          </Button>
-
             </Form.Item>
 
             <div style={{ textAlign: "center" }}>

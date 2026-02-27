@@ -48,7 +48,6 @@ import { haversineKm } from "../shared/geo/haversine";
 import { nominatimReverse as _nominatimReverse } from "../shared/geo/nominatim";
 import RatingModal from "@features/shared/components/RatingModal";
 import ClientBonusWidget from "@/features/client/components/ClientBonusWidget";
-import UniGoSidebar from "@shared/components/UniGoSidebar";
 
 // Backward-compatible signature (lat, lng, signal)
 async function nominatimReverse(lat, lng, signal) {
@@ -302,7 +301,6 @@ export default function ClientTaxiPage() {
 
   // theme
   const [darkMode, setDarkMode] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // flow
   const [step, setStep] = useState("main"); // main | search | dest_map | route | searching | coming
@@ -1750,17 +1748,7 @@ export default function ClientTaxiPage() {
   );
 
   return (
-    <div style={{ width: "100%", height: "100vh", position: "relative" }}>
-      <UniGoSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <button
-        type="button"
-        onClick={() => setSidebarOpen(true)}
-        style={{ position: "absolute", top: 14, left: 14, zIndex: 9999 }}
-        className="w-11 h-11 rounded-2xl bg-white/90 backdrop-blur shadow-md hover:bg-white active:bg-gray-100 transition flex items-center justify-center"
-        aria-label="Menu"
-      >
-        ☰
-      </button>
+    <div style={{ width: "100%", height: "100vh" }}>
       {Styles}
       {MapUI}
       {Header}
