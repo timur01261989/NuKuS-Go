@@ -22,37 +22,6 @@ export default async function handler(req, res) {
     if (!hasSupabaseEnv()) return serverError(res, 'Server misconfigured: missing SUPABASE env');
     const sb = getSupabaseAdmin();
 
-
-    // POST /api/presence/service
-    // body: { driver_id, service_type, is_online }
-    // Per-service online/offline (driver_service_presence)
-    if (req.method === 'POST' && sub === 'service') {
-      const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-      const driver_id = String(body.driver_id || '').trim();
-      const service_type = String(body.service_type || '').trim();
-      const is_online = !!body.is_online;
-
-      if (!driver_id) return badRequest(res, 'driver_id required');
-      if (!service_type) return badRequest(res, 'service_type required');
-
-      const payload = {
-        driver_id,
-        service_type,
-        is_online,
-        last_seen_at: nowIso(),
-        updated_at: nowIso(),
-      };
-
-      const { data, error } = await sb
-        .from('driver_service_presence')
-        .upsert([payload], { onConflict: 'driver_id,service_type' })
-        .select('driver_id,service_type,is_online,last_seen_at,updated_at')
-        .single();
-
-      if (error) throw error;
-      return json(res, 200, { ok: true, presence: data });
-    }
-
     if (req.method === 'POST' && (sub === 'heartbeat' || sub === 'ping' || sub === '')) {
       const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
       const driver_id = String(body.driver_id || body.driver_id || '').trim();
@@ -77,22 +46,6 @@ export default async function handler(req, res) {
         .upsert([payload], { onConflict: 'driver_id' })
         .select('driver_id,last_seen_at,is_online,state,updated_at,lat,lng')
         .single();
-      // Optional: per-service presence refresh (if services[] is provided)
-      const services = Array.isArray(body.services) ? body.services.map(s => String(s||'').trim()).filter(Boolean) : [];
-      if (services.length) {
-        const rows = services.map((st) => ({
-          driver_id,
-          service_type: st,
-          is_online: true,
-          last_seen_at: nowIso(),
-          updated_at: nowIso(),
-        }));
-        const { error: se } = await sb
-          .from('driver_service_presence')
-          .upsert(rows, { onConflict: 'driver_id,service_type' });
-        if (se) throw se;
-      }
-
       if (error) throw error;
 
       return json(res, 200, { ok: true, presence: data });

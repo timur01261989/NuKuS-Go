@@ -4,6 +4,7 @@ import { CheckCircleOutlined, EnvironmentFilled } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { IntercityProvider, PRESET_CITIES, useIntercity } from "./context/IntercityContext";
 import IntercityMap from "./map/IntercityMap";
+import UniGoSidebar from "@shared/components/UniGoSidebar";
 import DatePickerSheet from "./components/Filters/DatePickerSheet";
 import PassengerCount from "./components/Filters/PassengerCount";
 import SeatSelector from "./components/Seats/SeatSelector";
@@ -26,6 +27,7 @@ function InnerPage() {
   } = useIntercity();
 
   const [submitting, setSubmitting] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const { distanceKm, durationMin } = useRoutePolyline(fromCity?.latlng, toCity?.latlng);
 
@@ -76,7 +78,17 @@ function InnerPage() {
   };
 
   return (
-    <div style={{ maxWidth: 980, margin: "0 auto", paddingBottom: 30 }}>
+    <div style={{ maxWidth: 980, margin: "0 auto", paddingBottom: 30, position: "relative" }}>
+      <UniGoSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <button
+        type="button"
+        onClick={() => setSidebarOpen(true)}
+        style={{ position: "absolute", top: 12, left: 0, zIndex: 10 }}
+        className="w-11 h-11 rounded-2xl bg-white/90 backdrop-blur shadow-md hover:bg-white active:bg-gray-100 transition flex items-center justify-center"
+        aria-label="Menu"
+      >
+        ☰
+      </button>
       <div style={{ padding: "0 6px" }}>
         <Title level={4} style={{ margin: "12px 0 6px" }}>
           Viloyatlararo taksi

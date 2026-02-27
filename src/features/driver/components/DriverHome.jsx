@@ -91,36 +91,11 @@ export default function DriverHome({ onLogout }) {
     }
   }, [selectedService]);
 
-  // =========================
-  // ONLINE (PER-SERVICE) — talab bo‘yicha global Online olib tashlandi
-  // service_type: 'taxi' | 'inter_prov' | 'inter_district' | 'delivery' | 'freight'
-  // =========================
-  const SERVICE_KEYS = useMemo(
-    () => ["taxi", "inter_prov", "inter_district", "delivery", "freight"],
-    []
-  );
-
-  const [serviceOnline, setServiceOnline] = useState(() => {
-    try {
-      const raw = typeof window !== "undefined" ? localStorage.getItem("driverServiceOnline") : null;
-      const parsed = raw ? JSON.parse(raw) : {};
-      const base = {};
-      for (const k of ["taxi", "inter_prov", "inter_district", "delivery", "freight"]) {
-        base[k] = !!parsed?.[k];
-      }
-      return base;
-    } catch {
-      return { taxi: false, inter_prov: false, inter_district: false, delivery: false, freight: false };
-    }
+  // Online flag (persist)
+  const [isOnline, setIsOnline] = useState(() => {
+    const v = (typeof window !== "undefined" ? localStorage.getItem("driverOnline") : null);
+    return v === "1";
   });
-
-  const anyOnline = useMemo(() => Object.values(serviceOnline).some(Boolean), [serviceOnline]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("driverServiceOnline", JSON.stringify(serviceOnline));
-    } catch {}
-  }, [serviceOnline]);
 
   const API_BASE = (import.meta?.env?.VITE_API_BASE || "").replace(/\/$/, "");
 
@@ -149,7 +124,7 @@ export default function DriverHome({ onLogout }) {
   };
 
   // =========================
-  // HEARTBEAT + LOCATION (ANY ONLINE)
+  // HEARTBEAT + LOCATION (ONLINE)
   // =========================
   const lastGeoRef = useRef({ lat: null, lng: null, bearing: null, speed: null });
   const watchIdRef = useRef(null);
@@ -174,25 +149,24 @@ export default function DriverHome({ onLogout }) {
     const state = nextOnline ? "online" : "offline";
     try {
       if (API_BASE) {
-        await postJson("/api/driver-state", { driver_id, state });
+         await postJson("/api/driver-state", { driver_id, state });
       }
     } catch {
       // ignore
     }
   };
 
-  const sendHeartbeat = async (driver_id, nextOnline, services) => {
+  const sendHeartbeat = async (driver_id, nextOnline) => {
     const { lat, lng, bearing } = lastGeoRef.current || {};
     try {
       if (API_BASE) {
-        await postJson("/api/driver-heartbeat", {
-          driver_id,
-          is_online: !!nextOnline,
-          lat: lat ?? undefined,
-          lng: lng ?? undefined,
-          bearing: bearing ?? undefined,
-          services: Array.isArray(services) ? services : undefined, // ⭐ per-service last_seen_at update
-        });
+          await postJson("/api/driver-heartbeat", {
+            driver_id,
+            is_online: !!nextOnline,
+            lat: lat ?? undefined,
+            lng: lng ?? undefined,
+            bearing: bearing ?? undefined,
+          });
       }
     } catch {
       // ignore
@@ -200,13 +174,17 @@ export default function DriverHome({ onLogout }) {
   };
 
   const stopTrackingFunc = () => {
+    // stop geolocation watch
     if (watchIdRef.current !== null && watchIdRef.current !== undefined) {
       try {
         navigator.geolocation?.clearWatch?.(watchIdRef.current);
-      } catch {}
+      } catch {
+        // ignore
+      }
     }
     watchIdRef.current = null;
 
+    // stop heartbeat interval
     if (heartbeatTimerRef.current) {
       clearInterval(heartbeatTimerRef.current);
       heartbeatTimerRef.current = null;
@@ -227,53 +205,56 @@ export default function DriverHome({ onLogout }) {
 
     watchIdRef.current = watchId ?? null;
 
-    const active = SERVICE_KEYS.filter((k) => serviceOnline[k]);
-    await sendHeartbeat(userId, true, active);
+    await sendHeartbeat(userId, true);
 
     heartbeatTimerRef.current = setInterval(() => {
       const uid = userIdRef.current;
       if (!uid) return;
-      const services = SERVICE_KEYS.filter((k) => serviceOnline[k]);
-      sendHeartbeat(uid, true, services);
+      sendHeartbeat(uid, true);
     }, 15000);
   };
 
-  const setServiceFlag = async (service_type, next) => {
+  // ✅ TUZATILGAN TOGGLE FUNCTION
+  const toggleOnline = async (next) => {
     setLoading(true);
     try {
       const { data: u, error: uErr } = await supabase.auth.getUser();
       if (uErr) throw uErr;
       const user = u?.user;
-      if (!user) return;
+      
+      if (!user) {
+          setLoading(false);
+          return;
+      }
 
       userIdRef.current = user.id;
 
-      // 1) Per-service presence (server → driver_service_presence)
-      if (API_BASE) {
-        await postJson("/api/presence/service", {
-          driver_id: user.id,
-          service_type,
-          is_online: !!next,
-        });
-      }
+      // 1. Supabase Update (Faqat is_online ni o'zgartiramiz, statusga tegmaymiz!)
+      const { error } = await supabase
+          .from("drivers")
+          .update({
+            is_online: next,
+            last_seen_at: new Date().toISOString(),
+          })
+          .eq("user_id", user.id);
 
-      // 2) Local state
-      setServiceOnline((prev) => ({ ...prev, [service_type]: !!next }));
+      if (error) throw error;
 
-      message.success(next ? "Xizmat Online" : "Xizmat Offline");
+      // 2. State yangilash
+      setIsOnline(next);
+      if (typeof window !== "undefined") localStorage.setItem("driverOnline", next ? "1" : "0");
+      
+      // 3. Backendga xabar
+      await sendDriverState(user.id, next);
+
+      message.success(next ? "Siz Online rejimdasiz" : "Siz Offline rejimdasiz");
     } catch (err) {
-      console.error("service online toggle error:", err);
-      message.error("Xizmat statusini o'zgartirishda xatolik!");
+      console.error("Status update error:", err);
+      // Agar xato bo'lsa, UI ni eski holatga qaytarish mumkin, 
+      // lekin hozircha xabarni o'zi yetarli.
+      message.error("Statusni o'zgartirishda xatolik!");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const setAllServices = async (next) => {
-    // parallel toggles, but keep UI consistent
-    for (const k of SERVICE_KEYS) {
-      // eslint-disable-next-line no-await-in-loop
-      await setServiceFlag(k, next);
     }
   };
 
@@ -290,13 +271,9 @@ export default function DriverHome({ onLogout }) {
 
         userIdRef.current = user.id;
 
-        if (!anyOnline) {
+        if (!isOnline) {
           await sendDriverState(user.id, false);
           stopTrackingFunc();
-          // driver_presence is_online=false (best effort)
-          try {
-            if (API_BASE) await postJson("/api/driver-heartbeat", { driver_id: user.id, is_online: false });
-          } catch {}
           return;
         }
 
@@ -313,8 +290,9 @@ export default function DriverHome({ onLogout }) {
       cancelled = true;
       stopTrackingFunc();
     };
-  }, [anyOnline, serviceOnline, SERVICE_KEYS]);
-// =========================
+  }, [isOnline]);
+
+  // =========================
   // RIGHT DRAWER SWIPE CLOSE (rubber band + velocity)
   // =========================
   const drawerInnerRef = useRef(null);
@@ -497,51 +475,48 @@ export default function DriverHome({ onLogout }) {
           </Text>
         </div>
 
-        {/* ✅ Per-service Online panel (TT bo‘yicha global Online yo‘q) */}
+        {/* ✅ Online/Offline chip headerda */}
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <Button
-            onClick={() => setAllServices(true)}
-            icon={<CheckCircleOutlined />}
-            size="middle"
-            loading={loading}
+          <div
+            onClick={() => toggleOnline(!isOnline)}
+            role="button"
+            tabIndex={0}
             style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "6px 10px",
               borderRadius: 999,
-              height: 36,
-              paddingLeft: 14,
-              paddingRight: 14,
-              background: "var(--brand)",
-              border: "none",
-              color: "#000",
-              fontWeight: 800,
-              boxShadow: "var(--shadow-soft)",
-            }}
-            {...btnTouchProps}
-          >
-            Barcha xizmatlarni yoqish
-          </Button>
-
-          <Button
-            onClick={() => setAllServices(false)}
-            icon={<StopOutlined />}
-            size="middle"
-            loading={loading}
-            style={{
-              borderRadius: 999,
-              height: 36,
-              paddingLeft: 14,
-              paddingRight: 14,
               background: "var(--field-bg)",
               border: "1px solid var(--field-border)",
-              color: "var(--card-text)",
-              fontWeight: 800,
               boxShadow: "var(--shadow-soft)",
+              cursor: "pointer",
+              userSelect: "none",
+              transition: "transform 0.1s",
+              color: "var(--card-text)",
             }}
             {...btnTouchProps}
           >
-            O‘chirish
-          </Button>
+            {loading ? <Spin size="small" /> : (
+            <>
+                <span
+                style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    background: isOnline ? "#52c41a" : "#8c8c8c",
+                    boxShadow: isOnline ? "0 0 0 3px rgba(82,196,26,0.20)" : "none",
+                }}
+                />
+                <span style={{ fontSize: 12, fontWeight: 800 }}>
+                {isOnline ? "Online" : "Offline"}
+                </span>
+            </>
+            )}
+          </div>
 
-          <Button icon={<UserOutlined />}
+          <Button
+            icon={<UserOutlined />}
             shape="circle"
             size="large"
             onClick={() => setProfileOpen(true)}
@@ -557,61 +532,53 @@ export default function DriverHome({ onLogout }) {
         </div>
       </div>
 
-      
-      {/* PER-SERVICE ONLINE SWITCHES */}
-      <div style={{ marginBottom: 16 }}>
-        <Card
-          style={{
-            borderRadius: 18,
-            border: "1px solid var(--card-border)",
-            background: "var(--card-bg)",
-            boxShadow: "var(--shadow-soft)",
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <div>
-              <div style={{ fontWeight: 900 }}>Xizmatlar Online holati</div>
-              <div style={{ fontSize: 12, opacity: 0.75 }}>
-                Har bir xizmat ichida alohida Online bo‘ladi (TT talabi).
-              </div>
-            </div>
-
-            <Tag color={anyOnline ? "green" : "default"} style={{ borderRadius: 999, fontWeight: 800 }}>
-              {anyOnline ? "Kamida 1 xizmat Online" : "Hamma Offline"}
-            </Tag>
-          </div>
-
-          <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontWeight: 700 }}>Taksi (Shahar ichida)</div>
-              <Switch checked={serviceOnline.taxi} onChange={(v) => setServiceFlag("taxi", v)} loading={loading} />
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontWeight: 700 }}>Viloyatlar aro</div>
-              <Switch checked={serviceOnline.inter_prov} onChange={(v) => setServiceFlag("inter_prov", v)} loading={loading} />
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontWeight: 700 }}>Tumanlar aro</div>
-              <Switch checked={serviceOnline.inter_district} onChange={(v) => setServiceFlag("inter_district", v)} loading={loading} />
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontWeight: 700 }}>Eltish</div>
-              <Switch checked={serviceOnline.delivery} onChange={(v) => setServiceFlag("delivery", v)} loading={loading} />
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontWeight: 700 }}>Yuk tashish</div>
-              <Switch checked={serviceOnline.freight} onChange={(v) => setServiceFlag("freight", v)} loading={loading} />
-            </div>
-          </div>
-        </Card>
-      </div>
-
-{/* ===================================
+      {/* ===================================
           ASOSIY MENYU QISMI (OVERLAY BILAN)
           ===================================
       */}
       <div style={{ position: "relative" }}>
-        <Row gutter={[15, 15]}>
+        
+        {/* 🔥 1. BLOKLASH QAVATI (OVERLAY) */}
+        {!isOnline && (
+          <div style={{
+            position: "absolute",
+            top: -10, left: -10, right: -10, bottom: -10,
+            background: "rgba(245, 245, 245, 0.6)", // Orqa fonni xira qiladi
+            zIndex: 50,
+            backdropFilter: "blur(3px)", // Xiralashtirish effekti
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 12
+          }}>
+            <StopOutlined style={{ fontSize: 48, color: "#ff4d4f", marginBottom: 16 }} />
+            <Title level={4} style={{ color: "#595959", textAlign: "center", margin: 0 }}>
+              Xizmatlar bloklangan
+            </Title>
+            <Text type="secondary" style={{ marginBottom: 20 }}>
+              Ishni boshlash uchun "Online" tugmasini yoqing
+            </Text>
+            <Button 
+              type="primary" 
+              size="large" 
+              onClick={() => toggleOnline(true)}
+              loading={loading}
+              icon={<CheckCircleOutlined />}
+              style={{ borderRadius: 12, height: 45, paddingLeft: 24, paddingRight: 24 }}
+            >
+              Online bo'lish
+            </Button>
+          </div>
+        )}
+
+        {/* 2. MENYU KARTOCHKALARI (Offline bo'lsa xira bo'ladi) */}
+        <div style={{ 
+            opacity: isOnline ? 1 : 0.4, 
+            pointerEvents: isOnline ? "auto" : "none",
+            transition: "opacity 0.3s ease" 
+        }}>
+            <Row gutter={[15, 15]}>
                 <Col span={24}>
                 <Card
                     hoverable
@@ -887,9 +854,8 @@ export default function DriverHome({ onLogout }) {
           >
             <div style={{ fontWeight: 900 }}>Profil</div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ fontSize: 12, opacity: 0.9 }}>
-                {anyOnline ? "Online (xizmat bo‘yicha)" : "Offline"}
-              </div>
+              <div style={{ fontSize: 12, opacity: 0.9 }}>{isOnline ? "Online" : "Offline"}</div>
+              <Switch size="small" checked={isOnline} onChange={toggleOnline} loading={loading} />
             </div>
           </div>
 

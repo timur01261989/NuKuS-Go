@@ -129,11 +129,6 @@ export async function dispatch_handler(req, res) {
     const pickup = await resolvePickup(sb, order_id, body.pickup);
     if (!pickup) return badRequest(res, 'pickup lat/lng kerak (body.pickup yoki orders.pickup)');
 
-    // service_type: dispatch per-xizmat online haydovchilarni tanlaydi
-    const { data: ordRow, error: ordErr } = await sb.from('orders').select('service_type').eq('id', order_id).maybeSingle();
-    if (ordErr) throw ordErr;
-    const service_type = String(ordRow?.service_type || 'taxi');
-
     // offer housekeeping: expire old offers
     const nowTs = nowIso();
     await sb.from('order_offers')
@@ -169,12 +164,11 @@ export async function dispatch_handler(req, res) {
 
     // Fetch nearest approved, fresh online drivers from DB (scales to 10k+ online drivers)
     const exclude_driver_ids = Array.from(alreadySet).slice(0, 5000);
-    const { data: candidates, error: ce } = await sb.rpc('find_nearby_drivers_for_service', {
+    const { data: candidates, error: ce } = await sb.rpc('find_nearby_drivers', {
       p_lat: pickup.lat,
       p_lng: pickup.lng,
       p_radius_km: radius_km,
       p_limit: 25,
-      p_service_type: service_type,
       p_exclude_driver_ids: exclude_driver_ids,
     });
     if (ce) throw ce;
@@ -226,11 +220,6 @@ export async function dispatch_smart_handler(req, res) {
     const pickup = await resolvePickup(sb, order_id, body.pickup);
     if (!pickup) return badRequest(res, 'pickup lat/lng kerak (body.pickup yoki orders.pickup)');
 
-    // service_type: dispatch per-xizmat online haydovchilarni tanlaydi
-    const { data: ordRow, error: ordErr } = await sb.from('orders').select('service_type').eq('id', order_id).maybeSingle();
-    if (ordErr) throw ordErr;
-    const service_type = String(ordRow?.service_type || 'taxi');
-
     const nowTs = nowIso();
     await sb.from('order_offers')
       .update({ status: 'expired', responded_at: nowTs })
@@ -263,19 +252,18 @@ export async function dispatch_smart_handler(req, res) {
 
     // Fetch nearest approved, fresh online drivers from DB (scales to 10k+ online drivers)
     const exclude_driver_ids = Array.from(alreadySet).slice(0, 5000);
-    const { data: candidates, error: ce } = await sb.rpc('find_nearby_drivers_for_service', {
+    const { data: candidates, error: ce } = await sb.rpc('find_nearby_drivers', {
       p_lat: pickup.lat,
       p_lng: pickup.lng,
       p_radius_km: radius_km,
       p_limit: 25,
-      p_service_type: service_type,
       p_exclude_driver_ids: exclude_driver_ids,
     });
     if (ce) throw ce;
 
     const ranked = (candidates || []).slice(0, 1);
 
-    const expires_at = new Date(Date.now() + 15 * 1000).toISOString();
+    const expires_at = new Date(Date.now() + 15 * 1000).toISOString();(Date.now() + 15 * 1000).toISOString();
     const rows = ranked.map((p) => ({ order_id, driver_id: p.driver_id, driver_id: p.driver_id, status: 'sent', sent_at: nowIso(), expires_at }));
     if (rows.length) {
       const { error: oe } = await sb.from('order_offers').upsert(rows, { onConflict: 'order_id,driver_id' });

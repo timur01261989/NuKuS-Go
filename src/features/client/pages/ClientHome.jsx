@@ -1,25 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Button, Card, Drawer, Space, Typography, Divider } from "antd";
-import {
-  MenuOutlined,
-  CarOutlined,
-  EnvironmentOutlined,
-  RocketOutlined,
-  ShopOutlined,
-  SettingOutlined,
-  HistoryOutlined,
-  CustomerServiceOutlined,
-  LogoutOutlined,
-  UserOutlined,
-} from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { listMarketCars, formatPriceUZS } from "@services/marketService";
 import { useLanguage } from "@shared/i18n/useLanguage";
-import { haversineKm } from "../shared/geo/haversine";
-import { nominatimReverse as _nominatimReverse } from "../shared/geo/nominatim";
-
-const { Title, Text } = Typography;
+import UniGoSidebar from "@shared/components/UniGoSidebar";
 
 function initials(name) {
   const s = String(name || "").trim();
@@ -28,10 +12,32 @@ function initials(name) {
   return parts.map((p) => p[0]?.toUpperCase()).join("") || "U";
 }
 
+function ServiceCard({ title, subtitle, emoji, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full text-left rounded-3xl p-5 bg-white shadow-sm hover:shadow-md active:shadow-sm transition border border-gray-100"
+    >
+      <div className="flex items-start gap-4">
+        <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-2xl">
+          {emoji}
+        </div>
+        <div className="flex-1">
+          <div className="text-base font-bold text-gray-900">{title}</div>
+          <div className="text-sm text-gray-500 mt-1">{subtitle}</div>
+        </div>
+        <div className="text-gray-300 text-xl">›</div>
+      </div>
+    </button>
+  );
+}
+
 export default function ClientHome() {
   const navigate = useNavigate();
-  const location = useLocation(); // YANGI - driver mode ga kelayotganda state o'tish
+  const location = useLocation();
   const { t } = useLanguage();
+
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profile, setProfile] = useState({ fullName: "", avatarUrl: "" });
   const [cars, setCars] = useState([]);
@@ -48,14 +54,12 @@ export default function ClientHome() {
         let avatarUrl = user.user_metadata?.avatar_url || "";
 
         try {
-          // Be resilient: some schemas don't have is_admin; some use user_id instead of id.
           let pRes = await supabase
             .from("profiles")
             .select("full_name,avatar_url,role")
             .eq("id", user.id)
             .maybeSingle();
 
-          // Fallback: some schemas use profiles.user_id instead of profiles.id
           if (pRes.error && /column\s+\"id\"\s+does\s+not\s+exist/i.test(pRes.error.message || "")) {
             pRes = await supabase
               .from("profiles")
@@ -65,19 +69,18 @@ export default function ClientHome() {
           }
 
           const p = pRes.data;
-
           if (p?.full_name) fullName = p.full_name;
           if (p?.avatar_url) avatarUrl = p.avatar_url;
         } catch {}
 
-        if (mounted) setProfile({ fullName: fullName || "Foydalanuvchi", avatarUrl });
+        if (mounted) setProfile({ fullName: fullName || (t?.user || "Foydalanuvchi"), avatarUrl });
       } catch {}
     })();
 
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     let mounted = true;
@@ -95,319 +98,155 @@ export default function ClientHome() {
     };
   }, []);
 
-  const open = () => setDrawerOpen(true);
-  const close = () => setDrawerOpen(false);
-
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--bg-layout)",
-        color: "var(--text)",
-      }}
-    >
-      {/* Top bar */}
-      <div
-        style={{
-          height: 56,
-          display: "flex",
-          alignItems: "center",
-          padding: "0 14px",
-          background: "var(--card-bg-strong)",
-          borderBottom: "1px solid var(--card-border)",
-          color: "var(--card-text)",
-          position: "sticky",
-          top: 0,
-          zIndex: 10,
-          backdropFilter: "blur(10px)",
-        }}
-      >
-        <Button
-          type="text"
-          onClick={open}
-          icon={<MenuOutlined style={{ color: "var(--card-text)", fontSize: 20 }} />}
-        />
-        <div style={{ flex: 1, textAlign: "center", fontWeight: 900 }}>
-          {t?.appName || "UniGo"}
-        </div>
-        <div style={{ width: 40 }} />
-      </div>
-
-      <div style={{ padding: 14, maxWidth: 560, margin: "0 auto" }}>
-        <Title level={4} style={{ marginTop: 10, marginBottom: 12, color: "var(--text)" }}>
-          {t?.whereTo || "Qayerga boramiz?"}
-        </Title>
-
-        <Space direction="vertical" size={12} style={{ width: "100%" }}>
-          <Card hoverable style={{ borderRadius: 16 }} onClick={() => navigate("/client/taxi")}>
-            <Space>
-              <CarOutlined />
-              <div>
-                <Text strong>{t?.cityTaxi || "Shahar ichida taksi"}</Text>
-                <br />
-                <Text type="secondary">{t?.cityTaxiHint || "Tez buyurtma"}</Text>
-              </div>
-            </Space>
-          </Card>
-
-          <Card
-            hoverable
-            style={{ borderRadius: 16 }}
-            onClick={() => navigate("/client/inter-provincial")}
-          >
-            <Space>
-              <EnvironmentOutlined />
-              <div>
-                <Text strong>{t?.interProv || "Viloyatlar aro"}</Text>
-                <br />
-                <Text type="secondary">{t?.interProvHint || "Shaharlar o‘rtasi"}</Text>
-              </div>
-            </Space>
-          </Card>
-
-          <Card
-            hoverable
-            style={{ borderRadius: 16 }}
-            onClick={() => navigate("/client/inter-district")}
-          >
-            <Space>
-              <RocketOutlined />
-              <div>
-                <Text strong>{t?.interDistrict || "Tumanlar aro"}</Text>
-                <br />
-                <Text type="secondary">{t?.interDistrictHint || "Tumanlar o‘rtasi"}</Text>
-              </div>
-            </Space>
-          </Card>
-
-          <Card hoverable style={{ borderRadius: 16 }} onClick={() => navigate("/client/freight")}>
-            <Space>
-              <RocketOutlined />
-              <div>
-                <Text strong>{t?.freight || "Yuk tashish"}</Text>
-                <br />
-                <Text type="secondary">{t?.freightHint || "Yuk xizmatlari"}</Text>
-              </div>
-            </Space>
-          </Card>
-
-          <Card hoverable style={{ borderRadius: 16 }} onClick={() => navigate("/client/delivery")}>
-            <Space>
-              <RocketOutlined />
-              <div>
-                <Text strong>{t?.delivery || "Eltish xizmati"}</Text>
-                <br />
-                <Text type="secondary">{t?.deliveryHint || "Yetkazib berish"}</Text>
-              </div>
-            </Space>
-          </Card>
-
-          <Button
-            type="primary"
-            block
-            icon={<ShopOutlined />}
-            style={{
-              height: 50,
-              borderRadius: 14,
-              fontWeight: 900,
-            }}
-            onClick={() => navigate("/auto-market")}
-          >
-            {t?.autoMarket || "Avto savdo"}
-          </Button>
-        </Space>
-
-        {/* Ads slots */}
-        <div style={{ marginTop: 16 }}>
-          <AdSlot title={t?.adSlot || "Reklama (admin joyi)"} />
-        </div>
-
-        {/* New cars preview */}
-        <div style={{ marginTop: 14 }}>
-          <Title level={5} style={{ marginBottom: 10, color: "var(--text)" }}>
-            {t?.newCars || "Yangi qo‘shilgan mashinalar"}
-          </Title>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            {(cars.length ? cars : Array.from({ length: 4 }).map((_, i) => ({ id: "p" + i }))).map(
-              (c, i) => (
-                <Card
-                  key={c.id || i}
-                  hoverable
-                  style={{ borderRadius: 16 }}
-                  onClick={() => navigate("/auto-market")}
-                >
-                  <div
-                    style={{
-                      height: 90,
-                      borderRadius: 12,
-                      background: "var(--field-bg)",
-                      border: "1px solid var(--field-border)",
-                    }}
-                  />
-                  <div style={{ marginTop: 8, fontWeight: 900 }}>
-                    {c.title || c.model || `Mashina ${i + 1}`}
-                  </div>
-                  <Text type="secondary">{c.price ? formatPriceUZS(c.price) : " "}</Text>
-                </Card>
-              )
-            )}
-          </div>
-        </div>
-
-        <div style={{ marginTop: 14 }}>
-          <AdSlot title={t?.adSlot || "Reklama (admin joyi)"} />
-        </div>
-      </div>
-
-      {/* Sidebar */}
-      <Drawer
-        placement="left"
-        open={drawerOpen}
-        onClose={close}
-        width={300}
-        bodyStyle={{ padding: 0 }}
-      >
-        <div
-          style={{
-            padding: 16,
-            background: "var(--card-bg-strong)",
-            color: "var(--card-text)",
-            borderBottom: "1px solid var(--card-border)",
-          }}
-        >
-          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <div
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: 12,
-                background: "var(--brand)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontWeight: 900,
-                color: "#111",
-                overflow: "hidden",
-              }}
-            >
-              {profile.avatarUrl ? (
-                <img
-                  alt="avatar"
-                  src={profile.avatarUrl}
-                  style={{ width: "100%", height: "100%", borderRadius: 12, objectFit: "cover" }}
-                />
-              ) : (
-                initials(profile.fullName)
-              )}
-            </div>
-
-            <div>
-              <div style={{ fontWeight: 900 }}>{profile.fullName || "Foydalanuvchi"}</div>
-              <div style={{ opacity: 0.85, fontSize: 12 }}>{t?.client || "Yolovchi"}</div>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ padding: 12, position: "relative", minHeight: "calc(100vh - 80px)" }}>
-          <Button
-            block
-            icon={<UserOutlined />}
-            style={{ height: 44, borderRadius: 12, textAlign: "left" }}
-            onClick={() => {
-              close();
-              navigate("/driver-mode", { 
-                replace: true,
-                state: { from: location.pathname }
-              });
-            }}
-          >
-            {t?.workAsDriver || "Haydovchi bo‘lib ishlash"}
-          </Button>
-
-          <Divider style={{ margin: "12px 0" }} />
-
-          <Button
-            block
-            icon={<EnvironmentOutlined />}
-            style={{ height: 44, borderRadius: 12, textAlign: "left" }}
-            onClick={() => {
-              close();
-              navigate("/addresses");
-            }}
-          >
-            {t?.myAddresses || "Mening manzillarim"}
-          </Button>
-
-          <Button
-            block
-            icon={<SettingOutlined />}
-            style={{ height: 44, borderRadius: 12, textAlign: "left", marginTop: 8 }}
-            onClick={() => {
-              close();
-              navigate("/settings");
-            }}
-          >
-            {t?.settings || "Sozlamalar"}
-          </Button>
-
-          <Button
-            block
-            icon={<HistoryOutlined />}
-            style={{ height: 44, borderRadius: 12, textAlign: "left", marginTop: 8 }}
-            onClick={() => {
-              close();
-              navigate("/orders");
-            }}
-          >
-            {t?.orderHistory || "Buyurtmalar tarixi"}
-          </Button>
-
-          <div style={{ position: "absolute", left: 12, right: 12, bottom: 12 }}>
-            <Button
-              block
-              icon={<CustomerServiceOutlined />}
-              style={{ height: 44, borderRadius: 12, textAlign: "left" }}
-              onClick={() => {
-                close();
-                navigate("/support");
-              }}
-            >
-              {t?.support || "Qo‘llab-quvvatlash"}
-            </Button>
-
-            <Button
-              danger
-              block
-              icon={<LogoutOutlined />}
-              style={{ height: 44, borderRadius: 12, textAlign: "left", marginTop: 8 }}
-              onClick={() => {
-                close();
-                navigate("/logout");
-              }}
-            >
-              {t?.logout || "Chiqish"}
-            </Button>
-          </div>
-        </div>
-      </Drawer>
-    </div>
+  const services = useMemo(
+    () => [
+      {
+        key: "taxi",
+        title: t?.cityTaxi || "Shahar taksi",
+        subtitle: t?.cityTaxiSub || "Tez va qulay yurish",
+        emoji: "🚕",
+        to: "/client/taxi",
+      },
+      {
+        key: "intercity",
+        title: t?.interCity || "Viloyatlar aro",
+        subtitle: t?.interCitySub || "Reys izlash / band qilish",
+        emoji: "🛣️",
+        to: "/client/inter-provincial",
+      },
+      {
+        key: "interdistrict",
+        title: t?.interDistrict || "Tumanlar aro",
+        subtitle: t?.interDistrictSub || "Pitak yoki manzildan manzilga",
+        emoji: "🏁",
+        to: "/client/inter-district",
+      },
+      {
+        key: "delivery",
+        title: t?.delivery || "Eltish",
+        subtitle: t?.deliverySub || "Posilka yuborish",
+        emoji: "📦",
+        to: "/client/delivery",
+      },
+      {
+        key: "freight",
+        title: t?.cargo || "Yuk tashish",
+        subtitle: t?.cargoSub || "Gazel, Kamaz va h.k.",
+        emoji: "🚚",
+        to: "/client/freight",
+      },
+      {
+        key: "market",
+        title: t?.market || "Avto savdo",
+        subtitle: t?.marketSub || "Real mashinalar (admin qo‘shgan)",
+        emoji: "🛒",
+        to: "/market",
+      },
+    ],
+    [t]
   );
-}
 
-function AdSlot({ title }) {
   return (
-    <Card style={{ borderRadius: 16 }}>
-      <Text type="secondary">{title}</Text>
-      <div
-        style={{
-          height: 90,
-          borderRadius: 12,
-          background: "var(--field-bg)",
-          border: "1px solid var(--field-border)",
-          marginTop: 10,
-        }}
-      />
-    </Card>
+    <div className="min-h-screen bg-gradient-to-br from-sky-50 to-indigo-50">
+      <UniGoSidebar open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+
+      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-100">
+        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            className="w-11 h-11 rounded-2xl bg-gray-100 hover:bg-gray-200 active:bg-gray-300 transition flex items-center justify-center"
+            aria-label="Menu"
+          >
+            ☰
+          </button>
+
+          <div className="flex-1">
+            <div className="text-sm text-gray-500">{t?.hello || "Salom"}</div>
+            <div className="text-base font-bold text-gray-900">{profile.fullName || "UniGo"}</div>
+          </div>
+
+          <div className="w-11 h-11 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-bold">
+            {initials(profile.fullName)}
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+        {/* Services */}
+        <section>
+          <div className="flex items-end justify-between mb-3">
+            <h2 className="text-lg font-extrabold text-gray-900">{t?.services || "Xizmatlar"}</h2>
+            <button
+              type="button"
+              onClick={() => navigate("/client/orders")}
+              className="text-sm font-semibold text-amber-600 hover:text-amber-700"
+            >
+              {t?.history || "Tarix"} →
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {services.map((s) => (
+              <ServiceCard
+                key={s.key}
+                title={s.title}
+                subtitle={s.subtitle}
+                emoji={s.emoji}
+                onClick={() => navigate(s.to)}
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* Marketplace preview */}
+        <section>
+          <div className="flex items-end justify-between mb-3">
+            <h2 className="text-lg font-extrabold text-gray-900">{t?.market || "Avto savdo"}</h2>
+            <button
+              type="button"
+              onClick={() => navigate("/market")}
+              className="text-sm font-semibold text-amber-600 hover:text-amber-700"
+            >
+              {t?.seeAll || "Barchasi"} →
+            </button>
+          </div>
+
+          {cars?.length ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {cars.map((c) => (
+                <button
+                  key={c.id || c.slug || c.title}
+                  type="button"
+                  onClick={() => navigate(`/market/car/${c.id || c.slug || ""}`)}
+                  className="rounded-3xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition overflow-hidden text-left"
+                >
+                  <div className="aspect-[16/10] bg-gray-100">
+                    {c?.cover_url ? (
+                      <img src={c.cover_url} alt={c.title || "car"} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-5xl">🚗</div>
+                    )}
+                  </div>
+                  <div className="p-4">
+                    <div className="font-bold text-gray-900 line-clamp-1">{c.title || "Mashina"}</div>
+                    <div className="text-sm text-gray-500 line-clamp-1 mt-1">
+                      {(c.city || c.region || "") + (c.year ? ` · ${c.year}` : "")}
+                    </div>
+                    <div className="mt-2 text-amber-600 font-extrabold">
+                      {typeof c.price_uzs === "number" ? formatPriceUZS(c.price_uzs) : (c.price || "")}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-3xl bg-white border border-gray-100 p-5 text-gray-500">
+              {t?.noCars || "Hozircha mashinalar yo‘q. Admin real e’lon qo‘shganda shu yerda chiqadi."}
+            </div>
+          )}
+        </section>
+      </main>
+    </div>
   );
 }
