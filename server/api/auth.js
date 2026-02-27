@@ -1,72 +1,175 @@
-// api/auth.js
-// Combined auth: OTP request + OTP verify
+import express from 'express';
+import { createClient } from '@supabase/supabase-js';
+import { asyncHandler, OperationalError } from '../middleware/errorHandler.js';
 
-import crypto from 'crypto';
-import { json, badRequest, nowIso, uid, isPhone } from '../_shared/cors.js';
+const router = express.Router();
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-
-export async function auth_otp_request_handler(req, res) {
-  if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Method not allowed' });
-
-  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-  const phone = String(body.phone || '').trim();
-
-  if (!isPhone(phone)) return badRequest(res, 'Telefon raqam noto\'g\'ri', { field:'phone' });
-
-  // DEMO: return fixed OTP and session id
-  const session_id = uid('otp');
-  const otp_code = '1111'; // demo only
-  return json(res, 200, { ok:true, session_id, otp_code, sent_at: nowIso() });
-}
-
-
-function sign(payload, secret) {
-  const data = JSON.stringify(payload);
-  const sig = crypto.createHmac('sha256', secret).update(data).digest('hex');
-  return Buffer.from(data).toString('base64url') + '.' + sig;
-}
-
-export async function auth_otp_verify_handler(req, res) {
-  if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Method not allowed' });
-
-  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-  const { session_id, otp_code, phone } = body;
-
-  if (!session_id) return badRequest(res, 'session_id kerak');
-  if (String(otp_code||'') !== '1111') return badRequest(res, 'OTP noto\'g\'ri');
-
-  const secret = process.env.AUTH_SECRET || 'dev-secret-change-me';
-  const user = { id: uid('u'), phone: String(phone||'').trim(), created_at: nowIso() };
-  const token = sign({ user, exp: Date.now() + 1000*60*60*24 }, secret); // 24h
-
-  return json(res, 200, { ok:true, token, user });
-}
-
-export default async function auth(req, res, routeKey = 'auth') {
-  // Backward compatible route keys:
-  // - auth-otp-request
-  // - auth-otp-verify
-  // New consolidated key:
-  // - auth  (action via query/body)
-  const url = new URL(req.url, 'http://localhost');
-  const action = url.searchParams.get('action') || (typeof req.body === 'object' && req.body?.action) || (typeof req.body === 'string' ? (()=>{try{return JSON.parse(req.body||'{}').action}catch{return null}})() : null);
-
-  switch (routeKey) {
-    case 'auth-otp-request':
-      return await auth_otp_request_handler(req, res);
-    case 'auth-otp-verify':
-      return await auth_otp_verify_handler(req, res);
-    case 'auth':
-    default:
-      if (action === 'otp-request') return await auth_otp_request_handler(req, res);
-      if (action === 'otp-verify') return await auth_otp_verify_handler(req, res);
-      // default: if client calls /api/auth without action, infer by body fields
-      try {
-        const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-        if (body.code) return await auth_otp_verify_handler(req, res);
-        return await auth_otp_request_handler(req, res);
-      } catch {
-        return await auth_otp_request_handler(req, res);
-      }
+/**
+ * Register new user
+ * POST /api/v1/auth/register
+ */
+router.post('/register', asyncHandler(async (req, res) => {
+  const { phone, password, fullName, role = 'client' } = req.body;
+  
+  if (!phone || !password) {
+    throw new OperationalError('Phone and password are required', 400);
   }
-}
+  
+  // Create auth user
+  const { data: authData, error: authError } = await supabase.auth.signUp({
+    phone: phone.startsWith('+') ? phone : `+998${phone}`,
+    password,
+    options: {
+      data: {
+        full_name: fullName,
+        role
+      }
+    }
+  });
+  
+  if (authError) {
+    throw new OperationalError(authError.message, 400);
+  }
+  
+  // Create user profile
+  const { data: user, error: userError } = await supabase
+    .from('users')
+    .insert({
+      id: authData.user.id,
+      phone,
+      full_name: fullName,
+      role
+    })
+    .select()
+    .single();
+  
+  if (userError) {
+    throw new OperationalError(userError.message, 500);
+  }
+  
+  // Create wallet for user
+  await supabase
+    .from('wallets')
+    .insert({
+      user_id: user.id,
+      balance: 0
+    });
+  
+  res.status(201).json({
+    success: true,
+    data: {
+      user,
+      session: authData.session
+    }
+  });
+}));
+
+/**
+ * Login
+ * POST /api/v1/auth/login
+ */
+router.post('/login', asyncHandler(async (req, res) => {
+  const { phone, password } = req.body;
+  
+  if (!phone || !password) {
+    throw new OperationalError('Phone and password are required', 400);
+  }
+  
+  const { data, error } = await supabase.auth.signInWithPassword({
+    phone: phone.startsWith('+') ? phone : `+998${phone}`,
+    password
+  });
+  
+  if (error) {
+    throw new OperationalError('Invalid credentials', 401);
+  }
+  
+  // Get user details
+  const { data: user } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', data.user.id)
+    .single();
+  
+  res.json({
+    success: true,
+    data: {
+      user,
+      session: data.session
+    }
+  });
+}));
+
+/**
+ * Verify OTP
+ * POST /api/v1/auth/verify-otp
+ */
+router.post('/verify-otp', asyncHandler(async (req, res) => {
+  const { phone, token } = req.body;
+  
+  if (!phone || !token) {
+    throw new OperationalError('Phone and token are required', 400);
+  }
+  
+  const { data, error } = await supabase.auth.verifyOtp({
+    phone: phone.startsWith('+') ? phone : `+998${phone}`,
+    token,
+    type: 'sms'
+  });
+  
+  if (error) {
+    throw new OperationalError('Invalid OTP', 400);
+  }
+  
+  res.json({
+    success: true,
+    data
+  });
+}));
+
+/**
+ * Logout
+ * POST /api/v1/auth/logout
+ */
+router.post('/logout', asyncHandler(async (req, res) => {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  
+  if (token) {
+    await supabase.auth.signOut();
+  }
+  
+  res.json({
+    success: true,
+    message: 'Logged out successfully'
+  });
+}));
+
+/**
+ * Refresh token
+ * POST /api/v1/auth/refresh
+ */
+router.post('/refresh', asyncHandler(async (req, res) => {
+  const { refresh_token } = req.body;
+  
+  if (!refresh_token) {
+    throw new OperationalError('Refresh token required', 400);
+  }
+  
+  const { data, error } = await supabase.auth.refreshSession({
+    refresh_token
+  });
+  
+  if (error) {
+    throw new OperationalError('Invalid refresh token', 401);
+  }
+  
+  res.json({
+    success: true,
+    data
+  });
+}));
+
+export default router;
