@@ -128,7 +128,7 @@ export default function ClientHome() {
           icon={<MenuOutlined style={{ color: "var(--card-text)", fontSize: 20 }} />}
         />
         <div style={{ flex: 1, textAlign: "center", fontWeight: 900 }}>
-          {t?.appName || "UniGo"}
+          {t?.appName || "Nukus Go"}
         </div>
         <div style={{ width: 40 }} />
       </div>

@@ -1,599 +1,442 @@
--- ============================================
--- UNIGO - COMPLETE DATABASE SCHEMA
--- To'liq ma'lumotlar bilan
--- ============================================
+-- NUKUS GO: Main Schema (orders, drivers, driver_presence, applications)
+-- Bu fayl ikkinchi bajarilishi kerak (profiles va auth trigger dan keyin)
 
--- Extensions
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "postgis";
+-- ============================================================
+-- DRIVER APPLICATIONS (haydovchi tasdig'i)
+-- ============================================================
 
--- ============================================
--- 1. USERS & AUTHENTICATION
--- ============================================
-
-CREATE TABLE IF NOT EXISTS public.users (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    phone VARCHAR(20) UNIQUE NOT NULL,
-    full_name VARCHAR(255),
-    email VARCHAR(255),
-    role VARCHAR(20) CHECK (role IN ('client', 'driver', 'admin')) DEFAULT 'client',
-    avatar_url TEXT,
-    rating DECIMAL(3,2) DEFAULT 5.00,
-    total_rides INTEGER DEFAULT 0,
-    is_verified BOOLEAN DEFAULT false,
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+create table if not exists public.driver_applications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  status text not null check (status in ('pending','approved','rejected')) default 'pending',
+  documents jsonb,
+  rejection_reason text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
 );
 
-CREATE TABLE IF NOT EXISTS public.driver_profiles (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID UNIQUE REFERENCES public.users(id) ON DELETE CASCADE,
-    license_number VARCHAR(50) UNIQUE,
-    license_expiry DATE,
-    car_model VARCHAR(100),
-    car_color VARCHAR(50),
-    car_number VARCHAR(20) UNIQUE,
-    car_year INTEGER,
-    car_photos TEXT[],
-    technical_passport TEXT,
-    insurance_policy TEXT,
-    status VARCHAR(20) CHECK (status IN ('pending', 'approved', 'rejected', 'suspended')) DEFAULT 'pending',
-    services_enabled TEXT[] DEFAULT ARRAY['city_taxi'],
-    is_online BOOLEAN DEFAULT false,
-    current_location GEOGRAPHY(POINT),
-    verification_documents JSONB,
-    admin_notes TEXT,
-    approved_at TIMESTAMP WITH TIME ZONE,
-    approved_by UUID REFERENCES public.users(id),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+create index if not exists idx_driver_applications_user_id on public.driver_applications(user_id);
+create index if not exists idx_driver_applications_status on public.driver_applications(status);
+
+alter table public.driver_applications enable row level security;
+
+drop policy if exists "driver_applications_own" on public.driver_applications;
+create policy "driver_applications_own" on public.driver_applications
+for select to authenticated
+using (user_id = auth.uid());
+
+drop policy if exists "driver_applications_insert_own" on public.driver_applications;
+create policy "driver_applications_insert_own" on public.driver_applications
+for insert to authenticated
+with check (user_id = auth.uid());
+
+-- ============================================================
+-- DRIVER PRESENCE (online haydovchilar, real-time location)
+-- ============================================================
+
+create table if not exists public.driver_presence (
+  driver_id uuid primary key references public.profiles(id) on delete cascade,
+  driver_user_id uuid,
+  is_online boolean default false,
+  state text,
+  lat double precision,
+  lng double precision,
+  heading double precision,
+  speed double precision,
+  accuracy double precision,
+  last_seen_at timestamptz,
+  updated_at timestamptz default now()
 );
 
--- ============================================
--- 2. REGIONS & DISTRICTS
--- ============================================
+-- Trigger: driver_user_id va last_seen_at'ni auto-sync qilish
+create or replace function public.sync_driver_presence_ids()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.driver_user_id is null then
+    new.driver_user_id := new.driver_id;
+  end if;
+  if new.last_seen_at is null then
+    new.last_seen_at := now();
+  end if;
+  new.updated_at := now();
+  return new;
+end;
+$$;
 
-CREATE TABLE IF NOT EXISTS public.regions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name_uz_latn VARCHAR(100) NOT NULL,
-    name_uz_cyrl VARCHAR(100),
-    name_kaa_latn VARCHAR(100),
-    name_kaa_cyrl VARCHAR(100),
-    name_ru VARCHAR(100),
-    name_en VARCHAR(100),
-    code VARCHAR(10) UNIQUE NOT NULL,
-    type VARCHAR(20) CHECK (type IN ('region', 'republic', 'city')),
-    center_location GEOGRAPHY(POINT),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+drop trigger if exists trg_sync_driver_presence_ids on public.driver_presence;
+create trigger trg_sync_driver_presence_ids
+before insert or update on public.driver_presence
+for each row execute function public.sync_driver_presence_ids();
+
+-- Indexes
+create index if not exists idx_driver_presence_online_updated on public.driver_presence(is_online, updated_at desc);
+create index if not exists idx_driver_presence_lat on public.driver_presence(lat);
+create index if not exists idx_driver_presence_lng on public.driver_presence(lng);
+create index if not exists idx_driver_presence_state on public.driver_presence(state);
+
+alter table public.driver_presence enable row level security;
+
+drop policy if exists "driver_presence_select_own" on public.driver_presence;
+create policy "driver_presence_select_own" on public.driver_presence
+for select to authenticated
+using (driver_id = auth.uid());
+
+drop policy if exists "driver_presence_select_online" on public.driver_presence;
+create policy "driver_presence_select_online" on public.driver_presence
+for select to authenticated
+using (is_online = true);
+
+drop policy if exists "driver_presence_upsert_own" on public.driver_presence;
+create policy "driver_presence_upsert_own" on public.driver_presence
+for insert to authenticated
+with check (driver_id = auth.uid());
+
+drop policy if exists "driver_presence_update_own" on public.driver_presence;
+create policy "driver_presence_update_own" on public.driver_presence
+for update to authenticated
+using (driver_id = auth.uid())
+with check (driver_id = auth.uid());
+
+-- ============================================================
+-- DRIVERS COMPATIBILITY TABLE (UI dashboard uchun)
+-- ============================================================
+
+create table if not exists public.drivers (
+  user_id uuid primary key references public.profiles(id) on delete cascade,
+  is_online boolean not null default false,
+  lat double precision,
+  lng double precision,
+  last_seen_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
 );
 
-CREATE TABLE IF NOT EXISTS public.districts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    region_id UUID REFERENCES public.regions(id) ON DELETE CASCADE,
-    name_uz_latn VARCHAR(100) NOT NULL,
-    name_uz_cyrl VARCHAR(100),
-    name_kaa_latn VARCHAR(100),
-    name_kaa_cyrl VARCHAR(100),
-    name_ru VARCHAR(100),
-    name_en VARCHAR(100),
-    code VARCHAR(10) UNIQUE NOT NULL,
-    center_location GEOGRAPHY(POINT),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+create index if not exists idx_drivers_is_online on public.drivers(is_online);
+
+alter table public.drivers enable row level security;
+
+drop policy if exists "drivers_select_own" on public.drivers;
+create policy "drivers_select_own" on public.drivers
+for select to authenticated
+using (user_id = auth.uid());
+
+drop policy if exists "drivers_upsert_own" on public.drivers;
+create policy "drivers_upsert_own" on public.drivers
+for insert to authenticated
+with check (user_id = auth.uid());
+
+drop policy if exists "drivers_update_own" on public.drivers;
+create policy "drivers_update_own" on public.drivers
+for update to authenticated
+using (user_id = auth.uid())
+with check (user_id = auth.uid());
+
+drop policy if exists "drivers_select_online" on public.drivers;
+create policy "drivers_select_online" on public.drivers
+for select to authenticated
+using (is_online = true);
+
+-- ============================================================
+-- ORDERS (asosiy order jadval - taxi, deliver, freight)
+-- ============================================================
+
+create table if not exists public.orders (
+  id uuid primary key default gen_random_uuid(),
+  passenger_id uuid references public.profiles(id) on delete set null,
+  driver_id uuid references public.profiles(id) on delete set null,
+  service_type text not null default 'taxi' check (service_type in ('taxi','delivery','freight','inter_prov','inter_district')),
+  pickup jsonb,
+  dropoff jsonb,
+  status text not null default 'searching',
+  price numeric,
+  created_at timestamptz default now(),
+  accepted_at timestamptz,
+  completed_at timestamptz,
+  
+  -- Inter-provincial fields
+  from_region text,
+  from_district text,
+  to_region text,
+  to_district text,
+  scheduled_at timestamptz,
+  seats_available integer default 4,
+  gender_pref text default 'all',
+  pickup_mode text default 'home',
+  
+  -- Metadata
+  distance_km numeric,
+  duration_minutes integer,
+  rating integer,
+  review text
 );
 
--- Saved Addresses
-CREATE TABLE IF NOT EXISTS public.saved_addresses (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
-    type VARCHAR(20) CHECK (type IN ('home', 'work', 'other')),
-    name VARCHAR(100),
-    address TEXT NOT NULL,
-    location GEOGRAPHY(POINT) NOT NULL,
-    district_id UUID REFERENCES public.districts(id),
-    region_id UUID REFERENCES public.regions(id),
-    entrance VARCHAR(20),
-    floor VARCHAR(20),
-    apartment VARCHAR(20),
-    notes TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+create index if not exists idx_orders_status on public.orders(status);
+create index if not exists idx_orders_driver_id on public.orders(driver_id);
+create index if not exists idx_orders_passenger_id on public.orders(passenger_id);
+create index if not exists idx_orders_service_type on public.orders(service_type);
+create index if not exists idx_orders_created_at on public.orders(created_at desc);
+create index if not exists idx_orders_scheduled_at on public.orders(scheduled_at);
+
+alter table public.orders enable row level security;
+
+drop policy if exists "orders_insert_passenger" on public.orders;
+create policy "orders_insert_passenger" on public.orders
+for insert to authenticated
+with check (passenger_id = auth.uid());
+
+drop policy if exists "orders_select_own_or_assigned" on public.orders;
+create policy "orders_select_own_or_assigned" on public.orders
+for select to authenticated
+using (passenger_id = auth.uid() or driver_id = auth.uid());
+
+drop policy if exists "orders_update_passenger_or_driver" on public.orders;
+create policy "orders_update_passenger_or_driver" on public.orders
+for update to authenticated
+using (passenger_id = auth.uid() or driver_id = auth.uid())
+with check (passenger_id = auth.uid() or driver_id = auth.uid());
+
+-- ============================================================
+-- ORDER OFFERS (haydovchilar uchun offer queue)
+-- ============================================================
+
+create table if not exists public.order_offers (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references public.orders(id) on delete cascade,
+  driver_id uuid not null references public.profiles(id) on delete cascade,
+  driver_user_id uuid,
+  status text not null check (status in ('sent','accepted','rejected','expired')) default 'sent',
+  sent_at timestamptz default now(),
+  expires_at timestamptz,
+  responded_at timestamptz
 );
 
--- ============================================
--- 3. CITY TAXI (Shahar ichida)
--- ============================================
+create unique index if not exists uq_order_offers_order_driver on public.order_offers(order_id, driver_id);
+create index if not exists idx_order_offers_order_status on public.order_offers(order_id, status);
+create index if not exists idx_order_offers_driver_status on public.order_offers(driver_id, status);
+create index if not exists idx_order_offers_status on public.order_offers(status);
 
-CREATE TABLE IF NOT EXISTS public.city_taxi_orders (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    client_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
-    driver_id UUID REFERENCES public.users(id),
-    pickup_location GEOGRAPHY(POINT) NOT NULL,
-    pickup_address TEXT NOT NULL,
-    dropoff_location GEOGRAPHY(POINT) NOT NULL,
-    dropoff_address TEXT NOT NULL,
-    distance_km DECIMAL(10,2),
-    estimated_duration_minutes INTEGER,
-    price DECIMAL(10,2),
-    tariff_type VARCHAR(20) CHECK (tariff_type IN ('economy', 'comfort', 'business', 'courier')),
-    status VARCHAR(20) CHECK (status IN ('pending', 'accepted', 'arrived', 'in_progress', 'completed', 'cancelled')) DEFAULT 'pending',
-    payment_method VARCHAR(20) CHECK (payment_method IN ('cash', 'card', 'wallet')),
-    payment_status VARCHAR(20) CHECK (payment_status IN ('pending', 'paid', 'refunded')) DEFAULT 'pending',
-    notes TEXT,
-    cancellation_reason TEXT,
-    cancelled_by VARCHAR(10) CHECK (cancelled_by IN ('client', 'driver', 'system')),
-    rating INTEGER CHECK (rating >= 1 AND rating <= 5),
-    feedback TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    accepted_at TIMESTAMP WITH TIME ZONE,
-    started_at TIMESTAMP WITH TIME ZONE,
-    completed_at TIMESTAMP WITH TIME ZONE,
-    cancelled_at TIMESTAMP WITH TIME ZONE
+-- Trigger: driver_user_id'ni auto-sync qilish
+create or replace function public.sync_order_offers_ids()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.driver_user_id is null then
+    new.driver_user_id := new.driver_id;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_sync_order_offers_ids on public.order_offers;
+create trigger trg_sync_order_offers_ids
+before insert or update on public.order_offers
+for each row execute function public.sync_order_offers_ids();
+
+alter table public.order_offers enable row level security;
+
+drop policy if exists "order_offers_select_driver" on public.order_offers;
+create policy "order_offers_select_driver" on public.order_offers
+for select to authenticated
+using (driver_id = auth.uid() or driver_user_id = auth.uid());
+
+-- ============================================================
+-- HELPER FUNCTION: find_nearby_drivers
+-- Haydovchilarni joylashuvi bo'yicha qidiriladi (PostGIS kerak emas)
+-- ============================================================
+
+create or replace function public.find_nearby_drivers(
+  p_lat double precision,
+  p_lng double precision,
+  p_radius_km double precision,
+  p_limit integer,
+  p_exclude_driver_ids uuid[] default '{}'
+)
+returns table (
+  driver_id uuid,
+  lat double precision,
+  lng double precision,
+  dist_km double precision
+)
+language sql
+stable
+as $$
+  with params as (
+    select
+      p_lat as lat0,
+      p_lng as lng0,
+      greatest(p_radius_km, 0.1) as rkm,
+      (p_radius_km / 111.0) as dlat,
+      (p_radius_km / (111.0 * greatest(cos(radians(p_lat)), 0.2))) as dlng
+  ),
+  fresh as (
+    select dp.driver_id, dp.lat, dp.lng
+    from public.driver_presence dp
+    join public.driver_applications da
+      on da.user_id = dp.driver_id and da.status = 'approved'
+    cross join params p
+    where dp.is_online = true
+      and dp.updated_at >= now() - interval '25 seconds'
+      and dp.lat is not null and dp.lng is not null
+      and dp.lat between (p.lat0 - p.dlat) and (p.lat0 + p.dlat)
+      and dp.lng between (p.lng0 - p.dlng) and (p.lng0 + p.dlng)
+      and (coalesce(p_exclude_driver_ids, '{}') = '{}'::uuid[] or dp.driver_id <> all(p_exclude_driver_ids))
+  )
+  select
+    f.driver_id,
+    f.lat,
+    f.lng,
+    (6371.0 * 2.0 * asin(
+      sqrt(
+        pow(sin(radians((f.lat - p.lat0) / 2.0)), 2)
+        + cos(radians(p.lat0)) * cos(radians(f.lat))
+        * pow(sin(radians((f.lng - p.lng0) / 2.0)), 2)
+      )
+    )) as dist_km
+  from fresh f
+  cross join params p
+  where (6371.0 * 2.0 * asin(
+      sqrt(
+        pow(sin(radians((f.lat - p.lat0) / 2.0)), 2)
+        + cos(radians(p.lat0)) * cos(radians(f.lat))
+        * pow(sin(radians((f.lng - p.lng0) / 2.0)), 2)
+      )
+    )) <= p.rkm
+  order by dist_km asc
+  limit greatest(p_limit, 1);
+$$;
+
+-- ============================================================
+-- TRIP BOOKING REQUESTS (inter-provincial booking)
+-- ============================================================
+
+create table if not exists public.trip_booking_requests (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references public.orders(id) on delete cascade,
+  passenger_id uuid not null references public.profiles(id) on delete cascade,
+  seats_booked integer not null default 1 check (seats_booked > 0),
+  status text not null check (status in ('pending','accepted','rejected','cancelled')) default 'pending',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
 );
 
--- ============================================
--- 4. INTERCITY ROUTES (Viloyatlar aro)
--- ============================================
+create index if not exists idx_trip_booking_order on public.trip_booking_requests(order_id);
+create index if not exists idx_trip_booking_passenger on public.trip_booking_requests(passenger_id);
+create index if not exists idx_trip_booking_status on public.trip_booking_requests(status);
 
-CREATE TABLE IF NOT EXISTS public.intercity_routes (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    driver_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
-    from_region_id UUID REFERENCES public.regions(id),
-    from_district_id UUID REFERENCES public.districts(id),
-    to_region_id UUID REFERENCES public.regions(id),
-    to_district_id UUID REFERENCES public.districts(id),
-    departure_location GEOGRAPHY(POINT) NOT NULL,
-    departure_address TEXT NOT NULL,
-    arrival_location GEOGRAPHY(POINT),
-    arrival_address TEXT,
-    departure_date DATE NOT NULL,
-    departure_time TIME NOT NULL,
-    total_seats INTEGER NOT NULL,
-    available_seats INTEGER NOT NULL,
-    price_per_seat DECIMAL(10,2) NOT NULL,
-    full_car_price DECIMAL(10,2),
-    pickup_from_home_price DECIMAL(10,2),
-    delivery_to_home_price DECIMAL(10,2),
-    car_features TEXT[],
-    car_class VARCHAR(20) CHECK (car_class IN ('economy', 'comfort', 'business', 'luxury')),
-    smoking_allowed BOOLEAN DEFAULT false,
-    pets_allowed BOOLEAN DEFAULT false,
-    luggage_space BOOLEAN DEFAULT true,
-    notes TEXT,
-    status VARCHAR(20) CHECK (status IN ('active', 'full', 'in_progress', 'completed', 'cancelled')) DEFAULT 'active',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+alter table public.trip_booking_requests enable row level security;
+
+drop policy if exists "trip_booking_select_own" on public.trip_booking_requests;
+create policy "trip_booking_select_own" on public.trip_booking_requests
+for select to authenticated
+using (passenger_id = auth.uid());
+
+drop policy if exists "trip_booking_insert_own" on public.trip_booking_requests;
+create policy "trip_booking_insert_own" on public.trip_booking_requests
+for insert to authenticated
+with check (passenger_id = auth.uid());
+
+-- ============================================================
+-- ORDER EVENTS (order status tarix)
+-- ============================================================
+
+create table if not exists public.order_events (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references public.orders(id) on delete cascade,
+  event_type text not null,
+  event_data jsonb,
+  created_at timestamptz default now()
 );
 
-CREATE TABLE IF NOT EXISTS public.intercity_bookings (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    route_id UUID REFERENCES public.intercity_routes(id) ON DELETE CASCADE,
-    client_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
-    seats_booked INTEGER NOT NULL,
-    is_full_car BOOLEAN DEFAULT false,
-    pickup_from_home BOOLEAN DEFAULT false,
-    delivery_to_home BOOLEAN DEFAULT false,
-    pickup_location GEOGRAPHY(POINT),
-    pickup_address TEXT,
-    delivery_location GEOGRAPHY(POINT),
-    delivery_address TEXT,
-    total_price DECIMAL(10,2) NOT NULL,
-    payment_method VARCHAR(20) CHECK (payment_method IN ('cash', 'card', 'wallet')),
-    payment_status VARCHAR(20) CHECK (payment_status IN ('pending', 'paid', 'refunded')) DEFAULT 'pending',
-    status VARCHAR(20) CHECK (status IN ('pending', 'confirmed', 'cancelled', 'completed')) DEFAULT 'pending',
-    passenger_names TEXT[],
-    passenger_phones TEXT[],
-    notes TEXT,
-    cancellation_reason TEXT,
-    rating INTEGER CHECK (rating >= 1 AND rating <= 5),
-    feedback TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    confirmed_at TIMESTAMP WITH TIME ZONE,
-    completed_at TIMESTAMP WITH TIME ZONE,
-    cancelled_at TIMESTAMP WITH TIME ZONE
+create index if not exists idx_order_events_order on public.order_events(order_id);
+create index if not exists idx_order_events_type on public.order_events(event_type);
+
+-- ============================================================
+-- SOS TICKETS (xavfsizlik)
+-- ============================================================
+
+create table if not exists public.sos_tickets (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references public.orders(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  ticket_type text not null check (ticket_type in ('unsafe_driver','unsafe_passenger','accident','medical')),
+  description text,
+  location jsonb,
+  status text not null default 'open' check (status in ('open','investigating','resolved','closed')),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
 );
 
--- ============================================
--- 5. DISTRICT ROUTES (Tumanlar aro)
--- ============================================
+create index if not exists idx_sos_tickets_user on public.sos_tickets(user_id);
+create index if not exists idx_sos_tickets_order on public.sos_tickets(order_id);
+create index if not exists idx_sos_tickets_status on public.sos_tickets(status);
 
-CREATE TABLE IF NOT EXISTS public.district_routes (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    driver_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
-    region_id UUID REFERENCES public.regions(id) NOT NULL,
-    from_district_id UUID REFERENCES public.districts(id) NOT NULL,
-    to_district_id UUID REFERENCES public.districts(id),
-    route_type VARCHAR(20) CHECK (route_type IN ('fixed', 'flexible')) DEFAULT 'fixed',
-    departure_location GEOGRAPHY(POINT) NOT NULL,
-    departure_address TEXT NOT NULL,
-    arrival_location GEOGRAPHY(POINT),
-    arrival_address TEXT,
-    departure_date DATE NOT NULL,
-    departure_time TIME NOT NULL,
-    total_seats INTEGER NOT NULL,
-    available_seats INTEGER NOT NULL,
-    price_per_seat DECIMAL(10,2) NOT NULL,
-    full_car_price DECIMAL(10,2),
-    pickup_from_home_price DECIMAL(10,2),
-    delivery_to_home_price DECIMAL(10,2),
-    car_features TEXT[],
-    notes TEXT,
-    status VARCHAR(20) CHECK (status IN ('active', 'full', 'in_progress', 'completed', 'cancelled')) DEFAULT 'active',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+-- ============================================================
+-- MESSAGES (chat uchun)
+-- ============================================================
+
+create table if not exists public.messages (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references public.orders(id) on delete cascade,
+  sender_id uuid not null references public.profiles(id) on delete cascade,
+  recipient_id uuid not null references public.profiles(id) on delete cascade,
+  message_text text,
+  is_read boolean default false,
+  created_at timestamptz default now()
 );
 
-CREATE TABLE IF NOT EXISTS public.district_bookings (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    route_id UUID REFERENCES public.district_routes(id) ON DELETE CASCADE,
-    client_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
-    seats_booked INTEGER NOT NULL,
-    is_full_car BOOLEAN DEFAULT false,
-    pickup_from_home BOOLEAN DEFAULT false,
-    delivery_to_home BOOLEAN DEFAULT false,
-    pickup_location GEOGRAPHY(POINT),
-    pickup_address TEXT,
-    delivery_location GEOGRAPHY(POINT),
-    delivery_address TEXT,
-    total_price DECIMAL(10,2) NOT NULL,
-    payment_method VARCHAR(20) CHECK (payment_method IN ('cash', 'card', 'wallet')),
-    payment_status VARCHAR(20) CHECK (payment_status IN ('pending', 'paid', 'refunded')) DEFAULT 'pending',
-    status VARCHAR(20) CHECK (status IN ('pending', 'confirmed', 'cancelled', 'completed')) DEFAULT 'pending',
-    passenger_names TEXT[],
-    passenger_phones TEXT[],
-    notes TEXT,
-    rating INTEGER CHECK (rating >= 1 AND rating <= 5),
-    feedback TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    confirmed_at TIMESTAMP WITH TIME ZONE,
-    completed_at TIMESTAMP WITH TIME ZONE,
-    cancelled_at TIMESTAMP WITH TIME ZONE
+create index if not exists idx_messages_order on public.messages(order_id);
+create index if not exists idx_messages_sender on public.messages(sender_id);
+create index if not exists idx_messages_recipient on public.messages(recipient_id);
+
+alter table public.messages enable row level security;
+
+drop policy if exists "messages_select_own" on public.messages;
+create policy "messages_select_own" on public.messages
+for select to authenticated
+using (sender_id = auth.uid() or recipient_id = auth.uid());
+
+drop policy if exists "messages_insert_own" on public.messages;
+create policy "messages_insert_own" on public.messages
+for insert to authenticated
+with check (sender_id = auth.uid());
+
+-- ============================================================
+-- TRAFFIC ZONES (hromat zonaları)
+-- ============================================================
+
+create table if not exists public.traffic_zones (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  zone_geom jsonb,
+  severity text check (severity in ('low','medium','high')) default 'medium',
+  is_active boolean default true,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
 );
 
--- ============================================
--- 6. DELIVERY ORDERS
--- ============================================
+create index if not exists idx_traffic_zones_active on public.traffic_zones(is_active);
 
-CREATE TABLE IF NOT EXISTS public.delivery_orders (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    driver_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
-    client_id UUID REFERENCES public.users(id),
-    from_region_id UUID REFERENCES public.regions(id),
-    from_district_id UUID REFERENCES public.districts(id),
-    to_region_id UUID REFERENCES public.regions(id),
-    to_district_id UUID REFERENCES public.districts(id),
-    pickup_location GEOGRAPHY(POINT) NOT NULL,
-    pickup_address TEXT NOT NULL,
-    dropoff_location GEOGRAPHY(POINT) NOT NULL,
-    dropoff_address TEXT NOT NULL,
-    departure_date DATE NOT NULL,
-    departure_time TIME NOT NULL,
-    package_description TEXT,
-    package_weight DECIMAL(10,2),
-    package_size VARCHAR(20) CHECK (package_size IN ('small', 'medium', 'large')),
-    price DECIMAL(10,2),
-    payment_method VARCHAR(20) CHECK (payment_method IN ('cash', 'card', 'wallet')),
-    payment_status VARCHAR(20) CHECK (payment_status IN ('pending', 'paid', 'refunded')) DEFAULT 'pending',
-    status VARCHAR(20) CHECK (status IN ('pending', 'accepted', 'picked_up', 'in_transit', 'delivered', 'cancelled')) DEFAULT 'pending',
-    receiver_name VARCHAR(255),
-    receiver_phone VARCHAR(20),
-    notes TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    accepted_at TIMESTAMP WITH TIME ZONE,
-    picked_up_at TIMESTAMP WITH TIME ZONE,
-    delivered_at TIMESTAMP WITH TIME ZONE,
-    cancelled_at TIMESTAMP WITH TIME ZONE
-);
+-- ============================================================
+-- GRANTS
+-- ============================================================
 
--- ============================================
--- 7. AUTO MARKET
--- ============================================
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on all tables in schema public to authenticated;
+grant select on all tables in schema public to anon;
+grant usage, select, update on all sequences in schema public to authenticated;
+grant usage, select on all sequences in schema public to anon;
 
-CREATE TABLE IF NOT EXISTS public.car_listings (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    seller_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
-    brand VARCHAR(100) NOT NULL,
-    model VARCHAR(100) NOT NULL,
-    year INTEGER NOT NULL,
-    mileage INTEGER,
-    price DECIMAL(15,2) NOT NULL,
-    currency VARCHAR(3) DEFAULT 'UZS',
-    condition VARCHAR(20) CHECK (condition IN ('new', 'used', 'excellent', 'good', 'fair')),
-    fuel_type VARCHAR(20) CHECK (fuel_type IN ('petrol', 'diesel', 'gas', 'electric', 'hybrid')),
-    transmission VARCHAR(20) CHECK (transmission IN ('manual', 'automatic')),
-    color VARCHAR(50),
-    region_id UUID REFERENCES public.regions(id),
-    district_id UUID REFERENCES public.districts(id),
-    location GEOGRAPHY(POINT),
-    photos TEXT[] NOT NULL,
-    description TEXT,
-    features TEXT[],
-    is_featured BOOLEAN DEFAULT false,
-    view_count INTEGER DEFAULT 0,
-    status VARCHAR(20) CHECK (status IN ('active', 'sold', 'suspended', 'pending')) DEFAULT 'pending',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    sold_at TIMESTAMP WITH TIME ZONE
-);
+alter default privileges in schema public
+grant select, insert, update, delete on tables to authenticated;
 
--- ============================================
--- 8. WALLET & TRANSACTIONS
--- ============================================
+alter default privileges in schema public
+grant select on tables to anon;
 
-CREATE TABLE IF NOT EXISTS public.wallets (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID UNIQUE REFERENCES public.users(id) ON DELETE CASCADE,
-    balance DECIMAL(15,2) DEFAULT 0.00,
-    currency VARCHAR(3) DEFAULT 'UZS',
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+alter default privileges in schema public
+grant usage, select, update on sequences to authenticated;
 
-CREATE TABLE IF NOT EXISTS public.transactions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    wallet_id UUID REFERENCES public.wallets(id) ON DELETE CASCADE,
-    type VARCHAR(20) CHECK (type IN ('deposit', 'withdrawal', 'payment', 'refund', 'bonus', 'commission')),
-    amount DECIMAL(15,2) NOT NULL,
-    balance_before DECIMAL(15,2) NOT NULL,
-    balance_after DECIMAL(15,2) NOT NULL,
-    description TEXT,
-    reference_type VARCHAR(50),
-    reference_id UUID,
-    status VARCHAR(20) CHECK (status IN ('pending', 'completed', 'failed', 'cancelled')) DEFAULT 'completed',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- ============================================
--- 9. NOTIFICATIONS
--- ============================================
-
-CREATE TABLE IF NOT EXISTS public.notifications (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
-    type VARCHAR(50) NOT NULL,
-    title TEXT,
-    message TEXT,
-    data JSONB,
-    is_read BOOLEAN DEFAULT false,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    read_at TIMESTAMP WITH TIME ZONE
-);
-
--- ============================================
--- 10. INDEXES
--- ============================================
-
-CREATE INDEX IF NOT EXISTS idx_users_phone ON public.users(phone);
-CREATE INDEX IF NOT EXISTS idx_users_role ON public.users(role);
-CREATE INDEX IF NOT EXISTS idx_driver_profiles_user_id ON public.driver_profiles(user_id);
-CREATE INDEX IF NOT EXISTS idx_driver_profiles_status ON public.driver_profiles(status);
-CREATE INDEX IF NOT EXISTS idx_driver_profiles_location ON public.driver_profiles USING GIST(current_location);
-CREATE INDEX IF NOT EXISTS idx_city_taxi_client ON public.city_taxi_orders(client_id);
-CREATE INDEX IF NOT EXISTS idx_city_taxi_driver ON public.city_taxi_orders(driver_id);
-CREATE INDEX IF NOT EXISTS idx_city_taxi_status ON public.city_taxi_orders(status);
-CREATE INDEX IF NOT EXISTS idx_intercity_routes_driver ON public.intercity_routes(driver_id);
-CREATE INDEX IF NOT EXISTS idx_intercity_routes_date ON public.intercity_routes(departure_date);
-CREATE INDEX IF NOT EXISTS idx_intercity_routes_status ON public.intercity_routes(status);
-
--- ============================================
--- 11. TRIGGERS
--- ============================================
-
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON public.users
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_driver_profiles_updated_at BEFORE UPDATE ON public.driver_profiles
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_saved_addresses_updated_at BEFORE UPDATE ON public.saved_addresses
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_intercity_routes_updated_at BEFORE UPDATE ON public.intercity_routes
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_district_routes_updated_at BEFORE UPDATE ON public.district_routes
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_wallets_updated_at BEFORE UPDATE ON public.wallets
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_car_listings_updated_at BEFORE UPDATE ON public.car_listings
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
--- ============================================
--- 12. SEED DATA - REGIONS
--- ============================================
-
-INSERT INTO public.regions (name_uz_latn, name_uz_cyrl, name_kaa_latn, name_kaa_cyrl, name_ru, name_en, code, type) VALUES
-('Qoraqalpog''iston Respublikasi', 'Қорақалпоғистон Республикаси', 'Qaraqalpaqstan Respublikasi', 'Қарақалпақстан Республикасы', 'Республика Каракалпакстан', 'Republic of Karakalpakstan', 'QR', 'republic'),
-('Andijon viloyati', 'Андижон вилояти', 'Andijon', 'Андижан', 'Андижанская область', 'Andijan Region', 'AN', 'region'),
-('Buxoro viloyati', 'Бухоро вилояти', 'Buxara', 'Бухара', 'Бухарская область', 'Bukhara Region', 'BU', 'region'),
-('Farg''ona viloyati', 'Фарғона вилояти', 'Farg''ona', 'Фарғона', 'Ферганская область', 'Fergana Region', 'FA', 'region'),
-('Jizzax viloyati', 'Жиззах вилояти', 'Jizzax', 'Жиззах', 'Джизакская область', 'Jizzakh Region', 'JI', 'region'),
-('Xorazm viloyati', 'Хоразм вилояти', 'Xorazm', 'Хорезм', 'Хорезмская область', 'Khorezm Region', 'XO', 'region'),
-('Namangan viloyati', 'Наманган вилояти', 'Namangan', 'Наманган', 'Наманганская область', 'Namangan Region', 'NA', 'region'),
-('Navoiy viloyati', 'Навоий вилояти', 'Navoiy', 'Навоий', 'Навоийская область', 'Navoi Region', 'NW', 'region'),
-('Qashqadaryo viloyati', 'Қашқадарё вилояти', 'Qashqadaryo', 'Қашқадарё', 'Кашкадарьинская область', 'Kashkadarya Region', 'QA', 'region'),
-('Samarqand viloyati', 'Самарқанд вилояти', 'Samarqand', 'Самарқанд', 'Самаркандская область', 'Samarkand Region', 'SA', 'region'),
-('Sirdaryo viloyati', 'Сирдарё вилояти', 'Sirdaryo', 'Сирдарё', 'Сырдарьинская область', 'Sirdarya Region', 'SI', 'region'),
-('Surxondaryo viloyati', 'Сурхондарё вилояти', 'Surxondaryo', 'Сурхондарё', 'Сурхандарьинская область', 'Surkhandarya Region', 'SU', 'region'),
-('Toshkent viloyati', 'Тошкент вилояти', 'Toshkent viloyati', 'Ташкент вилаяты', 'Ташкентская область', 'Tashkent Region', 'TO', 'region'),
-('Toshkent shahri', 'Тошкент шаҳри', 'Toshkent qalasi', 'Ташкент қаласы', 'Город Ташкент', 'Tashkent City', 'TK', 'city')
-ON CONFLICT (code) DO NOTHING;
-
--- ============================================
--- 13. SEED DATA - DISTRICTS (QORAQALPOG'ISTON)
--- ============================================
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_kaa_latn, name_kaa_cyrl, name_ru, name_en, code)
-SELECT id, 'Nukus shahri', 'Нукус шаҳри', 'Nókis qalasi', 'Нөкис қаласы', 'Город Нукус', 'Nukus City', 'QR_NUK'
-FROM public.regions WHERE code = 'QR'
-ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_kaa_latn, name_kaa_cyrl, name_ru, name_en, code)
-SELECT id, 'Amudaryo tumani', 'Амударё тумани', 'Amudarya rayoni', 'Амудария районы', 'Амударьинский район', 'Amudarya District', 'QR_AMU'
-FROM public.regions WHERE code = 'QR'
-ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_kaa_latn, name_kaa_cyrl, name_ru, name_en, code)
-SELECT id, 'Beruniy tumani', 'Беруний тумани', 'Biruniy rayoni', 'Бируний районы', 'Берунийский район', 'Beruniy District', 'QR_BER'
-FROM public.regions WHERE code = 'QR'
-ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_kaa_latn, name_kaa_cyrl, name_ru, name_en, code)
-SELECT id, 'Chimboy tumani', 'Чимбой тумани', 'Shımbay rayoni', 'Шымбай районы', 'Чимбайский район', 'Chimboy District', 'QR_CHI'
-FROM public.regions WHERE code = 'QR'
-ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_kaa_latn, name_kaa_cyrl, name_ru, name_en, code)
-SELECT id, 'Ellikqal''a tumani', 'Элликқалъа тумани', 'Ellikqala rayoni', 'Элликқала районы', 'Элликкалинский район', 'Ellikqala District', 'QR_ELL'
-FROM public.regions WHERE code = 'QR'
-ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_kaa_latn, name_kaa_cyrl, name_ru, name_en, code)
-SELECT id, 'Kegeyli tumani', 'Кегейли тумани', 'Kegayli rayoni', 'Кегейли районы', 'Кегейлийский район', 'Kegeyli District', 'QR_KEG'
-FROM public.regions WHERE code = 'QR'
-ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_kaa_latn, name_kaa_cyrl, name_ru, name_en, code)
-SELECT id, 'Mo''ynoq tumani', 'Мўйноқ тумани', 'Moynaq rayoni', 'Мойнақ районы', 'Муйнакский район', 'Muynak District', 'QR_MOY'
-FROM public.regions WHERE code = 'QR'
-ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_kaa_latn, name_kaa_cyrl, name_ru, name_en, code)
-SELECT id, 'Nukus tumani', 'Нукус тумани', 'Nókis rayoni', 'Нөкис районы', 'Нукусский район', 'Nukus District', 'QR_NUT'
-FROM public.regions WHERE code = 'QR'
-ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_kaa_latn, name_kaa_cyrl, name_ru, name_en, code)
-SELECT id, 'Qanliko''l tumani', 'Қанликўл тумани', 'Qanliko''l rayoni', 'Қанлыкөл районы', 'Канлыкульский район', 'Qanlykul District', 'QR_QAN'
-FROM public.regions WHERE code = 'QR'
-ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_kaa_latn, name_kaa_cyrl, name_ru, name_en, code)
-SELECT id, 'Qorao''zak tumani', 'Қораўзак тумани', 'Qara''ózek rayoni', 'Қараөзек районы', 'Караузякский район', 'Karauzak District', 'QR_QOR'
-FROM public.regions WHERE code = 'QR'
-ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_kaa_latn, name_kaa_cyrl, name_ru, name_en, code)
-SELECT id, 'Qo''ng''irot tumani', 'Қўнғирот тумани', 'Qóñirat rayoni', 'Қоңырат районы', 'Кунградский район', 'Kungrad District', 'QR_QUN'
-FROM public.regions WHERE code = 'QR'
-ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_kaa_latn, name_kaa_cyrl, name_ru, name_en, code)
-SELECT id, 'Shumanay tumani', 'Шуманай тумани', 'Shumanay rayoni', 'Шуманай районы', 'Шуманайский район', 'Shumanay District', 'QR_SHU'
-FROM public.regions WHERE code = 'QR'
-ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_kaa_latn, name_kaa_cyrl, name_ru, name_en, code)
-SELECT id, 'Taxtako''pir tumani', 'Тахтакўпир тумани', 'Taxtakópir rayoni', 'Тахтакөпир районы', 'Тахтакупырский район', 'Takhtakupyr District', 'QR_TAX'
-FROM public.regions WHERE code = 'QR'
-ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_kaa_latn, name_kaa_cyrl, name_ru, name_en, code)
-SELECT id, 'To''rtkul tumani', 'Тўрткул тумани', 'Tórtkól rayoni', 'Төрткөл районы', 'Турткульский район', 'Turtkul District', 'QR_TOR'
-FROM public.regions WHERE code = 'QR'
-ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_kaa_latn, name_kaa_cyrl, name_ru, name_en, code)
-SELECT id, 'Xo''jayli tumani', 'Хўжайли тумани', 'Xojayli rayoni', 'Хожайли районы', 'Ходжейлийский район', 'Khojayli District', 'QR_XOJ'
-FROM public.regions WHERE code = 'QR'
-ON CONFLICT (code) DO NOTHING;
-
--- Qolgan viloyatlar uchun asosiy tumanlarni qo'shamiz (kamida 5-10 ta har biriga)
--- ANDIJON
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_ru, name_en, code)
-SELECT id, 'Andijon shahri', 'Андижон шаҳри', 'Город Андижан', 'Andijan City', 'AN_AND'
-FROM public.regions WHERE code = 'AN' ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_ru, name_en, code)
-SELECT id, 'Asaka tumani', 'Асака тумани', 'Асакинский район', 'Asaka District', 'AN_ASA'
-FROM public.regions WHERE code = 'AN' ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_ru, name_en, code)
-SELECT id, 'Baliqchi tumani', 'Балиқчи тумани', 'Балыкчинский район', 'Balykchy District', 'AN_BAL'
-FROM public.regions WHERE code = 'AN' ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_ru, name_en, code)
-SELECT id, 'Bo''z tumani', 'Бўз тумани', 'Бузский район', 'Buz District', 'AN_BOZ'
-FROM public.regions WHERE code = 'AN' ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_ru, name_en, code)
-SELECT id, 'Buloqboshi tumani', 'Булоқбоши тумани', 'Булакбашинский район', 'Bulakbashi District', 'AN_BUL'
-FROM public.regions WHERE code = 'AN' ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_ru, name_en, code)
-SELECT id, 'Izboskan tumani', 'Избоскан тумани', 'Избасканский район', 'Izboskan District', 'AN_IZB'
-FROM public.regions WHERE code = 'AN' ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_ru, name_en, code)
-SELECT id, 'Jalaquduq tumani', 'Жалақудуқ тумани', 'Джалакудукский район', 'Jalakuduk District', 'AN_JAL'
-FROM public.regions WHERE code = 'AN' ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_ru, name_en, code)
-SELECT id, 'Xo''jaobod tumani', 'Хўжаобод тумани', 'Ходжаабадский район', 'Khodjaabad District', 'AN_XOJ'
-FROM public.regions WHERE code = 'AN' ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_ru, name_en, code)
-SELECT id, 'Qo''rg''ontepa tumani', 'Қўрғонтепа тумани', 'Кургантепинский район', 'Kurgantepa District', 'AN_QOR'
-FROM public.regions WHERE code = 'AN' ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_ru, name_en, code)
-SELECT id, 'Marhamat tumani', 'Марҳамат тумани', 'Мархаматский район', 'Marhamat District', 'AN_MAR'
-FROM public.regions WHERE code = 'AN' ON CONFLICT (code) DO NOTHING;
-
--- TOSHKENT SHAHRI
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_ru, name_en, code)
-SELECT id, 'Bektemir tumani', 'Бектемир тумани', 'Бектемирский район', 'Bektemir District', 'TK_BEK'
-FROM public.regions WHERE code = 'TK' ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_ru, name_en, code)
-SELECT id, 'Chilonzor tumani', 'Чилонзор тумани', 'Чиланзарский район', 'Chilanzar District', 'TK_CHI'
-FROM public.regions WHERE code = 'TK' ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_ru, name_en, code)
-SELECT id, 'Mirobod tumani', 'Миробод тумани', 'Мирабадский район', 'Mirabad District', 'TK_MIR'
-FROM public.regions WHERE code = 'TK' ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_ru, name_en, code)
-SELECT id, 'Olmazor tumani', 'Олмазор тумани', 'Алмазарский район', 'Almazar District', 'TK_OLM'
-FROM public.regions WHERE code = 'TK' ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_ru, name_en, code)
-SELECT id, 'Sergeli tumani', 'Сергели тумани', 'Сергелийский район', 'Sergeli District', 'TK_SER'
-FROM public.regions WHERE code = 'TK' ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_ru, name_en, code)
-SELECT id, 'Shayxontohur tumani', 'Шайхонтоҳур тумани', 'Шайхантахурский район', 'Shaykhantakhur District', 'TK_SHA'
-FROM public.regions WHERE code = 'TK' ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_ru, name_en, code)
-SELECT id, 'Uchtepa tumani', 'Учтепа тумани', 'Учтепинский район', 'Uchtepa District', 'TK_UCH'
-FROM public.regions WHERE code = 'TK' ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_ru, name_en, code)
-SELECT id, 'Yakkasaroy tumani', 'Яккасарой тумани', 'Яккасарайский район', 'Yakkasaray District', 'TK_YAK'
-FROM public.regions WHERE code = 'TK' ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_ru, name_en, code)
-SELECT id, 'Yashnobod tumani', 'Яшнобод тумани', 'Яшнабадский район', 'Yashnabad District', 'TK_YAS'
-FROM public.regions WHERE code = 'TK' ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_ru, name_en, code)
-SELECT id, 'Yunusobod tumani', 'Юнусобод тумани', 'Юнусабадский район', 'Yunusabad District', 'TK_YUN'
-FROM public.regions WHERE code = 'TK' ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO public.districts (region_id, name_uz_latn, name_uz_cyrl, name_ru, name_en, code)
-SELECT id, 'Yongihaуot tumani', 'Янгиҳаёт тумани', 'Янгихаятский район', 'Yangikhayot District', 'TK_YON'
-FROM public.regions WHERE code = 'TK' ON CONFLICT (code) DO NOTHING;
-
-COMMENT ON DATABASE current_database() IS 'UniGo - Complete Transport Platform Database';
+alter default privileges in schema public
+grant usage, select on sequences to anon;

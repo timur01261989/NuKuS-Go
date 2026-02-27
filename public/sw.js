@@ -76,7 +76,7 @@ self.addEventListener("push", (event) => {
   try {
     const data = event.data ? event.data.json() : {};
 
-    const title = data.title || "UniGo";
+    const title = data.title || "Nukus Go";
     const body = data.body || "";
     const icon = data.icon || "/icons/icon-192.png";
     const badge = data.badge || "/icons/badge-72.png";
@@ -100,7 +100,7 @@ self.addEventListener("push", (event) => {
   } catch {
     // Push data noto'g'ri bo'lsa ham SW buzilmasin
     event.waitUntil(
-      self.registration.showNotification("UniGo", { body: "Yangi xabar" })
+      self.registration.showNotification("Nukus Go", { body: "Yangi xabar" })
     );
   }
 });

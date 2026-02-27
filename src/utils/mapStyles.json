@@ -1,0 +1,14 @@
+{
+  "hdr_settings": {
+    "exposure": 1.2,
+    "brightness": "105%",
+    "contrast": "110%",
+    "saturate": "120%",
+    "shadow_color": "rgba(0,0,0,0.15)",
+    "highlight_intensity": 1.5
+  },
+  "day_mode": {
+    "sky_color": "#87CEEB",
+    "sun_position": { "x": 10, "y": 50 }
+  }
+}

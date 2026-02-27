@@ -1,6 +1,6 @@
 {
   "appId": "com.nukusgo.driver",
-  "appName": "UniGo Driver",
+  "appName": "Nukus Go Driver",
   "webDir": "dist",
   "bundledWebRuntime": false
 }

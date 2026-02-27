@@ -401,7 +401,7 @@ console.log(performance.getEntriesByType('measure'))
 
 ## ⚖️ License
 
-Proprietary — UniGo Team
+Proprietary — Nukus Go Team
 
 ---
 
@@ -421,5 +421,5 @@ Barcha qadamni bajarilgandan keyin:
 
 ---
 
-**Muallif:** UniGo Team  
+**Muallif:** Nukus Go Team  
 **Oxirgi update:** 2026-02-24
