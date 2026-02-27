@@ -40,17 +40,50 @@ export default function LoginPage() {
 
       if (error) throw error;
 
-      // Get user details
-      const { data: user } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', data.user.id)
-        .single();
+      const uid = data?.user?.id;
+      if (!uid) throw new Error('Auth user not found after login');
+
+      // Get role safely (do NOT assume a row exists)
+      let role = 'client';
+
+      // 1) Try legacy `users` table
+      {
+        const { data: userRow, error: userErr } = await supabase
+          .from('users')
+          .select('id, role')
+          .eq('id', uid)
+          .maybeSingle();
+
+        // Ignore "0 rows" cases; only log real errors
+        if (userErr && userErr.code !== 'PGRST116') {
+          console.warn('users lookup error:', userErr);
+        }
+        if (userRow?.role) role = userRow.role;
+      }
+
+      // 2) Fallback to `profiles` table
+      if (!role || role === 'client') {
+        for (const key of ['id', 'user_id']) {
+          const { data: profileRow, error: profErr } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq(key, uid)
+            .maybeSingle();
+
+          if (profErr && profErr.code !== 'PGRST116') {
+            console.warn('profiles lookup error:', profErr);
+          }
+          if (profileRow?.role) {
+            role = profileRow.role;
+            break;
+          }
+        }
+      }
 
       message.success(t('login_success') || 'Muvaffaqiyatli kirildi!');
       
       // Redirect based on role
-      if (user.role === 'driver') {
+      if (role === 'driver') {
         navigate('/driver/home');
       } else {
         navigate('/client/home');

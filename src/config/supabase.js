@@ -23,14 +23,32 @@ export const getCurrentUser = async () => {
 };
 
 export const getUserProfile = async (userId) => {
-  const { data, error } = await supabase
-    .from('users')
-    .select('*')
-    .eq('id', userId)
-    .single();
-  
-  if (error) throw error;
-  return data;
+  // Prefer legacy `users` table if present, but do not crash if row is missing.
+  {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
+
+    // If a real error happened (not "0 rows"), surface it
+    if (error && error.code !== 'PGRST116') throw error;
+    if (data) return data;
+  }
+
+  // Fallback to `profiles`
+  for (const key of ['id', 'user_id']) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq(key, userId)
+      .maybeSingle();
+
+    if (error && error.code !== 'PGRST116') throw error;
+    if (data) return data;
+  }
+
+  return null;
 };
 
 export const getDriverProfile = async (userId) => {
@@ -38,9 +56,9 @@ export const getDriverProfile = async (userId) => {
     .from('driver_profiles')
     .select('*')
     .eq('user_id', userId)
-    .single();
+    .maybeSingle();
   
-  if (error) throw error;
+  if (error && error.code !== 'PGRST116') throw error;
   return data;
 };
 
