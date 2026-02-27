@@ -430,7 +430,184 @@ export default function DriverHome({ onLogout }) {
       {/* Header */}
       <header className="flex items-center justify-between p-4 bg-transparent">
         <div className="flex items-center gap-4">
-</nav>
+          <button
+            type="button"
+            onClick={() => setProfileOpen(true)}
+            className="p-2 rounded-xl neumorphic-pop text-slate-700"
+            aria-label="Menyu"
+          >
+            <span className="material-symbols-outlined block">menu</span>
+          </button>
+
+          <h1 className="text-2xl font-bold tracking-tight text-primarySidebar">Nukus Go</h1>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setProfileOpen(true)}
+          className="flex items-center gap-3"
+          aria-label="Profil"
+        >
+          <div className="text-right">
+            <p className="text-sm font-bold leading-tight">{driverHeader?.name || "Haydovchi"}</p>
+            <p className="text-xs text-slate-500">ID: {driverHeader?.publicId || "----"}</p>
+          </div>
+
+          <div className="w-12 h-12 rounded-full neumorphic-pop p-1">
+            {driverHeader?.avatarUrl ? (
+              <img
+                alt="Driver Profile"
+                className="w-full h-full rounded-full object-cover"
+                src={driverHeader.avatarUrl}
+              />
+            ) : (
+              <div className="w-full h-full rounded-full bg-white flex items-center justify-center text-primarySidebar">
+                <span className="material-symbols-outlined">person</span>
+              </div>
+            )}
+          </div>
+        </button>
+      </header>
+
+      {/* Status Toggle */}
+      <div className="px-4 py-2">
+        <div className="neumorphic-pop rounded-2xl p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={`w-3 h-3 rounded-full ${isOnline ? "bg-green-500" : "bg-slate-400"}`} />
+            <div>
+              <p className="font-bold text-slate-800">Haydovchi holati</p>
+              <p className="text-sm text-slate-500">
+                Siz hozir {isOnline ? "onlayn" : "oflayn"} rejimdasiz
+              </p>
+            </div>
+          </div>
+
+          <label
+            className={`relative flex h-8 w-14 items-center rounded-full p-1 transition-colors ${
+              isOnline ? "bg-primarySidebar" : "bg-slate-200"
+            } ${loading ? "opacity-60" : "cursor-pointer"}`}
+          >
+            <input
+              type="checkbox"
+              className="sr-only"
+              checked={isOnline}
+              disabled={loading}
+              onChange={(e) => toggleOnline(e.target.checked)}
+            />
+            <div
+              className={`h-6 w-6 rounded-full bg-white shadow-md transition-transform ${
+                isOnline ? "translate-x-6" : "translate-x-0"
+              }`}
+            />
+          </label>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <main className="p-4 space-y-6 pb-24">
+        {/* City taxi big card */}
+        <section>
+          <button
+            type="button"
+            onClick={() => selectService("taxi")}
+            className="w-full text-left neumorphic-pop rounded-2xl p-6 flex items-center justify-between border-2 border-primarySidebar/20"
+          >
+            <div className="flex items-center gap-5">
+              <div className="w-16 h-16 rounded-2xl bg-orange-100 flex items-center justify-center text-primarySidebar">
+                <span className="material-symbols-outlined text-4xl">local_taxi</span>
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold text-slate-900">Shahar ichida taksi</h3>
+                <p className="text-slate-500 text-sm">Eng tezkor va qulay narxlar</p>
+              </div>
+            </div>
+
+            <div className="bg-primarySidebar text-white h-12 w-12 rounded-xl flex items-center justify-center shadow-lg">
+              <span className="material-symbols-outlined">arrow_forward</span>
+            </div>
+          </button>
+        </section>
+
+        {/* Grid categories */}
+        <section className="grid grid-cols-2 gap-4">
+          <button
+            type="button"
+            onClick={() => selectService("interProv")}
+            className="neumorphic-pop rounded-2xl p-6 flex flex-col items-center text-center gap-4 border border-white/50"
+          >
+            <div className="w-14 h-14 rounded-2xl bg-orange-100 flex items-center justify-center text-primarySidebar">
+              <span className="material-symbols-outlined text-4xl">map</span>
+            </div>
+            <p className="font-bold text-slate-800">Viloyatlar aro</p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => selectService("interDist")}
+            className="neumorphic-pop rounded-2xl p-6 flex flex-col items-center text-center gap-4 border border-white/50"
+          >
+            <div className="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center text-blue-600">
+              <span className="material-symbols-outlined text-4xl">distance</span>
+            </div>
+            <p className="font-bold text-slate-800">Tumanlar aro</p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => selectService("freight")}
+            className="neumorphic-pop rounded-2xl p-6 flex flex-col items-center text-center gap-4 border border-white/50"
+          >
+            <div className="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+              <span className="material-symbols-outlined text-4xl">local_shipping</span>
+            </div>
+            <p className="font-bold text-slate-800">Yuk tashish</p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => selectService("delivery")}
+            className="neumorphic-pop rounded-2xl p-6 flex flex-col items-center text-center gap-4 border border-white/50"
+          >
+            <div className="w-14 h-14 rounded-2xl bg-purple-100 flex items-center justify-center text-purple-600">
+              <span className="material-symbols-outlined text-4xl">inventory_2</span>
+            </div>
+            <p className="font-bold text-slate-800">Eltish xizmati</p>
+          </button>
+        </section>
+      </main>
+
+      {/* Bottom Navigation Bar (no big +, no profile) */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-slate-200 px-6 py-2 flex justify-around items-center z-50">
+        <button
+          type="button"
+          onClick={() => {
+            backToMenu();
+            navigate("/driver/dashboard");
+          }}
+          className="flex flex-col items-center gap-1 text-primarySidebar"
+        >
+          <span className="material-symbols-outlined">home</span>
+          <span className="text-[10px] font-bold">Asosiy</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate("/driver/orders")}
+          className="flex flex-col items-center gap-1 text-slate-400"
+        >
+          <span className="material-symbols-outlined">history</span>
+          <span className="text-[10px] font-medium">Buyurtmalar tarixi</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate("/driver/wallet")}
+          className="flex flex-col items-center gap-1 text-slate-400"
+        >
+          <span className="material-symbols-outlined">account_balance_wallet</span>
+          <span className="text-[10px] font-medium">Hamyon</span>
+        </button>
+      </nav>
 
       {/* Profile drawer (right) - existing flow kept */}
       <Drawer
