@@ -1,0 +1,12 @@
+{
+  "enabled": true,
+  "title": "Avto savdo",
+  "cta_label": "Savdoga kirish",
+  "data_source": "local_json",
+  "local_json_path": "/config/market_listings.json",
+  "refresh_seconds": 60,
+  "ui": {
+    "show_preview_count": 6,
+    "currency": "UZS"
+  }
+}

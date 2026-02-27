@@ -8,15 +8,16 @@
  *  - Keeps backward compatibility with existing handlers (order/auth/driver/dispatch/...)
  */
 
-import orderHandler from "../server/api/order.js";
-import authHandler from "../server/api/auth.js";
-import driverHandler from "../server/api/driver.js";
-import dispatchHandler from "../server/api/dispatch.js";
-import billingHandler from "../server/api/billing.js";
-import sosHandler from "../server/api/sos.js";
-import presenceHandler from "../server/api/presence.js";
-import notificationsHandler from "../server/api/notifications.js";
-import miscHandler from "../server/api/misc.js";
+import orderHandler from "./order.js";
+import authHandler from "./auth.js";
+import driverHandler from "./driver.js";
+import dispatchHandler from "./dispatch.js";
+import billingHandler from "./billing.js";
+import sosNotificationsHandler from "./comms.js";
+import presenceHandler from "./presence.js";
+import cronDispatchHandler from "./cron_dispatch.js";
+import miscHandler from "./misc.js";
+
 
 function normalizePath(rawPath) {
   // Supports both direct path (/api/order) and rewritten query (?path=order)
@@ -61,14 +62,9 @@ function getRouteKey(path) {
 
   if (base === "order") return "order";
   if (base === "auth") return "auth";
-  if (base === "offer") return "billing-offer";
-  if (base === "wallet") return "billing-wallet";
-  if (base === "billing") return "billing";
+  if (base === "offer") return "offer";
+  if (base === "wallet") return "wallet";
   if (base === "sos") return "sos";
-  if (base === "pricing") return "misc-pricing";
-  if (base === "gamification") return "misc-gamification";
-  if (base === "misc") return "misc";
-  if (base === "cron_dispatch") return "dispatch-cron";
 
   // Older flat paths still used by frontend in a few places:
   if (base === "driver-state") return "driver-state";
@@ -163,6 +159,7 @@ export default async function handler(req, res) {
 
     // routeKey for subroutes (used by dispatch/driver modules)
     req.routeKey = getRouteKey(path);
+    req.__routeKey = req.routeKey;
 
     if (path.startsWith("order")) {
       return await orderHandler(req, res);
@@ -176,9 +173,7 @@ export default async function handler(req, res) {
       return await driverHandler(req, res, req.routeKey || "driver");
     }
 
-    if (path.startsWith("dispatch") || path.startsWith("cron_dispatch")) {
-      req.query = req.query || {};
-      req.query.__subpath = path;
+    if (path.startsWith("dispatch")) {
       return await dispatchHandler(req, res);
     }
 
@@ -189,26 +184,16 @@ export default async function handler(req, res) {
     if (path.startsWith("cron_dispatch")) {
       return await cronDispatchHandler(req, res);
     }
-    if (path.startsWith("offer") || path.startsWith("wallet") || path.startsWith("billing")) {
-      req.query = req.query || {};
-      req.query.__subpath = path;
+    if (path.startsWith("offer") || path.startsWith("wallet")) {
       return await billingHandler(req, res);
     }
-
-    if (path.startsWith("sos")) {
-      return await sosHandler(req, res);
+    if (path.startsWith("sos") || path.startsWith("notifications")) {
+      return await sosNotificationsHandler(req, res);
     }
-
-    if (path.startsWith("notifications")) {
-      return await notificationsHandler(req, res);
-    }
-    if (path.startsWith("gamification") || path.startsWith("pricing") || path.startsWith("misc")) {
-      req.query = req.query || {};
-      req.query.__subpath = path;
+    if (path.startsWith("gamification") || path.startsWith("pricing") || path.startsWith("regions") || path.startsWith("intercity") || path.startsWith("users")) {
       return await miscHandler(req, res);
     }
-
-    res.statusCode = 404;
+res.statusCode = 404;
     res.setHeader("Content-Type", "application/json");
     res.end(JSON.stringify({ error: "API route topilmadi", path }));
   } catch (e) {
