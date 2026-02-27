@@ -40,6 +40,7 @@ const ClientDelivery = lazy(() => import("@features/client/delivery/DeliveryPage
 const DriverOrders = lazy(() => import("@features/driver/pages/DriverOrders"));
 const DriverDashboard = lazy(() => import("@features/driver/pages/DriverDashboard"));
 const DriverWalletPage = lazy(() => import("@features/driver/pages/DriverWalletPage"));
+const DriverProfilePage = lazy(() => import("@features/driver/pages/DriverProfilePage"));
 const DriverRegister = lazy(() => import("@features/driver/components/DriverRegister"));
 const DriverModeRedirect = lazy(() => import("@shared/routes/DriverModeRedirect")); // YANGI
 
