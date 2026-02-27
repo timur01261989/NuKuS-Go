@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
+import "./i18n/i18next";
 import api from "@/utils/apiHelper";
 import { setupNotifications } from "@/services/notifications";
 import { supabase } from "@/lib/supabase";

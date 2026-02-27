@@ -26,10 +26,8 @@ export default function Settings() {
   // Language options
   const languageOptions = useMemo(
     () => [
-      { value: "uz_lotin", label: "O'zbek (Lotin)" },
-      { value: "uz_kirill", label: "Ўзбек (Кирилл)" },
-      { value: "qq_lotin", label: "Qaraqalpaq (Lotin)" },
-      { value: "qq_kirill", label: "Қарақалпақ (Кирилл)" },
+      { value: "qk", label: "Qaraqalpaqsha" },
+      { value: "uz", label: "O‘zbekcha" },
       { value: "ru", label: "Русский" },
       { value: "en", label: "English" },
     ],

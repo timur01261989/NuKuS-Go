@@ -17,8 +17,9 @@ export default function DriverServiceSelect({ onSelectService }) {
   // State: Onlayn/Oflayn holati
   const [isOnline, setIsOnline] = useState(false);
 
-  const savedLang = localStorage.getItem("appLang") || "uz_lotin";
-  const t = translations[savedLang] || translations["uz_lotin"];
+  const savedLang = (localStorage.getItem("unigo_lang") || "uz").toLowerCase();
+  const dictKey = savedLang === "qk" ? "qq_lotin" : savedLang === "uz" ? "uz_lotin" : savedLang;
+  const t = translations[dictKey] || translations["uz_lotin"];
 
   // --- Switch bosilganda ishlaydi ---
   const toggleOnline = (checked) => {

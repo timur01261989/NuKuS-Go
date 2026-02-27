@@ -45,9 +45,10 @@ export default function Dashboard() {
   const [currentView, setCurrentView] = useState("dashboard");
   const [loading, setLoading] = useState(true);
 
-  const savedLang = localStorage.getItem("appLang") || "uz_lotin";
+  const savedLang = (localStorage.getItem("unigo_lang") || "uz").toLowerCase();
   const [langKey, setLangKey] = useState(savedLang);
-  const t = translations[langKey] || translations["uz_lotin"];
+  const dictKey = langKey === "qk" ? "qq_lotin" : langKey === "uz" ? "uz_lotin" : langKey;
+  const t = translations[dictKey] || translations["uz_lotin"];
 
   // ✅ Night mode mode: "auto" | "on" | "off"
   const [nightMode, setNightMode] = useState("auto");
@@ -102,9 +103,11 @@ export default function Dashboard() {
   const toggleDrawer = () => setOpen(!open);
 
   const changeLang = (newLang) => {
-    setLangKey(newLang);
-    localStorage.setItem("appLang", newLang);
-    message.success(t.languageChanged);
+    const next = (newLang || "uz").toLowerCase();
+    setLangKey(next);
+    localStorage.setItem("unigo_lang", next);
+    window.dispatchEvent(new CustomEvent("unigoLangChanged", { detail: { key: next } }));
+    message.success(t?.languageChanged || "Til o'zgartirildi");
   };
 
   const logout = async () => {
@@ -123,9 +126,10 @@ export default function Dashboard() {
 
   const langMenu = {
     items: [
-      { key: "uz_lotin", label: "O‘zbek (lotin)", onClick: () => changeLang("uz_lotin") },
-      { key: "uz_kiril", label: "Ўzbek (kiril)", onClick: () => changeLang("uz_kiril") },
+      { key: "qk", label: "Qaraqalpaqsha", onClick: () => changeLang("qk") },
+      { key: "uz", label: "O‘zbekcha", onClick: () => changeLang("uz") },
       { key: "ru", label: "Русский", onClick: () => changeLang("ru") },
+      { key: "en", label: "English", onClick: () => changeLang("en") },
     ],
   };
 

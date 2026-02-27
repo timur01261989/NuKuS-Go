@@ -2,6 +2,7 @@ import React, { Suspense, lazy } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ConfigProvider, Spin } from "antd";
 import { LanguageProvider } from "@shared/i18n/LanguageContext";
+import LanguageGate from "@shared/i18n/LanguageGate";
 import RoleGate from "@shared/routes/RoleGate";
 import "./styles/hdr-taxi.css";
 
@@ -15,7 +16,6 @@ const SearchOnRoutePage = lazy(() => import("./pages/SuperPro/SearchOnRoutePage"
 // --- PAGES (LAZY) ---
 const Auth = lazy(() => import("./features/auth/pages/Auth"));
 const Register = lazy(() => import("./features/auth/pages/Register"));
-const Otp = lazy(() => import("./features/auth/pages/Otp"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 // Dashboard va MainPage import qilinmaydi — route'da ishlatilmaydi
 const RootRedirect = lazy(() => import("./pages/RootRedirect"));
@@ -60,6 +60,7 @@ export default function App() {
   return (
     <ConfigProvider>
       <LanguageProvider>
+        <LanguageGate />
         <BrowserRouter>
           <Suspense fallback={<PageLoader />}>
             <Routes>
@@ -67,7 +68,6 @@ export default function App() {
               <Route path="/" element={<RootRedirect />} />
               <Route path="/login" element={<Auth />} />
               <Route path="/register" element={<Register />} />
-              <Route path="/otp" element={<Otp />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/logout" element={<Logout />} />
 

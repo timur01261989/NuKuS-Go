@@ -14,23 +14,19 @@ import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@shared/i18n/useLanguage";
 import { LockOutlined, GlobalOutlined, PhoneOutlined } from "@ant-design/icons";
 
-import { translations } from "@i18n/translations";
 import { supabase } from "@/lib/supabase";
 
 const { Title, Text } = Typography;
 
 export default function Auth() {
-  const [form] = Form.useForm();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
   const { langKey, setLangKey, t } = useLanguage();
 
   const languages = [
-    { key: "uz_lotin", label: "O'zbek (Lotin)" },
-    { key: "uz_kirill", label: "Ўзбек (Кирилл)" },
-    { key: "qq_lotin", label: "Qaraqalpaq (Lotin)" },
-    { key: "qq_kirill", label: "Қарақалпақ (Кирилл)" },
+    { key: "qk", label: "Qaraqalpaqsha" },
+    { key: "uz", label: "O‘zbekcha" },
     { key: "ru", label: "Русский" },
     { key: "en", label: "English" },
   ];
@@ -50,7 +46,7 @@ export default function Auth() {
 
   const handleLangChange = ({ key }) => {
     setLangKey(key);
-        message.success("Til o'zgartirildi");
+    message.success(t?.languageChanged || "Til o'zgartirildi");
   };
 
   const formatUzPhone = (rawPhone) => {
@@ -89,25 +85,6 @@ export default function Auth() {
       setLoading(false);
     }
   };
-
-  const onSms = async () => {
-    setLoading(true);
-    try {
-      const values = await form.validateFields(["phone"]);
-      const phone = formatUzPhone(values.phone);
-      const { error } = await supabase.auth.signInWithOtp({ phone });
-      if (error) throw error;
-      message.success(t?.smsSent || "SMS kod yuborildi");
-      navigate(`/otp?phone=${encodeURIComponent(phone)}`);
-    } catch (e) {
-      // validateFields throws array sometimes
-      if (Array.isArray(e)) return;
-      message.error(e?.message || "Xatolik");
-    } finally {
-      setLoading(false);
-    }
-  };
-
 
   return (
     <ConfigProvider theme={{ token: { colorPrimary: "#FFD700" } }}>
@@ -152,30 +129,30 @@ export default function Auth() {
             >
               <span style={{ fontSize: 30, fontWeight: "bold" }}>GO</span>
             </div>
-            <Title level={3}>Nukus Go</Title>
-            <Text type="secondary">Kirish</Text>
+            <Title level={3}>UniGo</Title>
+            <Text type="secondary">{t?.appSubtitle || "Yagona Yechim"}</Text>
           </div>
 
-          <Form form={form} name="login_form" onFinish={onFinish} size="large">
-            <Form.Item name="phone" rules={[{ required: true, message: "Telefon raqam!" }]}>
+          <Form name="login_form" onFinish={onFinish} size="large">
+            <Form.Item name="phone" rules={[{ required: true, message: t?.enterPhone || "Telefon raqam!" }]}>
               <Input
                 prefix={<PhoneOutlined />}
                 addonBefore="+998"
-                placeholder="90 123 45 67"
+                placeholder={t?.phonePlaceholder || "90 123 45 67"}
               />
             </Form.Item>
 
-            <Form.Item name="password" rules={[{ required: true, message: "Parol!" }]}>
-              <Input.Password prefix={<LockOutlined />} placeholder="Parol" />
+            <Form.Item name="password" rules={[{ required: true, message: t?.password || "Parol!" }]}>
+              <Input.Password prefix={<LockOutlined />} placeholder={t?.password || "Parol"} />
             </Form.Item>
 
             <Form.Item>
-              <Checkbox>{t.remember || "Eslab qolish"}</Checkbox>
+              <Checkbox>{t?.remember || "Eslab qolish"}</Checkbox>
               <a
                 style={{ float: "right", color: "#FFD700", fontWeight: "bold" }}
                 onClick={() => navigate("/reset-password")}
               >
-                Parolni unutdingizmi?
+                {t?.forgot || "Parolni unutdingizmi?"}
               </a>
             </Form.Item>
 
@@ -193,19 +170,14 @@ export default function Auth() {
                   fontWeight: "bold",
                 }}
               >
-                KIRISH
+                {t?.login || "KIRISH"}
               </Button>
-
-          <Button onClick={onSms} loading={loading} block style={{ marginTop: 8 }}>
-            {t?.smsLogin || "SMS orqali kirish"}
-          </Button>
-
             </Form.Item>
 
             <div style={{ textAlign: "center" }}>
-              <Text>Hisobingiz yo'qmi? </Text>
+              <Text>{t?.noAccount || "Hisobingiz yo'qmi?"} </Text>
               <a onClick={() => navigate("/register")} style={{ color: "#FFD700", fontWeight: "bold" }}>
-                Ro'yxatdan o'tish
+                {t?.register || "Ro'yxatdan o'tish"}
               </a>
             </div>
           </Form>
