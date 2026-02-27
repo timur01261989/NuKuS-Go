@@ -10,17 +10,34 @@ This is the **ULTIMATE** version combining:
 - ✅ **NOTHING LOST** - Everything preserved in `/legacy`
 
 ---
+## ☁️ Vercel Deploy (recommended)
+
+1) **Environment Variables (Vercel → Project → Settings → Environment Variables)**
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   
+   Optional (only if you use these features): `VAPID_*`, `TWILIO_*`, `REDIS_URL`, `PY_AI_URL`.
+
+2) Frontend talks to backend via **`/api`** (serverless). Set `VITE_API_BASE_URL=/api` (default in `.env.example`).
+
+3) Deploy.
+
+> Note: `/server` and `/backend` folders are kept for **legacy/local** usage, but Vercel uses only `/api/*`.
+
+---
 
 ## 🎯 Complete Features
 
-### 👥 CLIENT Side (9 Pages - FULLY WORKING)
+### 👥 CLIENT Side (9 Pages - Included (needs env + Supabase))
 ✅ **City Taxi** - Real-time taxi with 4 tariffs (Economy, Comfort, Business, Courier)
 ✅ **Intercity Routes** - Full search/booking between all 14 regions & 150+ districts
 ✅ **District Routes** - Intra-district transport
 ✅ **Delivery Service** - Package delivery with tracking
 ✅ **Auto Market** - Car marketplace with filters
 
-### 🚙 DRIVER Side (8 Pages - FULLY WORKING)
+### 🚙 DRIVER Side (8 Pages - Included (needs env + Supabase))
 ✅ **Dashboard** - Stats, earnings, ratings
 ✅ **City Taxi** - Online/offline mode with order management
 ✅ **Intercity Routes** - Create and manage routes
