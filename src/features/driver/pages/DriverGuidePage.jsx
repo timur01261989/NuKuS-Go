@@ -1,7 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 
-export default function DriverWalletPage() {
+export default function DriverGuidePage() {
   const navigate = useNavigate();
   return (
     <div className="min-h-screen bg-white">
@@ -12,11 +12,11 @@ export default function DriverWalletPage() {
         >
           <span className="material-symbols-rounded">arrow_back</span>
         </button>
-        <div className="font-extrabold">Hisobni to‘ldirish</div>
+        <div className="font-extrabold">Qo‘llanma</div>
       </div>
 
       <div className="p-4 text-sm text-gray-600">
-        Bu sahifa hozir placeholder. Keyin shu faylga to‘lov usullari va balans logikasini qo‘shasan.
+        Bu sahifa hozir placeholder. Keyin haydovchi uchun qo‘llanma matnlarini shu faylga qo‘shasan.
       </div>
     </div>
   );
