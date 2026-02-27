@@ -14,7 +14,7 @@ export const TaxiOrderStatus = {
 };
 
 export const initialTaxiState = {
-  isOnline: (typeof window !== "undefined" ? localStorage.getItem("driverOnline") === "1" : false),
+  isOnline: false,
 
   driverLocation: {
     latlng: null, // [lat,lng]

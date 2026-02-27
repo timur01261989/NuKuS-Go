@@ -1,165 +1,191 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useState, useEffect } from "react";
+import {
+  Form,
+  Input,
+  Button,
+  Checkbox,
+  Typography,
+  Card,
+  message,
+  ConfigProvider,
+  Dropdown,
+} from "antd";
 import { useNavigate } from "react-router-dom";
-import { message } from "antd";
-import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@shared/i18n/useLanguage";
+import { LockOutlined, GlobalOutlined, PhoneOutlined } from "@ant-design/icons";
 
-const LANGS = [
-  { key: "qq_kirill", label: "Қарақалпақ (Кирилл)" },
-  { key: "qq_lotin", label: "Qaraqalpaq (Lotin)" },
-  { key: "uz_kirill", label: "Ўзбек (Кирилл)" },
-  { key: "uz_lotin", label: "O'zbek (Lotin)" },
-  { key: "ru", label: "Русский" },
-  { key: "en", label: "English" },
-];
+import { translations } from "@i18n/translations";
+import { supabase } from "@/lib/supabase";
 
-function formatUzPhone(rawPhone) {
-  let digits = String(rawPhone || "").replace(/\D/g, "");
-  // allow entering 9-digit local number (90xxxxxxx) or full
-  if (digits.length === 9) digits = "998" + digits;
-  if (!digits.startsWith("998")) digits = "998" + digits;
-  digits = digits.slice(0, 12);
-  return "+" + digits;
-}
+const { Title, Text } = Typography;
 
 export default function Auth() {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+
   const { langKey, setLangKey, t } = useLanguage();
 
-  const [loading, setLoading] = useState(false);
-  const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
-  const [remember, setRemember] = useState(true);
-
-  const langLabel = useMemo(() => LANGS.find((l) => l.key === langKey)?.label || "Language", [langKey]);
+  const languages = [
+    { key: "uz_lotin", label: "O'zbek (Lotin)" },
+    { key: "uz_kirill", label: "Ўзбек (Кирилл)" },
+    { key: "qq_lotin", label: "Qaraqalpaq (Lotin)" },
+    { key: "qq_kirill", label: "Қарақалпақ (Кирилл)" },
+    { key: "ru", label: "Русский" },
+    { key: "en", label: "English" },
+  ];
 
   useEffect(() => {
-    const check = async () => {
+    const checkSession = async () => {
       if (!supabase?.auth) return;
       const { data } = await supabase.auth.getSession();
-      if (data?.session) navigate("/", { replace: true });
+      // If user is already logged in, redirect to RootRedirect (/)
+      // which will decide the correct destination based on app_mode and user role.
+      if (data?.session) {
+        navigate("/", { replace: true });
+      }
     };
-    check();
+    checkSession();
   }, [navigate]);
 
-  const onSubmit = async (e) => {
-    e.preventDefault();
+  const handleLangChange = ({ key }) => {
+    setLangKey(key);
+        message.success("Til o'zgartirildi");
+  };
+
+  const formatUzPhone = (rawPhone) => {
+    let digits = String(rawPhone || "").replace(/\D/g, "");
+    if (digits.length === 9) digits = "998" + digits;
+    if (!digits.startsWith("998")) digits = "998" + digits;
+    digits = digits.slice(0, 12);
+    return "+" + digits;
+  };
+
+  const onFinish = async (values) => {
     setLoading(true);
     try {
-      const formatted = formatUzPhone(phone);
-      const { error } = await supabase.auth.signInWithPassword({ phone: formatted, password });
+      const phone = formatUzPhone(values.phone);
+
+      const { error } = await supabase.auth.signInWithPassword({
+        phone,
+        password: values.password,
+      });
+
       if (error) throw error;
 
-      // remember preference
-      localStorage.setItem("unigo_remember", remember ? "1" : "0");
-
-      message.success(t("login") || "KIRISH");
+      message.success(t?.greeting || "Xush kelibsiz!");
+      
+      // Default: app_mode ni "client" ga reset qil agar belgilanmagan bo'lsa
+      // Agar user haydovchi bo'lishni xohlasa, /driver-mode tugmasini bosganda app_mode="driver" bo'ladi
+      try { localStorage.setItem("app_mode", "client"); } catch(e) {}
+      
+      // RootRedirect (/) quyidagilni tekshiradi:
+      // - app_mode="client" → /client/home
+      // - app_mode="driver" → /driver/register, /driver/pending, yoki /driver/dashboard
       navigate("/", { replace: true });
-    } catch (err) {
-      message.error(err?.message || "Login error");
+    } catch {
+      message.error("Telefon raqam yoki parol noto'g'ri!");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-md bg-white shadow-lg rounded-2xl p-6 border border-gray-100">
-        <div className="flex items-start justify-between gap-3 mb-6">
-          <div>
-            <div className="text-2xl font-extrabold tracking-tight">UniGo</div>
-            <div className="text-sm text-gray-500">{t("appSubtitle") || "Haydovchi va yo'lovchilar uchun"}</div>
-          </div>
-
-          <div className="text-right">
-            <div className="text-xs text-gray-500 mb-1">{t("language") || "Til"}</div>
-            <select
-              className="text-sm border rounded-xl px-3 py-2 bg-white"
-              value={langKey}
-              onChange={(e) => {
-                setLangKey(e.target.value);
-                message.success("OK");
-              }}
-              aria-label="language"
-            >
-              {LANGS.map((l) => (
-                <option key={l.key} value={l.key}>
-                  {l.label}
-                </option>
-              ))}
-            </select>
-          </div>
+    <ConfigProvider theme={{ token: { colorPrimary: "#FFD700" } }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "100vh",
+          background: "#f0f2f5",
+          padding: 20,
+        }}
+      >
+        <div style={{ position: "absolute", top: 20, right: 20 }}>
+          <Dropdown menu={{ items: languages, onClick: handleLangChange }} trigger={["click"]}>
+            <Button icon={<GlobalOutlined />} shape="round">
+              {languages.find((l) => l.key === langKey)?.label || "Til"}
+            </Button>
+          </Dropdown>
         </div>
 
-        <form onSubmit={onSubmit} className="space-y-4">
-          <div>
-            <label className="text-sm text-gray-600">{t("enterPhone") || "Telefon raqamingizni kiriting"}</label>
-            <input
-              className="mt-1 w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-400"
-              placeholder={t("phonePlaceholder") || "90 123 45 67"}
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              inputMode="tel"
-              autoComplete="tel"
-            />
+        <Card
+          style={{
+            width: 400,
+            borderRadius: 20,
+            boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+          }}
+          bordered={false}
+        >
+          <div style={{ textAlign: "center", marginBottom: 30 }}>
+            <div
+              style={{
+                width: 60,
+                height: 60,
+                background: "#FFD700",
+                borderRadius: 15,
+                margin: "0 auto 15px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <span style={{ fontSize: 30, fontWeight: "bold" }}>GO</span>
+            </div>
+            <Title level={3}>UniGo</Title>
+            <Text type="secondary">Kirish</Text>
           </div>
 
-          <div>
-            <label className="text-sm text-gray-600">{t("password") || "Parol"}</label>
-            <input
-              className="mt-1 w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-400"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              type="password"
-              autoComplete="current-password"
-            />
-          </div>
-
-          <div className="flex items-center justify-between gap-3">
-            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                className="rounded"
-                checked={remember}
-                onChange={(e) => setRemember(e.target.checked)}
+          <Form name="login_form" onFinish={onFinish} size="large">
+            <Form.Item name="phone" rules={[{ required: true, message: "Telefon raqam!" }]}>
+              <Input
+                prefix={<PhoneOutlined />}
+                addonBefore="+998"
+                placeholder="90 123 45 67"
               />
-              {t("remember") || "Eslab qolish"}
-            </label>
+            </Form.Item>
 
-            <button
-              type="button"
-              onClick={() => navigate("/reset-password")}
-              className="text-sm font-medium text-amber-600 hover:text-amber-700"
-            >
-              {t("forgot") || "Parolni unutdingizmi?"}
-            </button>
-          </div>
+            <Form.Item name="password" rules={[{ required: true, message: "Parol!" }]}>
+              <Input.Password prefix={<LockOutlined />} placeholder="Parol" />
+            </Form.Item>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-xl px-4 py-3 font-semibold bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-60"
-          >
-            {loading ? "..." : (t("login") || "KIRISH")}
-          </button>
+            <Form.Item>
+              <Checkbox>{t.remember || "Eslab qolish"}</Checkbox>
+              <a
+                style={{ float: "right", color: "#FFD700", fontWeight: "bold" }}
+                onClick={() => navigate("/reset-password")}
+              >
+                Parolni unutdingizmi?
+              </a>
+            </Form.Item>
 
-          <div className="text-sm text-gray-600 text-center">
-            {t("noAccount") || "Hisobingiz yo'qmi?"}{" "}
-            <button
-              type="button"
-              className="font-semibold text-gray-900 hover:underline"
-              onClick={() => navigate("/register")}
-            >
-              {t("register") || "Ro'yxatdan o'tish"}
-            </button>
-          </div>
+            <Form.Item>
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={loading}
+                block
+                style={{
+                  background: "black",
+                  borderColor: "black",
+                  height: 50,
+                  borderRadius: 10,
+                  fontWeight: "bold",
+                }}
+              >
+                KIRISH
+              </Button>
+            </Form.Item>
 
-          <div className="text-xs text-gray-400 text-center">
-            {langLabel}
-          </div>
-        </form>
+            <div style={{ textAlign: "center" }}>
+              <Text>Hisobingiz yo'qmi? </Text>
+              <a onClick={() => navigate("/register")} style={{ color: "#FFD700", fontWeight: "bold" }}>
+                Ro'yxatdan o'tish
+              </a>
+            </div>
+          </Form>
+        </Card>
       </div>
-    </div>
+    </ConfigProvider>
   );
 }

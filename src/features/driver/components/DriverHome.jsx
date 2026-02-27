@@ -39,6 +39,7 @@ import DriverProfile from "./DriverProfile";
 
 import { supabase } from "@lib/supabase"; 
 import { startTracking } from "./services/locationService";
+import { SERVICE_TYPES, fetchServicePresence, setServiceOnline, setAllServicesOnline } from "./services/driverServicePresence";
 
 const { Title, Text } = Typography;
 
@@ -96,6 +97,97 @@ export default function DriverHome({ onLogout }) {
     const v = (typeof window !== "undefined" ? localStorage.getItem("driverOnline") : null);
     return v === "1";
   });
+
+  // Per-service online flags
+  const [servicePresence, setServicePresence] = useState({});
+  const [lastLoc, setLastLoc] = useState(null);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    let stop = null;
+    // start GPS tracking once; we use it for presence updates
+    stop = startTracking((loc) => setLastLoc(loc));
+    return () => {
+      if (typeof navigator !== "undefined" && stop != null) {
+        try { navigator.geolocation.clearWatch(stop); } catch (e) {}
+      }
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!user?.id) return;
+        const map = await fetchServicePresence({ driverId: user.id });
+        setServicePresence(map);
+        const anyOnline = Object.values(map || {}).some((r) => r?.is_online);
+        setIsOnline(!!anyOnline);
+      } catch (e) {
+        // ignore
+      }
+    })();
+  }, [user?.id]);
+
+  const applyGlobalPresence = useCallback(async (anyOnline) => {
+    if (!user?.id) return;
+    try {
+      const { error } = await supabase.from("driver_presence").upsert({
+        driver_id: user.id,
+        is_online: !!anyOnline,
+        lat: lastLoc?.lat ?? null,
+        lng: lastLoc?.lng ?? null,
+      }, { onConflict: "driver_id" });
+      if (error) throw error;
+    } catch (e) {
+      // ignore
+    }
+  }, [user?.id, lastLoc]);
+
+  const toggleServiceOnline = useCallback(async (serviceType, next) => {
+    if (!user?.id) return;
+    try {
+      setLoading(true);
+      await setServiceOnline({
+        driverId: user.id,
+        serviceType,
+        isOnline: next,
+        lat: lastLoc?.lat ?? null,
+        lng: lastLoc?.lng ?? null,
+      });
+      const nextMap = await fetchServicePresence({ driverId: user.id });
+      setServicePresence(nextMap);
+      const anyOnline = Object.values(nextMap || {}).some((r) => r?.is_online);
+      setIsOnline(!!anyOnline);
+      await applyGlobalPresence(anyOnline);
+    } catch (e) {
+      message.error("Online holatini o‘zgartirib bo‘lmadi");
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id, lastLoc, applyGlobalPresence]);
+
+  const toggleAllServices = useCallback(async (next) => {
+    if (!user?.id) return;
+    try {
+      setLoading(true);
+      await setAllServicesOnline({
+        driverId: user.id,
+        isOnline: next,
+        lat: lastLoc?.lat ?? null,
+        lng: lastLoc?.lng ?? null,
+      });
+      const nextMap = await fetchServicePresence({ driverId: user.id });
+      setServicePresence(nextMap);
+      setIsOnline(!!next);
+      await applyGlobalPresence(next);
+    } catch (e) {
+      message.error("Barcha xizmatlarni yoqib/o‘chirib bo‘lmadi");
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id, lastLoc, applyGlobalPresence]);
+
+
 
   const API_BASE = (import.meta?.env?.VITE_API_BASE || "").replace(/\/$/, "");
 
@@ -470,36 +562,6 @@ export default function DriverHome({ onLogout }) {
           <Title level={5} style={{ margin: 0, fontWeight: 800, color: "var(--text)" }}>
             HAYDOVCHI
           </Title>
-
-        <div style={{ marginTop: 10, display: "flex", gap: 10 }}>
-          <Button type="primary" onClick={async () => {
-            try {
-              const { data } = await supabase.auth.getUser();
-              const uid = data?.user?.id;
-              if (!uid) return;
-              // global flag (used as default for service modules)
-              if (typeof window !== "undefined") localStorage.setItem("driverOnline", "1");
-              // legacy drivers table
-              await supabase.from("drivers").update({ is_online: true, last_seen_at: new Date().toISOString() }).eq("user_id", uid);
-              message.success("Barcha xizmatlar uchun default Online yoqildi (xizmat ichida ham yoqiladi)");
-            } catch (e) {
-              message.error("Xatolik");
-            }
-          }}>Barcha xizmatlarni yoqish</Button>
-          <Button danger onClick={async () => {
-            try {
-              const { data } = await supabase.auth.getUser();
-              const uid = data?.user?.id;
-              if (!uid) return;
-              if (typeof window !== "undefined") localStorage.setItem("driverOnline", "0");
-              await supabase.from("drivers").update({ is_online: false, last_seen_at: new Date().toISOString() }).eq("user_id", uid);
-              message.success("Default Offline");
-            } catch (e) {
-              message.error("Xatolik");
-            }
-          }}>Barchasini o'chirish</Button>
-        </div>
-
           <Text type="secondary" style={{ fontSize: 12 }}>
             Xizmat turini tanlang
           </Text>
@@ -883,7 +945,46 @@ export default function DriverHome({ onLogout }) {
             }}
           >
             <div style={{ fontWeight: 900 }}>Profil</div>
-            <div style={{ fontSize: 12, opacity: 0.85 }}>Online tugmasi har bir xizmat ichida alohida.</div>
+            
+<div style={{ width: "100%" }}>
+  <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 8 }}>Xizmatlar bo‘yicha online</div>
+
+  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+    <Button size="small" type="primary" onClick={() => toggleAllServices(true)} disabled={loading}>
+      Barcha xizmatlarni yoqish
+    </Button>
+    <Button size="small" danger onClick={() => toggleAllServices(false)} disabled={loading}>
+      Barcha xizmatlarni o‘chirish
+    </Button>
+  </div>
+
+  <div style={{ display: "grid", gap: 8 }}>
+    {SERVICE_TYPES.map((s) => {
+      const row = servicePresence?.[s.key];
+      const checked = !!row?.is_online;
+      return (
+        <div
+          key={s.key}
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "8px 10px",
+            border: "1px solid rgba(0,0,0,0.08)",
+            borderRadius: 12,
+          }}
+        >
+          <div>
+            <div style={{ fontWeight: 700 }}>{s.label}</div>
+            <div style={{ fontSize: 12, opacity: 0.75 }}>{checked ? "Online" : "Offline"}</div>
+          </div>
+          <Switch size="small" checked={checked} onChange={(v) => toggleServiceOnline(s.key, v)} loading={loading} />
+        </div>
+      );
+    })}
+  </div>
+</div>
+
           </div>
 
           <DriverProfile

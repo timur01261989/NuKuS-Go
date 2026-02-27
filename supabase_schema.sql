@@ -440,3 +440,107 @@ grant usage, select, update on sequences to authenticated;
 
 alter default privileges in schema public
 grant usage, select on sequences to anon;
+
+
+-- ============================================================
+-- DRIVER SERVICE PRESENCE (per-service online/offline)
+-- ============================================================
+create table if not exists public.driver_service_presence (
+  id uuid primary key default gen_random_uuid(),
+  driver_id uuid not null references public.drivers(id) on delete cascade,
+  service_type text not null check (service_type in ('city_taxi','intercity','interdistrict','freight','delivery')),
+  is_online boolean not null default false,
+  lat double precision,
+  lng double precision,
+  updated_at timestamptz not null default now(),
+  unique(driver_id, service_type)
+);
+
+create index if not exists driver_service_presence_online_idx
+  on public.driver_service_presence (service_type, is_online, updated_at desc);
+
+create or replace function public.touch_driver_service_presence_updated_at()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at = now();
+  return new;
+end $$;
+
+drop trigger if exists trg_touch_driver_service_presence on public.driver_service_presence;
+create trigger trg_touch_driver_service_presence
+before update on public.driver_service_presence
+for each row execute function public.touch_driver_service_presence_updated_at();
+
+-- ============================================================
+-- FIND NEARBY DRIVERS FOR SPECIFIC SERVICE
+-- ============================================================
+
+create or replace function public.find_nearby_drivers_for_service(
+  p_lat double precision,
+  p_lng double precision,
+  p_radius_km double precision,
+  p_limit integer,
+  p_service_type text,
+  p_exclude_driver_ids uuid[] default '{}'
+)
+returns table (
+  driver_id uuid,
+  lat double precision,
+  lng double precision,
+  dist_km double precision
+)
+language sql
+stable
+as $$
+  with params as (
+    select
+      p_lat as lat0,
+      p_lng as lng0,
+      greatest(p_radius_km, 0.1) as rkm,
+      (p_radius_km / 111.0) as dlat,
+      (p_radius_km / (111.0 * greatest(cos(radians(p_lat)), 0.2))) as dlng
+  ),
+  fresh as (
+    select
+      dp.driver_id,
+      coalesce(dsp.lat, dp.lat) as lat,
+      coalesce(dsp.lng, dp.lng) as lng
+    from public.driver_presence dp
+    join public.driver_service_presence dsp
+      on dsp.driver_id = dp.driver_id
+    join public.driver_applications da
+      on da.user_id = dp.driver_id and da.status = 'approved'
+    cross join params p
+    where dsp.service_type = p_service_type
+      and dsp.is_online = true
+      and dp.updated_at >= now() - interval '25 seconds'
+      and coalesce(dsp.lat, dp.lat) is not null
+      and coalesce(dsp.lng, dp.lng) is not null
+      and coalesce(dsp.lat, dp.lat) between (p.lat0 - p.dlat) and (p.lat0 + p.dlat)
+      and coalesce(dsp.lng, dp.lng) between (p.lng0 - p.dlng) and (p.lng0 + p.dlng)
+      and (coalesce(p_exclude_driver_ids, '{}') = '{}'::uuid[] or dp.driver_id <> all(p_exclude_driver_ids))
+  )
+  select
+    f.driver_id,
+    f.lat,
+    f.lng,
+    (6371.0 * 2.0 * asin(
+      sqrt(
+        pow(sin(radians((f.lat - p.lat0) / 2.0)), 2)
+        + cos(radians(p.lat0)) * cos(radians(f.lat))
+        * pow(sin(radians((f.lng - p.lng0) / 2.0)), 2)
+      )
+    )) as dist_km
+  from fresh f
+  cross join params p
+  where (6371.0 * 2.0 * asin(
+      sqrt(
+        pow(sin(radians((f.lat - p.lat0) / 2.0)), 2)
+        + cos(radians(p.lat0)) * cos(radians(f.lat))
+        * pow(sin(radians((f.lng - p.lng0) / 2.0)), 2)
+      )
+    )) <= p.rkm
+  order by dist_km asc
+  limit greatest(coalesce(p_limit, 30), 1);
+$$;
+

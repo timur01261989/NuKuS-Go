@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Button, Card, Drawer, Space, Typography, Divider } from "antd";
-import UniGoSidebar from "@/components/UniGoSidebar";
+import UniSidebar from "@/shared/components/UniSidebar";
 import {
   MenuOutlined,
   CarOutlined,
@@ -129,7 +129,7 @@ export default function ClientHome() {
           icon={<MenuOutlined style={{ color: "var(--card-text)", fontSize: 20 }} />}
         />
         <div style={{ flex: 1, textAlign: "center", fontWeight: 900 }}>
-          {t?.appName || "Nukus Go"}
+          {t?.appName || "UniGo"}
         </div>
         <div style={{ width: 40 }} />
       </div>
@@ -269,7 +269,9 @@ export default function ClientHome() {
         width={300}
         bodyStyle={{ padding: 0 }}
       >
-        <UniGoSidebar onClose={() => setDrawerOpen(false)} />
+        
+      <UniSidebar onClose={() => setDrawerOpen(false)} />
+
       </Drawer>
     </div>
   );

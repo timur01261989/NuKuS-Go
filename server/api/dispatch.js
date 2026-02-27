@@ -165,7 +165,6 @@ export async function dispatch_handler(req, res) {
     // Fetch nearest approved, fresh online drivers from DB (scales to 10k+ online drivers)
     const exclude_driver_ids = Array.from(alreadySet).slice(0, 5000);
     const { data: candidates, error: ce } = await sb.rpc('find_nearby_drivers_for_service', {
-      p_service_type: String(body.service_type || 'taxi'),
       p_lat: pickup.lat,
       p_lng: pickup.lng,
       p_radius_km: radius_km,
@@ -254,7 +253,6 @@ export async function dispatch_smart_handler(req, res) {
     // Fetch nearest approved, fresh online drivers from DB (scales to 10k+ online drivers)
     const exclude_driver_ids = Array.from(alreadySet).slice(0, 5000);
     const { data: candidates, error: ce } = await sb.rpc('find_nearby_drivers_for_service', {
-      p_service_type: String(body.service_type || 'taxi'),
       p_lat: pickup.lat,
       p_lng: pickup.lng,
       p_radius_km: radius_km,
