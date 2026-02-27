@@ -1,0 +1,12 @@
+{
+  "type": "raster",
+  "tileSize": 256,
+  "templates": [
+    "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+  ],
+  "attribution": "© OpenStreetMap contributors",
+  "cache": {
+    "enabled": true,
+    "maxEntries": 5000
+  }
+}

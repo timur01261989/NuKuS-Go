@@ -132,7 +132,7 @@ export default function Auth() {
             >
               <span style={{ fontSize: 30, fontWeight: "bold" }}>GO</span>
             </div>
-            <Title level={3}>Nukus Go</Title>
+            <Title level={3}>UniGo</Title>
             <Text type="secondary">Kirish</Text>
           </div>
 

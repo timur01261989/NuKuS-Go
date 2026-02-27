@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getCarList } from "../../api/cars.service";
+import { getCarList } from "../../api/cars.service.js";
 
 export function useCarsList(params = {}) {
   return useQuery({

@@ -1,4 +1,4 @@
-# Nukus Go — Supabase SQL Schema Qo'llanmasi
+# UniGo — Supabase SQL Schema Qo'llanmasi
 
 ## 🎯 Jami Fayllar va Bajarilish Tartibi
 
@@ -221,5 +221,5 @@ Bajarilgandan keyin tekshiring:
 - **Frontend Services:** `/src/services/` folder'da
 - **Database Hooks:** `/src/lib/supabase.js`
 
-**Muallif:** Nukus Go Team  
+**Muallif:** UniGo Team  
 **Oxirgi yangilash:** 2026-02-24

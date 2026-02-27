@@ -58,7 +58,7 @@ export default async function handler(req, res) {
 
   const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
   const userId = String(body.user_id || body.driver_id || "").trim();
-  const title = String(body.title || "Nukus Go").trim();
+  const title = String(body.title || "UniGo").trim();
   const notifBody = String(body.body || "").trim();
   const url = String(body.url || "/").trim();
   const tag = String(body.tag || "nukusgo").trim();

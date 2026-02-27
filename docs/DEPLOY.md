@@ -1,4 +1,4 @@
-# Nukus Go — Deploy Qo'llanmasi
+# UniGo — Deploy Qo'llanmasi
 
 ## 1. Supabase SQL Migratsiyalar (tartibda bajaring)
 
@@ -86,7 +86,7 @@ Yaratish: https://realfavicongenerator.net yoki Figma
 
 ```bash
 npm install @capacitor/core @capacitor/cli
-npx cap init "Nukus Go" "uz.nukusgo.app"
+npx cap init "UniGo" "uz.nukusgo.app"
 npx cap add android
 npm run build
 npx cap sync

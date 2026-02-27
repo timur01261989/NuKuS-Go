@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "tiles": [
+    {
+      "id": "post_ad",
+      "title": {
+        "uz": "E’lon berish",
+        "ru": "Подать объявление"
+      },
+      "action": {
+        "type": "open_post_ad"
+      },
+      "badge": "NEW"
+    },
+    {
+      "id": "cars",
+      "title": {
+        "uz": "Avtomobillar",
+        "ru": "Автомобили"
+      },
+      "action": {
+        "type": "open_category",
+        "categoryId": "cars"
+      },
+      "searchQuery": {
+        "sort_by": "newest",
+        "limit": 50
+      }
+    },
+    {
+      "id": "spare_parts",
+      "title": {
+        "uz": "Ehtiyot qismlar",
+        "ru": "Запчасти"
+      },
+      "action": {
+        "type": "open_category",
+        "categoryId": "spare_parts"
+      },
+      "searchQuery": {
+        "sort_by": "newest",
+        "limit": 50
+      }
+    }
+  ]
+}
