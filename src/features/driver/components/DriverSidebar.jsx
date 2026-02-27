@@ -1,118 +1,131 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@lib/supabase";
 
-export default function DriverSidebar({
-  open,
-  onClose,
-  onGoClient,
-  onGoOrders,
-  onGoWallet,
-  onGoSettings,
-  onGoPromo,
-  onGoGuide,
-  onLogout,
-}) {
-  const [profile, setProfile] = useState(null);
-
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const { data } = await supabase.auth.getUser();
-        const uid = data?.user?.id;
-        if (!uid) return;
-        const { data: p } = await supabase
-          .from("profiles")
-          .select("full_name, phone, role")
-          .eq("id", uid)
-          .maybeSingle();
-        if (!cancelled) setProfile(p || null);
-      } catch {
-        // ignore
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [open]);
-
-  const items = useMemo(
-    () => [
-      { label: "Yolovchi sahifasi", icon: "swap_horiz", onClick: onGoClient },
-      { label: "Buyurtmalar tarixi", icon: "receipt_long", onClick: onGoOrders },
-      { label: "Hisobni to‘ldirish", icon: "account_balance_wallet", onClick: onGoWallet },
-      { label: "Sozlamalar", icon: "settings", onClick: onGoSettings },
-      { label: "Promokodlar", icon: "sell", onClick: onGoPromo },
-      { label: "Qo‘llanma", icon: "menu_book", onClick: onGoGuide },
-    ],
-    [onGoClient, onGoOrders, onGoWallet, onGoSettings, onGoPromo, onGoGuide]
+function Item({ icon, label, active, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        "w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left transition",
+        active ? "bg-white/70 shadow-sm" : "hover:bg-white/50",
+      ].join(" ")}
+    >
+      <span className="material-symbols-outlined text-[22px] text-slate-700">{icon}</span>
+      <span className="text-[15px] font-semibold text-slate-800">{label}</span>
+    </button>
   );
+}
+
+export default function DriverSidebar({ open, onClose, onLogout }) {
+  const nav = useNavigate();
+  const loc = useLocation();
+
+  const go = (to) => {
+    onClose?.();
+    nav(to);
+  };
+
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      // ignore; still continue
+    } finally {
+      onClose?.();
+      onLogout?.();
+      nav("/login");
+    }
+  };
 
   if (!open) return null;
 
+  const path = loc.pathname;
+
   return (
-    <div className="fixed inset-0 z-[9999]">
+    <div className="fixed inset-0 z-[60]">
       {/* overlay */}
-      <div
-        className="absolute inset-0 bg-black/35 backdrop-blur-[2px]"
+      <button
+        type="button"
         onClick={onClose}
+        className="absolute inset-0 bg-black/40 backdrop-blur-[1px]"
+        aria-label="Yopish"
       />
 
       {/* drawer */}
-      <aside className="absolute left-0 top-0 h-full w-[82%] max-w-[320px] bg-white shadow-2xl">
-        <div className="p-4 border-b">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-11 w-11 rounded-full bg-orange-100 flex items-center justify-center">
-                <span className="material-symbols-rounded">person</span>
-              </div>
-              <div>
-                <div className="font-extrabold leading-5">
-                  {profile?.full_name || "Haydovchi"}
-                </div>
-                <div className="text-xs text-gray-500">{profile?.phone || ""}</div>
-              </div>
-            </div>
-
-            <button
-              onClick={onClose}
-              className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center active:scale-95"
-              aria-label="Close"
-            >
-              <span className="material-symbols-rounded">close</span>
-            </button>
+      <aside className="absolute inset-y-0 left-0 w-[78%] max-w-[320px] bg-[#f3f7ff] shadow-2xl rounded-r-[28px] p-4 flex flex-col">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-[14px] text-slate-500">Haydovchi menyusi</div>
+            <div className="text-[20px] font-extrabold text-slate-900">Nukus Go</div>
           </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 rounded-xl bg-white/70 hover:bg-white shadow-sm"
+            aria-label="Yopish"
+          >
+            <span className="material-symbols-outlined">close</span>
+          </button>
         </div>
 
-        <div className="p-3">
-          <div className="space-y-1">
-            {items.map((it) => (
-              <button
-                key={it.label}
-                onClick={it.onClick}
-                className="w-full flex items-center gap-3 rounded-xl px-3 py-3 hover:bg-gray-50 active:scale-[0.99] text-left"
-              >
-                <span className="material-symbols-rounded text-[22px]">{it.icon}</span>
-                <span className="font-semibold">{it.label}</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="mt-3 border-t pt-3">
-            <button
-              onClick={onLogout}
-              className="w-full flex items-center gap-3 rounded-xl px-3 py-3 bg-red-50 text-red-700 hover:bg-red-100 active:scale-[0.99] text-left"
-            >
-              <span className="material-symbols-rounded text-[22px]">logout</span>
-              <span className="font-extrabold">Chiqish</span>
-            </button>
-          </div>
+        <div className="mt-4 space-y-2">
+          <Item
+            icon="person"
+            label="Yolovchi sahifasi"
+            active={path.startsWith("/client")}
+            onClick={() => go("/client/home")}
+          />
+          <Item
+            icon="history"
+            label="Buyurtmalar tarixi"
+            active={path.startsWith("/driver/orders")}
+            onClick={() => go("/driver/orders")}
+          />
+          <Item
+            icon="account_balance_wallet"
+            label="Hisobni to‘ldirish"
+            active={path.startsWith("/driver/wallet")}
+            onClick={() => go("/driver/wallet")}
+          />
+          <Item
+            icon="settings"
+            label="Sozlamalar"
+            active={path.startsWith("/driver/settings")}
+            onClick={() => go("/driver/settings")}
+          />
+          <Item
+            icon="local_activity"
+            label="Promokodlar"
+            active={path.startsWith("/driver/promo")}
+            onClick={() => go("/driver/promo")}
+          />
+          <Item
+            icon="help"
+            label="Qo‘llanma"
+            active={path.startsWith("/driver/guide")}
+            onClick={() => go("/driver/guide")}
+          />
         </div>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t">
-          <div className="text-sm font-extrabold">Nukus Go</div>
-          <div className="text-xs text-gray-500">UniGo</div>
+        <div className="mt-auto pt-4">
+          <button
+            type="button"
+            onClick={logout}
+            className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-white/80 hover:bg-white shadow-sm"
+          >
+            <span className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-[22px] text-red-600">logout</span>
+              <span className="text-[15px] font-extrabold text-slate-900">Chiqish</span>
+            </span>
+            <span className="material-symbols-outlined text-slate-400">chevron_right</span>
+          </button>
+
+          <div className="mt-4 text-center">
+            <div className="text-[14px] font-extrabold text-slate-900">Nukus Go</div>
+            <div className="text-[12px] font-semibold text-slate-500">UniGo</div>
+          </div>
         </div>
       </aside>
     </div>
