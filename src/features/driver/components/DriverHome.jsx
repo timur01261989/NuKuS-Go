@@ -12,7 +12,7 @@ import DriverDelivery from "./services/DriverDelivery";
 
 import DriverProfile from "./DriverProfile";
 
-import { supabase } from "@lib/supabase";
+import { supabase } from "../../../lib/supabase";
 import { startTracking } from "./services/locationService";
 
 function safeShortId(id) {
@@ -27,9 +27,7 @@ export default function DriverHome({ onLogout }) {
   // =========================
   // STATE
   // =========================
-  const [selectedService, setSelectedService] = useState(
-    (typeof window !== "undefined" ? localStorage.getItem("driverActiveService") : null) || null
-  );
+    const [selectedService, setSelectedService] = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
