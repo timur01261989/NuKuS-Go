@@ -1,64 +1,27 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { useEffect, useRef, useState } from 'react';
+import { subscribeDriverLocation } from '../services/ordersRealtime.js';
 
-/**
- * useDriverLocationRealtime(orderId)
- * - Debug-friendly hook.
- * - Tries to subscribe to 'driver_locations' by order_id if present.
- */
 export function useDriverLocationRealtime(orderId) {
+  const [lastPayload, setLastPayload] = useState(null);
   const [location, setLocation] = useState(null);
-  const [error, setError] = useState(null);
+  const unsubRef = useRef(null);
 
   useEffect(() => {
-    if (!orderId) {
-      setLocation(null);
-      setError(null);
-      return;
-    }
+    if (!orderId) return;
 
-    let channel;
+    if (unsubRef.current) unsubRef.current();
 
-    (async () => {
-      try {
-        const { data, error: e } = await supabase
-          .from("driver_locations")
-          .select("*")
-          .eq("order_id", orderId)
-          .order("updated_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (e) throw e;
-        if (data) setLocation(data);
-
-        channel = supabase
-          .channel(`driver_locations:${orderId}`)
-          .on(
-            "postgres_changes",
-            {
-              event: "*",
-              schema: "public",
-              table: "driver_locations",
-              filter: `order_id=eq.${orderId}`,
-            },
-            (payload) => {
-              const row = payload?.new || payload?.old || null;
-              if (row) setLocation(row);
-            }
-          )
-          .subscribe();
-      } catch (err) {
-        setError(err);
-      }
-    })();
+    unsubRef.current = subscribeDriverLocation(orderId, (payload) => {
+      setLastPayload(payload);
+      if (payload?.new) setLocation(payload.new);
+      else if (payload?.eventType === 'DELETE') setLocation(null);
+    });
 
     return () => {
-      try {
-        if (channel) supabase.removeChannel(channel);
-      } catch (_) {}
+      if (unsubRef.current) unsubRef.current();
+      unsubRef.current = null;
     };
   }, [orderId]);
 
-  return { location, error };
+  return { location, lastPayload };
 }

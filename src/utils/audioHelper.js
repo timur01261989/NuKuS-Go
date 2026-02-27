@@ -1,17 +1,14 @@
-/**
- * src/utils/audioHelper.js
- * Simple sound effect helper used by map/order UIs.
- */
+const audioCache = {};
 
-export function playSound(url, { volume = 1.0 } = {}) {
-  try {
-    if (typeof window === "undefined") return;
-    if (!url) return;
-    const a = new Audio(url);
-    a.volume = Math.max(0, Math.min(1, volume));
-    // Autoplay may be blocked; ignore errors
-    a.play().catch(() => {});
-  } catch (_) {
-    // no-op
+export const playSound = (soundName) => {
+  // soundName: 'success', 'arrived', 'new_order'
+  if (!audioCache[soundName]) {
+    audioCache[soundName] = new Audio(`/assets/sounds/${soundName}.mp3`);
   }
-}
+
+  audioCache[soundName].currentTime = 0; // Har safar boshidan qo'yish
+  audioCache[soundName].play().catch(e => console.log("Ovozni qo'yib bo'lmadi:", e));
+};
+
+// Ishlatilishi:
+// if (status === 'completed') playSound('success');

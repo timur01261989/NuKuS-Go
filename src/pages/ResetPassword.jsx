@@ -83,7 +83,7 @@ export default function ResetPassword() {
           <div style={{ background: 'rgba(255,255,255,0.2)', padding: 15, borderRadius: '50%', marginBottom: 15, backdropFilter: 'blur(5px)' }}>
              <SafetyOutlined style={{ fontSize: 40, color: '#000' }} />
           </div>
-          <Title level={2} style={{ margin: 0, fontWeight: 900, color: '#000' }}>UniGo</Title>
+          <Title level={2} style={{ margin: 0, fontWeight: 900, color: '#000' }}>Nukus Go</Title>
           <Text style={{ opacity: 0.7, fontWeight: 600, color: '#000' }}>{t.resetTitle?.toUpperCase()}</Text>
         </div>
 

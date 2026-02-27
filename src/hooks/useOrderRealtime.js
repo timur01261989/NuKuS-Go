@@ -1,61 +1,27 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { useEffect, useRef, useState } from 'react';
+import { subscribeOrder } from '../services/ordersRealtime.js';
 
-/**
- * useOrderRealtime(orderId)
- * - Debug-friendly hook used in Dev tools.
- * - Subscribes to 'orders' table changes (if present) and keeps last row in state.
- */
 export function useOrderRealtime(orderId) {
+  const [lastPayload, setLastPayload] = useState(null);
   const [order, setOrder] = useState(null);
-  const [error, setError] = useState(null);
+  const unsubRef = useRef(null);
 
   useEffect(() => {
-    if (!orderId) {
-      setOrder(null);
-      setError(null);
-      return;
-    }
+    if (!orderId) return;
 
-    let channel;
+    if (unsubRef.current) unsubRef.current();
 
-    (async () => {
-      try {
-        // Initial fetch (safe if table exists)
-        const { data, error: e } = await supabase
-          .from("orders")
-          .select("*")
-          .eq("id", orderId)
-          .maybeSingle();
-
-        if (e) throw e;
-        if (data) setOrder(data);
-
-        channel = supabase
-          .channel(`orders:${orderId}`)
-          .on(
-            "postgres_changes",
-            { event: "*", schema: "public", table: "orders", filter: `id=eq.${orderId}` },
-            (payload) => {
-              const row = payload?.new || payload?.old || null;
-              if (row) setOrder(row);
-            }
-          )
-          .subscribe((status) => {
-            // status: SUBSCRIBED / TIMED_OUT / CHANNEL_ERROR / CLOSED
-          });
-      } catch (err) {
-        // Don't crash the app if table doesn't exist; keep it visible for dev pages.
-        setError(err);
-      }
-    })();
+    unsubRef.current = subscribeOrder(orderId, (payload) => {
+      setLastPayload(payload);
+      if (payload?.new) setOrder(payload.new);
+      else if (payload?.eventType === 'DELETE') setOrder(null);
+    });
 
     return () => {
-      try {
-        if (channel) supabase.removeChannel(channel);
-      } catch (_) {}
+      if (unsubRef.current) unsubRef.current();
+      unsubRef.current = null;
     };
   }, [orderId]);
 
-  return { order, error };
+  return { order, lastPayload };
 }

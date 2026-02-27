@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { createAiJob, getAiJob, subscribeAiJobEvents } from "../../api/ai.jobs.service.js";
+import { createAiJob, getAiJob, subscribeAiJobEvents } from "../../api/ai.jobs.service";
 import { useAiProcess } from "../../context/AiProcessContext";
 
 /**

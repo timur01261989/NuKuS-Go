@@ -18,7 +18,7 @@ import { nominatimReverse as _nominatimReverse } from "../shared/geo/nominatim";
 import ClientTaxiPage from "../taxi/ClientTaxiPage";
 import DeliveryPage from "../delivery/DeliveryPage";
 import ClientInterProvincial from "../intercity/ClientIntercityPage";
-// FreightPage (TODO): src/features/driver/freight/FreightPage.jsx
+// import FreightPage from "./freight/FreightPage"; // Agar tayyor bo'lsa oching
 import MarketEntry from "../../auto-market/AutoMarketEntry"; // Yoki MarketRouter
 
 const { Text } = Typography;

@@ -23,7 +23,7 @@ Implements the exact contract used by the React feature:
 
 ## Connect frontend
 Set frontend env:
-VITE_API_BASE_URL=/api
+VITE_API_BASE_URL=http://localhost:4000
 
 ## Switch to Python AI
 1) Run Python service (see ../python-ai/README.md)

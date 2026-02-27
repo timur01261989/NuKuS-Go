@@ -140,7 +140,7 @@ export default function DriverProfile({ onBack, onLogout }) {
             <List.Item.Meta
               avatar={<TrophyFilled style={{ color: '#FFD700', fontSize: 22 }} />}
               title={<b>Top haydovchilar</b>}
-              description="UniGo reytingida o'z o'rningizni ko'ring"
+              description="Nukus Go reytingida o'z o'rningizni ko'ring"
             />
           </List.Item>
 

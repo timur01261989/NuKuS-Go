@@ -470,6 +470,36 @@ export default function DriverHome({ onLogout }) {
           <Title level={5} style={{ margin: 0, fontWeight: 800, color: "var(--text)" }}>
             HAYDOVCHI
           </Title>
+
+        <div style={{ marginTop: 10, display: "flex", gap: 10 }}>
+          <Button type="primary" onClick={async () => {
+            try {
+              const { data } = await supabase.auth.getUser();
+              const uid = data?.user?.id;
+              if (!uid) return;
+              // global flag (used as default for service modules)
+              if (typeof window !== "undefined") localStorage.setItem("driverOnline", "1");
+              // legacy drivers table
+              await supabase.from("drivers").update({ is_online: true, last_seen_at: new Date().toISOString() }).eq("user_id", uid);
+              message.success("Barcha xizmatlar uchun default Online yoqildi (xizmat ichida ham yoqiladi)");
+            } catch (e) {
+              message.error("Xatolik");
+            }
+          }}>Barcha xizmatlarni yoqish</Button>
+          <Button danger onClick={async () => {
+            try {
+              const { data } = await supabase.auth.getUser();
+              const uid = data?.user?.id;
+              if (!uid) return;
+              if (typeof window !== "undefined") localStorage.setItem("driverOnline", "0");
+              await supabase.from("drivers").update({ is_online: false, last_seen_at: new Date().toISOString() }).eq("user_id", uid);
+              message.success("Default Offline");
+            } catch (e) {
+              message.error("Xatolik");
+            }
+          }}>Barchasini o'chirish</Button>
+        </div>
+
           <Text type="secondary" style={{ fontSize: 12 }}>
             Xizmat turini tanlang
           </Text>
@@ -853,10 +883,7 @@ export default function DriverHome({ onLogout }) {
             }}
           >
             <div style={{ fontWeight: 900 }}>Profil</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ fontSize: 12, opacity: 0.9 }}>{isOnline ? "Online" : "Offline"}</div>
-              <Switch size="small" checked={isOnline} onChange={toggleOnline} loading={loading} />
-            </div>
+            <div style={{ fontSize: 12, opacity: 0.85 }}>Online tugmasi har bir xizmat ichida alohida.</div>
           </div>
 
           <DriverProfile

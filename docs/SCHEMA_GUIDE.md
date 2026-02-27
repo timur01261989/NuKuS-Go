@@ -1,4 +1,4 @@
-# UniGo — SQL Schema Fayllar Qo'llanmasi
+# Nukus Go — SQL Schema Fayllar Qo'llanmasi
 
 ## Qaysi faylni qachon ishga tushirish kerak?
 
