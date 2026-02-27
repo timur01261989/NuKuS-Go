@@ -1,206 +1,219 @@
-import React, { useState } from 'react';
-import { Button, Input, Form, Card, Typography, Space, message, ConfigProvider, Progress } from 'antd';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeftOutlined, PhoneOutlined, LockOutlined, CheckCircleOutlined, SafetyOutlined } from '@ant-design/icons';
-import { translations } from "@i18n/translations"; 
-
-const { Title, Text } = Typography;
+import React, { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { message } from "antd";
+import { translations } from "@i18n/translations";
 
 export default function ResetPassword() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [passwordStrength, setPasswordStrength] = useState(0); // Parol kuchi
+
+  const [phone, setPhone] = useState("");
+  const [smsCode, setSmsCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [passwordStrength, setPasswordStrength] = useState(0);
+
   const navigate = useNavigate();
-  const [form] = Form.useForm();
 
   const savedLang = localStorage.getItem("appLang") || "uz_lotin";
-  const t = translations[savedLang] || translations["uz_lotin"];
+  const t = useMemo(() => translations[savedLang] || translations["uz_lotin"], [savedLang]);
 
-  const handleFinishData = (values) => {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      if (step === 1) {
-        message.success(t.smsSent || "SMS kod yuborildi");
-        setStep(2);
-      } else {
-        message.success(t.successPass || "Parol o'zgartirildi");
-        navigate('/login');
-      }
-    }, 1500);
+  const normalizePhoneInput = (value) => {
+    let digits = String(value || "").replace(/\D/g, "").slice(0, 9);
+    let out = digits;
+    if (digits.length > 2) out = `${digits.slice(0, 2)} ${digits.slice(2)}`;
+    if (digits.length > 5) out = `${out.slice(0, 6)} ${digits.slice(5)}`;
+    if (digits.length > 7) out = `${out.slice(0, 9)} ${digits.slice(7)}`;
+    return out;
   };
 
-  // Telefon raqamni formatlash (90 123 45 67)
-  const handlePhoneChange = (e) => {
-    let value = e.target.value.replace(/\D/g, "");
-    if (value.length > 9) value = value.slice(0, 9);
-
-    let formattedValue = value;
-    if (value.length > 2) formattedValue = `${value.slice(0, 2)} ${value.slice(2)}`;
-    if (value.length > 5) formattedValue = `${formattedValue.slice(0, 6)} ${value.slice(5)}`;
-    if (value.length > 7) formattedValue = `${formattedValue.slice(0, 9)} ${value.slice(7)}`;
-
-    form.setFieldsValue({ phone: formattedValue });
-  };
-
-  // SMS Kodni faqat raqam qilib olish
-  const handleCodeChange = (e) => {
-    const value = e.target.value.replace(/\D/g, "");
-    form.setFieldsValue({ smsCode: value });
-  };
-
-  // Parol kuchini tekshirish
-  const checkPasswordStrength = (e) => {
-    const pass = e.target.value;
+  const calcStrength = (pass) => {
     let score = 0;
     if (pass.length > 5) score += 30;
     if (pass.length > 8) score += 30;
     if (/[A-Z]/.test(pass)) score += 20;
     if (/[0-9]/.test(pass)) score += 20;
-    setPasswordStrength(score);
+    return Math.min(100, score);
+  };
+
+  const strengthLabel = (score) => {
+    if (score < 50) return "Juda oddiy";
+    if (score < 80) return "O'rtacha";
+    return "Kuchli parol";
+  };
+
+  const handleFinish = async (e) => {
+    e.preventDefault();
+    if (loading) return;
+
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      if (step === 1) {
+        if (phone.replace(/\D/g, "").length !== 9) {
+          message.error("Telefon raqamni to'liq kiriting (9 ta raqam).");
+          return;
+        }
+        message.success(t.smsSent || "SMS kod yuborildi");
+        setStep(2);
+        return;
+      }
+
+      // step 2 validation (keeps original fake flow)
+      if (smsCode.replace(/\D/g, "").length !== 4) {
+        message.error("Kod 4 ta raqam bo'lishi kerak.");
+        return;
+      }
+      if (!newPassword || newPassword.length < 6) {
+        message.error("Parol kamida 6 ta belgi bo'lsin.");
+        return;
+      }
+      if (newPassword !== confirm) {
+        message.error(t.passMismatch || "Parollar mos kelmadi!");
+        return;
+      }
+
+      message.success(t.successPass || "Parol o'zgartirildi");
+      navigate("/login");
+    }, 900);
   };
 
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#000000', borderRadius: 16 } }}>
-      <div style={{ 
-        height: "100vh", 
-        background: "linear-gradient(135deg, #FFD700 0%, #FFC107 100%)", 
-        display: "flex", 
-        flexDirection: "column",
-        justifyContent: "flex-end",
-        overflow: "hidden",
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-      }}>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-100 to-blue-100 p-4">
+      <main className="w-full max-w-sm">
+        <header className="text-center mb-8 relative">
+          <button
+            type="button"
+            onClick={() => (step === 2 ? setStep(1) : navigate("/login"))}
+            className="absolute left-0 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/60 hover:bg-white/80 border border-white/30"
+            aria-label="Back"
+          >
+            <svg className="w-5 h-5 text-gray-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
 
-        {/* Yuqori qism - Header */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", position: 'relative' }}>
-          <Button 
-            icon={<ArrowLeftOutlined />} 
-            type="text" 
-            onClick={() => step === 2 ? setStep(1) : navigate('/login')}
-            style={{ position: 'absolute', top: 20, left: 10, fontSize: 18, color: '#000' }}
-          />
-          <div style={{ background: 'rgba(255,255,255,0.2)', padding: 15, borderRadius: '50%', marginBottom: 15, backdropFilter: 'blur(5px)' }}>
-             <SafetyOutlined style={{ fontSize: 40, color: '#000' }} />
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-unigo-primary rounded-2xl shadow-lg mb-4 transform -rotate-2 mx-auto">
+            <span className="text-white text-3xl font-black tracking-tighter">UG</span>
           </div>
-          <Title level={2} style={{ margin: 0, fontWeight: 900, color: '#000' }}>Nukus Go</Title>
-          <Text style={{ opacity: 0.7, fontWeight: 600, color: '#000' }}>{t.resetTitle?.toUpperCase()}</Text>
-        </div>
+          <h1 className="text-3xl font-extrabold text-unigo-dark tracking-tight">UniGo</h1>
+          <p className="text-unigo-accent font-semibold tracking-wide uppercase text-xs mt-1">
+            {(t.resetTitle || "Parolni tiklash").toUpperCase()}
+          </p>
+        </header>
 
-        {/* Asosiy blok */}
-        <Card bordered={false} style={{ borderRadius: "32px 32px 0 0", boxShadow: "0 -10px 40px rgba(0,0,0,0.1)", padding: "10px 5px" }}>
-
+        <section className="rounded-3xl p-8 shadow-modern bg-white/90 backdrop-blur border border-white/20">
           {step === 1 ? (
-            <Form form={form} layout="vertical" onFinish={handleFinishData} size="large" autoComplete="off">
-              <Title level={4} style={{ marginBottom: 10, textAlign: 'center' }}>{t.resetTitle}</Title>
-              <Text type="secondary" style={{ display: 'block', marginBottom: 30, textAlign: 'center' }}>{t.enterPhone}</Text>
+            <>
+              <h2 className="text-xl font-semibold text-gray-800 mb-2 text-center">{t.resetTitle || "Parolni tiklash"}</h2>
+              <p className="text-gray-500 text-sm text-center mb-6">{t.enterPhone || "Telefon raqam kiriting"}</p>
 
-              {/* Telefon */}
-              <Form.Item name="phone" rules={[{ required: true, message: 'Telefon raqam kiriting!' }]}>
-                <Input 
-                  prefix={<Space><PhoneOutlined style={{ color: "#aaa" }} /><Text strong style={{ color: "#333" }}>+998</Text></Space>} 
-                  placeholder="90 123 45 67" 
-                  onChange={handlePhoneChange}
-                  style={{ borderRadius: "16px", height: 55, background: "#f9f9f9", border: '1px solid #eee' }} 
-                />
-              </Form.Item>
+              <form className="space-y-5" onSubmit={handleFinish}>
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-gray-500 uppercase ml-1">Telefon raqam</label>
+                  <div className="relative flex items-center">
+                    <span className="absolute left-4 text-gray-400 font-medium">+998</span>
+                    <input
+                      value={phone}
+                      onChange={(e) => setPhone(normalizePhoneInput(e.target.value))}
+                      className="w-full pl-16 pr-4 py-3.5 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-unigo-accent transition-all text-gray-700"
+                      placeholder="90 123 45 67"
+                      inputMode="numeric"
+                      autoComplete="tel"
+                    />
+                  </div>
+                </div>
 
-              <Button 
-                type="primary" htmlType="submit" block loading={loading} 
-                style={{ 
-                  height: 55, borderRadius: "16px", background: "black", fontSize: 16, fontWeight: 800, marginTop: 10,
-                  boxShadow: "0 4px 15px rgba(0,0,0,0.2)", transition: "transform 0.1s"
-                }}
-                onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.97)"}
-                onMouseUp={(e) => e.currentTarget.style.transform = "scale(1)"}
-                onTouchStart={(e) => e.currentTarget.style.transform = "scale(0.97)"}
-                onTouchEnd={(e) => e.currentTarget.style.transform = "scale(1)"}
-              >
-                {t.sendCode || "KODNI YUBORISH"}
-              </Button>
-            </Form>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-unigo-primary hover:bg-amber-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-orange-200 transition-all transform active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {loading ? "Yuborilmoqda..." : t.sendCode || "KODNI YUBORISH"}
+                </button>
+              </form>
+            </>
           ) : (
-            <div style={{ textAlign: 'center', padding: '10px 0' }}>
-              <Title level={4} style={{ marginBottom: 5 }}>{t.resetTitle}</Title>
-              <Text type="secondary">{t.enterSms}</Text>
+            <>
+              <h2 className="text-xl font-semibold text-gray-800 mb-2 text-center">{t.resetTitle || "Parolni tiklash"}</h2>
+              <p className="text-gray-500 text-sm text-center mb-6">{t.enterSms || "SMS kodni kiriting"}</p>
 
-              <Form form={form} layout="vertical" onFinish={handleFinishData} size="large" style={{ marginTop: 25 }}>
+              <form className="space-y-5" onSubmit={handleFinish}>
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-gray-500 uppercase ml-1">SMS kod</label>
+                  <input
+                    value={smsCode}
+                    onChange={(e) => setSmsCode(String(e.target.value).replace(/\D/g, "").slice(0, 4))}
+                    className="w-full px-4 py-4 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-unigo-accent transition-all text-gray-700 text-center text-3xl font-extrabold tracking-[0.6em]"
+                    placeholder="0000"
+                    inputMode="numeric"
+                    maxLength={4}
+                    autoComplete="one-time-code"
+                  />
+                </div>
 
-                  {/* SMS Kod */}
-                  <Form.Item name="smsCode" rules={[{ required: true, message: 'Kodni kiriting!' }, { len: 4, message: '4 xona!' }]}>
-                    <Input 
-                       onChange={handleCodeChange}
-                       style={{ textAlign: 'center', fontSize: '28px', fontWeight: 'bold', borderRadius: 16, height: 65, letterSpacing: 15, background: '#f9f9f9', border: '1px solid #eee' }} 
-                       placeholder="0000" maxLength={4} inputMode="numeric"
-                    />
-                  </Form.Item>
-
-                  {/* Yangi parol */}
-                  <Form.Item name="newPassword" rules={[{ required: true, message: 'Yangi parol kiriting!' }, { min: 6, message: 'Eng kamida 6 ta belgi' }]}>
-                    <Input.Password 
-                        prefix={<LockOutlined style={{ color: "#aaa" }} />} 
-                        placeholder={t.newPassword || "Yangi parol"} 
-                        onChange={checkPasswordStrength}
-                        style={{ borderRadius: "16px", height: 55, background: "#f9f9f9", border: '1px solid #eee' }} 
-                    />
-                  </Form.Item>
-
-                  {/* Parol kuchi indikatori */}
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-gray-500 uppercase ml-1">{t.newPassword || "Yangi parol"}</label>
+                  <input
+                    value={newPassword}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setNewPassword(v);
+                      const sc = calcStrength(v);
+                      setPasswordStrength(sc);
+                    }}
+                    className="w-full px-4 py-3.5 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-unigo-accent transition-all text-gray-700"
+                    placeholder={t.newPassword || "Yangi parol"}
+                    type="password"
+                    autoComplete="new-password"
+                  />
                   {passwordStrength > 0 && (
-                     <div style={{ marginBottom: 20, marginTop: -15, padding: '0 5px' }}>
-                        <Progress 
-                          percent={passwordStrength} showInfo={false} size="small" 
-                          strokeColor={passwordStrength < 50 ? "#ff4d4f" : passwordStrength < 80 ? "#faad14" : "#52c41a"} 
+                    <div className="pt-2">
+                      <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-2 bg-unigo-accent transition-all"
+                          style={{ width: `${passwordStrength}%` }}
                         />
-                        <Text type="secondary" style={{ fontSize: 10, float: 'left' }}>
-                          {passwordStrength < 50 ? "Juda oddiy" : passwordStrength < 80 ? "O'rtacha" : "Kuchli parol"}
-                        </Text>
-                     </div>
+                      </div>
+                      <div className="text-[11px] text-gray-500 mt-1">{strengthLabel(passwordStrength)}</div>
+                    </div>
                   )}
+                </div>
 
-                  {/* Parolni tasdiqlash */}
-                  <Form.Item 
-                    name="confirm" 
-                    dependencies={['newPassword']}
-                    rules={[
-                      { required: true, message: 'Parolni tasdiqlang!' },
-                      ({ getFieldValue }) => ({
-                        validator(_, value) {
-                          if (!value || getFieldValue('newPassword') === value) {
-                            return Promise.resolve();
-                          }
-                          return Promise.reject(new Error(t.passMismatch || "Parollar mos kelmadi!"));
-                        },
-                      }),
-                    ]}
-                  >
-                    <Input.Password 
-                        prefix={<CheckCircleOutlined style={{ color: "#aaa" }} />} 
-                        placeholder={t.confirmPassword || "Parolni tasdiqlang"} 
-                        style={{ borderRadius: "16px", height: 55, background: "#f9f9f9", border: '1px solid #eee' }} 
-                    />
-                  </Form.Item>
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-gray-500 uppercase ml-1">
+                    {t.confirmPassword || "Parolni tasdiqlang"}
+                  </label>
+                  <input
+                    value={confirm}
+                    onChange={(e) => setConfirm(e.target.value)}
+                    className="w-full px-4 py-3.5 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-unigo-accent transition-all text-gray-700"
+                    placeholder={t.confirmPassword || "Parolni tasdiqlang"}
+                    type="password"
+                    autoComplete="new-password"
+                  />
+                </div>
 
-                  <Button 
-                    type="primary" block htmlType="submit" loading={loading}
-                    style={{ 
-                      height: 55, borderRadius: 16, background: 'black', fontWeight: 800, 
-                      boxShadow: "0 4px 15px rgba(0,0,0,0.2)", transition: "transform 0.1s"
-                    }} 
-                    onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.97)"}
-                    onMouseUp={(e) => e.currentTarget.style.transform = "scale(1)"}
-                    onTouchStart={(e) => e.currentTarget.style.transform = "scale(0.97)"}
-                    onTouchEnd={(e) => e.currentTarget.style.transform = "scale(1)"}
-                  >
-                    {t.save || "SAQLASH"}
-                  </Button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-unigo-primary hover:bg-amber-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-orange-200 transition-all transform active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {loading ? "Saqlanmoqda..." : t.save || "SAQLASH"}
+                </button>
 
-                  <Button type="link" onClick={() => setStep(1)} style={{ color: '#888', marginTop: 15, fontWeight: 600 }}>{t.back || "Ortga"}</Button>
-              </Form>
-            </div>
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className="w-full text-center text-gray-500 text-sm font-semibold hover:underline"
+                >
+                  {t.back || "Ortga"}
+                </button>
+              </form>
+            </>
           )}
-        </Card>
-      </div>
-    </ConfigProvider>
+        </section>
+      </main>
+    </div>
   );
 }
