@@ -26,6 +26,10 @@ const DriverPending = lazy(() => import("./pages/DriverPending"));
 
 // --- CLIENT ---
 const ClientHome = lazy(() => import("@features/client/pages/ClientHome"));
+const ClientWallet = lazy(() => import("@features/client/pages/ClientWallet"));
+const ClientProfile = lazy(() => import("@features/client/pages/ClientProfile"));
+const ClientPaymentMethods = lazy(() => import("@features/client/pages/ClientPaymentMethods"));
+const ClientPromo = lazy(() => import("@features/client/pages/ClientPromo"));
 const ClientTaxi = lazy(() => import("@features/client/taxi/ClientTaxiPage"));
 const ClientIntercity = lazy(() => import("@features/client/intercity/ClientIntercityPage"));
 const ClientInterDistrict = lazy(() => import("@features/client/interDistrict/ClientInterDistrictPage"));
@@ -136,6 +140,39 @@ export default function App() {
                 element={
                   <RoleGate allow={{ client: true, driver: true }}>
                     <MyAddresses />
+                  </RoleGate>
+                }
+              />
+
+              <Route
+                path="/client/wallet"
+                element={
+                  <RoleGate allow={{ client: true, driver: true }}>
+                    <ClientWallet />
+                  </RoleGate>
+                }
+              />
+              <Route
+                path="/client/profile"
+                element={
+                  <RoleGate allow={{ client: true, driver: true }}>
+                    <ClientProfile />
+                  </RoleGate>
+                }
+              />
+              <Route
+                path="/client/payment-methods"
+                element={
+                  <RoleGate allow={{ client: true, driver: true }}>
+                    <ClientPaymentMethods />
+                  </RoleGate>
+                }
+              />
+              <Route
+                path="/client/promo"
+                element={
+                  <RoleGate allow={{ client: true, driver: true }}>
+                    <ClientPromo />
                   </RoleGate>
                 }
               />

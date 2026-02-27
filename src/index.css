@@ -3,6 +3,30 @@
 @tailwind utilities;
 
 /* =========================================
+   Tailwind utilities used by new client UI
+========================================= */
+@layer utilities {
+  .neumorphic-dark {
+    background: #232b35;
+    box-shadow: 6px 6px 12px #181d24, -4px -4px 10px #2e3946;
+  }
+  .neumorphic-inset-dark {
+    background: #232b35;
+    box-shadow: inset 4px 4px 8px #181d24, inset -4px -4px 8px #2e3946;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .font-variation-fill {
+    font-variation-settings: 'FILL' 1;
+  }
+}
+
+/* =========================================
    0) GLOBAL RESET
 ========================================= */
 html,

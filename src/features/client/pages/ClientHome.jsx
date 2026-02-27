@@ -1,39 +1,23 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Button, Card, Drawer, Space, Typography, Divider } from "antd";
-import {
-  MenuOutlined,
-  CarOutlined,
-  EnvironmentOutlined,
-  RocketOutlined,
-  ShopOutlined,
-  SettingOutlined,
-  HistoryOutlined,
-  CustomerServiceOutlined,
-  LogoutOutlined,
-  UserOutlined,
-} from "@ant-design/icons";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { listMarketCars, formatPriceUZS } from "@services/marketService";
 import { useLanguage } from "@shared/i18n/useLanguage";
-import { haversineKm } from "../shared/geo/haversine";
-import { nominatimReverse as _nominatimReverse } from "../shared/geo/nominatim";
-
-const { Title, Text } = Typography;
+import ClientSidebar from "../components/ClientSidebar";
 
 function initials(name) {
   const s = String(name || "").trim();
   if (!s) return "U";
   const parts = s.split(/\s+/).slice(0, 2);
-  return parts.map((p) => p[0]?.toUpperCase()).join("") || "U";
+  return parts.map((p) => (p[0] || "").toUpperCase()).join("") || "U";
 }
 
 export default function ClientHome() {
   const navigate = useNavigate();
-  const location = useLocation(); // YANGI - driver mode ga kelayotganda state o'tish
   const { t } = useLanguage();
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [profile, setProfile] = useState({ fullName: "", avatarUrl: "" });
+
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [profile, setProfile] = useState({ fullName: "Foydalanuvchi", avatarUrl: "" });
   const [cars, setCars] = useState([]);
 
   useEffect(() => {
@@ -48,10 +32,9 @@ export default function ClientHome() {
         let avatarUrl = user.user_metadata?.avatar_url || "";
 
         try {
-          // Be resilient: some schemas don't have is_admin; some use user_id instead of id.
           let pRes = await supabase
             .from("profiles")
-            .select("full_name,avatar_url,role")
+            .select("full_name,avatar_url")
             .eq("id", user.id)
             .maybeSingle();
 
@@ -59,21 +42,28 @@ export default function ClientHome() {
           if (pRes.error && /column\s+\"id\"\s+does\s+not\s+exist/i.test(pRes.error.message || "")) {
             pRes = await supabase
               .from("profiles")
-              .select("full_name,avatar_url,role")
+              .select("full_name,avatar_url")
               .eq("user_id", user.id)
               .maybeSingle();
           }
 
           const p = pRes.data;
-
           if (p?.full_name) fullName = p.full_name;
           if (p?.avatar_url) avatarUrl = p.avatar_url;
-        } catch {}
+        } catch {
+          // ignore
+        }
 
-        if (mounted) setProfile({ fullName: fullName || "Foydalanuvchi", avatarUrl });
-      } catch {}
+        if (mounted) {
+          setProfile({
+            fullName: fullName || "Foydalanuvchi",
+            avatarUrl: avatarUrl || "",
+          });
+        }
+      } catch {
+        // ignore
+      }
     })();
-
     return () => {
       mounted = false;
     };
@@ -89,325 +79,240 @@ export default function ClientHome() {
         if (mounted) setCars([]);
       }
     })();
-
     return () => {
       mounted = false;
     };
   }, []);
 
-  const open = () => setDrawerOpen(true);
-  const close = () => setDrawerOpen(false);
+  const avatarFallback = useMemo(() => initials(profile.fullName), [profile.fullName]);
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--bg-layout)",
-        color: "var(--text)",
-      }}
-    >
-      {/* Top bar */}
-      <div
-        style={{
-          height: 56,
-          display: "flex",
-          alignItems: "center",
-          padding: "0 14px",
-          background: "var(--card-bg-strong)",
-          borderBottom: "1px solid var(--card-border)",
-          color: "var(--card-text)",
-          position: "sticky",
-          top: 0,
-          zIndex: 10,
-          backdropFilter: "blur(10px)",
-        }}
-      >
-        <Button
-          type="text"
-          onClick={open}
-          icon={<MenuOutlined style={{ color: "var(--card-text)", fontSize: 20 }} />}
-        />
-        <div style={{ flex: 1, textAlign: "center", fontWeight: 900 }}>
-          {t?.appName || "Nukus Go"}
-        </div>
-        <div style={{ width: 40 }} />
-      </div>
+    <div className="min-h-screen pb-24 bg-softBlue dark:bg-backgroundDark font-display text-slate-900 dark:text-slate-100">
+      {/* Top Header */}
+      <header className="sticky top-0 z-50 flex items-center justify-between px-6 py-4 bg-softBlue/80 dark:bg-backgroundDark/80 backdrop-blur-md">
+        <button
+          type="button"
+          className="flex items-center gap-3 text-left"
+          onClick={() => setSidebarOpen(true)}
+        >
+          <div className="size-10 rounded-full overflow-hidden border-2 border-primaryHome flex items-center justify-center bg-white">
+            {profile.avatarUrl ? (
+              <img
+                className="w-full h-full object-cover"
+                alt="avatar"
+                src={profile.avatarUrl}
+              />
+            ) : (
+              <span className="text-sm font-bold text-primaryHome">{avatarFallback}</span>
+            )}
+          </div>
+          <div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Xush kelibsiz</p>
+            <h1 className="text-lg font-bold leading-none tracking-tight">{t?.appName || "UniGo"}</h1>
+          </div>
+        </button>
 
-      <div style={{ padding: 14, maxWidth: 560, margin: "0 auto" }}>
-        <Title level={4} style={{ marginTop: 10, marginBottom: 12, color: "var(--text)" }}>
-          {t?.whereTo || "Qayerga boramiz?"}
-        </Title>
+        <button type="button" className="neumorphic-dark p-2 rounded-xl text-primaryHome">
+          <span className="material-symbols-outlined">notifications</span>
+        </button>
+      </header>
 
-        <Space direction="vertical" size={12} style={{ width: "100%" }}>
-          <Card hoverable style={{ borderRadius: 16 }} onClick={() => navigate("/client/taxi")}>
-            <Space>
-              <CarOutlined />
-              <div>
-                <Text strong>{t?.cityTaxi || "Shahar ichida taksi"}</Text>
-                <br />
-                <Text type="secondary">{t?.cityTaxiHint || "Tez buyurtma"}</Text>
+      <main className="px-4 space-y-6">
+        {/* Main Service: City Taxi */}
+        <section className="mt-4">
+          <div className="neumorphic-dark rounded-2xl overflow-hidden p-1">
+            <div className="relative h-48 rounded-xl overflow-hidden">
+              <img
+                className="w-full h-full object-cover"
+                alt="taxi"
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDZ5RHRrcqAdtLXXxWBcOvZs_KD32FUb7YdVjteNkkkhWjhfBHBKG2gB_RSlsRaYwrfRZUwHixUJmclJITyR47DG2p4FTJqQfWxKq0l17XyiD1Q7kicXJ3ciB4bDmp4xRF52nGbLE6x-LQ2AwYb9Z_7LssASTvhhyjaRMSakVJ1D1WIwnNrOS-3ri9C3Yajle213_nKptAO9IsWfiI5npd7USNZIK2iwXdkfaV2pmDX2gnJGgaVtW7f46Jyaw53Jdp8n6JG-9737w0"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-backgroundDark/90 to-transparent" />
+              <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end">
+                <div>
+                  <h2 className="text-xl font-bold text-white">{t?.cityTaxi || "Shahar ichida taksi"}</h2>
+                  <p className="text-slate-300 text-sm">{t?.cityTaxiHint || "Tez va ishonchli xizmat"}</p>
+                </div>
+                <button
+                  type="button"
+                  className="bg-primaryHome hover:bg-primaryHome/90 text-backgroundDark font-bold py-2 px-6 rounded-lg transition-transform active:scale-95 shadow-lg"
+                  onClick={() => navigate("/client/taxi")}
+                >
+                  Buyurtma berish
+                </button>
               </div>
-            </Space>
-          </Card>
+            </div>
+          </div>
+        </section>
 
-          <Card
-            hoverable
-            style={{ borderRadius: 16 }}
-            onClick={() => navigate("/client/inter-provincial")}
-          >
-            <Space>
-              <EnvironmentOutlined />
-              <div>
-                <Text strong>{t?.interProv || "Viloyatlar aro"}</Text>
-                <br />
-                <Text type="secondary">{t?.interProvHint || "Shaharlar o‘rtasi"}</Text>
-              </div>
-            </Space>
-          </Card>
+        {/* Service Grid */}
+        <section>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold">Xizmatlar</h3>
+            <span className="text-primaryHome text-sm font-medium">Hammasi</span>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <ServiceCard
+              icon="map"
+              label={t?.interProv || "Viloyatlar aro"}
+              onClick={() => navigate("/client/inter-provincial")}
+            />
+            <ServiceCard
+              icon="distance"
+              label={t?.interDistrict || "Tumanlar aro"}
+              onClick={() => navigate("/client/inter-district")}
+            />
+            <ServiceCard
+              icon="local_shipping"
+              label={t?.freight || "Yuk tashish"}
+              onClick={() => navigate("/client/freight")}
+            />
+            <ServiceCard
+              icon="package_2"
+              label={t?.delivery || "Eltish xizmati"}
+              onClick={() => navigate("/client/delivery")}
+            />
+          </div>
+        </section>
 
-          <Card
-            hoverable
-            style={{ borderRadius: 16 }}
-            onClick={() => navigate("/client/inter-district")}
-          >
-            <Space>
-              <RocketOutlined />
-              <div>
-                <Text strong>{t?.interDistrict || "Tumanlar aro"}</Text>
-                <br />
-                <Text type="secondary">{t?.interDistrictHint || "Tumanlar o‘rtasi"}</Text>
-              </div>
-            </Space>
-          </Card>
-
-          <Card hoverable style={{ borderRadius: 16 }} onClick={() => navigate("/client/freight")}>
-            <Space>
-              <RocketOutlined />
-              <div>
-                <Text strong>{t?.freight || "Yuk tashish"}</Text>
-                <br />
-                <Text type="secondary">{t?.freightHint || "Yuk xizmatlari"}</Text>
-              </div>
-            </Space>
-          </Card>
-
-          <Card hoverable style={{ borderRadius: 16 }} onClick={() => navigate("/client/delivery")}>
-            <Space>
-              <RocketOutlined />
-              <div>
-                <Text strong>{t?.delivery || "Eltish xizmati"}</Text>
-                <br />
-                <Text type="secondary">{t?.deliveryHint || "Yetkazib berish"}</Text>
-              </div>
-            </Space>
-          </Card>
-
-          <Button
-            type="primary"
-            block
-            icon={<ShopOutlined />}
-            style={{
-              height: 50,
-              borderRadius: 14,
-              fontWeight: 900,
-            }}
+        {/* Auto Savdo Banner */}
+        <section>
+          <button
+            type="button"
+            className="w-full neumorphic-dark rounded-2xl p-4 flex items-center justify-between bg-gradient-to-r from-cardDark to-primaryHome/10 border-l-4 border-primaryHome text-left"
             onClick={() => navigate("/auto-market")}
           >
-            {t?.autoMarket || "Avto savdo"}
-          </Button>
-        </Space>
+            <div className="space-y-1">
+              <h3 className="text-xl font-bold">Avto Savdo</h3>
+              <p className="text-sm text-slate-400">Mashina sotib oling va soting</p>
+            </div>
+            <div className="text-primaryHome">
+              <span className="material-symbols-outlined text-4xl">directions_car</span>
+            </div>
+          </button>
+        </section>
 
-        {/* Ads slots */}
-        <div style={{ marginTop: 16 }}>
-          <AdSlot title={t?.adSlot || "Reklama (admin joyi)"} />
-        </div>
+        {/* New Cars */}
+        <section className="pb-8">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold">Yangi qo'shilgan mashinalar</h3>
+            <button
+              type="button"
+              className="text-primaryHome text-sm font-medium"
+              onClick={() => navigate("/auto-market")}
+            >
+              Barchasi
+            </button>
+          </div>
 
-        {/* New cars preview */}
-        <div style={{ marginTop: 14 }}>
-          <Title level={5} style={{ marginBottom: 10, color: "var(--text)" }}>
-            {t?.newCars || "Yangi qo‘shilgan mashinalar"}
-          </Title>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            {(cars.length ? cars : Array.from({ length: 4 }).map((_, i) => ({ id: "p" + i }))).map(
+          <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 no-scrollbar">
+            {(cars.length ? cars : Array.from({ length: 3 }).map((_, i) => ({ id: "p" + i }))).map(
               (c, i) => (
-                <Card
+                <CarCard
                   key={c.id || i}
-                  hoverable
-                  style={{ borderRadius: 16 }}
+                  title={c.title || c.model || `Mashina ${i + 1}`}
+                  year={c.year}
+                  priceUZS={c.price_uzs ?? c.price}
+                  image={c.image}
                   onClick={() => navigate("/auto-market")}
-                >
-                  <div
-                    style={{
-                      height: 90,
-                      borderRadius: 12,
-                      background: "var(--field-bg)",
-                      border: "1px solid var(--field-border)",
-                    }}
-                  />
-                  <div style={{ marginTop: 8, fontWeight: 900 }}>
-                    {c.title || c.model || `Mashina ${i + 1}`}
-                  </div>
-                  <Text type="secondary">{c.price ? formatPriceUZS(c.price) : " "}</Text>
-                </Card>
+                />
               )
             )}
           </div>
+        </section>
+      </main>
+
+      {/* Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-softBlue dark:bg-backgroundDark/95 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 px-2 pb-6 pt-2">
+        <div className="flex justify-around items-center">
+          <BottomNavItem
+            active
+            icon="home"
+            label="Asosiy"
+            onClick={() => navigate("/client/home")}
+          />
+          <BottomNavItem
+            icon="receipt_long"
+            label="Buyurtmalar"
+            onClick={() => navigate("/client/orders")}
+          />
+          <BottomNavItem
+            icon="account_balance_wallet"
+            label="Hamyon"
+            onClick={() => navigate("/client/wallet")}
+          />
+          <BottomNavItem
+            icon="person"
+            label="Profil"
+            onClick={() => navigate("/client/profile")}
+          />
         </div>
+      </nav>
 
-        <div style={{ marginTop: 14 }}>
-          <AdSlot title={t?.adSlot || "Reklama (admin joyi)"} />
-        </div>
-      </div>
-
-      {/* Sidebar */}
-      <Drawer
-        placement="left"
-        open={drawerOpen}
-        onClose={close}
-        width={300}
-        bodyStyle={{ padding: 0 }}
-      >
-        <div
-          style={{
-            padding: 16,
-            background: "var(--card-bg-strong)",
-            color: "var(--card-text)",
-            borderBottom: "1px solid var(--card-border)",
-          }}
-        >
-          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <div
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: 12,
-                background: "var(--brand)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontWeight: 900,
-                color: "#111",
-                overflow: "hidden",
-              }}
-            >
-              {profile.avatarUrl ? (
-                <img
-                  alt="avatar"
-                  src={profile.avatarUrl}
-                  style={{ width: "100%", height: "100%", borderRadius: 12, objectFit: "cover" }}
-                />
-              ) : (
-                initials(profile.fullName)
-              )}
-            </div>
-
-            <div>
-              <div style={{ fontWeight: 900 }}>{profile.fullName || "Foydalanuvchi"}</div>
-              <div style={{ opacity: 0.85, fontSize: 12 }}>{t?.client || "Yolovchi"}</div>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ padding: 12, position: "relative", minHeight: "calc(100vh - 80px)" }}>
-          <Button
-            block
-            icon={<UserOutlined />}
-            style={{ height: 44, borderRadius: 12, textAlign: "left" }}
-            onClick={() => {
-              close();
-              navigate("/driver-mode", { 
-                replace: true,
-                state: { from: location.pathname }
-              });
-            }}
-          >
-            {t?.workAsDriver || "Haydovchi bo‘lib ishlash"}
-          </Button>
-
-          <Divider style={{ margin: "12px 0" }} />
-
-          <Button
-            block
-            icon={<EnvironmentOutlined />}
-            style={{ height: 44, borderRadius: 12, textAlign: "left" }}
-            onClick={() => {
-              close();
-              navigate("/addresses");
-            }}
-          >
-            {t?.myAddresses || "Mening manzillarim"}
-          </Button>
-
-          <Button
-            block
-            icon={<SettingOutlined />}
-            style={{ height: 44, borderRadius: 12, textAlign: "left", marginTop: 8 }}
-            onClick={() => {
-              close();
-              navigate("/settings");
-            }}
-          >
-            {t?.settings || "Sozlamalar"}
-          </Button>
-
-          <Button
-            block
-            icon={<HistoryOutlined />}
-            style={{ height: 44, borderRadius: 12, textAlign: "left", marginTop: 8 }}
-            onClick={() => {
-              close();
-              navigate("/orders");
-            }}
-          >
-            {t?.orderHistory || "Buyurtmalar tarixi"}
-          </Button>
-
-          <div style={{ position: "absolute", left: 12, right: 12, bottom: 12 }}>
-            <Button
-              block
-              icon={<CustomerServiceOutlined />}
-              style={{ height: 44, borderRadius: 12, textAlign: "left" }}
-              onClick={() => {
-                close();
-                navigate("/support");
-              }}
-            >
-              {t?.support || "Qo‘llab-quvvatlash"}
-            </Button>
-
-            <Button
-              danger
-              block
-              icon={<LogoutOutlined />}
-              style={{ height: 44, borderRadius: 12, textAlign: "left", marginTop: 8 }}
-              onClick={() => {
-                close();
-                navigate("/logout");
-              }}
-            >
-              {t?.logout || "Chiqish"}
-            </Button>
-          </div>
-        </div>
-      </Drawer>
+      <ClientSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} profile={profile} />
     </div>
   );
 }
 
-function AdSlot({ title }) {
+function ServiceCard({ icon, label, onClick }) {
   return (
-    <Card style={{ borderRadius: 16 }}>
-      <Text type="secondary">{title}</Text>
-      <div
-        style={{
-          height: 90,
-          borderRadius: 12,
-          background: "var(--field-bg)",
-          border: "1px solid var(--field-border)",
-          marginTop: 10,
-        }}
-      />
-    </Card>
+    <button
+      type="button"
+      onClick={onClick}
+      className="neumorphic-dark p-4 rounded-2xl flex flex-col items-center text-center gap-3 active:scale-95 transition-all"
+    >
+      <div className="bg-primaryHome/10 p-3 rounded-xl text-primaryHome">
+        <span className="material-symbols-outlined text-3xl">{icon}</span>
+      </div>
+      <p className="text-sm font-semibold">{label}</p>
+    </button>
+  );
+}
+
+function CarCard({ title, year, priceUZS, image, onClick }) {
+  const priceLabel =
+    typeof priceUZS === "number" ? formatPriceUZS(priceUZS) : priceUZS ? String(priceUZS) : "";
+  const yearLabel = year ? String(year) + " yil" : "";
+  const img = image || "";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="neumorphic-dark min-w-[200px] w-52 rounded-2xl overflow-hidden p-2 text-left"
+    >
+      <div className="h-32 rounded-xl overflow-hidden mb-3 bg-slate-800/30">
+        {img ? (
+          <img className="w-full h-full object-cover" alt={title} src={img} />
+        ) : (
+          <div className="w-full h-full" />
+        )}
+      </div>
+      <div className="px-2 pb-2">
+        <h4 className="font-bold text-sm truncate">{title}</h4>
+        <div className="flex justify-between items-center mt-1">
+          <span className="text-xs text-slate-400">{yearLabel}</span>
+          <span className="text-primaryHome font-bold text-sm">{priceLabel}</span>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function BottomNavItem({ icon, label, active, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        "flex flex-col items-center gap-1 " +
+        (active ? "text-primaryHome" : "text-slate-400")
+      }
+    >
+      <span className={"material-symbols-outlined " + (active ? "font-variation-fill" : "")}>
+        {icon}
+      </span>
+      <span className="text-[10px] font-medium">{label}</span>
+    </button>
   );
 }
