@@ -1,33 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Drawer, Switch, message } from "antd";
+
 import { appConfig } from "../../../shared/config/appConfig";
-import {
-  Button,
-  Card,
-  Typography,
-  Row,
-  Col,
-  Drawer,
-  Switch,
-  Tag,
-  message,
-  Spin
-} from "antd";
-import {
-  ArrowLeftOutlined,
-  CarOutlined,
-  GlobalOutlined,
-  RocketOutlined,
-  ShopOutlined,
-  NotificationOutlined,
-  UserOutlined,
-  EnvironmentOutlined,
-  WalletOutlined,
-  ToolOutlined,
-  SearchOutlined,
-  StopOutlined,
-  CheckCircleOutlined
-} from "@ant-design/icons";
 
 import DriverTaxi from "./services/DriverTaxi";
 import DriverInterDistrict from "./services/DriverInterDistrict";
@@ -37,10 +12,14 @@ import DriverDelivery from "./services/DriverDelivery";
 
 import DriverProfile from "./DriverProfile";
 
-import { supabase } from "@lib/supabase"; 
+import { supabase } from "@lib/supabase";
 import { startTracking } from "./services/locationService";
 
-const { Title, Text } = Typography;
+function safeShortId(id) {
+  const s = String(id || "");
+  if (!s) return "----";
+  return s.length > 6 ? s.slice(-6) : s;
+}
 
 export default function DriverHome({ onLogout }) {
   const navigate = useNavigate();
@@ -54,20 +33,25 @@ export default function DriverHome({ onLogout }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Driver header info (name/avatar/id)
+  const [driverHeader, setDriverHeader] = useState({
+    name: "Haydovchi",
+    publicId: "----",
+    avatarUrl: "",
+  });
+
   // =========================
   // BACK (browser / Android back) handling
   // =========================
-  // Bu loyihada servislar route bilan emas, ichki state bilan ochiladi.
-  // Shuning uchun foydalanuvchi "Shahar ichi"ga kirganda browser back ishlamay qoladi.
-  // Yechim: servis ochilganda history'ga bitta state push qilamiz.
-  // Back bosilganda popstate keladi va menyuga qaytaramiz.
   useEffect(() => {
     const onPopState = () => {
       setSelectedService((prev) => {
         if (prev) {
           try {
             localStorage.removeItem("driverActiveService");
-          } catch (e) {}
+          } catch {
+            // ignore
+          }
           return null;
         }
         return prev;
@@ -86,33 +70,11 @@ export default function DriverHome({ onLogout }) {
         "",
         window.location.href
       );
-    } catch (e) {
+    } catch {
       // ignore
     }
   }, [selectedService]);
 
-  // Online flag (persist)
-  const [isOnline, setIsOnline] = useState(() => {
-    const v = (typeof window !== "undefined" ? localStorage.getItem("driverOnline") : null);
-    return v === "1";
-  });
-
-  const API_BASE = (import.meta?.env?.VITE_API_BASE || "").replace(/\/$/, "");
-
-  // =========================
-  // PRESS ANIMATION
-  // =========================
-  const btnTouchProps = {
-    onMouseDown: (e) => (e.currentTarget.style.transform = "scale(0.97)"),
-    onMouseUp: (e) => (e.currentTarget.style.transform = "scale(1)"),
-    onMouseLeave: (e) => (e.currentTarget.style.transform = "scale(1)"),
-    onTouchStart: (e) => (e.currentTarget.style.transform = "scale(0.97)"),
-    onTouchEnd: (e) => (e.currentTarget.style.transform = "scale(1)"),
-  };
-
-  // =========================
-  // ACTIVE BADGE (selectedService)
-  // =========================
   const selectService = (key) => {
     setSelectedService(key);
     if (typeof window !== "undefined") localStorage.setItem("driverActiveService", key);
@@ -122,6 +84,16 @@ export default function DriverHome({ onLogout }) {
     setSelectedService(null);
     if (typeof window !== "undefined") localStorage.removeItem("driverActiveService");
   };
+
+  // =========================
+  // Online flag (persist)
+  // =========================
+  const [isOnline, setIsOnline] = useState(() => {
+    const v = typeof window !== "undefined" ? localStorage.getItem("driverOnline") : null;
+    return v === "1";
+  });
+
+  const API_BASE = (import.meta?.env?.VITE_API_BASE || "").replace(/\/$/, "");
 
   // =========================
   // HEARTBEAT + LOCATION (ONLINE)
@@ -149,7 +121,7 @@ export default function DriverHome({ onLogout }) {
     const state = nextOnline ? "online" : "offline";
     try {
       if (API_BASE) {
-         await postJson("/api/driver-state", { driver_id, state });
+        await postJson("/api/driver-state", { driver_id, state });
       }
     } catch {
       // ignore
@@ -160,13 +132,13 @@ export default function DriverHome({ onLogout }) {
     const { lat, lng, bearing } = lastGeoRef.current || {};
     try {
       if (API_BASE) {
-          await postJson("/api/driver-heartbeat", {
-            driver_id,
-            is_online: !!nextOnline,
-            lat: lat ?? undefined,
-            lng: lng ?? undefined,
-            bearing: bearing ?? undefined,
-          });
+        await postJson("/api/driver-heartbeat", {
+          driver_id,
+          is_online: !!nextOnline,
+          lat: lat ?? undefined,
+          lng: lng ?? undefined,
+          bearing: bearing ?? undefined,
+        });
       }
     } catch {
       // ignore
@@ -174,7 +146,6 @@ export default function DriverHome({ onLogout }) {
   };
 
   const stopTrackingFunc = () => {
-    // stop geolocation watch
     if (watchIdRef.current !== null && watchIdRef.current !== undefined) {
       try {
         navigator.geolocation?.clearWatch?.(watchIdRef.current);
@@ -184,7 +155,6 @@ export default function DriverHome({ onLogout }) {
     }
     watchIdRef.current = null;
 
-    // stop heartbeat interval
     if (heartbeatTimerRef.current) {
       clearInterval(heartbeatTimerRef.current);
       heartbeatTimerRef.current = null;
@@ -214,44 +184,42 @@ export default function DriverHome({ onLogout }) {
     }, 15000);
   };
 
-  // ✅ TUZATILGAN TOGGLE FUNCTION
+  // ✅ Toggle online/offline (existing principle preserved)
   const toggleOnline = async (next) => {
     setLoading(true);
     try {
       const { data: u, error: uErr } = await supabase.auth.getUser();
       if (uErr) throw uErr;
       const user = u?.user;
-      
+
       if (!user) {
-          setLoading(false);
-          return;
+        setLoading(false);
+        return;
       }
 
       userIdRef.current = user.id;
 
-      // 1. Supabase Update (Faqat is_online ni o'zgartiramiz, statusga tegmaymiz!)
+      // 1) Supabase update
       const { error } = await supabase
-          .from("drivers")
-          .update({
-            is_online: next,
-            last_seen_at: new Date().toISOString(),
-          })
-          .eq("user_id", user.id);
+        .from("drivers")
+        .update({
+          is_online: next,
+          last_seen_at: new Date().toISOString(),
+        })
+        .eq("user_id", user.id);
 
       if (error) throw error;
 
-      // 2. State yangilash
+      // 2) local state
       setIsOnline(next);
       if (typeof window !== "undefined") localStorage.setItem("driverOnline", next ? "1" : "0");
-      
-      // 3. Backendga xabar
+
+      // 3) backend notify
       await sendDriverState(user.id, next);
 
       message.success(next ? "Siz Online rejimdasiz" : "Siz Offline rejimdasiz");
     } catch (err) {
       console.error("Status update error:", err);
-      // Agar xato bo'lsa, UI ni eski holatga qaytarish mumkin, 
-      // lekin hozircha xabarni o'zi yetarli.
       message.error("Statusni o'zgartirishda xatolik!");
     } finally {
       setLoading(false);
@@ -291,6 +259,42 @@ export default function DriverHome({ onLogout }) {
       stopTrackingFunc();
     };
   }, [isOnline]);
+
+  // =========================
+  // HEADER DATA
+  // =========================
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      try {
+        const { data: u, error: uErr } = await supabase.auth.getUser();
+        if (uErr) throw uErr;
+        const user = u?.user;
+        if (!user || !alive) return;
+
+        const { data: d } = await supabase
+          .from("drivers")
+          .select("id, first_name, avatar_url")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (!alive) return;
+
+        setDriverHeader({
+          name: d?.first_name || "Haydovchi",
+          publicId: d?.id ? String(d.id) : safeShortId(user.id),
+          avatarUrl: d?.avatar_url || "",
+        });
+      } catch {
+        // ignore
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // =========================
   // RIGHT DRAWER SWIPE CLOSE (rubber band + velocity)
@@ -419,412 +423,246 @@ export default function DriverHome({ onLogout }) {
   }, [selectedService]);
 
   // =========================
-  // MENU UI
+  // MENU UI (Tailwind design)
   // =========================
   const menuUi = (
-    <div
-      style={{
-        padding: "20px",
-        background: "var(--bg-layout)",
-        minHeight: "100vh",
-        color: "var(--text)",
-      }}
-    >
-      {/* HEADER */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 25,
-        }}
-      >
-        <Button
-          onClick={() => {
-            // Driver menyusidan chiqishda client sahifasiga "uchib ketish" oldini olamiz.
-            // Agar history mavjud bo'lsa, oddiy ortga qaytamiz; bo'lmasa driver dashboardga.
-            try {
-              if (typeof window !== "undefined" && window.history && window.history.length > 1) {
-                navigate("/client/home", { replace: true });
-              } else {
-                navigate("/driver/dashboard", { replace: true });
-              }
-            } catch {
-              navigate("/driver/dashboard", { replace: true });
-            }
-          }}
-          icon={<ArrowLeftOutlined />}
-          shape="circle"
-          size="large"
-          style={{
-            background: "var(--field-bg)",
-            border: "1px solid var(--field-border)",
-            boxShadow: "var(--shadow-soft)",
-            transition: "transform 0.1s",
-            color: "var(--card-text)",
-          }}
-          {...btnTouchProps}
-        />
-
-        <div style={{ textAlign: "center" }}>
-          <Title level={5} style={{ margin: 0, fontWeight: 800, color: "var(--text)" }}>
-            HAYDOVCHI
-          </Title>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            Xizmat turini tanlang
-          </Text>
+    <div className="min-h-screen bg-backgroundLightDriver font-display text-slate-900">
+      {/* Header */}
+      <header className="flex items-center justify-between p-4 bg-transparent">
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => setProfileOpen(true)}
+            className="p-2 rounded-xl neumorphic-pop text-slate-700"
+            aria-label="Menu"
+          >
+            <span className="material-symbols-outlined block">menu</span>
+          </button>
+          <h1 className="text-2xl font-bold tracking-tight text-primarySidebar">Nukus Go</h1>
         </div>
 
-        {/* ✅ Online/Offline chip headerda */}
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <div
-            onClick={() => toggleOnline(!isOnline)}
-            role="button"
-            tabIndex={0}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "6px 10px",
-              borderRadius: 999,
-              background: "var(--field-bg)",
-              border: "1px solid var(--field-border)",
-              boxShadow: "var(--shadow-soft)",
-              cursor: "pointer",
-              userSelect: "none",
-              transition: "transform 0.1s",
-              color: "var(--card-text)",
-            }}
-            {...btnTouchProps}
-          >
-            {loading ? <Spin size="small" /> : (
-            <>
-                <span
-                style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: "50%",
-                    background: isOnline ? "#52c41a" : "#8c8c8c",
-                    boxShadow: isOnline ? "0 0 0 3px rgba(82,196,26,0.20)" : "none",
-                }}
-                />
-                <span style={{ fontSize: 12, fontWeight: 800 }}>
-                {isOnline ? "Online" : "Offline"}
-                </span>
-            </>
+        <button
+          type="button"
+          onClick={() => setProfileOpen(true)}
+          className="flex items-center gap-3"
+          aria-label="Profil"
+        >
+          <div className="text-right">
+            <p className="text-sm font-bold leading-tight">{driverHeader.name}</p>
+            <p className="text-xs text-slate-500">ID: {driverHeader.publicId}</p>
+          </div>
+          <div className="w-12 h-12 rounded-full neumorphic-pop p-1">
+            {driverHeader.avatarUrl ? (
+              <img
+                alt="Driver"
+                className="w-full h-full rounded-full object-cover"
+                src={driverHeader.avatarUrl}
+              />
+            ) : (
+              <div className="w-full h-full rounded-full flex items-center justify-center text-slate-600">
+                <span className="material-symbols-outlined">person</span>
+              </div>
             )}
           </div>
+        </button>
+      </header>
 
-          <Button
-            icon={<UserOutlined />}
-            shape="circle"
-            size="large"
-            onClick={() => setProfileOpen(true)}
-            style={{
-              background: "var(--brand)",
-              border: "none",
-              boxShadow: "var(--shadow-soft)",
-              color: "#000",
-              transition: "transform 0.1s",
-            }}
-            {...btnTouchProps}
-          />
-        </div>
-      </div>
-
-      {/* ===================================
-          ASOSIY MENYU QISMI (OVERLAY BILAN)
-          ===================================
-      */}
-      <div style={{ position: "relative" }}>
-        
-        {/* 🔥 1. BLOKLASH QAVATI (OVERLAY) */}
-        {!isOnline && (
-          <div style={{
-            position: "absolute",
-            top: -10, left: -10, right: -10, bottom: -10,
-            background: "rgba(245, 245, 245, 0.6)", // Orqa fonni xira qiladi
-            zIndex: 50,
-            backdropFilter: "blur(3px)", // Xiralashtirish effekti
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: 12
-          }}>
-            <StopOutlined style={{ fontSize: 48, color: "#ff4d4f", marginBottom: 16 }} />
-            <Title level={4} style={{ color: "#595959", textAlign: "center", margin: 0 }}>
-              Xizmatlar bloklangan
-            </Title>
-            <Text type="secondary" style={{ marginBottom: 20 }}>
-              Ishni boshlash uchun "Online" tugmasini yoqing
-            </Text>
-            <Button 
-              type="primary" 
-              size="large" 
-              onClick={() => toggleOnline(true)}
-              loading={loading}
-              icon={<CheckCircleOutlined />}
-              style={{ borderRadius: 12, height: 45, paddingLeft: 24, paddingRight: 24 }}
-            >
-              Online bo'lish
-            </Button>
-          </div>
-        )}
-
-        {/* 2. MENYU KARTOCHKALARI (Offline bo'lsa xira bo'ladi) */}
-        <div style={{ 
-            opacity: isOnline ? 1 : 0.4, 
-            pointerEvents: isOnline ? "auto" : "none",
-            transition: "opacity 0.3s ease" 
-        }}>
-            <Row gutter={[15, 15]}>
-                <Col span={24}>
-                <Card
-                    hoverable
-                    onClick={() => selectService("taxi")}
-                    style={{
-                    borderRadius: 24,
-                    textAlign: "center",
-                    cursor: "pointer",
-                    transition: "transform 0.1s",
-                    border:
-                        selectedService === "taxi"
-                        ? "1px solid rgba(82,196,26,0.45)"
-                        : "1px solid var(--card-border)",
-                    background: "var(--card-bg)",
-                    boxShadow:
-                        selectedService === "taxi"
-                        ? "0 12px 26px rgba(0,0,0,0.18)"
-                        : "var(--shadow-soft)",
-                    position: "relative",
-                    overflow: "hidden",
-                    }}
-                    {...btnTouchProps}
-                >
-                    {selectedService === "taxi" && (
-                    <div style={{ position: "absolute", top: 12, right: 12 }}>
-                        <Tag color="green" style={{ borderRadius: 999, fontWeight: 800, padding: "2px 10px" }}>
-                        Active
-                        </Tag>
-                    </div>
-                    )}
-
-                    <div
-                    style={{
-                        background: "var(--brand)",
-                        width: 60,
-                        height: 60,
-                        borderRadius: "50%",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        margin: "0 auto 15px",
-                        boxShadow: "0 4px 10px rgba(255, 215, 0, 0.35)",
-                    }}
-                    >
-                    <CarOutlined style={{ fontSize: 30, color: "#000" }} />
-                    </div>
-                    <Title level={4} style={{ margin: 0 }}>
-                    Shahar ichida Taksi
-                    </Title>
-                    <Text type="secondary">Buyurtmalarni qabul qilish</Text>
-                </Card>
-                </Col>
-
-                <Col span={12}>
-                <Card
-                    hoverable
-                    onClick={() => selectService("interProv")}
-                    style={{
-                    borderRadius: 20,
-                    textAlign: "center",
-                    height: "100%",
-                    cursor: "pointer",
-                    transition: "transform 0.1s",
-                    border:
-                        selectedService === "interProv"
-                        ? "1px solid rgba(82,196,26,0.45)"
-                        : "1px solid var(--card-border)",
-                    background: "var(--card-bg)",
-                    boxShadow:
-                        selectedService === "interProv"
-                        ? "0 12px 26px rgba(0,0,0,0.18)"
-                        : "var(--shadow-soft)",
-                    position: "relative",
-                    overflow: "hidden",
-                    }}
-                    {...btnTouchProps}
-                >
-                    {selectedService === "interProv" && (
-                    <div style={{ position: "absolute", top: 10, right: 10 }}>
-                        <Tag color="green" style={{ borderRadius: 999, fontWeight: 800, padding: "2px 10px" }}>
-                        Active
-                        </Tag>
-                    </div>
-                    )}
-                    <GlobalOutlined style={{ fontSize: 30, color: "#1890ff", marginBottom: 15 }} />
-                    <div style={{ fontWeight: "bold", fontSize: 15 }}>Viloyatlar aro</div>
-                </Card>
-                </Col>
-
-                <Col span={12}>
-                <Card
-                    hoverable
-                    onClick={() => selectService("interDist")}
-                    style={{
-                    borderRadius: 20,
-                    textAlign: "center",
-                    height: "100%",
-                    cursor: "pointer",
-                    transition: "transform 0.1s",
-                    border:
-                        selectedService === "interDist"
-                        ? "1px solid rgba(82,196,26,0.45)"
-                        : "1px solid var(--card-border)",
-                    background: "var(--card-bg)",
-                    boxShadow:
-                        selectedService === "interDist"
-                        ? "0 12px 26px rgba(0,0,0,0.18)"
-                        : "var(--shadow-soft)",
-                    position: "relative",
-                    overflow: "hidden",
-                    }}
-                    {...btnTouchProps}
-                >
-                    {selectedService === "interDist" && (
-                    <div style={{ position: "absolute", top: 10, right: 10 }}>
-                        <Tag color="green" style={{ borderRadius: 999, fontWeight: 800, padding: "2px 10px" }}>
-                        Active
-                        </Tag>
-                    </div>
-                    )}
-                    <EnvironmentOutlined style={{ fontSize: 30, color: "#52c41a", marginBottom: 15 }} />
-                    <div style={{ fontWeight: "bold", fontSize: 15 }}>Tumanlar aro</div>
-                </Card>
-                </Col>
-
-                <Col span={12}>
-                <Card
-                    hoverable
-                    onClick={() => selectService("freight")}
-                    style={{
-                    borderRadius: 20,
-                    textAlign: "center",
-                    height: "100%",
-                    cursor: "pointer",
-                    transition: "transform 0.1s",
-                    border:
-                        selectedService === "freight"
-                        ? "1px solid rgba(82,196,26,0.45)"
-                        : "1px solid var(--card-border)",
-                    background: "var(--card-bg)",
-                    boxShadow:
-                        selectedService === "freight"
-                        ? "0 12px 26px rgba(0,0,0,0.18)"
-                        : "var(--shadow-soft)",
-                    position: "relative",
-                    overflow: "hidden",
-                    }}
-                    {...btnTouchProps}
-                >
-                    {selectedService === "freight" && (
-                    <div style={{ position: "absolute", top: 10, right: 10 }}>
-                        <Tag color="green" style={{ borderRadius: 999, fontWeight: 800, padding: "2px 10px" }}>
-                        Active
-                        </Tag>
-                    </div>
-                    )}
-                    <ShopOutlined style={{ fontSize: 30, color: "#faad14", marginBottom: 15 }} />
-                    <div style={{ fontWeight: "bold", fontSize: 15 }}>Yuk tashish</div>
-                </Card>
-                </Col>
-
-                <Col span={12}>
-                <Card
-                    hoverable
-                    onClick={() => selectService("delivery")}
-                    style={{
-                    borderRadius: 20,
-                    textAlign: "center",
-                    height: "100%",
-                    cursor: "pointer",
-                    transition: "transform 0.1s",
-                    border:
-                        selectedService === "delivery"
-                        ? "1px solid rgba(82,196,26,0.45)"
-                        : "1px solid var(--card-border)",
-                    background: "var(--card-bg)",
-                    boxShadow:
-                        selectedService === "delivery"
-                        ? "0 12px 26px rgba(0,0,0,0.18)"
-                        : "var(--shadow-soft)",
-                    position: "relative",
-                    overflow: "hidden",
-                    }}
-                    {...btnTouchProps}
-                >
-                    {selectedService === "delivery" && (
-                    <div style={{ position: "absolute", top: 10, right: 10 }}>
-                        <Tag color="green" style={{ borderRadius: 999, fontWeight: 800, padding: "2px 10px" }}>
-                        Active
-                        </Tag>
-                    </div>
-                    )}
-                    <RocketOutlined style={{ fontSize: 30, color: "#eb2f96", marginBottom: 15 }} />
-                    <div style={{ fontWeight: "bold", fontSize: 15 }}>Eltish xizmati</div>
-                </Card>
-                </Col>
-            </Row>
-
-            {/* SUPER PRO */}
-            <div style={{ marginTop: 18 }}>
-                <Card
-                style={{
-                    borderRadius: 24,
-                    border: "1px solid var(--card-border)",
-                    background: "var(--card-bg)",
-                    boxShadow: "var(--shadow-soft)",
-                }}
-                >
-                <Title level={5} style={{ marginTop: 0 }}>
-                    Super Pro
-                </Title>
-
-                <Row gutter={[12, 12]}>
-                    {appConfig.features.garage && (
-                    <Col span={8}>
-                        <Button block icon={<ToolOutlined />} onClick={() => navigate("/garage")} style={{ transition: "transform 0.1s" }} {...btnTouchProps}>
-                        Garage
-                        </Button>
-                    </Col>
-                    )}
-                    {appConfig.features.payments && (
-                    <Col span={8}>
-                        <Button block icon={<WalletOutlined />} onClick={() => navigate("/payments")} style={{ transition: "transform 0.1s" }} {...btnTouchProps}>
-                        To‘lov
-                        </Button>
-                    </Col>
-                    )}
-                    {appConfig.features.searchOnRoute && (
-                    <Col span={8}>
-                        <Button block icon={<SearchOutlined />} onClick={() => navigate("/search-route")} style={{ transition: "transform 0.1s" }} {...btnTouchProps}>
-                        Yo‘lda
-                        </Button>
-                    </Col>
-                    )}
-                </Row>
-
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                    Eslatma: bu bo‘limlar scaffold. Keyin backend va POI manba bilan ulaysiz.
-                </Text>
-                </Card>
+      {/* Status toggle */}
+      <div className="px-4 py-2">
+        <div className="neumorphic-pop rounded-2xl p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={`w-3 h-3 rounded-full ${isOnline ? "bg-green-500" : "bg-slate-400"}`} />
+            <div>
+              <p className="font-bold text-slate-800">Haydovchi holati</p>
+              <p className="text-sm text-slate-500">
+                {isOnline ? "Siz hozir onlayn rejimdasiz" : "Siz hozir oflayn rejimdasiz"}
+              </p>
             </div>
+          </div>
+
+          <label
+            className={`relative flex h-8 w-14 items-center rounded-full p-1 transition-colors ${
+              isOnline ? "bg-primarySidebar" : "bg-slate-200"
+            } ${loading ? "opacity-70 cursor-not-allowed" : "cursor-pointer"}`}
+          >
+            <input
+              className="sr-only"
+              type="checkbox"
+              checked={isOnline}
+              onChange={(e) => {
+                if (loading) return;
+                toggleOnline(e.target.checked);
+              }}
+            />
+            <div
+              className={`h-6 w-6 rounded-full bg-white shadow-md transform transition-transform ${
+                isOnline ? "translate-x-6" : "translate-x-0"
+              }`}
+            />
+          </label>
         </div>
       </div>
 
+      {/* Main */}
+      <main className="p-4 space-y-6 pb-24">
+        {/* Primary: City taxi */}
+        <section>
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => selectService("taxi")}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") selectService("taxi");
+            }}
+            className="neumorphic-pop rounded-2xl p-6 flex items-center justify-between border-2 border-primarySidebar/20 cursor-pointer"
+          >
+            <div className="flex items-center gap-5">
+              <div className="w-16 h-16 rounded-2xl bg-orange-100 flex items-center justify-center text-primarySidebar">
+                <span className="material-symbols-outlined text-4xl">local_taxi</span>
+              </div>
+              <div className="text-left">
+                <h3 className="text-2xl font-bold text-slate-900">Shahar ichida taksi</h3>
+                <p className="text-slate-500 text-sm">Eng tezkor va qulay narxlar</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                selectService("taxi");
+              }}
+              className="bg-primarySidebar text-white h-12 w-12 rounded-xl flex items-center justify-center shadow-lg shadow-primarySidebar/30"
+              aria-label="Kirish"
+            >
+              <span className="material-symbols-outlined">arrow_forward</span>
+            </button>
+          </div>
+        </section>
 
-      {/* PROFIL DRAWER (RIGHT) */}
+        {/* Grid services */}
+        <section className="grid grid-cols-2 gap-4">
+          <button
+            type="button"
+            onClick={() => selectService("interProv")}
+            className="neumorphic-pop rounded-2xl p-6 flex flex-col items-center text-center gap-4 border border-white/50"
+          >
+            <div className="w-14 h-14 rounded-2xl bg-orange-100 flex items-center justify-center text-primarySidebar">
+              <span className="material-symbols-outlined text-4xl">map</span>
+            </div>
+            <p className="font-bold text-slate-800">Viloyatlar aro</p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => selectService("interDist")}
+            className="neumorphic-pop rounded-2xl p-6 flex flex-col items-center text-center gap-4 border border-white/50"
+          >
+            <div className="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center text-blue-600">
+              <span className="material-symbols-outlined text-4xl">distance</span>
+            </div>
+            <p className="font-bold text-slate-800">Tumanlar aro</p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => selectService("freight")}
+            className="neumorphic-pop rounded-2xl p-6 flex flex-col items-center text-center gap-4 border border-white/50"
+          >
+            <div className="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+              <span className="material-symbols-outlined text-4xl">local_shipping</span>
+            </div>
+            <p className="font-bold text-slate-800">Yuk tashish</p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => selectService("delivery")}
+            className="neumorphic-pop rounded-2xl p-6 flex flex-col items-center text-center gap-4 border border-white/50"
+          >
+            <div className="w-14 h-14 rounded-2xl bg-purple-100 flex items-center justify-center text-purple-600">
+              <span className="material-symbols-outlined text-4xl">inventory_2</span>
+            </div>
+            <p className="font-bold text-slate-800">Eltish xizmati</p>
+          </button>
+        </section>
+
+        {/* Super Pro shortcuts (kept) */}
+        {(appConfig.features.garage || appConfig.features.payments || appConfig.features.searchOnRoute) && (
+          <section className="neumorphic-pop rounded-2xl p-4">
+            <div className="font-bold text-slate-900 mb-3">Super Pro</div>
+            <div className="grid grid-cols-3 gap-3">
+              {appConfig.features.garage && (
+                <button
+                  type="button"
+                  onClick={() => navigate("/garage")}
+                  className="neumorphic-inset rounded-xl py-3 text-xs font-bold"
+                >
+                  Garage
+                </button>
+              )}
+              {appConfig.features.payments && (
+                <button
+                  type="button"
+                  onClick={() => navigate("/payments")}
+                  className="neumorphic-inset rounded-xl py-3 text-xs font-bold"
+                >
+                  To‘lov
+                </button>
+              )}
+              {appConfig.features.searchOnRoute && (
+                <button
+                  type="button"
+                  onClick={() => navigate("/search-route")}
+                  className="neumorphic-inset rounded-xl py-3 text-xs font-bold"
+                >
+                  Yo‘lda
+                </button>
+              )}
+            </div>
+            <div className="text-xs text-slate-500 mt-3">
+              Eslatma: bu bo‘limlar scaffold. Keyin backend va POI manba bilan ulaysiz.
+            </div>
+          </section>
+        )}
+      </main>
+
+      {/* Bottom nav (NO big + button) */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-slate-200 px-6 py-2 flex justify-between items-center z-50">
+        <button
+          type="button"
+          className="flex flex-col items-center gap-1 text-primarySidebar"
+          onClick={() => navigate("/driver/dashboard")}
+        >
+          <span className="material-symbols-outlined">home</span>
+          <span className="text-[10px] font-bold">Asosiy</span>
+        </button>
+        <button
+          type="button"
+          className="flex flex-col items-center gap-1 text-slate-400"
+          onClick={() => navigate("/driver/orders")}
+        >
+          <span className="material-symbols-outlined">history</span>
+          <span className="text-[10px] font-medium">Buyurtmalar</span>
+        </button>
+        <button
+          type="button"
+          className="flex flex-col items-center gap-1 text-slate-400"
+          onClick={() => navigate("/driver/wallet")}
+        >
+          <span className="material-symbols-outlined">account_balance_wallet</span>
+          <span className="text-[10px] font-medium">Hamyon</span>
+        </button>
+        <button
+          type="button"
+          className="flex flex-col items-center gap-1 text-slate-400"
+          onClick={() => navigate("/driver/profile")}
+        >
+          <span className="material-symbols-outlined">person</span>
+          <span className="text-[10px] font-medium">Profil</span>
+        </button>
+      </nav>
+
+      {/* Profile drawer (right) - existing flow kept */}
       <Drawer
         placement="right"
         width="100%"

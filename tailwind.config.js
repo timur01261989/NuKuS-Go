@@ -10,6 +10,9 @@ export default {
         primary: "#f48c25",
         primaryHome: "#f48c25",
         primarySidebar: "#ec5b13",
+        // Driver home design
+        backgroundLightDriver: "#e0f2fe",
+        cardLightDriver: "#f0f9ff",
         backgroundLight: "#f0f4f8",
         backgroundLightSidebar: "#f8f6f6",
         backgroundDark: "#1a1f26",

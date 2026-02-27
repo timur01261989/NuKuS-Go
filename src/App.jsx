@@ -39,6 +39,8 @@ const ClientDelivery = lazy(() => import("@features/client/delivery/DeliveryPage
 // --- DRIVER ---
 const DriverOrders = lazy(() => import("@features/driver/pages/DriverOrders"));
 const DriverDashboard = lazy(() => import("@features/driver/pages/DriverDashboard"));
+const DriverWalletPage = lazy(() => import("@features/driver/pages/DriverWalletPage"));
+const DriverProfilePage = lazy(() => import("@features/driver/pages/DriverProfilePage"));
 const DriverRegister = lazy(() => import("@features/driver/components/DriverRegister"));
 const DriverModeRedirect = lazy(() => import("@shared/routes/DriverModeRedirect")); // YANGI
 
@@ -222,6 +224,23 @@ export default function App() {
                 element={
                   <RoleGate allow={{ client: false, driver: true, requireDriverApproved: true }}>
                     <DriverOrders />
+                  </RoleGate>
+                }
+              />
+
+              <Route
+                path="/driver/wallet"
+                element={
+                  <RoleGate allow={{ client: false, driver: true, requireDriverApproved: true }}>
+                    <DriverWalletPage />
+                  </RoleGate>
+                }
+              />
+              <Route
+                path="/driver/profile"
+                element={
+                  <RoleGate allow={{ client: false, driver: true, requireDriverApproved: true }}>
+                    <DriverProfilePage />
                   </RoleGate>
                 }
               />

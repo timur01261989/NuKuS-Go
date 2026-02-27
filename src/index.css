@@ -6,6 +6,16 @@
    Tailwind utilities used by new client UI
 ========================================= */
 @layer utilities {
+  /* Light neumorphic (driver dashboard, etc.) */
+  .neumorphic-pop {
+    background: #f0f9ff;
+    box-shadow: 6px 6px 12px #c9dae6, -6px -6px 12px #ffffff;
+  }
+  .neumorphic-inset {
+    background: #f0f9ff;
+    box-shadow: inset 4px 4px 8px #c9dae6, inset -4px -4px 8px #ffffff;
+  }
+
   .neumorphic-dark {
     background: #232b35;
     box-shadow: 6px 6px 12px #181d24, -4px -4px 10px #2e3946;
