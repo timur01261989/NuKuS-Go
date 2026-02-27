@@ -15,6 +15,7 @@ const SearchOnRoutePage = lazy(() => import("./pages/SuperPro/SearchOnRoutePage"
 // --- PAGES (LAZY) ---
 const Auth = lazy(() => import("./features/auth/pages/Auth"));
 const Register = lazy(() => import("./features/auth/pages/Register"));
+const Otp = lazy(() => import("./features/auth/pages/Otp"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 // Dashboard va MainPage import qilinmaydi — route'da ishlatilmaydi
 const RootRedirect = lazy(() => import("./pages/RootRedirect"));
@@ -66,6 +67,7 @@ export default function App() {
               <Route path="/" element={<RootRedirect />} />
               <Route path="/login" element={<Auth />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/otp" element={<Otp />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/logout" element={<Logout />} />
 
