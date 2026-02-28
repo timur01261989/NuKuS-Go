@@ -6,7 +6,6 @@ import RoleGate from "@shared/routes/RoleGate";
 import "./styles/hdr-taxi.css";
 
 import { appConfig } from "./shared/config/appConfig";
-import ErrorBoundary from "./components/ErrorBoundary";
 
 // --- SUPER PRO / LEGACY FEATURES ---
 const GaragePage = lazy(() => import("./pages/SuperPro/GaragePage"));
@@ -94,7 +93,7 @@ export default function App() {
                 path="/client/taxi"
                 element={
                   <RoleGate allow={{ client: true, driver: true }}>
-                    <ErrorBoundary><ClientTaxi /></ErrorBoundary>
+                    <ClientTaxi />
                   </RoleGate>
                 }
               />
