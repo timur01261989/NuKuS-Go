@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
 
 
@@ -44,6 +45,7 @@ import "leaflet/dist/leaflet.css";
 import api from "@/utils/apiHelper";
 import VehicleMarker from "./components/VehicleMarker";
 import TaxiMap from "./TaxiMap";
+import { normalizeLatLng, toNum } from "./utils/latlng";
 import TaxiSearchSheet from "./TaxiSearchSheet";
 import DestinationPicker from "./DestinationPicker";
 import { haversineKm } from "../shared/geo/haversine";
@@ -333,6 +335,7 @@ function speak(text) {
 
 /** --- main component --- */
 export default function ClientTaxiPage() {
+  const navigate = useNavigate();
   const mapRef = useRef(null);
   const tariffSectionRef = useRef(null);
   const scrollTariffOnOpenRef = useRef(false);
@@ -494,6 +497,26 @@ export default function ClientTaxiPage() {
   const [bonusVisible, setBonusVisible] = useState(false);
   const [earnedBonus, setEarnedBonus] = useState(0);
   const [etaMin, setEtaMin] = useState(null);
+  // map safety (avoid Leaflet "Invalid LatLng" crashes)
+  const safePickup = useMemo(() => normalizeLatLng(pickup?.latlng), [pickup]);
+  const safeDest = useMemo(() => normalizeLatLng(dest?.latlng), [dest]);
+  const safeWaypoints = useMemo(
+    () => (waypoints || []).map((w) => normalizeLatLng(w)).filter(Boolean),
+    [waypoints]
+  );
+  const driverPos = useMemo(() => {
+    if (!assignedDriver) return null;
+    return normalizeLatLng([toNum(assignedDriver.lat), toNum(assignedDriver.lng)]);
+  }, [assignedDriver]);
+  const safeRouteCoords = useMemo(() => {
+    const coords = route?.coords || [];
+    return coords.map((c) => normalizeLatLng(c)).filter(Boolean);
+  }, [route]);
+  const safeDispatchLine = useMemo(() => {
+    const coords = dispatchLine || [];
+    return coords.map((c) => normalizeLatLng(c)).filter(Boolean);
+  }, [dispatchLine]);
+
 
   // actions / modals
   const [podyezdOpen, setPodyezdOpen] = useState(false);
@@ -1354,13 +1377,11 @@ const RouteSheet = (
             <div style={{ fontSize: 12, opacity: 0.7 }}>Oraliq bekatlar</div>
             <Button
               size="small"
-              icon={<PlusOutlined />}
+              icon={<PlusOutlined style={{ fontSize: 16 }} />}
               className="yg-chip"
               onClick={() => { setAddStopOpen(true); setStep('stop_map'); }}
               disabled={waypoints.length >= 3}
-            >
-              +
-            </Button>
+            />
           </div>
           {waypoints.length === 0 ? (
             <div style={{ fontSize: 12, opacity: 0.55, marginTop: 4 }}>Hozircha yo‘q</div>
@@ -1392,13 +1413,12 @@ const RouteSheet = (
           <Button
             size="small"
             style={{ borderRadius: 999 }}
-            icon={<ShareAltOutlined />}
+            icon={<CompassOutlined />}
             onClick={() => {
-              const p = pickup?.latlng;
-              const d = dest?.latlng;
+              const p = normalizeLatLng(pickup?.latlng);
+              const d = normalizeLatLng(dest?.latlng);
               if (!p || !d) { message.info("Manzil tanlang"); return; }
-              const url = `https://www.google.com/maps/dir/?api=1&origin=${p[0]},${p[1]}&destination=${d[0]},${d[1]}`;
-              window.open(url, "_blank", "noopener,noreferrer");
+              navigate("/client/navigator", { state: { pickup: p, dest: d, waypoints: (waypoints || []).map(normalizeLatLng).filter(Boolean) } });
             }}
           >
             Navigator
@@ -1737,7 +1757,7 @@ const RouteSheet = (
 
 /** share modal */
   const ShareModal = (
-    <Modal open={shareOpen} onCancel={() => setShareOpen(false)} footer={null} title="Buyurtmani ulashish">
+    <Modal open={shareOpen} onCancel={() => setShareOpen(false)} footer={null} title="Buyurtmani ulashish" zIndex={6500} getContainer={document.body}>
       <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>
         Havolani do‘stingizga yuboring. U sizning holatingizni ko‘ra oladi.
       </div>
@@ -1926,35 +1946,41 @@ const RouteSheet = (
       <div className="yg-wave" />
       <div className="yg-wave" />
       <div className="yg-wave" />
-      {dispatchLine ? <Polyline positions={dispatchLine} pathOptions={{ weight: 4, opacity: 0.65, dashArray: "8 10" }} /> : null}
-      {nearCars.map((c, idx) => (
-        <VehicleMarker
-          key={c.id}
-          position={[c.lat, c.lng]}
-          bearing={c.bearing}
-          label={idx === dispatchIdx ? `${Math.max(1, Math.round(durationMin / 2))} daq` : undefined}
-          color={idx === dispatchIdx ? "#f6c200" : "#ddd"}
-          durationMs={700}
-        />
-      ))}
+      {safeDispatchLine.length > 1 ? (
+        <Polyline positions={safeDispatchLine} pathOptions={{ weight: 4, opacity: 0.65, dashArray: "8 10" }} />
+      ) : null}
+      {nearCars.map((c, idx) => {
+        const pos = normalizeLatLng([toNum(c.lat), toNum(c.lng)]);
+        if (!pos) return null;
+        return (
+          <VehicleMarker
+            key={c.id}
+            position={pos}
+            bearing={c.bearing}
+            label={idx === dispatchIdx ? `${Math.max(1, Math.round(durationMin / 2))} daq` : undefined}
+            color={idx === dispatchIdx ? "#f6c200" : "#ddd"}
+            durationMs={700}
+          />
+        );
+      })}
     </>
   ) : null;
 
   /** driver overlay in coming */
-  const DriverOverlay = step === "coming" && assignedDriver?.lat && assignedDriver?.lng ? (
+  const DriverOverlay = step === "coming" && driverPos ? (
     <>
       <VehicleMarker
-        position={[assignedDriver.lat, assignedDriver.lng]}
-        bearing={assignedDriver.bearing}
+        position={driverPos}
+        bearing={assignedDriver?.bearing}
         label={etaMin ? `${etaMin} daq` : undefined}
         color="#f6c200"
         durationMs={800}
       />
-      {pickup.latlng ? (
+      {safePickup ? (
         <Polyline
           positions={[
-            [assignedDriver.lat, assignedDriver.lng],
-            pickup.latlng,
+            driverPos,
+            safePickup,
           ]}
           pathOptions={{ weight: 6, opacity: 0.9 }}
         />
@@ -1976,7 +2002,7 @@ const RouteSheet = (
   const MapUI = (
     <TaxiMap
       mapRef={mapRef}
-      center={pickup.latlng || userLoc || [42.4602, 59.6156]}
+      center={safePickup || userLoc || [42.4602, 59.6156]}
       mapTile={mapTile}
       step={step}
       userLoc={userLoc}
