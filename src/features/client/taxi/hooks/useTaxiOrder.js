@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { message } from "antd";
 import api from "@/utils/apiHelper";
 import { haversineKm } from "../shared/geo/haversine";
-import { nominatimReverse as _nominatimReverse } from "../../shared/geo/nominatim";
+import { nominatimReverse as _nominatimReverse } from "../shared/geo/nominatim";
 import { nominatimSearch } from "../services/nominatim"; // Import yo'lini loyihangizga moslang
 
 // --- Yordamchi Funksiyalar (Utils) ---
