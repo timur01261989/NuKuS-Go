@@ -11,23 +11,18 @@ export default class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, info) {
-    // Log to console so you can screenshot the exact problem
     // eslint-disable-next-line no-console
     console.error("[ErrorBoundary] Uncaught error:", error, info);
   }
 
-  handleReload = () => {
-    // reset boundary state
-    this.setState({ hasError: false, error: null });
-  };
-
   render() {
     if (this.state.hasError) {
+      const txt = (this.state.error && (this.state.error.stack || String(this.state.error))) || "Unknown error";
       return (
         <div style={{ minHeight: "100vh", padding: 16, fontFamily: "system-ui" }}>
           <h2 style={{ margin: 0, fontSize: 18 }}>Sahifa ochilmadi</h2>
-          <p style={{ opacity: 0.8, marginTop: 8 }}>
-            Xato sababini aniqlash uchun brauzerning <b>Console</b> bo‘limini ochib, chiqgan xatoni rasmga oling.
+          <p style={{ opacity: 0.85, marginTop: 8 }}>
+            Konsolda chiqgan xatoni rasmga oling va yuboring — shu xatoning o‘zini tuzatamiz.
           </p>
           <pre
             style={{
@@ -40,21 +35,8 @@ export default class ErrorBoundary extends React.Component {
               fontSize: 12,
             }}
           >
-            {(this.state.error && (this.state.error.stack || String(this.state.error))) || "Unknown error"}
+            {txt}
           </pre>
-          <button
-            onClick={this.handleReload}
-            style={{
-              marginTop: 12,
-              padding: "10px 14px",
-              borderRadius: 12,
-              border: "1px solid #e5e7eb",
-              background: "#fff",
-              cursor: "pointer",
-            }}
-          >
-            Qayta urinib ko‘rish
-          </button>
         </div>
       );
     }
