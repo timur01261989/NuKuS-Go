@@ -48,7 +48,6 @@ import TaxiSearchSheet from "./TaxiSearchSheet";
 import DestinationPicker from "./DestinationPicker";
 import { haversineKm } from "../shared/geo/haversine";
 import { nominatimReverse as _nominatimReverse } from "../shared/geo/nominatim";
-import { nominatimSearch as _nominatimSearch } from "../shared/geo/nominatim";
 import AutoMarketAdsPanel from "./components/AutoMarketAdsPanel";
 import { listMarketCars } from "../../../services/marketService.js";
 import RatingModal from "@features/shared/components/RatingModal";
@@ -59,10 +58,6 @@ async function nominatimReverse(lat, lng, signal) {
   return _nominatimReverse(lat, lng, { signal });
 }
 
-// Backward-compatible signature (q, signal)
-async function nominatimSearch(q, signal) {
-  return _nominatimSearch(q, { signal });
-}
 
 /**
  * CLIENT TAXI (Yandex-Go like flow)
@@ -2059,4 +2054,3 @@ const RouteSheet = (
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);
-
