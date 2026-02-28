@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
 
 
@@ -45,7 +44,6 @@ import "leaflet/dist/leaflet.css";
 import api from "@/utils/apiHelper";
 import VehicleMarker from "./components/VehicleMarker";
 import TaxiMap from "./TaxiMap";
-import { normalizeLatLng, toNum } from "./utils/latlng";
 import TaxiSearchSheet from "./TaxiSearchSheet";
 import DestinationPicker from "./DestinationPicker";
 import { haversineKm } from "../shared/geo/haversine";
@@ -54,6 +52,7 @@ import AutoMarketAdsPanel from "./components/AutoMarketAdsPanel";
 import { listMarketCars } from "../../../services/marketService.js";
 import RatingModal from "@features/shared/components/RatingModal";
 import ClientBonusWidget from "@/features/client/components/ClientBonusWidget";
+import { nominatimSearch } from "./services/nominatim";
 
 // Backward-compatible signature (lat, lng, signal)
 async function nominatimReverse(lat, lng, signal) {
@@ -129,27 +128,6 @@ const destIcon = L.divIcon({
 function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
 }
-
-
-
-async function nominatimSearch(q, signal) {
-  // countrycodes=uz natijalarni faqat O'zbekiston bilan cheklaydi
-  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=7&addressdetails=1&q=${encodeURIComponent(
-    q
-  )}&countrycodes=uz`;
-  try {
-    const res = await fetch(url, { signal, headers: { "Accept-Language": "uz,ru,en" } });
-    const data = await res.json();
-    return (data || []).map((x) => ({
-      id: x.place_id,
-      label: x.display_name,
-      lat: parseFloat(x.lat),
-      lng: parseFloat(x.lon),
-    }));
-  } catch (e) {
-    if (e?.name === "AbortError") return [];
-    return [];
-  }
 }
 
 // OSRM yo'nalish topa olmasa ham xato bermaslik uchun:
@@ -335,7 +313,6 @@ function speak(text) {
 
 /** --- main component --- */
 export default function ClientTaxiPage() {
-  const navigate = useNavigate();
   const mapRef = useRef(null);
   const tariffSectionRef = useRef(null);
   const scrollTariffOnOpenRef = useRef(false);
@@ -349,9 +326,7 @@ export default function ClientTaxiPage() {
   // --- mobile BACK handling: rely on phone back button, not UI back arrow ---
   const isPopNavRef = useRef(false);
   const stepRef = useRef(step);
-  useEffect(() => { stepRef.current = step; }, [step]);
-
-  useEffect(() => {
+useEffect(() => {
     // Push an entry for in-page flow steps so phone back button returns inside the flow first.
     // We avoid pushing for the initial mount.
     const st = { __taxiStep: step };
@@ -362,29 +337,7 @@ export default function ClientTaxiPage() {
     }
     isPopNavRef.current = false;
   }, [step]);
-
-  useEffect(() => {
-    const onPop = (e) => {
-      // Mark this navigation as popstate-driven to avoid pushState loop
-      isPopNavRef.current = true;
-
-      const cur = stepRef.current;
-
-      // Step back inside the taxi flow
-      if (cur === "stop_map") { setStep("route"); return; }
-      if (cur === "searching" || cur === "coming") { setStep("route"); return; }
-      if (cur === "route") { setStep("main"); return; }
-      if (cur === "dest_map") { setStep("search"); return; }
-      if (cur === "search") { setStep("main"); return; }
-
-      // If already at main — allow browser to go to previous page
-      // (Do nothing here; browser will handle it naturally)
-    };
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, []);
-
-  const requestLocateNow = useCallback(() => {
+const requestLocateNow = useCallback(() => {
     if (!navigator.geolocation) {
       message.error("Geolokatsiya mavjud emas");
       return;
@@ -497,26 +450,6 @@ export default function ClientTaxiPage() {
   const [bonusVisible, setBonusVisible] = useState(false);
   const [earnedBonus, setEarnedBonus] = useState(0);
   const [etaMin, setEtaMin] = useState(null);
-  // map safety (avoid Leaflet "Invalid LatLng" crashes)
-  const safePickup = useMemo(() => normalizeLatLng(pickup?.latlng), [pickup]);
-  const safeDest = useMemo(() => normalizeLatLng(dest?.latlng), [dest]);
-  const safeWaypoints = useMemo(
-    () => (waypoints || []).map((w) => normalizeLatLng(w)).filter(Boolean),
-    [waypoints]
-  );
-  const driverPos = useMemo(() => {
-    if (!assignedDriver) return null;
-    return normalizeLatLng([toNum(assignedDriver.lat), toNum(assignedDriver.lng)]);
-  }, [assignedDriver]);
-  const safeRouteCoords = useMemo(() => {
-    const coords = route?.coords || [];
-    return coords.map((c) => normalizeLatLng(c)).filter(Boolean);
-  }, [route]);
-  const safeDispatchLine = useMemo(() => {
-    const coords = dispatchLine || [];
-    return coords.map((c) => normalizeLatLng(c)).filter(Boolean);
-  }, [dispatchLine]);
-
 
   // actions / modals
   const [podyezdOpen, setPodyezdOpen] = useState(false);
@@ -549,22 +482,8 @@ export default function ClientTaxiPage() {
   const pickupAddrFromCenter = useDebouncedReverse(step === "main" || step === "search", centerLatLng, 300);
   const destAddrFromCenter = useDebouncedReverse(step === "dest_map", centerLatLng, 300);
   // Update pickup address from map center while selecting pickup (main/search)
-  useEffect(() => {
-    if ((step === "main" || step === "search") && pickupAddrFromCenter) {
-      setPickup((p) => ({ ...p, address: pickupAddrFromCenter, latlng: centerLatLng }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pickupAddrFromCenter, step]);
-
-  // Update destination address from center while selecting destination on map
-  useEffect(() => {
-    if (step === "dest_map" && destAddrFromCenter) {
-      setDest((d) => ({ ...d, address: destAddrFromCenter, latlng: centerLatLng }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [destAddrFromCenter, step]);
-
- useEffect(() => {
+// Update destination address from center while selecting destination on map
+useEffect(() => {
     const onStorage = (e) => {
       if (e?.key === "savedAddresses_v1") setMyAddressesV1(loadMyAddressesV1());
     };
@@ -573,120 +492,13 @@ export default function ClientTaxiPage() {
   }, []);
 
   /** get user location */
-  useEffect(() => {
-    const saved = loadSavedPlaces();
-    setSavedPlaces(saved);
-    try {
-      const sc = JSON.parse(localStorage.getItem('taxiShortcuts') || '{}');
-      setShortcuts({ home: sc.home || null, work: sc.work || null });
-    } catch {}
-
-    let mounted = true;
-
-    const ok = (pos) => {
-      if (!mounted) return;
-      const ll = [pos.coords.latitude, pos.coords.longitude];
-      setUserLoc(ll);
-      setPickup((p) => ({ ...p, latlng: ll }));
-    };
-    const fail = () => {
-      // fallback Nukus center
-      const ll = [42.4602, 59.6156];
-      setUserLoc(ll);
-      setPickup((p) => ({ ...p, latlng: ll }));
-    };
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(ok, fail, {
-        enableHighAccuracy: true,
-        timeout: 8000,
-        maximumAge: 2000,
-      });
-    } else {
-      fail();
-    }
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  /** keep pickup address synced from center pin in main/search (when user drags map) */
-  useEffect(() => {
-    if (!(step === "main" || step === "search")) return;
-    if (!centerLatLng) return;
-
-    // only update while in main/search; user can override via search list, but map move should update pickup
-    setPickup((p) => ({ ...p, latlng: centerLatLng, address: pickupAddrFromCenter || p.address }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pickupAddrFromCenter]);
-
-  /** keep dest address synced from center pin in dest_map */
-  useEffect(() => {
-    if (step !== "dest_map") return;
-    if (!centerLatLng) return;
-    setDest((d) => ({ ...d, latlng: centerLatLng, address: destAddrFromCenter || d.address }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [destAddrFromCenter]);
-
-  /** compute route when we have pickup + dest + waypoints and step route */
-  useEffect(() => {
-    let cancelled = false;
-    const run = async () => {
-      if (step !== "route" && step !== "coming") return;
-      if (!pickup.latlng || !dest.latlng) {
-        setRoute(null);
-        return;
-      }
-      const pts = [pickup.latlng, ...waypoints.map((w) => w.latlng).filter(Boolean), dest.latlng];
-      const r = await osrmRouteMulti(pts);
-      if (!cancelled) setRoute(r);
-    };
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [step, pickup.latlng?.[0], pickup.latlng?.[1], dest.latlng?.[0], dest.latlng?.[1], waypoints.length]);
-
-  const distanceKm = useMemo(() => route?.distanceKm || (pickup.latlng && dest.latlng ? haversineKm(pickup.latlng, dest.latlng) : 0), [
-    route?.distanceKm,
-    pickup.latlng,
-    dest.latlng,
-  ]);
-  const durationMin = useMemo(() => route?.durationMin || (distanceKm ? distanceKm * 2 : 0), [route?.durationMin, distanceKm]);
-
-  const totalPrice = useMemo(() => {
-    const d = distanceKm || 0;
-    const p = (tariff.base + d * tariff.perKm) * (tariff.mult || 1);
-    return Math.round(p);
-  }, [distanceKm, tariff]);
-
-  /** search drawer: fetch results (debounced + abortable) */
+/** keep pickup address synced from center pin in main/search (when user drags map) */
+/** keep dest address synced from center pin in dest_map */
+/** compute route when we have pickup + dest + waypoints and step route */
+/** search drawer: fetch results (debounced + abortable) */
   const pickupAbortRef = useRef(null);
   const destAbortRef = useRef(null);
-
-  useEffect(() => {
-    if (!searchOpen) return;
-
-    const t = setTimeout(async () => {
-      const q = pickupSearchText.trim();
-      if (!q) {
-        setPickupResults([]);
-        return;
-      }
-      if (pickupAbortRef.current) pickupAbortRef.current.abort();
-      const ac = new AbortController();
-      pickupAbortRef.current = ac;
-      setSearchBusy(true);
-      const res = await nominatimSearch(q, ac.signal);
-      setPickupResults(res);
-      setSearchBusy(false);
-    }, 250);
-
-    return () => clearTimeout(t);
-  }, [pickupSearchText, searchOpen]);
-
-  useEffect(() => {
+useEffect(() => {
     if (!searchOpen) return;
 
     const t = setTimeout(async () => {
@@ -910,167 +722,8 @@ export default function ClientTaxiPage() {
   }, [orderId]);
 
   /** polling active order on reload */
-  useEffect(() => {
-    let mounted = true;
-    const run = async () => {
-      try {
-        const saved = localStorage.getItem("activeOrderId");
-        if (saved) setOrderId(saved);
-
-        const res = await api.post("/api/order", { action: "active" });
-        const o = res?.data || res;
-        if (!mounted) return;
-        if (o?.id) {
-          setOrderId(String(o.id));
-          localStorage.setItem("activeOrderId", String(o.id));
-          setOrderStatus(o.status || o.order_status || "searching");
-          setPickup((p) => ({
-            ...p,
-            latlng: o.from_lat && o.from_lng ? [Number(o.from_lat), Number(o.from_lng)] : p.latlng,
-            address: o.pickup_location || p.address,
-          }));
-          if (o.to_lat && o.to_lng) {
-            setDest({ latlng: [Number(o.to_lat), Number(o.to_lng)], address: o.dropoff_location || "" });
-          }
-          if (o.status === "accepted" || o.status === "coming" || o.status === "arrived") {
-            setStep("coming");
-          } else if (o.status === "searching") {
-            setStep("searching");
-          } else {
-            setStep("main");
-          }
-        }
-      } catch (e) {
-        // ignore
-      }
-    };
-    run();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  /** polling order status + driver info */
-  useEffect(() => {
-    if (!orderId) return;
-
-    let timer = null;
-    let alive = true;
-
-    const tick = async () => {
-      try {
-        const res = await api.post("/api/order", { action: "get", order_id: orderId });
-        if (!alive) return;
-        const o = res?.data || res;
-        const st = o?.status || o?.order_status;
-        if (st && st !== orderStatus) {
-          setOrderStatus(st);
-          if (st === "accepted") speak("Haydovchi topildi");
-          if (st === "arrived") speak("Haydovchi yetib keldi");
-          // Safar yakunlandi — reyting modalini ochish
-          if (st === "completed" || st === "done") {
-            speak("Safar yakunlandi. Rahmat!");
-            const drvId = o?.driver?.id || o?.driver_id || o?.assigned_driver_id || null;
-            const clientId = o?.client_user_id || o?.user_id || null;
-            setCompletedOrderForRating({
-              id: orderId,
-              driver_id: drvId,
-              client_user_id: clientId,
-            });
-            setRatingVisible(true);
-            // Cashback hisoblash: narxning 1%i
-            const price = Number(o?.price || o?.amount || o?.priceUzs || 0);
-            setEarnedBonus(Math.max(1, Math.floor(price * 0.01)));
-          }
-        }
-
-        const drv = o?.driver || o?.assigned_driver || o?.assignedDriver;
-        if (drv) {
-          setAssignedDriver({
-            first_name: drv.first_name || drv.name || "Haydovchi",
-            avatar_url: drv.avatar_url || drv.avatar || "",
-            car_model: drv.car_model || drv.car || "",
-            plate: drv.plate || drv.car_plate || "",
-            lat: Number(drv.lat ?? drv.driver_lat ?? drv.latitude),
-            lng: Number(drv.lng ?? drv.driver_lng ?? drv.longitude),
-            bearing: Number(drv.bearing ?? drv.heading ?? 0),
-            rating: Number(drv.rating ?? 4.8),
-            phone: drv.phone || "",
-          });
-        }
-
-        // ETA calc
-        if (assignedDriver?.lat && assignedDriver?.lng && pickup.latlng) {
-          const d = haversineKm([assignedDriver.lat, assignedDriver.lng], pickup.latlng);
-          setEtaMin(Math.max(1, Math.round(d * 3)));
-        }
-      } catch (e) {
-        // ignore
-      }
-    };
-
-    tick();
-    const nextInterval = () => {
-      // Polling interval strategy to avoid heating the phone
-      // searching: 2s, driver found: 3.5s, trip: 8s
-      if (step === "searching" || orderStatus === "searching") return 2000;
-      if (orderStatus === "accepted" || orderStatus === "coming" || orderStatus === "arrived") return 3500;
-      if (orderStatus === "ontrip" || orderStatus === "in_trip") return 8000;
-      return 4000;
-    };
-
-    let stopped = false;
-    const loop = async () => {
-      if (stopped) return;
-      await tick();
-      if (stopped) return;
-      timer = setTimeout(loop, nextInterval());
-    };
-
-    loop();
-
-    return () => {
-      alive = false;
-      stopped = true;
-      if (timer) clearTimeout(timer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderId, pickup.latlng?.[0], pickup.latlng?.[1], orderStatus, step]);
-
-  /** searching state: simulate nearby cars + dispatch cycling (visual only, backend dispatch can be added later) */
-  useEffect(() => {
-    if (step !== "searching") return;
-    if (!pickup.latlng) return;
-
-    // create fake cars around pickup if backend not returning
-    const baseLat = pickup.latlng[0];
-    const baseLng = pickup.latlng[1];
-
-    const cars = Array.from({ length: 6 }).map((_, i) => {
-      const ang = (i / 6) * Math.PI * 2;
-      const r = 0.006 + Math.random() * 0.01;
-      return {
-        id: "c" + i,
-        lat: baseLat + Math.cos(ang) * r,
-        lng: baseLng + Math.sin(ang) * r,
-        bearing: Math.random() * 360,
-      };
-    });
-
-    setNearCars(cars);
-    setDispatchIdx(0);
-
-    let t = null;
-    t = setInterval(() => {
-      setDispatchIdx((x) => (x + 1) % cars.length);
-    }, 1800);
-
-    return () => {
-      if (t) clearInterval(t);
-    };
-  }, [step, pickup.latlng]);
-
-  useEffect(() => {
+/** polling order status + driver info */
+useEffect(() => {
     if (step !== "searching") return;
     if (!pickup.latlng) return;
     if (!nearCars.length) return;
@@ -1080,16 +733,7 @@ export default function ClientTaxiPage() {
   }, [step, dispatchIdx, nearCars, pickup.latlng]);
 
   /** fly to driver when coming */
-  useEffect(() => {
-    if (step !== "coming") return;
-    const map = mapRef.current;
-    if (!map) return;
-    if (assignedDriver?.lat && assignedDriver?.lng) {
-      map.flyTo([assignedDriver.lat, assignedDriver.lng], clamp(map.getZoom() || 15, 14, 17), { duration: 0.6 });
-    }
-  }, [step, assignedDriver?.lat, assignedDriver?.lng]);
-
-  /** share link */
+/** share link */
   const shareLink = useMemo(() => {
     if (!orderId) return "";
     try {
@@ -1335,17 +979,6 @@ export default function ClientTaxiPage() {
       }}
     />
   );
-
-  
-  useEffect(() => {
-    if (step === "route" && scrollTariffOnOpenRef.current) {
-      scrollTariffOnOpenRef.current = false;
-      setTimeout(() => {
-        try { tariffSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch {}
-      }, 50);
-    }
-  }, [step]);
-
 const RouteSheet = (
     <div className="yg-sheet">
       <div className="yg-route-top">
@@ -1377,11 +1010,13 @@ const RouteSheet = (
             <div style={{ fontSize: 12, opacity: 0.7 }}>Oraliq bekatlar</div>
             <Button
               size="small"
-              icon={<PlusOutlined style={{ fontSize: 16 }} />}
+              icon={<PlusOutlined />}
               className="yg-chip"
               onClick={() => { setAddStopOpen(true); setStep('stop_map'); }}
               disabled={waypoints.length >= 3}
-            />
+            >
+              +
+            </Button>
           </div>
           {waypoints.length === 0 ? (
             <div style={{ fontSize: 12, opacity: 0.55, marginTop: 4 }}>Hozircha yo‘q</div>
@@ -1413,12 +1048,13 @@ const RouteSheet = (
           <Button
             size="small"
             style={{ borderRadius: 999 }}
-            icon={<CompassOutlined />}
+            icon={<ShareAltOutlined />}
             onClick={() => {
-              const p = normalizeLatLng(pickup?.latlng);
-              const d = normalizeLatLng(dest?.latlng);
+              const p = pickup?.latlng;
+              const d = dest?.latlng;
               if (!p || !d) { message.info("Manzil tanlang"); return; }
-              navigate("/client/navigator", { state: { pickup: p, dest: d, waypoints: (waypoints || []).map(normalizeLatLng).filter(Boolean) } });
+              const url = `https://www.google.com/maps/dir/?api=1&origin=${p[0]},${p[1]}&destination=${d[0]},${d[1]}`;
+              window.open(url, "_blank", "noopener,noreferrer");
             }}
           >
             Navigator
@@ -1757,7 +1393,7 @@ const RouteSheet = (
 
 /** share modal */
   const ShareModal = (
-    <Modal open={shareOpen} onCancel={() => setShareOpen(false)} footer={null} title="Buyurtmani ulashish" zIndex={6500} getContainer={document.body}>
+    <Modal open={shareOpen} onCancel={() => setShareOpen(false)} footer={null} title="Buyurtmani ulashish">
       <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>
         Havolani do‘stingizga yuboring. U sizning holatingizni ko‘ra oladi.
       </div>
@@ -1923,6 +1559,359 @@ const RouteSheet = (
     const isPickup = step === "main" || step === "search";
     const isDest = step === "dest_map";
     if (!isPickup && !isDest) return null;
+
+  // --- Effects (moved here to avoid TDZ / init order crashes in production) ---
+
+  useEffect(() => { stepRef.current = step; }, [step]);
+
+  
+
+
+  useEffect(() => {
+    const onPop = (e) => {
+      // Mark this navigation as popstate-driven to avoid pushState loop
+      isPopNavRef.current = true;
+
+      const cur = stepRef.current;
+
+      // Step back inside the taxi flow
+      if (cur === "stop_map") { setStep("route"); return; }
+      if (cur === "searching" || cur === "coming") { setStep("route"); return; }
+      if (cur === "route") { setStep("main"); return; }
+      if (cur === "dest_map") { setStep("search"); return; }
+      if (cur === "search") { setStep("main"); return; }
+
+      // If already at main — allow browser to go to previous page
+      // (Do nothing here; browser will handle it naturally)
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  
+
+  useEffect(() => {
+    if ((step === "main" || step === "search") && pickupAddrFromCenter) {
+      setPickup((p) => ({ ...p, address: pickupAddrFromCenter, latlng: centerLatLng }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickupAddrFromCenter, step]);
+
+  
+
+  useEffect(() => {
+    if (step === "dest_map" && destAddrFromCenter) {
+      setDest((d) => ({ ...d, address: destAddrFromCenter, latlng: centerLatLng }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [destAddrFromCenter, step]);
+
+ 
+
+  useEffect(() => {
+    const saved = loadSavedPlaces();
+    setSavedPlaces(saved);
+    try {
+      const sc = JSON.parse(localStorage.getItem('taxiShortcuts') || '{}');
+      setShortcuts({ home: sc.home || null, work: sc.work || null });
+    } catch {}
+
+    let mounted = true;
+
+    const ok = (pos) => {
+      if (!mounted) return;
+      const ll = [pos.coords.latitude, pos.coords.longitude];
+      setUserLoc(ll);
+      setPickup((p) => ({ ...p, latlng: ll }));
+    };
+    const fail = () => {
+      // fallback Nukus center
+      const ll = [42.4602, 59.6156];
+      setUserLoc(ll);
+      setPickup((p) => ({ ...p, latlng: ll }));
+    };
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(ok, fail, {
+        enableHighAccuracy: true,
+        timeout: 8000,
+        maximumAge: 2000,
+      });
+    } else {
+      fail();
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  
+
+  useEffect(() => {
+    if (!(step === "main" || step === "search")) return;
+    if (!centerLatLng) return;
+
+    // only update while in main/search; user can override via search list, but map move should update pickup
+    setPickup((p) => ({ ...p, latlng: centerLatLng, address: pickupAddrFromCenter || p.address }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickupAddrFromCenter]);
+
+  
+
+  useEffect(() => {
+    if (step !== "dest_map") return;
+    if (!centerLatLng) return;
+    setDest((d) => ({ ...d, latlng: centerLatLng, address: destAddrFromCenter || d.address }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [destAddrFromCenter]);
+
+  
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (step !== "route" && step !== "coming") return;
+      if (!pickup.latlng || !dest.latlng) {
+        setRoute(null);
+        return;
+      }
+      const pts = [pickup.latlng, ...waypoints.map((w) => w.latlng).filter(Boolean), dest.latlng];
+      const r = await osrmRouteMulti(pts);
+      if (!cancelled) setRoute(r);
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [step, pickup.latlng?.[0], pickup.latlng?.[1], dest.latlng?.[0], dest.latlng?.[1], waypoints.length]);
+
+  const distanceKm = useMemo(() => route?.distanceKm || (pickup.latlng && dest.latlng ? haversineKm(pickup.latlng, dest.latlng) : 0), [
+    route?.distanceKm,
+    pickup.latlng,
+    dest.latlng,
+  ]);
+  const durationMin = useMemo(() => route?.durationMin || (distanceKm ? distanceKm * 2 : 0), [route?.durationMin, distanceKm]);
+
+  const totalPrice = useMemo(() => {
+    const d = distanceKm || 0;
+    const p = (tariff.base + d * tariff.perKm) * (tariff.mult || 1);
+    return Math.round(p);
+  }, [distanceKm, tariff]);
+
+  
+
+
+  useEffect(() => {
+    if (!searchOpen) return;
+
+    const t = setTimeout(async () => {
+      const q = pickupSearchText.trim();
+      if (!q) {
+        setPickupResults([]);
+        return;
+      }
+      if (pickupAbortRef.current) pickupAbortRef.current.abort();
+      const ac = new AbortController();
+      pickupAbortRef.current = ac;
+      setSearchBusy(true);
+      const res = await nominatimSearch(q, ac.signal);
+      setPickupResults(res);
+      setSearchBusy(false);
+    }, 250);
+
+    return () => clearTimeout(t);
+  }, [pickupSearchText, searchOpen]);
+
+  
+
+  useEffect(() => {
+    let mounted = true;
+    const run = async () => {
+      try {
+        const saved = localStorage.getItem("activeOrderId");
+        if (saved) setOrderId(saved);
+
+        const res = await api.post("/api/order", { action: "active" });
+        const o = res?.data || res;
+        if (!mounted) return;
+        if (o?.id) {
+          setOrderId(String(o.id));
+          localStorage.setItem("activeOrderId", String(o.id));
+          setOrderStatus(o.status || o.order_status || "searching");
+          setPickup((p) => ({
+            ...p,
+            latlng: o.from_lat && o.from_lng ? [Number(o.from_lat), Number(o.from_lng)] : p.latlng,
+            address: o.pickup_location || p.address,
+          }));
+          if (o.to_lat && o.to_lng) {
+            setDest({ latlng: [Number(o.to_lat), Number(o.to_lng)], address: o.dropoff_location || "" });
+          }
+          if (o.status === "accepted" || o.status === "coming" || o.status === "arrived") {
+            setStep("coming");
+          } else if (o.status === "searching") {
+            setStep("searching");
+          } else {
+            setStep("main");
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+    run();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  
+
+  useEffect(() => {
+    if (!orderId) return;
+
+    let timer = null;
+    let alive = true;
+
+    const tick = async () => {
+      try {
+        const res = await api.post("/api/order", { action: "get", order_id: orderId });
+        if (!alive) return;
+        const o = res?.data || res;
+        const st = o?.status || o?.order_status;
+        if (st && st !== orderStatus) {
+          setOrderStatus(st);
+          if (st === "accepted") speak("Haydovchi topildi");
+          if (st === "arrived") speak("Haydovchi yetib keldi");
+          // Safar yakunlandi — reyting modalini ochish
+          if (st === "completed" || st === "done") {
+            speak("Safar yakunlandi. Rahmat!");
+            const drvId = o?.driver?.id || o?.driver_id || o?.assigned_driver_id || null;
+            const clientId = o?.client_user_id || o?.user_id || null;
+            setCompletedOrderForRating({
+              id: orderId,
+              driver_id: drvId,
+              client_user_id: clientId,
+            });
+            setRatingVisible(true);
+            // Cashback hisoblash: narxning 1%i
+            const price = Number(o?.price || o?.amount || o?.priceUzs || 0);
+            setEarnedBonus(Math.max(1, Math.floor(price * 0.01)));
+          }
+        }
+
+        const drv = o?.driver || o?.assigned_driver || o?.assignedDriver;
+        if (drv) {
+          setAssignedDriver({
+            first_name: drv.first_name || drv.name || "Haydovchi",
+            avatar_url: drv.avatar_url || drv.avatar || "",
+            car_model: drv.car_model || drv.car || "",
+            plate: drv.plate || drv.car_plate || "",
+            lat: Number(drv.lat ?? drv.driver_lat ?? drv.latitude),
+            lng: Number(drv.lng ?? drv.driver_lng ?? drv.longitude),
+            bearing: Number(drv.bearing ?? drv.heading ?? 0),
+            rating: Number(drv.rating ?? 4.8),
+            phone: drv.phone || "",
+          });
+        }
+
+        // ETA calc
+        if (assignedDriver?.lat && assignedDriver?.lng && pickup.latlng) {
+          const d = haversineKm([assignedDriver.lat, assignedDriver.lng], pickup.latlng);
+          setEtaMin(Math.max(1, Math.round(d * 3)));
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    tick();
+    const nextInterval = () => {
+      // Polling interval strategy to avoid heating the phone
+      // searching: 2s, driver found: 3.5s, trip: 8s
+      if (step === "searching" || orderStatus === "searching") return 2000;
+      if (orderStatus === "accepted" || orderStatus === "coming" || orderStatus === "arrived") return 3500;
+      if (orderStatus === "ontrip" || orderStatus === "in_trip") return 8000;
+      return 4000;
+    };
+
+    let stopped = false;
+    const loop = async () => {
+      if (stopped) return;
+      await tick();
+      if (stopped) return;
+      timer = setTimeout(loop, nextInterval());
+    };
+
+    loop();
+
+    return () => {
+      alive = false;
+      stopped = true;
+      if (timer) clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderId, pickup.latlng?.[0], pickup.latlng?.[1], orderStatus, step]);
+
+  /** searching state: simulate nearby cars + dispatch cycling (visual only, backend dispatch can be added later) */
+  useEffect(() => {
+    if (step !== "searching") return;
+    if (!pickup.latlng) return;
+
+    // create fake cars around pickup if backend not returning
+    const baseLat = pickup.latlng[0];
+    const baseLng = pickup.latlng[1];
+
+    const cars = Array.from({ length: 6 }).map((_, i) => {
+      const ang = (i / 6) * Math.PI * 2;
+      const r = 0.006 + Math.random() * 0.01;
+      return {
+        id: "c" + i,
+        lat: baseLat + Math.cos(ang) * r,
+        lng: baseLng + Math.sin(ang) * r,
+        bearing: Math.random() * 360,
+      };
+    });
+
+    setNearCars(cars);
+    setDispatchIdx(0);
+
+    let t = null;
+    t = setInterval(() => {
+      setDispatchIdx((x) => (x + 1) % cars.length);
+    }, 1800);
+
+    return () => {
+      if (t) clearInterval(t);
+    };
+  }, [step, pickup.latlng]);
+
+  
+
+  useEffect(() => {
+    if (step !== "coming") return;
+    const map = mapRef.current;
+    if (!map) return;
+    if (assignedDriver?.lat && assignedDriver?.lng) {
+      map.flyTo([assignedDriver.lat, assignedDriver.lng], clamp(map.getZoom() || 15, 14, 17), { duration: 0.6 });
+    }
+  }, [step, assignedDriver?.lat, assignedDriver?.lng]);
+
+  
+
+
+  
+  useEffect(() => {
+    if (step === "route" && scrollTariffOnOpenRef.current) {
+      scrollTariffOnOpenRef.current = false;
+      setTimeout(() => {
+        try { tariffSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch {}
+      }, 50);
+    }
+  }, [step]);
+
+
+
     return (
       <div className={"yg-center-pin " + (isDraggingMap ? "lift" : "")}>
         <div
@@ -1946,41 +1935,35 @@ const RouteSheet = (
       <div className="yg-wave" />
       <div className="yg-wave" />
       <div className="yg-wave" />
-      {safeDispatchLine.length > 1 ? (
-        <Polyline positions={safeDispatchLine} pathOptions={{ weight: 4, opacity: 0.65, dashArray: "8 10" }} />
-      ) : null}
-      {nearCars.map((c, idx) => {
-        const pos = normalizeLatLng([toNum(c.lat), toNum(c.lng)]);
-        if (!pos) return null;
-        return (
-          <VehicleMarker
-            key={c.id}
-            position={pos}
-            bearing={c.bearing}
-            label={idx === dispatchIdx ? `${Math.max(1, Math.round(durationMin / 2))} daq` : undefined}
-            color={idx === dispatchIdx ? "#f6c200" : "#ddd"}
-            durationMs={700}
-          />
-        );
-      })}
+      {dispatchLine ? <Polyline positions={dispatchLine} pathOptions={{ weight: 4, opacity: 0.65, dashArray: "8 10" }} /> : null}
+      {nearCars.map((c, idx) => (
+        <VehicleMarker
+          key={c.id}
+          position={[c.lat, c.lng]}
+          bearing={c.bearing}
+          label={idx === dispatchIdx ? `${Math.max(1, Math.round(durationMin / 2))} daq` : undefined}
+          color={idx === dispatchIdx ? "#f6c200" : "#ddd"}
+          durationMs={700}
+        />
+      ))}
     </>
   ) : null;
 
   /** driver overlay in coming */
-  const DriverOverlay = step === "coming" && driverPos ? (
+  const DriverOverlay = step === "coming" && assignedDriver?.lat && assignedDriver?.lng ? (
     <>
       <VehicleMarker
-        position={driverPos}
-        bearing={assignedDriver?.bearing}
+        position={[assignedDriver.lat, assignedDriver.lng]}
+        bearing={assignedDriver.bearing}
         label={etaMin ? `${etaMin} daq` : undefined}
         color="#f6c200"
         durationMs={800}
       />
-      {safePickup ? (
+      {pickup.latlng ? (
         <Polyline
           positions={[
-            driverPos,
-            safePickup,
+            [assignedDriver.lat, assignedDriver.lng],
+            pickup.latlng,
           ]}
           pathOptions={{ weight: 6, opacity: 0.9 }}
         />
@@ -2002,7 +1985,7 @@ const RouteSheet = (
   const MapUI = (
     <TaxiMap
       mapRef={mapRef}
-      center={safePickup || userLoc || [42.4602, 59.6156]}
+      center={pickup.latlng || userLoc || [42.4602, 59.6156]}
       mapTile={mapTile}
       step={step}
       userLoc={userLoc}
@@ -2080,4 +2063,3 @@ const RouteSheet = (
   );
 }
   
-
