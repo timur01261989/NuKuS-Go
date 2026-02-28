@@ -153,9 +153,8 @@ async function osrmRouteMulti(points /* [[lat,lng], ...] */) {
     console.warn("OSRM yo'nalish chizishda xatolik:", e);
   }
   // Fallback: Agar yo'nalish chizib bo'lmasa, to'g'ri chiziq chizamiz
-  const from = points && points.length ? points[0] : null;
-  const to = points && points.length ? points[points.length - 1] : null;
-  if (!from || !to) return null;
+  const from = points[0];
+  const to = points[points.length - 1];
   return {
     coords: [from, to],
     distanceKm: haversineKm(from, to),
@@ -726,7 +725,7 @@ useEffect(() => {
 useEffect(() => {
     if (step !== "searching") return;
     if (!pickup.latlng) return;
-    if (!Array.isArray(nearCars) || nearCars.length === 0) return;
+    if (!nearCars.length) return;
     const c = nearCars[dispatchIdx];
     if (!c) return;
     setDispatchLine([[c.lat, c.lng], pickup.latlng]);
@@ -897,7 +896,7 @@ useEffect(() => {
             Ish
           </Button>
         </div>
-        {(Array.isArray(savedPlaces) ? savedPlaces.length : 0) === 0 ? (
+        {savedPlaces.length === 0 ? (
           <div style={{ fontSize: 12, opacity: 0.55, padding: "8px 0" }}>Hozircha saqlangan manzil yo‘q</div>
         ) : (
           <div className="yg-saved">
@@ -1013,12 +1012,12 @@ const RouteSheet = (
               icon={<PlusOutlined />}
               className="yg-chip"
               onClick={() => { setAddStopOpen(true); setStep('stop_map'); }}
-              disabled={(Array.isArray(waypoints) ? waypoints.length : 0) >= 3}
+              disabled={waypoints.length >= 3}
             >
               +
             </Button>
           </div>
-          {(Array.isArray(waypoints) ? waypoints.length : 0) === 0 ? (
+          {waypoints.length === 0 ? (
             <div style={{ fontSize: 12, opacity: 0.55, marginTop: 4 }}>Hozircha yo‘q</div>
           ) : (
             <div style={{ marginTop: 6 }}>
@@ -1559,6 +1558,16 @@ const RouteSheet = (
     const isPickup = step === "main" || step === "search";
     const isDest = step === "dest_map";
     if (!isPickup && !isDest) return null;
+    const label = isPickup ? "Qayerdan?" : "Qayerga?";
+    return (
+      <div className="yg-pin-wrap" aria-hidden="true">
+        <div className="yg-pin">
+          <span className="material-symbols-outlined">location_on</span>
+        </div>
+        <div className="yg-pin-badge">{label}</div>
+      </div>
+    );
+  }, [step]);
 
   // --- Effects (moved here to avoid TDZ / init order crashes in production) ---
 
@@ -1684,7 +1693,7 @@ const RouteSheet = (
     return () => {
       cancelled = true;
     };
-  }, [step, pickup.latlng?.[0], pickup.latlng?.[1], dest.latlng?.[0], dest.latlng?.[1], (Array.isArray(waypoints)?waypoints.length:0)]);
+  }, [step, pickup.latlng?.[0], pickup.latlng?.[1], dest.latlng?.[0], dest.latlng?.[1], waypoints.length]);
 
   const distanceKm = useMemo(() => route?.distanceKm || (pickup.latlng && dest.latlng ? haversineKm(pickup.latlng, dest.latlng) : 0), [
     route?.distanceKm,
@@ -1878,7 +1887,7 @@ const RouteSheet = (
 
     let t = null;
     t = setInterval(() => {
-      setDispatchIdx((x) => (x + 1) % ((Array.isArray(cars) && cars.length) ? cars.length : 1));
+      setDispatchIdx((x) => (x + 1) % cars.length);
     }, 1800);
 
     return () => {
