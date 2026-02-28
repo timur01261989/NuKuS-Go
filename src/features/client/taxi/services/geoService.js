@@ -1,34 +1,27 @@
-// src/features/client/taxi/services/geoService.js
-import { haversineKm } from "../../shared/geo/haversine";
-import { nominatimReverse as _nominatimReverse } from "../../shared/nominatim/reverse";
-
 /**
- * OSRM multi-stop route (pickup -> [stops...] -> dest)
+ * Haversine distance calculation (km)
  */
-export async function osrmRouteMulti(points, { signal } = {}) {
-  if (!Array.isArray(points) || points.length < 2) return null;
-  const coords = points
-    .filter(Boolean)
-    .map((p) => Array.isArray(p) ? p : [p.lat, p.lng])
-    .map(([lat, lng]) => `${lng},${lat}`)
-    .join(";");
+export function haversineKm(a, b) {
+  if (!a || !b) return 0;
 
-  const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=false`;
-  const res = await fetch(url, { signal });
-  if (!res.ok) throw new Error(`OSRM route failed: ${res.status}`);
-  const data = await res.json();
-  const r = data?.routes?.[0];
-  if (!r?.geometry?.coordinates) return null;
+  const toRad = (v) => (v * Math.PI) / 180;
 
-  const routeCoords = r.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
-  const distanceKm = (r.distance || 0) / 1000;
-  const durationMin = (r.duration || 0) / 60;
-  return { coords: routeCoords, distanceKm, durationMin };
+  const R = 6371;
+  const dLat = toRad(b[0] - a[0]);
+  const dLng = toRad(b[1] - a[1]);
+
+  const lat1 = toRad(a[0]);
+  const lat2 = toRad(b[0]);
+
+  const sin1 = Math.sin(dLat / 2) ** 2;
+  const sin2 = Math.sin(dLng / 2) ** 2;
+
+  const c =
+    2 *
+    Math.atan2(
+      Math.sqrt(sin1 + Math.cos(lat1) * Math.cos(lat2) * sin2),
+      Math.sqrt(1 - (sin1 + Math.cos(lat1) * Math.cos(lat2) * sin2))
+    );
+
+  return R * c;
 }
-
-export async function nominatimReverse(lat, lon, { signal } = {}) {
-  // Nominatim reverse expects lat/lon
-  return _nominatimReverse(lat, lon, { signal });
-}
-
-export { haversineKm };
