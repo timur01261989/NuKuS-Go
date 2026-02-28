@@ -60,7 +60,7 @@ async function nominatimReverse(lat, lng, signal) {
 }
 
 // Backward-compatible signature (q, signal)
-async function _nominatimSearchWrapper(q, signal) {
+async function nominatimSearch(q, signal) {
   return _nominatimSearch(q, { signal });
 }
 
@@ -1146,6 +1146,7 @@ export default function ClientTaxiPage() {
           }
         }}
       />
+      */}
       <div style={{ flex: 1 }} />
       {headerRight}
     </div>
