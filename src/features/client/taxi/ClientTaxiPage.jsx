@@ -620,7 +620,20 @@ useEffect(() => {
   );
 
 
-  /** order create (destination optional) */
+  const distanceKm = useMemo(() => route?.distanceKm || (pickup.latlng && dest.latlng ? haversineKm(pickup.latlng, dest.latlng) : 0), [
+    route?.distanceKm,
+    pickup.latlng,
+    dest.latlng,
+  ]);
+  const durationMin = useMemo(() => route?.durationMin || (distanceKm ? distanceKm * 2 : 0), [route?.durationMin, distanceKm]);
+
+  const totalPrice = useMemo(() => {
+    const d = distanceKm || 0;
+    const p = (tariff.base + d * tariff.perKm) * (tariff.mult || 1);
+    return Math.round(p);
+  }, [distanceKm, tariff]);
+
+/** order create (destination optional) */
   const handleOrderCreate = useCallback(async () => {
     if (!pickup.latlng) {
       message.error("Yo'lovchini olish nuqtasi aniqlanmadi");
@@ -1685,19 +1698,7 @@ const RouteSheet = (
     };
   }, [step, pickup.latlng?.[0], pickup.latlng?.[1], dest.latlng?.[0], dest.latlng?.[1], waypoints.length]);
 
-  const distanceKm = useMemo(() => route?.distanceKm || (pickup.latlng && dest.latlng ? haversineKm(pickup.latlng, dest.latlng) : 0), [
-    route?.distanceKm,
-    pickup.latlng,
-    dest.latlng,
-  ]);
-  const durationMin = useMemo(() => route?.durationMin || (distanceKm ? distanceKm * 2 : 0), [route?.durationMin, distanceKm]);
-
-  const totalPrice = useMemo(() => {
-    const d = distanceKm || 0;
-    const p = (tariff.base + d * tariff.perKm) * (tariff.mult || 1);
-    return Math.round(p);
-  }, [distanceKm, tariff]);
-
+  
   
 
 
