@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { message } from "antd";
 import api from "@/utils/apiHelper";
-import { haversineKm } from "../shared/geo/haversine";
+import { haversineKm } from "../../shared/geo/haversine";
 import { nominatimReverse as _nominatimReverse } from "../../shared/geo/nominatim";
 
 // Constants
