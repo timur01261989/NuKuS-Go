@@ -60,7 +60,7 @@ import {
   tileNight,
   MAX_KM,
   savePlace,
-} from "./useTaxiOrder";
+} from "./hooks/useTaxiOrder";
 
 const { Text } = Typography;
 
