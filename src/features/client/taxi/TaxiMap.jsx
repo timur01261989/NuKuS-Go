@@ -49,6 +49,7 @@ export default function TaxiMap({
   mapTile,
   step,
   userLoc,
+  onRequestLocate,
   mapBottom = 240,
   onCenterChange,
   onMoveStart,
@@ -87,7 +88,7 @@ export default function TaxiMap({
 
       {centerPin}
 
-      <LocateButton mapRef={mapRef} userLoc={userLoc} bottom={mapBottom} />
+      <LocateButton mapRef={mapRef} userLoc={userLoc} onRequestLocate={onRequestLocate} bottom={mapBottom} />
     </div>
   );
 }

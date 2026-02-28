@@ -7,7 +7,7 @@ import { AimOutlined } from "@ant-design/icons";
  * - "Mening joylashuvim" tugmasi (🎯)
  * - Bosilganda xarita userLoc ga flyTo qiladi
  */
-export default function LocateButton({ mapRef, userLoc, bottom = 240 }) {
+export default function LocateButton({ mapRef, userLoc, onRequestLocate, bottom = 240 }) {
   return (
     <div style={{ position: "absolute", right: 16, bottom, zIndex: 800 }}>
       <Button
@@ -17,7 +17,11 @@ export default function LocateButton({ mapRef, userLoc, bottom = 240 }) {
         style={{ boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}
         onClick={() => {
           const map = mapRef?.current;
-          if (map && userLoc) map.flyTo(userLoc, 16, { duration: 0.6 });
+          if (map && userLoc) {
+            map.flyTo(userLoc, 16, { duration: 0.6 });
+            return;
+          }
+          onRequestLocate?.();
         }}
       />
     </div>

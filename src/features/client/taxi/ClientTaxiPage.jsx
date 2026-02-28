@@ -20,6 +20,8 @@ import {
 } from "antd";
 import {
   AimOutlined,
+  HomeOutlined,
+  BankOutlined,
   ArrowLeftOutlined,
   CarOutlined,
   CheckOutlined,
@@ -46,12 +48,20 @@ import TaxiSearchSheet from "./TaxiSearchSheet";
 import DestinationPicker from "./DestinationPicker";
 import { haversineKm } from "../shared/geo/haversine";
 import { nominatimReverse as _nominatimReverse } from "../shared/geo/nominatim";
+import { nominatimSearch as _nominatimSearch } from "../shared/geo/nominatim";
+import AutoMarketAdsPanel from "./components/AutoMarketAdsPanel";
+import { listMarketCars } from "../../../services/marketService.js";
 import RatingModal from "@features/shared/components/RatingModal";
 import ClientBonusWidget from "@/features/client/components/ClientBonusWidget";
 
 // Backward-compatible signature (lat, lng, signal)
 async function nominatimReverse(lat, lng, signal) {
   return _nominatimReverse(lat, lng, { signal });
+}
+
+// Backward-compatible signature (q, signal)
+async function nominatimSearch(q, signal) {
+  return _nominatimSearch(q, { signal });
 }
 
 /**
@@ -257,7 +267,29 @@ function LocateMeButton({ mapRef, userLoc, bottom = 240 }) {
         style={{ boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}
         onClick={() => {
           const map = mapRef.current;
-          if (map && userLoc) map.flyTo(userLoc, 16, { duration: 0.6 });
+          // If we already have a location — just center the map
+          if (map && userLoc) {
+            map.flyTo(userLoc, 16, { duration: 0.6 });
+            return;
+          }
+          // Otherwise request location now (user may have granted permission after initial load)
+          if (!navigator.geolocation) {
+            message.error("Geolokatsiya mavjud emas");
+            return;
+          }
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const ll = [pos.coords.latitude, pos.coords.longitude];
+              setUserLoc(ll);
+              // Keep pickup in sync with the real device location (does not change flow)
+              setPickup((p) => ({ ...p, latlng: ll }));
+              if (map) map.flyTo(ll, 16, { duration: 0.6 });
+            },
+            () => {
+              message.error("Joylashuvni aniqlab bo‘lmadi");
+            },
+            { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+          );
         }}
       />
     </div>
@@ -265,6 +297,15 @@ function LocateMeButton({ mapRef, userLoc, bottom = 240 }) {
 }
 
 /** --- local saved addresses --- */
+/** --- my addresses (savedAddresses_v1) --- */
+function loadMyAddressesV1() {
+  try {
+    const raw = localStorage.getItem("savedAddresses_v1");
+    const arr = raw ? JSON.parse(raw) : [];
+    if (Array.isArray(arr)) return arr;
+  } catch {}
+  return [];
+}
 function loadSavedPlaces() {
   try {
     const raw = localStorage.getItem("client_saved_places");
@@ -298,12 +339,72 @@ function speak(text) {
 /** --- main component --- */
 export default function ClientTaxiPage() {
   const mapRef = useRef(null);
+  const tariffSectionRef = useRef(null);
+  const scrollTariffOnOpenRef = useRef(false);
 
   // theme
   const [darkMode, setDarkMode] = useState(false);
 
   // flow
   const [step, setStep] = useState("main"); // main | search | dest_map | route | searching | coming
+
+  // --- mobile BACK handling: rely on phone back button, not UI back arrow ---
+  const isPopNavRef = useRef(false);
+  const stepRef = useRef(step);
+  useEffect(() => { stepRef.current = step; }, [step]);
+
+  useEffect(() => {
+    // Push an entry for in-page flow steps so phone back button returns inside the flow first.
+    // We avoid pushing for the initial mount.
+    const st = { __taxiStep: step };
+    if (!isPopNavRef.current) {
+      try {
+        window.history.pushState(st, "");
+      } catch {}
+    }
+    isPopNavRef.current = false;
+  }, [step]);
+
+  useEffect(() => {
+    const onPop = (e) => {
+      // Mark this navigation as popstate-driven to avoid pushState loop
+      isPopNavRef.current = true;
+
+      const cur = stepRef.current;
+
+      // Step back inside the taxi flow
+      if (cur === "stop_map") { setStep("route"); return; }
+      if (cur === "searching" || cur === "coming") { setStep("route"); return; }
+      if (cur === "route") { setStep("main"); return; }
+      if (cur === "dest_map") { setStep("search"); return; }
+      if (cur === "search") { setStep("main"); return; }
+
+      // If already at main — allow browser to go to previous page
+      // (Do nothing here; browser will handle it naturally)
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  const requestLocateNow = useCallback(() => {
+    if (!navigator.geolocation) {
+      message.error("Geolokatsiya mavjud emas");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const ll = [pos.coords.latitude, pos.coords.longitude];
+        setUserLoc(ll);
+        setPickup((p) => ({ ...p, latlng: ll }));
+        const map = mapRef.current;
+        if (map) map.flyTo(ll, 16, { duration: 0.6 });
+      },
+      () => {
+        message.error("Joylashuvni aniqlab bo‘lmadi");
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+    );
+  }, []);
   const [loading, setLoading] = useState(false);
 
   // locations
@@ -368,6 +469,12 @@ export default function ClientTaxiPage() {
 
   // saved places
   const [savedPlaces, setSavedPlaces] = useState([]);
+
+  // my addresses (Uy/Ish) from MyAddresses page
+  const [myAddressesV1, setMyAddressesV1] = useState(() => loadMyAddressesV1());
+  const homeAddr = useMemo(() => myAddressesV1.find(x => String(x?.label || '').toLowerCase() === 'uy') || null, [myAddressesV1]);
+  const workAddr = useMemo(() => myAddressesV1.find(x => String(x?.label || '').toLowerCase() === 'ish') || null, [myAddressesV1]);
+
 
   // route preview
   const [route, setRoute] = useState(null); // {coords, distanceKm, durationMin}
@@ -649,6 +756,34 @@ export default function ClientTaxiPage() {
     setAddStopOpen(false);
     message.success("Oraliq bekat qo'shildi");
   }, [centerLatLng, step, destAddrFromCenter, pickupAddrFromCenter]);
+
+  // Select destination from a plain address string (Uy/Ish from "Mening manzillarim")
+  const applyDestinationFromAddressString = useCallback(
+    async (addressStr) => {
+      const q = String(addressStr || "").trim();
+      if (!q) return;
+      try {
+        const results = await nominatimSearch(q);
+        const first = Array.isArray(results) ? results[0] : null;
+        if (!first) {
+          message.error("Manzil topilmadi");
+          return;
+        }
+        const ll = [Number(first.lat), Number(first.lon)];
+        const addr = first.display_name || q;
+        setDest({ latlng: ll, address: addr });
+        setSearchQuery(addr);
+        setSearchOpen(false);
+        // Keep pickup, then show route preview
+        if (pickup?.latlng) setStep("route");
+        else setStep("main");
+      } catch (e) {
+        message.error("Manzilni aniqlab bo‘lmadi");
+      }
+    },
+    [pickup?.latlng]
+  );
+
 
   /** order create (destination optional) */
   const handleOrderCreate = useCallback(async () => {
@@ -984,6 +1119,9 @@ export default function ClientTaxiPage() {
   /** render header */
   const Header = (
     <div className="yg-header">
+      <div style={{ width: 40, height: 40 }} />
+      {/* back button removed: use phone back */}
+      {/*
       <Button
         shape="circle"
         icon={<ArrowLeftOutlined />}
@@ -1072,6 +1210,24 @@ export default function ClientTaxiPage() {
       {/* My saved addresses */}
       <div style={{ marginTop: 10 }}>
         <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Mening manzillarim</div>
+        <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+          <Button
+            icon={<HomeOutlined />}
+            style={{ flex: 1, borderRadius: 12 }}
+            disabled={!homeAddr}
+            onClick={() => applyDestinationFromAddressString(homeAddr?.address)}
+          >
+            Uy
+          </Button>
+          <Button
+            icon={<BankOutlined />}
+            style={{ flex: 1, borderRadius: 12 }}
+            disabled={!workAddr}
+            onClick={() => applyDestinationFromAddressString(workAddr?.address)}
+          >
+            Ish
+          </Button>
+        </div>
         {savedPlaces.length === 0 ? (
           <div style={{ fontSize: 12, opacity: 0.55, padding: "8px 0" }}>Hozircha saqlangan manzil yo‘q</div>
         ) : (
@@ -1094,7 +1250,15 @@ export default function ClientTaxiPage() {
         <Button className="yg-blue" type="primary" onClick={handleOrderCreate}>
           Buyurtma berish
         </Button>
-        <Button className="yg-round" icon={<CarOutlined />} onClick={() => message.info("Tarif sozlamalari tez kunda")} />
+        <Button className="yg-round" icon={<CarOutlined />} onClick={() => {
+            // Open tariff selector (scroll to tariffs section)
+            if (step !== "route") {
+              scrollTariffOnOpenRef.current = true;
+              setStep("route");
+              return;
+            }
+            try { tariffSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch {}
+          }} />
       </div>
     </div>
   );
@@ -1147,7 +1311,17 @@ export default function ClientTaxiPage() {
     />
   );
 
-  const RouteSheet = (
+  
+  useEffect(() => {
+    if (step === "route" && scrollTariffOnOpenRef.current) {
+      scrollTariffOnOpenRef.current = false;
+      setTimeout(() => {
+        try { tariffSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch {}
+      }, 50);
+    }
+  }, [step]);
+
+const RouteSheet = (
     <div className="yg-sheet">
       <div className="yg-route-top">
         <div className="yg-route-row">
@@ -1180,7 +1354,7 @@ export default function ClientTaxiPage() {
               size="small"
               icon={<PlusOutlined />}
               className="yg-chip"
-              onClick={() => setAddStopOpen(true)}
+              onClick={() => { setAddStopOpen(true); setStep('stop_map'); }}
               disabled={waypoints.length >= 3}
             >
               +
@@ -1211,11 +1385,23 @@ export default function ClientTaxiPage() {
 
         <Divider style={{ margin: "12px 0" }} />
 
-        {/* tabs */}
-        <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 10 }}>
-          <div style={{ fontSize: 12, opacity: 0.7 }}>Navigator</div>
-          <div style={{ fontSize: 12, opacity: 0.7 }}>Transport</div>
-          <div className="yg-tab">Taksi va Yetkazish</div>
+        {/* header actions */}
+        <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
+          <Button
+            size="small"
+            style={{ borderRadius: 999 }}
+            icon={<ShareAltOutlined />}
+            onClick={() => {
+              const p = pickup?.latlng;
+              const d = dest?.latlng;
+              if (!p || !d) { message.info("Manzil tanlang"); return; }
+              const url = `https://www.google.com/maps/dir/?api=1&origin=${p[0]},${p[1]}&destination=${d[0]},${d[1]}`;
+              window.open(url, "_blank", "noopener,noreferrer");
+            }}
+          >
+            Navigator
+          </Button>
+          <div className="yg-tab">Yetkazish xizmati</div>
         </div>
 
         <div className="yg-tariffs">
@@ -1257,13 +1443,7 @@ export default function ClientTaxiPage() {
           )}
 
           <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-            <Button
-              icon={<SettingOutlined />}
-              onClick={() => setWishesOpen(true)}
-              style={{ flex: 1, borderRadius: 12 }}
-            >
-              Istaklar
-            </Button>
+            {/* "Istaklar" removed — keep only schedule and "kim uchun" */}
             <Button
               icon={<ClockCircleOutlined />}
               onClick={() => setScheduleOpen(true)}
@@ -1303,6 +1483,15 @@ export default function ClientTaxiPage() {
         <Button className="yg-gray" onClick={() => message.info("Tafsilotlar keyin qo'shiladi")}>
           Tafsilotlar
         </Button>
+      </div>
+
+      <div style={{ marginTop: 14 }}>
+        <AutoMarketAdsPanel
+          title="Avto savdo e’lonlari"
+          mode="waiting"
+          onOpenAd={(id) => navigate(`/auto-market/ad/${id}`)}
+          fetchAds={listMarketCars}
+        />
       </div>
     </div>
   );
@@ -1346,6 +1535,13 @@ export default function ClientTaxiPage() {
 
       <Divider style={{ margin: "12px 0" }} />
 
+      <AutoMarketAdsPanel
+        title="Avto savdo e’lonlari"
+        mode="waiting"
+        onOpenAd={(id) => navigate(`/auto-market/ad/${id}`)}
+        fetchAds={listMarketCars}
+      />
+
       <div className="yg-cancel-link" onClick={handleCancel}>
         Safarni bekor qilish
       </div>
@@ -1359,24 +1555,70 @@ export default function ClientTaxiPage() {
     </div>
   );
 
-  /** add-stop modal */
-  const AddStopModal = (
-    <Modal
-      open={addStopOpen}
-      onCancel={() => setAddStopOpen(false)}
-      onOk={addStopFromCenter}
-      okText="Hozirgi joydan qo'shish"
-      cancelText="Bekor"
-      title="Oraliq bekat qo'shish"
+  /** oraliq bekat tanlash overlay (Modal emas — z-index muammosini yo‘q qiladi) */
+  const StopPickerOverlay = (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 2500,
+        display: step === "stop_map" && addStopOpen ? "flex" : "none",
+        flexDirection: "column",
+        justifyContent: "flex-end",
+        background: "rgba(0,0,0,0.15)",
+      }}
+      onClick={() => {
+        // tap outside closes
+        setAddStopOpen(false);
+        setStep("route");
+      }}
     >
-      <div style={{ opacity: 0.75, marginBottom: 10 }}>
-        Xaritani kerakli joyga olib boring, so‘ng "Hozirgi joydan qo‘shish"ni bosing.
+      <div
+        style={{
+          background: "#fff",
+          borderTopLeftRadius: 18,
+          borderTopRightRadius: 18,
+          padding: 14,
+          boxShadow: "0 -8px 30px rgba(0,0,0,0.25)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 6 }}>Oraliq bekat qo‘shish</div>
+        <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 10 }}>
+          Xaritani kerakli joyga olib boring, so‘ng “Qo‘shish”ni bosing.
+        </div>
+        <div className="yg-small-box" style={{ marginBottom: 12 }}>
+          {(destAddrFromCenter || pickupAddrFromCenter) || "Manzil aniqlanmoqda..."}
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <Button
+            style={{ flex: 1, borderRadius: 12 }}
+            onClick={() => {
+              setAddStopOpen(false);
+              setStep("route");
+            }}
+          >
+            Bekor
+          </Button>
+          <Button
+            type="primary"
+            style={{ flex: 1, borderRadius: 12, background: "#000", borderColor: "#000" }}
+            onClick={() => {
+              addStopFromCenter();
+              setStep("route");
+            }}
+          >
+            Qo‘shish
+          </Button>
+        </div>
       </div>
-      <div className="yg-small-box">{(step === "dest_map" ? destAddrFromCenter : pickupAddrFromCenter) || "Manzil aniqlanmoqda..."}</div>
-    </Modal>
+    </div>
   );
 
-  /** podyezd modal */
+  /** add-stop modal (eski) — endi ishlatilmaydi, lekin kod saqlangan */
+  const AddStopModal = null;
+
+/** podyezd modal */
   const PodyezdModal = (
     <Modal
       open={podyezdOpen}
@@ -1736,6 +1978,7 @@ export default function ClientTaxiPage() {
       mapTile={mapTile}
       step={step}
       userLoc={userLoc}
+      onRequestLocate={requestLocateNow}
       mapBottom={mapBottom}
       onCenterChange={(ll) => setCenterLatLng(ll)}
       onMoveStart={() => setIsDraggingMap(true)}
@@ -1762,7 +2005,7 @@ export default function ClientTaxiPage() {
       {step === "coming" && ComingSheet}
 
       {SearchDrawer}
-      {AddStopModal}
+      {StopPickerOverlay}
       {PodyezdModal}
       {WishesModal}
       {ScheduleModal}
@@ -1808,3 +2051,12 @@ export default function ClientTaxiPage() {
     </div>
   );
 }
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e?.key === "savedAddresses_v1") setMyAddressesV1(loadMyAddressesV1());
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+
