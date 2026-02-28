@@ -153,8 +153,9 @@ async function osrmRouteMulti(points /* [[lat,lng], ...] */) {
     console.warn("OSRM yo'nalish chizishda xatolik:", e);
   }
   // Fallback: Agar yo'nalish chizib bo'lmasa, to'g'ri chiziq chizamiz
-  const from = points[0];
-  const to = points[points.length - 1];
+  const from = points && points.length ? points[0] : null;
+  const to = points && points.length ? points[points.length - 1] : null;
+  if (!from || !to) return null;
   return {
     coords: [from, to],
     distanceKm: haversineKm(from, to),
@@ -620,20 +621,7 @@ useEffect(() => {
   );
 
 
-  const distanceKm = useMemo(() => route?.distanceKm || (pickup.latlng && dest.latlng ? haversineKm(pickup.latlng, dest.latlng) : 0), [
-    route?.distanceKm,
-    pickup.latlng,
-    dest.latlng,
-  ]);
-  const durationMin = useMemo(() => route?.durationMin || (distanceKm ? distanceKm * 2 : 0), [route?.durationMin, distanceKm]);
-
-  const totalPrice = useMemo(() => {
-    const d = distanceKm || 0;
-    const p = (tariff.base + d * tariff.perKm) * (tariff.mult || 1);
-    return Math.round(p);
-  }, [distanceKm, tariff]);
-
-/** order create (destination optional) */
+  /** order create (destination optional) */
   const handleOrderCreate = useCallback(async () => {
     if (!pickup.latlng) {
       message.error("Yo'lovchini olish nuqtasi aniqlanmadi");
@@ -738,7 +726,7 @@ useEffect(() => {
 useEffect(() => {
     if (step !== "searching") return;
     if (!pickup.latlng) return;
-    if (!nearCars.length) return;
+    if (!Array.isArray(nearCars) || nearCars.length === 0) return;
     const c = nearCars[dispatchIdx];
     if (!c) return;
     setDispatchLine([[c.lat, c.lng], pickup.latlng]);
@@ -909,7 +897,7 @@ useEffect(() => {
             Ish
           </Button>
         </div>
-        {savedPlaces.length === 0 ? (
+        {(Array.isArray(savedPlaces) ? savedPlaces.length : 0) === 0 ? (
           <div style={{ fontSize: 12, opacity: 0.55, padding: "8px 0" }}>Hozircha saqlangan manzil yo‘q</div>
         ) : (
           <div className="yg-saved">
@@ -1025,12 +1013,12 @@ const RouteSheet = (
               icon={<PlusOutlined />}
               className="yg-chip"
               onClick={() => { setAddStopOpen(true); setStep('stop_map'); }}
-              disabled={waypoints.length >= 3}
+              disabled={(Array.isArray(waypoints) ? waypoints.length : 0) >= 3}
             >
               +
             </Button>
           </div>
-          {waypoints.length === 0 ? (
+          {(Array.isArray(waypoints) ? waypoints.length : 0) === 0 ? (
             <div style={{ fontSize: 12, opacity: 0.55, marginTop: 4 }}>Hozircha yo‘q</div>
           ) : (
             <div style={{ marginTop: 6 }}>
@@ -1696,9 +1684,21 @@ const RouteSheet = (
     return () => {
       cancelled = true;
     };
-  }, [step, pickup.latlng?.[0], pickup.latlng?.[1], dest.latlng?.[0], dest.latlng?.[1], waypoints.length]);
+  }, [step, pickup.latlng?.[0], pickup.latlng?.[1], dest.latlng?.[0], dest.latlng?.[1], (Array.isArray(waypoints)?waypoints.length:0)]);
 
-  
+  const distanceKm = useMemo(() => route?.distanceKm || (pickup.latlng && dest.latlng ? haversineKm(pickup.latlng, dest.latlng) : 0), [
+    route?.distanceKm,
+    pickup.latlng,
+    dest.latlng,
+  ]);
+  const durationMin = useMemo(() => route?.durationMin || (distanceKm ? distanceKm * 2 : 0), [route?.durationMin, distanceKm]);
+
+  const totalPrice = useMemo(() => {
+    const d = distanceKm || 0;
+    const p = (tariff.base + d * tariff.perKm) * (tariff.mult || 1);
+    return Math.round(p);
+  }, [distanceKm, tariff]);
+
   
 
 
@@ -1878,7 +1878,7 @@ const RouteSheet = (
 
     let t = null;
     t = setInterval(() => {
-      setDispatchIdx((x) => (x + 1) % cars.length);
+      setDispatchIdx((x) => (x + 1) % ((Array.isArray(cars) && cars.length) ? cars.length : 1));
     }, 1800);
 
     return () => {
