@@ -25,6 +25,7 @@ const ClientOrders = lazy(() => import("./pages/ClientOrders"));
 const DriverPending = lazy(() => import("./pages/DriverPending"));
 
 // --- CLIENT ---
+const ErrorBoundary = lazy(() => import("@/components/ErrorBoundary"));
 const ClientHome = lazy(() => import("@features/client/pages/ClientHome"));
 const ClientWallet = lazy(() => import("@features/client/pages/ClientWallet"));
 const ClientProfile = lazy(() => import("@features/client/pages/ClientProfile"));
