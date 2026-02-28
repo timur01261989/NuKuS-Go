@@ -1,27 +1,48 @@
-/**
- * Haversine distance calculation (km)
- */
+// src/features/client/taxi/services/geoService.js
+// Geo utilitlar: masofa, reverse geocoding (Nominatim)
+
 export function haversineKm(a, b) {
   if (!a || !b) return 0;
-
-  const toRad = (v) => (v * Math.PI) / 180;
+  const lat1 = Number(a[0]);
+  const lon1 = Number(a[1]);
+  const lat2 = Number(b[0]);
+  const lon2 = Number(b[1]);
+  if (![lat1, lon1, lat2, lon2].every((n) => Number.isFinite(n))) return 0;
 
   const R = 6371;
-  const dLat = toRad(b[0] - a[0]);
-  const dLng = toRad(b[1] - a[1]);
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const sLat1 = toRad(lat1);
+  const sLat2 = toRad(lat2);
 
-  const lat1 = toRad(a[0]);
-  const lat2 = toRad(b[0]);
+  const h =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(sLat1) * Math.cos(sLat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
 
-  const sin1 = Math.sin(dLat / 2) ** 2;
-  const sin2 = Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
 
-  const c =
-    2 *
-    Math.atan2(
-      Math.sqrt(sin1 + Math.cos(lat1) * Math.cos(lat2) * sin2),
-      Math.sqrt(1 - (sin1 + Math.cos(lat1) * Math.cos(lat2) * sin2))
-    );
+export async function nominatimReverse(lat, lng, signal) {
+  const la = Number(lat);
+  const ln = Number(lng);
+  if (!Number.isFinite(la) || !Number.isFinite(ln)) return null;
 
-  return R * c;
+  const url =
+    `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(
+      la
+    )}&lon=${encodeURIComponent(ln)}`;
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { "Accept": "application/json" },
+    signal,
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  const label = data?.display_name || data?.name || null;
+
+  return label
+    ? { label, raw: data }
+    : null;
 }
