@@ -541,7 +541,13 @@ export default function ClientTaxiPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [destAddrFromCenter, step]);
 
-
+ useEffect(() => {
+    const onStorage = (e) => {
+      if (e?.key === "savedAddresses_v1") setMyAddressesV1(loadMyAddressesV1());
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   /** get user location */
   useEffect(() => {
@@ -2047,12 +2053,5 @@ const RouteSheet = (
     </div>
   );
 }
-  useEffect(() => {
-    const onStorage = (e) => {
-      if (e?.key === "savedAddresses_v1") setMyAddressesV1(loadMyAddressesV1());
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
-
+  
 
