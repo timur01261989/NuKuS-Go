@@ -1146,6 +1146,7 @@ export default function ClientTaxiPage() {
           }
         }}
       />
+      */}
       <div style={{ flex: 1 }} />
       {headerRight}
     </div>
@@ -2058,5 +2059,4 @@ const RouteSheet = (
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);
-
 
