@@ -128,7 +128,6 @@ const destIcon = L.divIcon({
 function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
 }
-}
 
 // OSRM yo'nalish topa olmasa ham xato bermaslik uchun:
 async function osrmRouteMulti(points /* [[lat,lng], ...] */) {
