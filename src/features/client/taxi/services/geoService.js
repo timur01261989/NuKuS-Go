@@ -1,48 +1,34 @@
 // src/features/client/taxi/services/geoService.js
-// Geo utilitlar: masofa, reverse geocoding (Nominatim)
+import { haversineKm } from "../../shared/geo/haversine";
+import { nominatimReverse as _nominatimReverse } from "../../shared/nominatim/reverse";
 
-export function haversineKm(a, b) {
-  if (!a || !b) return 0;
-  const lat1 = Number(a[0]);
-  const lon1 = Number(a[1]);
-  const lat2 = Number(b[0]);
-  const lon2 = Number(b[1]);
-  if (![lat1, lon1, lat2, lon2].every((n) => Number.isFinite(n))) return 0;
+/**
+ * OSRM multi-stop route (pickup -> [stops...] -> dest)
+ */
+export async function osrmRouteMulti(points, { signal } = {}) {
+  if (!Array.isArray(points) || points.length < 2) return null;
+  const coords = points
+    .filter(Boolean)
+    .map((p) => Array.isArray(p) ? p : [p.lat, p.lng])
+    .map(([lat, lng]) => `${lng},${lat}`)
+    .join(";");
 
-  const R = 6371;
-  const toRad = (d) => (d * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const sLat1 = toRad(lat1);
-  const sLat2 = toRad(lat2);
-
-  const h =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(sLat1) * Math.cos(sLat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
-
-export async function nominatimReverse(lat, lng, signal) {
-  const la = Number(lat);
-  const ln = Number(lng);
-  if (!Number.isFinite(la) || !Number.isFinite(ln)) return null;
-
-  const url =
-    `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(
-      la
-    )}&lon=${encodeURIComponent(ln)}`;
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: { "Accept": "application/json" },
-    signal,
-  });
-  if (!res.ok) return null;
+  const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=false`;
+  const res = await fetch(url, { signal });
+  if (!res.ok) throw new Error(`OSRM route failed: ${res.status}`);
   const data = await res.json();
-  const label = data?.display_name || data?.name || null;
+  const r = data?.routes?.[0];
+  if (!r?.geometry?.coordinates) return null;
 
-  return label
-    ? { label, raw: data }
-    : null;
+  const routeCoords = r.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+  const distanceKm = (r.distance || 0) / 1000;
+  const durationMin = (r.duration || 0) / 60;
+  return { coords: routeCoords, distanceKm, durationMin };
 }
+
+export async function nominatimReverse(lat, lon, { signal } = {}) {
+  // Nominatim reverse expects lat/lon
+  return _nominatimReverse(lat, lon, { signal });
+}
+
+export { haversineKm };

@@ -1,19 +1,64 @@
-// Centralized Nominatim search to avoid duplicate declarations and keep behavior consistent.
-// NOTE: Do not shorten or remove fields - ClientTaxiPage expects full objects.
-export async function nominatimSearch(q, signal) {
-  const query = (q || "").trim();
-  if (!query) return [];
-  const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&addressdetails=1&countrycodes=uz&q=${encodeURIComponent(query)}`;
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Accept": "application/json",
-      "Accept-Language": "uz,ru,en",
-    },
-    signal,
-  });
-  if (!res.ok) return [];
-  const data = await res.json();
-  if (!Array.isArray(data)) return [];
-  return data;
+// src/features/client/taxi/services/nominatim.js
+/**
+ * Nominatim API search wrapper for address/place search
+ */
+
+export async function nominatimSearch(query, signal = null) {
+  if (!query || typeof query !== 'string') {
+    return [];
+  }
+
+  try {
+    const url = new URL('https://nominatim.openstreetmap.org/search');
+    url.searchParams.set('q', query);
+    url.searchParams.set('format', 'json');
+    url.searchParams.set('limit', '10');
+    url.searchParams.set('addressdetails', '1');
+
+    const options = {
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'TaxiClient/1.0'
+      }
+    };
+
+    if (signal) {
+      options.signal = signal;
+    }
+
+    const response = await fetch(url.toString(), options);
+    
+    if (!response.ok) {
+      console.warn(`Nominatim search failed: ${response.status}`);
+      return [];
+    }
+
+    const data = await response.json();
+    
+    if (!Array.isArray(data)) {
+      return [];
+    }
+
+    // Transform Nominatim results to a common format
+    return data.map(item => ({
+      id: item.osm_id,
+      address: item.display_name || '',
+      name: item.name || '',
+      latitude: parseFloat(item.lat) || null,
+      longitude: parseFloat(item.lon) || null,
+      lat: parseFloat(item.lat) || null,
+      lng: parseFloat(item.lon) || null,
+      type: item.type || 'place',
+      osm_type: item.osm_type,
+      osm_id: item.osm_id,
+      address_type: item.address_type || ''
+    }));
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      // Request was cancelled
+      return [];
+    }
+    console.error('Nominatim search error:', error);
+    return [];
+  }
 }

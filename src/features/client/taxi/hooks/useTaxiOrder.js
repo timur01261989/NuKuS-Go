@@ -42,11 +42,13 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 import api from "@/utils/apiHelper";
+import { TARIFFS } from "../constants/tariffs";
 import VehicleMarker from "../components/VehicleMarker";
 import TaxiMap from "../TaxiMap";
 import TaxiSearchSheet from "../TaxiSearchSheet";
 import DestinationPicker from "../DestinationPicker";
-import { haversineKm, nominatimReverse as _nominatimReverse } from "../services/geoService";
+import { haversineKm } from "../../shared/geo/haversine";
+import { nominatimReverse as _nominatimReverse } from "../../shared/geo/nominatim";
 import AutoMarketAdsPanel from "../components/AutoMarketAdsPanel";
 import { listMarketCars } from "../../../services/marketService.js";
 import RatingModal from "@features/shared/components/RatingModal";
@@ -486,7 +488,7 @@ useEffect(() => {
       if (e?.key === "savedAddresses_v1") setMyAddressesV1(loadMyAddressesV1());
     };
     window.addEventListener("storage", onStorage);
-    const page = (() => window.removeEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
   /** get user location */
