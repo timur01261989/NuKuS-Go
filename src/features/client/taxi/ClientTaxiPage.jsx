@@ -48,7 +48,6 @@ import TaxiSearchSheet from "./TaxiSearchSheet";
 import DestinationPicker from "./DestinationPicker";
 import { haversineKm } from "../shared/geo/haversine";
 import { nominatimReverse as _nominatimReverse } from "../shared/geo/nominatim";
-import { nominatimSearch as _nominatimSearch } from "../shared/geo/nominatim";
 import AutoMarketAdsPanel from "./components/AutoMarketAdsPanel";
 import { listMarketCars } from "../../../services/marketService.js";
 import RatingModal from "@features/shared/components/RatingModal";
@@ -59,10 +58,6 @@ async function nominatimReverse(lat, lng, signal) {
   return _nominatimReverse(lat, lng, { signal });
 }
 
-// Backward-compatible signature (q, signal)
-async function nominatimSearch(q, signal) {
-  return _nominatimSearch(q, { signal });
-}
 
 /**
  * CLIENT TAXI (Yandex-Go like flow)
@@ -588,37 +583,24 @@ export default function ClientTaxiPage() {
   }, []);
 
   /** keep pickup address synced from center pin in main/search (when user drags map) */
-useEffect(() => {
-  if (!(step === "main" || step === "search")) return;
-  if (!centerLatLng) return;
-  // Only sync after user finishes dragging map (prevents render loops)
-  if (isDraggingMap) return;
+  useEffect(() => {
+    if (!(step === "main" || step === "search")) return;
+    if (!centerLatLng) return;
 
-  setPickup((p) => {
-    const sameLat = Array.isArray(p.latlng) && p.latlng[0] === centerLatLng[0] && p.latlng[1] === centerLatLng[1];
-    const nextAddr = pickupAddrFromCenter || p.address;
-    const sameAddr = (p.address || "") === (nextAddr || "");
-    if (sameLat && sameAddr) return p;
-    return { ...p, latlng: centerLatLng, address: nextAddr };
-  });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [isDraggingMap, step, centerLatLng?.[0], centerLatLng?.[1], pickupAddrFromCenter]);
-/** keep dest address synced from center pin in dest_map */
-useEffect(() => {
-  if (step !== "dest_map") return;
-  if (!centerLatLng) return;
-  if (isDraggingMap) return;
+    // only update while in main/search; user can override via search list, but map move should update pickup
+    setPickup((p) => ({ ...p, latlng: centerLatLng, address: pickupAddrFromCenter || p.address }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickupAddrFromCenter]);
 
-  setDest((d) => {
-    const sameLat = Array.isArray(d.latlng) && d.latlng[0] === centerLatLng[0] && d.latlng[1] === centerLatLng[1];
-    const nextAddr = destAddrFromCenter || d.address;
-    const sameAddr = (d.address || "") === (nextAddr || "");
-    if (sameLat && sameAddr) return d;
-    return { ...d, latlng: centerLatLng, address: nextAddr };
-  });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [isDraggingMap, step, centerLatLng?.[0], centerLatLng?.[1], destAddrFromCenter]);
-/** compute route when we have pickup + dest + waypoints and step route */
+  /** keep dest address synced from center pin in dest_map */
+  useEffect(() => {
+    if (step !== "dest_map") return;
+    if (!centerLatLng) return;
+    setDest((d) => ({ ...d, latlng: centerLatLng, address: destAddrFromCenter || d.address }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [destAddrFromCenter]);
+
+  /** compute route when we have pickup + dest + waypoints and step route */
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
@@ -1159,6 +1141,7 @@ useEffect(() => {
           }
         }}
       />
+      */}
       <div style={{ flex: 1 }} />
       {headerRight}
     </div>
