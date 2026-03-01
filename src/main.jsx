@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
-import AuthProvider from "@/shared/auth/AuthProvider";
+import { AuthProvider } from "@/shared/auth/AuthProvider";
 import api from "@/utils/apiHelper";
 import { setupNotifications } from "@/services/notifications";
 import { supabase } from "@/lib/supabase";
