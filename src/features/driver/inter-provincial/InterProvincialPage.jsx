@@ -15,7 +15,8 @@ import {
   Tag, 
   Segmented, 
   TimePicker, 
-  Spin
+  Spin,
+  Typography
 } from "antd";
 import { 
   EnvironmentOutlined, 
@@ -36,7 +37,7 @@ import { useAuth } from "@/shared/auth/AuthProvider";
 
 import "leaflet/dist/leaflet.css";
 
-// Marker icon fix
+// Marker icon fix (Vite uchun)
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
@@ -49,7 +50,7 @@ function getRegionCenter(regionName) {
   return r?.center || null;
 }
 
-// Manzil nomini aniqlash
+// Manzil nomini aniqlash (Nominatim)
 async function getAddressName(lat, lng) {
   try {
     const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=uz`);
@@ -176,17 +177,6 @@ export default function InterProvincialPage() {
     }
   }, [fromLL, toLL]);
 
-  // Validatsiya: Tugma qachon yonishini belgilaydi
-  const canCreate = Boolean(
-    user?.id && 
-    from.region && 
-    to.region && 
-    travelDate && 
-    travelTime && 
-    seats > 0 && 
-    ((vehicleType === 'car' && priceFront > 0 && priceBack > 0) || (vehicleType !== 'car' && price > 0))
-  );
-
   // Data state
   const [saving, setSaving] = useState(false);
   const [trips, setTrips] = useState([]);
@@ -249,7 +239,7 @@ export default function InterProvincialPage() {
     setFrom({ region: trip.from_region, district: trip.from_district || "" });
     setTo({ region: trip.to_region, district: trip.to_district || "" });
     setTravelDate(trip.depart_date ? dayjs(trip.depart_date) : null);
-    setTravelTime(trip.depart_time ? dayjs(trip.depart_time, "HH:mm") : null);
+    setTravelTime(trip.depart_time ? dayjs(trip.depart_time, "HH:mm:ss") : null);
     setSeats(trip.seats || 4);
     setPrice(trip.price || 0);
     setPriceFront(trip.price_front || 0);
@@ -273,10 +263,21 @@ export default function InterProvincialPage() {
   }, []);
 
   const createOrUpdate = useCallback(async () => {
-    if (!user?.id) {
-      message.error("Avtorizatsiyadan o'tilmagan");
-      return;
+    // 1. Validatsiya
+    if (!user?.id) return message.error("Tizimga kirilmagan");
+    if (!from.region || !to.region) return message.error("Yo'nalishni (Viloyat) tanlang");
+    if (!travelDate) return message.error("Sanani tanlang");
+    if (!travelTime) return message.error("Vaqtni tanlang");
+    if (seats <= 0) return message.error("O'rinlar sonini kiriting");
+
+    // Narx validatsiyasi
+    if (vehicleType === 'car') {
+        if (!priceFront || priceFront <= 0) return message.error("Oldi o'rindiq narxini kiriting");
+        if (!priceBack || priceBack <= 0) return message.error("Orqa o'rindiq narxini kiriting");
+    } else {
+        if (!price || price <= 0) return message.error("Narxni kiriting");
     }
+
     setSaving(true);
     
     const payload = {
@@ -285,8 +286,8 @@ export default function InterProvincialPage() {
       from_district: from.district || null,
       to_region: to.region,
       to_district: to.district || null,
-      depart_date: travelDate ? travelDate.format("YYYY-MM-DD") : null,
-      depart_time: travelTime ? travelTime.format("HH:mm") : null,
+      depart_date: travelDate.format("YYYY-MM-DD"),
+      depart_time: travelTime.format("HH:mm"),
       seats: Number(seats),
       vehicle_type: vehicleType,
       women_only: womenOnly,
@@ -298,7 +299,7 @@ export default function InterProvincialPage() {
       pickup_lat: pickupLL ? pickupLL[0] : null,
       pickup_lng: pickupLL ? pickupLL[1] : null,
       
-      // Pricing Logic
+      // Yangi ustunlar
       price: vehicleType === 'car' ? 0 : Number(price), 
       price_front: vehicleType === 'car' ? Number(priceFront) : null,
       price_back: vehicleType === 'car' ? Number(priceBack) : null,
@@ -309,17 +310,17 @@ export default function InterProvincialPage() {
       if (editingTrip?.id) {
         const { error } = await supabase.from("interprov_trips").update(payload).eq("id", editingTrip.id);
         if (error) throw error;
-        message.success("Reys muvaffaqiyatli yangilandi");
+        message.success("Reys yangilandi");
       } else {
         const { error } = await supabase.from("interprov_trips").insert(payload);
         if (error) throw error;
-        message.success("Yangi reys yaratildi");
+        message.success("Reys yaratildi");
       }
       resetForm();
       loadMyTrips();
     } catch (e) {
       console.error(e);
-      message.error("Xatolik: " + (e.message || "Baza bilan aloqa yo'q"));
+      message.error("Saqlashda xatolik: " + e.message);
     } finally {
       setSaving(false);
     }
@@ -499,7 +500,8 @@ export default function InterProvincialPage() {
         </div>
 
         <div style={{ display: "flex", gap: 12 }}>
-          <Button type="primary" size="large" onClick={createOrUpdate} loading={saving} disabled={!canCreate} block>
+          {/* TUGMA DISABLED EMAS, BOSILGANDA TEKSHIRADI */}
+          <Button type="primary" size="large" onClick={createOrUpdate} loading={saving} block>
             {editingTrip ? "Saqlash" : "Reys yaratish"}
           </Button>
           <Button size="large" onClick={resetForm} block>
