@@ -1,47 +1,36 @@
-import React, { useMemo, useState, useCallback, useEffect, useRef } from "react";
-import { Button, DatePicker, Drawer, Empty, Spin, message, Switch, Select, InputNumber, Checkbox, Radio, Tag, Segmented, Input, Divider, Typography } from "antd";
-import {
-  AimOutlined,
-  HomeOutlined,
-  BankOutlined,
-  CarOutlined,
-  CloseOutlined,
-  EnvironmentOutlined,
-  FlagOutlined,
-  PlusOutlined,
-  ShareAltOutlined,
-  PhoneOutlined,
-  ClockCircleOutlined,
-  StarFilled,
-  UserOutlined,
-  CompassOutlined
-} from "@ant-design/icons";
-// 1-TUZATISH: useMapEvents qo'shildi
+import React, { useMemo, useState, useCallback, useEffect } from "react";
+import { 
+  Button, 
+  DatePicker, 
+  Drawer, 
+  Empty, 
+  Spin, 
+  message, 
+  Select 
+} from "antd";
+// 1. TUZATISH: useMapEvents qo'shildi
 import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
-import dayjs from "dayjs";
 import { useNavigate } from "react-router-dom"; 
 
-import api from "@/utils/apiHelper";
 import RegionDistrictSelect from "@/shared/components/RegionDistrictSelect";
 import { UZ_REGIONS } from "@/shared/constants/uzRegions";
 import { supabase } from "@/services/supabaseClient";
 
-// 2-TUZATISH: haversineKm olib tashlandi (pastda funksiya sifatida bor)
-import { osrmRouteDriving } from "@/shared/services/osrm";
+// 2. TUZATISH: haversineKm bu yerdan olib tashlandi (pastda funksiya sifatida bor)
+// import { haversineKm } ... o'rniga faqat kerakli narsalar qoladi yoki bu qator o'chiriladi
+// Agar osrmRouteDriving kerak bo'lmasa, bu qatorni butunlay o'chirish mumkin. 
+// Hozircha xato bermasligi uchun shunday qoldiramiz:
+import { osrmRouteDriving } from "@/shared/services/osrm"; 
 
-// 3-TUZATISH: AutoMarketAdsPanel yo'li to'g'irlandi. 
-// Agar u "taxi" papkasida bo'lsa, bitta papka yuqoriga chiqib kirish kerak.
+// 3. TUZATISH: AutoMarketAdsPanel yo'li to'g'irlandi
+// Intercity papkasidan chiqib (..), taxi papkasiga kiramiz
 import AutoMarketAdsPanel from "../taxi/components/AutoMarketAdsPanel"; 
-
-// Agar bu importlar boshqa joyda bo'lsa, yo'llarini tekshiring:
 import { listMarketCars } from "../../../services/marketService.js";
-import RatingModal from "@features/shared/components/RatingModal";
-import ClientBonusWidget from "@/features/client/components/ClientBonusWidget";
 
 import "leaflet/dist/leaflet.css";
 
-// Fix default marker icon (Vite)
+// Marker icon fix
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
@@ -58,7 +47,7 @@ function getRegionCenter(regionName) {
   return r?.center || null;
 }
 
-// Local haversineKm funksiyasi
+// BU FUNKSIYA IMPORT QILINMAGAN, SHU YERDA E'LON QILINGAN
 function haversineKm(a, b) {
   if (!a || !b) return 0;
   const toRad = (x) => (x * Math.PI) / 180;
@@ -86,7 +75,7 @@ function savePickupPoint(pt) {
   localStorage.setItem("saved_pickup_points", JSON.stringify(newPts));
 }
 
-// --- Map Componentlari ---
+// --- Komponentlar ---
 
 function FitBounds({ points }) {
   const map = useMap();
@@ -106,6 +95,7 @@ function FitBounds({ points }) {
 }
 
 function PickupPicker({ value, onChange, savedPoints }) {
+  // useMapEvents endi to'g'ri ishlaydi
   useMapEvents({
     click(e) {
       const ll = [e.latlng.lat, e.latlng.lng];
@@ -385,7 +375,6 @@ export default function ClientIntercityPage() {
         </Button>
       </Drawer>
 
-      {/* AutoMarketAdsPanel komponenti bu yerda chaqirilmoqda */}
       <div style={{ marginTop: 24 }}>
         <AutoMarketAdsPanel 
           title="Avto savdo e’lonlari" 
