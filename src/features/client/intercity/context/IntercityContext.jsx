@@ -74,3 +74,7 @@ export const PRESET_CITIES = [
   { id: "guliston", title: "Guliston", latlng: [40.4897, 68.7849] },
   { id: "qoqon", title: "Qo'qon", latlng: [40.5286, 70.9428] },
 ];
+
+
+// Expose context for optional consumers (e.g. small map preview)
+export { IntercityContext };

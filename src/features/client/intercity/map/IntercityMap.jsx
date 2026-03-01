@@ -1,49 +1,55 @@
-import React, { useEffect, useMemo } from "react";
-import { MapContainer, TileLayer, Polyline, Marker, useMap } from "react-leaflet";
+import React, { useContext, useMemo } from "react";
+import { MapContainer, TileLayer, Marker, Polyline } from "react-leaflet";
 import L from "leaflet";
-import { useIntercity } from "../context/IntercityContext";
-import { useRoutePolyline } from "./useRoutePolyline";
+import "leaflet/dist/leaflet.css";
+import { IntercityContext } from "../context/IntercityContext";
 
-const defaultIcon = new L.Icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-});
+/**
+ * IntercityMap
+ * - Works both with provider (full intercity flow) and without provider (small preview).
+ *
+ * Props:
+ * - center: [lat,lng] optional (when provided, component won't require provider data)
+ * - small: boolean => use smaller height
+ */
+export default function IntercityMap({ height = "52vh", center = null, small = false }) {
+  const ctx = useContext(IntercityContext);
 
-function FitBounds({ fromLatLng, toLatLng }) {
-  const map = useMap();
-  useEffect(() => {
-    if (!fromLatLng || !toLatLng) return;
-    const b = L.latLngBounds(fromLatLng, toLatLng);
-    map.fitBounds(b, { paddingTopLeft: [30, 30], paddingBottomRight: [30, 260] });
-  }, [map, fromLatLng, toLatLng]);
-  return null;
-}
+  const fromLatLng = ctx?.fromCity?.latlng || null;
+  const toLatLng = ctx?.toCity?.latlng || null;
+  const routeLine = ctx?.routeLine || null;
 
-export default function IntercityMap({ height = "52vh" }) {
-  const { fromCity, toCity } = useIntercity();
+  const computedCenter = useMemo(() => {
+    if (center && Array.isArray(center) && center.length === 2) return center;
+    if (fromLatLng) return fromLatLng;
+    // Nukus default
+    return [42.4602, 59.6156];
+  }, [center, fromLatLng]);
 
-  const fromLatLng = fromCity?.latlng;
-  const toLatLng = toCity?.latlng;
+  const pin = new L.Icon({
+    iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+    shadowSize: [41, 41],
+  });
 
-  const { coords } = useRoutePolyline(fromLatLng, toLatLng);
-
-  const center = useMemo(() => {
-    if (fromLatLng && toLatLng) return [(fromLatLng[0] + toLatLng[0]) / 2, (fromLatLng[1] + toLatLng[1]) / 2];
-    return fromLatLng || [41.2995, 69.2401];
-  }, [fromLatLng, toLatLng]);
+  const finalHeight = small ? "160px" : height;
 
   return (
-    <div style={{ height, width: "100%", borderRadius: 18, overflow: "hidden", position: "relative" }}>
-      <MapContainer center={center} zoom={6} style={{ height: "100%", width: "100%" }} scrollWheelZoom>
-        <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-        {fromLatLng && <Marker position={fromLatLng} icon={defaultIcon} />}
-        {toLatLng && <Marker position={toLatLng} icon={defaultIcon} />}
-        {coords && <Polyline positions={coords} pathOptions={{ weight: 5, opacity: 0.9 }} />}
-        <FitBounds fromLatLng={fromLatLng} toLatLng={toLatLng} />
-      </MapContainer>
-    </div>
+    <MapContainer center={computedCenter} zoom={10} style={{ height: finalHeight, width: "100%" }}>
+      <TileLayer
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution="&copy; OpenStreetMap contributors"
+      />
+
+      {fromLatLng && <Marker position={fromLatLng} icon={pin} />}
+      {toLatLng && <Marker position={toLatLng} icon={pin} />}
+
+      {routeLine && routeLine.length > 1 ? (
+        <Polyline positions={routeLine} pathOptions={{ color: "blue", weight: 5 }} />
+      ) : null}
+    </MapContainer>
   );
 }
