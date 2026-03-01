@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { Button, DatePicker, Drawer, Empty, Spin, message, Switch, Select, InputNumber, Checkbox, Radio, Tag } from "antd";
-// TUZATISH 1: useMapEvents qo'shildi
 import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import dayjs from "dayjs";
@@ -8,8 +7,7 @@ import dayjs from "dayjs";
 import RegionDistrictSelect from "@/shared/components/RegionDistrictSelect";
 import { UZ_REGIONS } from "@/shared/constants/uzRegions";
 import { supabase } from "@/services/supabaseClient";
-// TUZATISH 2: haversineKm olib tashlandi, faqat osrmRouteDriving qoldi
-import { osrmRouteDriving } from "@/shared/services/osrm";
+import { osrmRouteDriving } from "@/shared/services/osrm"; 
 
 import "leaflet/dist/leaflet.css";
 
@@ -21,6 +19,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
+// Map Tile URL
 const mapTile = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 
 function getRegionCenter(regionName) {
@@ -28,8 +27,8 @@ function getRegionCenter(regionName) {
   return r?.center || null;
 }
 
-// Bu funksiya fayl ichida bor, shuning uchun importdan olib tashladik
-function haversineKm(a, b) {
+// ✅ FIX: Local haversine funksiyasini boshqa nomga o'zgartirdik (osrm'dan import qilingan bilan collision oldini olish)
+function calculateDistanceKm(a, b) {
   if (!a || !b) return 0;
   const toRad = (x) => (x * Math.PI) / 180;
   const R = 6371;
@@ -68,14 +67,14 @@ function TripCard({ trip, onViewMap, onSelect }) {
     <div style={{ border: "1px solid rgba(0,0,0,0.08)", borderRadius: 14, padding: 14, marginBottom: 10 }}>
       <div style={{ fontWeight: 700, marginBottom: 6 }}>{titleFrom} → {titleTo}</div>
       <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 10 }}>
-        {trip.depart_date}{trip.depart_time ? ` • ${String(trip.depart_time).slice(0,5)}` : ""} • {trip.seats} o‘rin
-        {typeof trip.price === "number" ? ` • ${trip.price} so‘m` : ""}
+        {trip.depart_date}{trip.depart_time ? ` • ${String(trip.depart_time).slice(0,5)}` : ""} • {trip.seats} o'rin
+        {typeof trip.price === "number" ? ` • ${trip.price} so'm` : ""}
         {trip.women_only ? " • Ayollar uchun" : ""}
         {trip.is_delivery ? " • Eltish" : ""}
         {trip.is_parcel ? " • Posilka" : ""}
       </div>
       <div style={{ display: "flex", gap: 10 }}>
-        <Button onClick={() => onViewMap(trip)} block>Yo‘lni ko‘rish</Button>
+        <Button onClick={() => onViewMap(trip)} block>Yo'lni ko'rish</Button>
         <Button type="primary" block onClick={() => onSelect && onSelect(trip)}>
           Tanlash
         </Button>
@@ -111,7 +110,6 @@ function loadSavedPickupPoints() {
 function savePickupPoint(pt) {
   if (!pt) return;
   const pts = loadSavedPickupPoints();
-  // Dublikatlarni oldini olish va oxirgi 5 tasini saqlash
   const newPts = [pt, ...pts].filter((v, i, a) => a.findIndex(t => (t[0] === v[0] && t[1] === v[1])) === i).slice(0, 5);
   localStorage.setItem("saved_pickup_points", JSON.stringify(newPts));
 }
@@ -129,7 +127,8 @@ export default function ClientIntercityPage() {
     return [fromLL, toLL];
   }, [fromLL, toLL]);
 
-  const distanceKm = useMemo(() => (fromLL && toLL ? haversineKm(fromLL, toLL) : 0), [fromLL, toLL]);
+  // ✅ FIX: calculateDistanceKm'ni ishlatding (eski haversineKm'dan)
+  const distanceKm = useMemo(() => (fromLL && toLL ? calculateDistanceKm(fromLL, toLL) : 0), [fromLL, toLL]);
 
   const canSearch = Boolean(from.region && to.region);
 
@@ -188,8 +187,6 @@ export default function ClientIntercityPage() {
 
   const handleSelectTrip = useCallback((trip) => {
     setSelectedTripForBooking(trip);
-    // Agar foydalanuvchi qayerdanligini xaritada belgilamagan bo'lsa, taklif qilamiz
-    // Default markaz sifatida 'fromLL' yoki Toshkent koordinatasini olamiz
     setPickupPoint(fromLL || getRegionCenter(trip.from_region) || [41.31, 69.28]);
     setPickupPickerOpen(true);
   }, [fromLL]);
@@ -267,7 +264,7 @@ export default function ClientIntercityPage() {
         {loading ? (
           <div style={{ display: "flex", justifyContent: "center", padding: 24 }}><Spin /></div>
         ) : trips.length === 0 ? (
-          <Empty description="Reys yo‘q" />
+          <Empty description="Reys yo'q" />
         ) : (
           <div>
             {trips.map((t) => (
@@ -283,7 +280,7 @@ export default function ClientIntercityPage() {
       </Drawer>
 
       <Drawer
-        title="Yo‘l"
+        title="Yo'l"
         open={Boolean(mapTrip)}
         onClose={() => setMapTrip(null)}
         height="78%"
@@ -308,7 +305,7 @@ export default function ClientIntercityPage() {
               </MapContainer>
             </div>
             <div style={{ padding: 12, fontSize: 12, opacity: 0.85 }}>
-              Masofa (taxminiy): {tripFromLL && tripToLL ? Math.round(haversineKm(tripFromLL, tripToLL)) : "—"} km
+              Masofa (taxminiy): {tripFromLL && tripToLL ? Math.round(calculateDistanceKm(tripFromLL, tripToLL)) : "—"} km
             </div>
           </div>
         )}
@@ -346,7 +343,6 @@ export default function ClientIntercityPage() {
           onClick={() => {
             if (!pickupPoint) { message.error("Xaritadan manzil tanlang"); return; }
             message.success("Manzil belgilandi! Buyurtma berishga o'tamiz...");
-            // Bu yerda keyingi bosqichga (booking) o'tish logikasi bo'ladi
             setPickupPickerOpen(false);
           }}
         >
