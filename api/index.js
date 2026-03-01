@@ -20,6 +20,7 @@ import cronDispatchHandler from "../server/api/cron_dispatch.js";
 import notificationsHandler from "../server/api/notifications.js";
 import gamificationHandler from "../server/api/gamification.js";
 import pricingHandler from "../server/api/pricing.js";
+import freightHandler from "../server/api/freight.js";
 
 function normalizePath(rawPath) {
   // Supports both direct path (/api/order) and rewritten query (?path=order)
@@ -208,6 +209,10 @@ export default async function handler(req, res) {
 
     if (path.startsWith("pricing")) {
       return await pricingHandler(req, res);
+    }
+
+    if (path.startsWith("freight")) {
+      return await freightHandler(req, res);
     }
 
     res.statusCode = 404;

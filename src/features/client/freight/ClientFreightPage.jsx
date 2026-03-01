@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Card, Divider, message, Typography } from "antd";
-import { SendOutlined } from "@ant-design/icons";
+import { Button, Card, Divider, List, message, Tag, Typography } from "antd";
+import { SendOutlined, ReloadOutlined, StopOutlined, CheckCircleOutlined } from "@ant-design/icons";
 
 import FreightMap from "./map/FreightMap";
 import { FreightProvider, useFreight } from "./context/FreightContext";
@@ -8,106 +8,303 @@ import TruckSelector from "./components/Selection/TruckSelector";
 import CargoPhotoUpload from "./components/Details/CargoPhotoUpload";
 import LoadersCounter from "./components/Details/LoadersCounter";
 import CargoForm from "./components/Details/CargoForm";
-import PriceEstimator from "./components/Order/PriceEstimator";
-import ActiveFreightPanel from "./components/Order/ActiveFreightPanel";
 
-import { createFreightOrder, cancelFreightOrder, freightStatus } from "./services/freightApi";
+import { createCargo, cancelCargo, cargoStatus, matchVehicles, listOffers, acceptOffer } from "./services/freightApi";
 import { formatUZS } from "./services/truckData";
+import { useAuth } from "@/shared/auth/AuthProvider";
 
 const { Title, Text } = Typography;
 
-function InnerFreightPage() {
-  const { truck, pickup, dropoff, cargoName, note, loadersEnabled, loadersCount, distanceKm, estimatedPrice } = useFreight();
+function statusTag(status) {
+  const st = String(status || "");
+  if (st === "posted") return <Tag color="blue">E’lon qilindi</Tag>;
+  if (st === "offering") return <Tag color="gold">Takliflar kelyapti</Tag>;
+  if (st === "driver_selected") return <Tag color="green">Haydovchi tanlandi</Tag>;
+  if (st === "loading") return <Tag color="cyan">Yuklanmoqda</Tag>;
+  if (st === "in_transit") return <Tag color="purple">Yo‘lda</Tag>;
+  if (st === "delivered") return <Tag color="geekblue">Yetkazildi</Tag>;
+  if (st === "closed") return <Tag color="green">Yopildi</Tag>;
+  if (st === "cancelled") return <Tag color="red">Bekor qilindi</Tag>;
+  return <Tag>{st || "-"}</Tag>;
+}
 
-  const [mode, setMode] = useState("");
-  const [assignedDriver, setAssignedDriver] = useState(null);
-  const [orderId, setOrderId] = useState(() => {
-    try { return localStorage.getItem("activeFreightOrderId") || ""; } catch { return ""; }
+function Inner() {
+  const { user } = useAuth();
+  const {
+    truck,
+    pickup,
+    dropoff,
+    cargoName,
+    cargoType,
+    weightKg,
+    volumeM3,
+    note,
+    loadersEnabled,
+    loadersCount,
+    estimatedPrice,
+  } = useFreight();
+
+  const [cargoId, setCargoId] = useState(() => {
+    try {
+      return localStorage.getItem("activeCargoId") || "";
+    } catch {
+      return "";
+    }
   });
+  const [cargo, setCargo] = useState(null);
+  const [offers, setOffers] = useState([]);
+  const [matches, setMatches] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const canOrder = useMemo(() => !!pickup.latlng && !!truck?.id, [pickup.latlng, truck?.id]);
+  const canPost = useMemo(() => {
+    return !!user?.id && !!pickup.latlng && !!dropoff.latlng;
+  }, [user?.id, pickup.latlng, dropoff.latlng]);
 
-  const handleCreate = useCallback(async () => {
-    if (!canOrder) return message.error("Avval yuklash joyini belgilang");
-    const hide = message.loading("Buyurtma yuborilmoqda...", 0);
+  const refresh = useCallback(
+    async (opts = {}) => {
+      if (!cargoId) return;
+      const silent = !!opts.silent;
+      if (!silent) setLoading(true);
+      try {
+        const st = await cargoStatus({ cargoId });
+        const c = st?.data?.cargo || st?.cargo;
+        const o = st?.data?.offers || st?.offers || [];
+        setCargo(c || null);
+        setOffers(Array.isArray(o) ? o : []);
+
+        // matches are optional (for “Mos mashinalar” panel)
+        try {
+          const m = await matchVehicles({ cargoId, radiusKm: 30 });
+          const mm = m?.data?.data || m?.data || [];
+          setMatches(Array.isArray(mm) ? mm : []);
+        } catch {
+          // ignore
+        }
+      } catch (e) {
+        if (!silent) message.error(e?.message || "Status olishda xatolik");
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [cargoId]
+  );
+
+  // Poll offers/status for active cargo
+  useEffect(() => {
+    if (!cargoId) return;
+    let stopped = false;
+    const tick = async () => {
+      if (stopped) return;
+      await refresh({ silent: true });
+    };
+    const iid = setInterval(tick, 4000);
+    tick();
+    return () => {
+      stopped = true;
+      clearInterval(iid);
+    };
+  }, [cargoId, refresh]);
+
+  const postCargo = useCallback(async () => {
+    if (!canPost) return message.error("Avval kirish qiling va nuqtalarni belgilang");
+    const hide = message.loading("Yuk joylanmoqda...", 0);
     try {
       const payload = {
-        truckId: truck.id,
+        ownerId: user.id,
         pickup,
         dropoff,
-        distanceKm: Number(distanceKm) || 0,
-        loadersEnabled: !!loadersEnabled,
-        loadersCount: loadersEnabled ? Number(loadersCount) || 0 : 0,
         cargoName,
+        cargoType,
+        weightKg,
+        volumeM3,
         note,
-        price: Math.round(Number(estimatedPrice) || 0),
+        // Bu yerda oldingi taxminiy narxni budget sifatida yuboramiz (majburiy emas)
+        budget: Math.round(Number(estimatedPrice) || 0) || null,
+        loadersEnabled,
+        loadersCount: loadersEnabled ? Number(loadersCount || 0) : 0,
+        // truck tanlovi: hozircha “tavsiya” sifatida qoladi (backend matching capacity asosida)
+        title: cargoName || (truck?.title ? `Yuk: ${truck.title}` : "Yuk"),
       };
-      const res = await createFreightOrder(payload);
-      const id = res?.data?.id || res?.id || res?.orderId;
-      if (!id) throw new Error("Serverdan ID kelmadi");
-      setOrderId(String(id));
-      try { localStorage.setItem("activeFreightOrderId", String(id)); } catch {}
-      setMode("searching");
-      message.success("Buyurtma yuborildi");
+      const res = await createCargo(payload);
+      const id = res?.data?.data?.id || res?.data?.id || res?.id;
+      if (!id) throw new Error("Serverdan cargoId kelmadi");
+      setCargoId(String(id));
+      try {
+        localStorage.setItem("activeCargoId", String(id));
+      } catch {}
+      message.success("Yuk e’loni yaratildi. Endi haydovchilar taklif yuboradi.");
+      await refresh({ silent: true });
     } catch (e) {
       console.error(e);
       message.error("Xatolik: " + (e?.message || "Server bilan aloqa yo‘q"));
     } finally {
       hide();
     }
-  }, [canOrder, truck, pickup, dropoff, distanceKm, loadersEnabled, loadersCount, cargoName, note, estimatedPrice]);
+  }, [canPost, user?.id, pickup, dropoff, cargoName, cargoType, weightKg, volumeM3, note, estimatedPrice, loadersEnabled, loadersCount, truck, refresh]);
 
-  const handleCancel = useCallback(async () => {
-    if (!orderId) { setMode(""); return; }
+  const doCancel = useCallback(async () => {
+    if (!cargoId) return;
     const hide = message.loading("Bekor qilinmoqda...", 0);
     try {
-      await cancelFreightOrder(orderId);
-      setMode("");
-      setAssignedDriver(null);
-      setOrderId("");
-      try { localStorage.removeItem("activeFreightOrderId"); } catch {}
+      await cancelCargo({ cargoId, actorId: user?.id || null });
+      setCargoId("");
+      setCargo(null);
+      setOffers([]);
+      setMatches([]);
+      try {
+        localStorage.removeItem("activeCargoId");
+      } catch {}
       message.success("Bekor qilindi");
     } catch (e) {
       message.error("Bekor qilishda xatolik: " + (e?.message || ""));
     } finally {
       hide();
     }
-  }, [orderId]);
+  }, [cargoId, user?.id]);
 
-  useEffect(() => {
-    if (!orderId) return;
-    let stopped = false;
-    const tick = async () => {
+  const doAcceptOffer = useCallback(
+    async (offerId) => {
+      if (!cargoId || !offerId) return;
+      const hide = message.loading("Taklif qabul qilinmoqda...", 0);
       try {
-        const res = await freightStatus(orderId);
-        const st = res?.data?.status || res?.status || res?.orderStatus;
-        const drv = res?.data?.driver || res?.driver || res?.assignedDriver;
-        if (stopped) return;
-        if (drv) setAssignedDriver(drv);
-        if (st === "accepted" || st === "coming") setMode("coming");
-        else if (st === "searching") setMode("searching");
-        else if (st === "cancelled" || st === "completed") {
-          setMode("");
-          setAssignedDriver(null);
-          setOrderId("");
-          try { localStorage.removeItem("activeFreightOrderId"); } catch {}
-        }
-      } catch {}
-    };
-    const iid = setInterval(tick, 4000);
-    tick();
-    return () => { stopped = true; clearInterval(iid); };
-  }, [orderId]);
+        await acceptOffer({ cargoId, offerId, ownerId: user?.id || null });
+        message.success("Haydovchi tanlandi ✅");
+        await refresh({ silent: true });
+      } catch (e) {
+        message.error("Xatolik: " + (e?.message || ""));
+      } finally {
+        hide();
+      }
+    },
+    [cargoId, user?.id, refresh]
+  );
 
+  // Active cargo view
+  if (cargoId) {
+    const st = cargo?.status;
+    const budget = cargo?.budget ?? null;
+    const selected = cargo?.selected_offer_id;
+    const activeOffers = (offers || []).filter((o) => o.status === "sent" || o.status === "accepted");
+
+    return (
+      <div style={{ padding: 14, maxWidth: 840, margin: "0 auto" }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
+          <div>
+            <Title level={4} style={{ margin: 0 }}>Yuk tashish</Title>
+            <Text type="secondary" style={{ fontSize: 12 }}>Yuk e’loni va haydovchi takliflari.</Text>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {statusTag(st)}
+            <Button icon={<ReloadOutlined />} onClick={() => refresh({ silent: false })} loading={loading} />
+          </div>
+        </div>
+
+        <div style={{ marginTop: 12 }}>
+          <FreightMap />
+        </div>
+
+        <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
+          <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+              <div>
+                <div style={{ fontWeight: 1000 }}>Yuk: {cargo?.title || "-"}</div>
+                <div style={{ fontSize: 12, opacity: 0.75 }}>
+                  {cargo?.weight_kg ? `${cargo.weight_kg} kg` : ""}{cargo?.volume_m3 ? ` • ${cargo.volume_m3} m³` : ""}
+                  {budget ? ` • budget: ${formatUZS(budget)}` : ""}
+                </div>
+              </div>
+              {st !== "cancelled" && st !== "closed" && (
+                <Button danger icon={<StopOutlined />} onClick={doCancel}>
+                  Bekor qilish
+                </Button>
+              )}
+            </div>
+            {cargo?.description ? (
+              <div style={{ marginTop: 8, fontSize: 12, opacity: 0.8 }}>{cargo.description}</div>
+            ) : null}
+          </Card>
+
+          <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
+            <div style={{ fontWeight: 1000, marginBottom: 10 }}>Haydovchi takliflari</div>
+            {activeOffers.length === 0 ? (
+              <div style={{ fontSize: 12, opacity: 0.75 }}>
+                Hozircha taklif yo‘q. Haydovchilar onlayn bo‘lsa taklif yuboradi.
+              </div>
+            ) : (
+              <List
+                dataSource={activeOffers}
+                renderItem={(o) => {
+                  const isAccepted = o.status === "accepted" || o.id === selected;
+                  return (
+                    <List.Item
+                      actions={
+                        isAccepted
+                          ? [<Tag key="acc" color="green" icon={<CheckCircleOutlined />}>Tanlangan</Tag>]
+                          : [
+                              <Button key="pick" type="primary" onClick={() => doAcceptOffer(o.id)}>
+                                Tanlash
+                              </Button>,
+                            ]
+                      }
+                    >
+                      <List.Item.Meta
+                        title={<span style={{ fontWeight: 900 }}>{formatUZS(o.price)} {o.eta_minutes ? <Text type="secondary">• {o.eta_minutes} min</Text> : null}</span>}
+                        description={o.note ? <span style={{ fontSize: 12 }}>{o.note}</span> : <span style={{ fontSize: 12, opacity: 0.75 }}>Izoh yo‘q</span>}
+                      />
+                    </List.Item>
+                  );
+                }}
+              />
+            )}
+          </Card>
+
+          <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
+            <div style={{ fontWeight: 1000, marginBottom: 10 }}>Mos mashinalar (informatsion)</div>
+            <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 10 }}>
+              Bu ro‘yxat — kimlar potensial mos. Real tanlov taklif (offer) orqali bo‘ladi.
+            </div>
+            <List
+              size="small"
+              dataSource={(matches || []).slice(0, 10)}
+              locale={{ emptyText: "Mos mashina topilmadi (yoki hali online yo‘q)" }}
+              renderItem={(m) => {
+                const v = m.vehicle || {};
+                return (
+                  <List.Item>
+                    <div style={{ display: "flex", justifyContent: "space-between", width: "100%", gap: 10 }}>
+                      <div>
+                        <div style={{ fontWeight: 900 }}>{v.title || "Yuk mashina"} {v.plate_number ? <Text type="secondary">• {v.plate_number}</Text> : null}</div>
+                        <div style={{ fontSize: 12, opacity: 0.75 }}>
+                          {v.body_type ? `Turi: ${v.body_type}` : ""}
+                          {Number.isFinite(v.capacity_kg) ? ` • ${v.capacity_kg} kg` : ""}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right", fontSize: 12, opacity: 0.75 }}>
+                        {Number.isFinite(m.dist_from_km) ? `${m.dist_from_km.toFixed(1)} km` : ""}
+                      </div>
+                    </div>
+                  </List.Item>
+                );
+              }}
+            />
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Create cargo view
   return (
-    <div style={{ padding: 14, maxWidth: 760, margin: "0 auto" }}>
+    <div style={{ padding: 14, maxWidth: 840, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
         <div>
-          <Title level={4} style={{ margin: 0 }}>Yuk mashina</Title>
-          <Text type="secondary" style={{ fontSize: 12 }}>Yuklash/tushirish nuqtalarini belgilang, mashinani tanlang.</Text>
+          <Title level={4} style={{ margin: 0 }}>Yuk tashish</Title>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Nuqtalarni belgilang, yuk detallarini to‘ldiring va e’lon qiling — haydovchilar taklif yuboradi.
+          </Text>
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 11, opacity: 0.7 }}>Taxminiy</div>
+          <div style={{ fontSize: 11, opacity: 0.7 }}>Taxminiy budget</div>
           <div style={{ fontWeight: 1000, fontSize: 18 }}>{formatUZS(estimatedPrice)}</div>
         </div>
       </div>
@@ -118,8 +315,11 @@ function InnerFreightPage() {
 
       <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
         <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
-          <div style={{ fontWeight: 1000, marginBottom: 10 }}>Mashina turini tanlang</div>
+          <div style={{ fontWeight: 1000, marginBottom: 10 }}>Mashina sinfi (tavsiya)</div>
           <TruckSelector />
+          <div style={{ fontSize: 12, opacity: 0.75, marginTop: 8 }}>
+            Eslatma: yakuniy tanlovni haydovchi takliflari orqali qilasiz.
+          </div>
         </Card>
 
         <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
@@ -133,29 +333,19 @@ function InnerFreightPage() {
           </div>
         </Card>
 
-        <PriceEstimator />
-
         <div style={{ position: "sticky", bottom: 12, zIndex: 5 }}>
-          {mode ? (
-            <ActiveFreightPanel mode={mode} onCancel={handleCancel} />
-          ) : (
-            <Button type="primary" size="large" icon={<SendOutlined />} style={{ width: "100%", borderRadius: 18, height: 52, fontWeight: 900 }} onClick={handleCreate} disabled={!canOrder}>
-              Buyurtma berish
-            </Button>
-          )}
+          <Button
+            type="primary"
+            size="large"
+            icon={<SendOutlined />}
+            style={{ width: "100%", borderRadius: 18, height: 52, fontWeight: 900 }}
+            onClick={postCargo}
+            disabled={!canPost}
+          >
+            Yukni e’lon qilish
+          </Button>
         </div>
       </div>
-
-      {mode === "coming" && assignedDriver && (
-        <div style={{ marginTop: 12 }}>
-          <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
-            <div style={{ fontWeight: 1000, marginBottom: 6 }}>Haydovchi</div>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              {assignedDriver?.first_name || "Haydovchi"} • {assignedDriver?.car_model || ""} • {assignedDriver?.car_plate || ""}
-            </Text>
-          </Card>
-        </div>
-      )}
     </div>
   );
 }
@@ -163,7 +353,7 @@ function InnerFreightPage() {
 export default function ClientFreightPage() {
   return (
     <FreightProvider>
-      <InnerFreightPage />
+      <Inner />
     </FreightProvider>
   );
 }

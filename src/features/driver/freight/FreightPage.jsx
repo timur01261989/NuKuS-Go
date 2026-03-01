@@ -1,265 +1,322 @@
-import React, { useMemo, useState } from "react";
-import { Button, Card, Col, Row, Tag, message, Spin } from "antd";
-import { CheckCircleOutlined, ThunderboltOutlined, CameraOutlined, InfoCircleOutlined } from "@ant-design/icons";
-import { FreightProvider, useFreight } from "./context/FreightContext";
-import VehiclePassport from "./components/shared/VehiclePassport";
-import PhotoGallery from "./components/shared/PhotoGallery";
-import UnifiedOrdersFeed from "./components/shared/UnifiedOrdersFeed";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Button, Card, Divider, Input, InputNumber, List, Modal, Switch, Tag, Typography, message } from "antd";
+import { ReloadOutlined, EnvironmentOutlined, DollarOutlined } from "@ant-design/icons";
 
-import RouteBidBoard from "./components/modes/long-haul/RouteBidBoard";
-import TruckLoadVisual from "./components/modes/long-haul/TruckLoadVisual";
-import ReturnTripSetup from "./components/modes/long-haul/ReturnTripSetup";
+import { useAuth } from "@/shared/auth/AuthProvider";
+import { upsertVehicle, setVehicleOnline, listVehicleCargo, createOffer } from "./services/freightApi";
+import { formatUZS } from "@/features/client/freight/services/truckData";
 
-import HourlyRateSetup from "./components/modes/city-logistics/HourlyRateSetup";
-import MoverOption from "./components/modes/city-logistics/MoverOption";
-import QuickOrderMap from "./components/modes/city-logistics/QuickOrderMap";
+const { Title, Text } = Typography;
 
-import MaterialSelector from "./components/modes/bulk-materials/MaterialSelector";
-import VolumePriceInput from "./components/modes/bulk-materials/VolumePriceInput";
-import QuarryLocator from "./components/modes/bulk-materials/QuarryLocator";
+function useGeo() {
+  const [pos, setPos] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-import HeavyLoadAlert from "./components/modals/HeavyLoadAlert";
-import WeighStationInfo from "./components/modals/WeighStationInfo";
-
-import { useFreightSocket } from "./hooks/useFreightSocket";
-import { useTruckFilter } from "./hooks/useTruckFilter";
-import { useMaterialCalculator } from "./hooks/useMaterialCalculator";
-import { bidOnOrder } from "./services/freightApi";
-
-const VEHICLES = [
-  { id: "labo", title: "Labo / Damas", kind: "small", capacityTons: 0.6, bodyMeters: 1.6, image: "🛻", tent: false, openBody: false },
-  { id: "gazel", title: "Gazel / Porter", kind: "medium", capacityTons: 1.5, bodyMeters: 3.0, image: "🚚", tent: true, openBody: false },
-  { id: "isuzu", title: "Isuzu", kind: "medium", capacityTons: 3.5, bodyMeters: 4.2, image: "🚛", tent: true, openBody: false },
-  { id: "fura", title: "Fura (Katta yuk)", kind: "heavy", capacityTons: 20, bodyMeters: 12, image: "🚛", tent: true, openBody: false },
-  { id: "kamaz", title: "Kamaz / Samosval", kind: "bulk", capacityTons: 10, bodyMeters: 6, image: "🚜", tent: false, openBody: true },
-];
-
-function FreightInner() {
-  const { state, dispatch } = useFreight();
-  const [heavyOpen, setHeavyOpen] = useState(false);
-  const [weighOpen, setWeighOpen] = useState(false);
-
-  // load orders realtime/polling when active
-  const enabled = state.step === 3;
-  useFreightSocket({ enabled, dispatch, vehicle: state.vehicle, mode: state.mode });
-
-  const filtered = useTruckFilter(state.orders, state.vehicle, state.mode);
-  const bulkTotal = useMaterialCalculator(state.volume, state.bulkPrice);
-
-  const modeLabel = useMemo(() => {
-    if (state.mode === "long-haul") return "Uzoq yo'l";
-    if (state.mode === "city-logistics") return "Shahar ichi";
-    if (state.mode === "bulk-materials") return "Qurilish material";
-    return "";
-  }, [state.mode]);
-
-  const canProceedMode = !!state.vehicle;
-  const canProceedActive = !!state.mode;
-
-  const chooseVehicle = (v) => {
-    dispatch({ type: "SET_VEHICLE", vehicle: v });
-    // auto mode suggestion
-    if (v.kind === "bulk") dispatch({ type: "SET_MODE", mode: "bulk-materials" });
-    else if (v.kind === "small") dispatch({ type: "SET_MODE", mode: "city-logistics" });
-    else dispatch({ type: "SET_MODE", mode: "long-haul" });
-  };
-
-  const bid = async (order) => {
-    try {
-      const hide = message.loading("Taklif yuborilmoqda...", 0);
-      await bidOnOrder({ order_id: order.id, price: order.budget || null });
-      hide();
-      message.success("Taklif yuborildi");
-    } catch (e) {
-      message.error(e?.message || "Taklif yuborilmadi");
+  const refresh = useCallback(() => {
+    if (!navigator?.geolocation) {
+      message.error("Brauzer geolokatsiyani qo‘llamaydi");
+      return;
     }
-  };
+    setLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        setLoading(false);
+        setPos({ lat: p.coords.latitude, lng: p.coords.longitude });
+      },
+      (err) => {
+        setLoading(false);
+        message.error(err?.message || "Joylashuvni olishda xatolik");
+      },
+      { enableHighAccuracy: true, timeout: 15000 }
+    );
+  }, []);
 
-  return (
-    <div style={{ padding: 14, maxWidth: 980, margin: "0 auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 12 }}>
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 900 }}>Freight (Haydovchi)</div>
-          <div style={{ fontSize: 12, color: "#666" }}>Mashina → Rejim → Aktiv feed</div>
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {state.mode ? <Tag color="gold" style={{ margin: 0 }}>{modeLabel}</Tag> : null}
-          {state.vehicle ? <Tag color="blue" style={{ margin: 0 }}>{state.vehicle.title}</Tag> : null}
-        </div>
-      </div>
-
-      {/* STEP INDICATOR */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
-        {[1,2,3].map((s) => (
-          <div key={s} style={{
-            flex: 1,
-            borderRadius: 14,
-            padding: 10,
-            background: state.step === s ? "#111" : "#f5f5f5",
-            color: state.step === s ? "#fff" : "#333",
-            fontWeight: 800,
-            textAlign: "center"
-          }}>
-            {s === 1 ? "1) Mashina" : s === 2 ? "2) Rejim" : "3) Aktiv"}
-          </div>
-        ))}
-      </div>
-
-      {state.step === 1 ? (
-        <Card style={{ borderRadius: 18 }}>
-          <div style={{ fontWeight: 900, marginBottom: 10 }}>Siz nima haydaysiz?</div>
-          <Row gutter={[12, 12]}>
-            {VEHICLES.map((v) => (
-              <Col xs={24} sm={12} md={8} key={v.id}>
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => chooseVehicle(v)}
-                  onKeyDown={(e) => e.key === "Enter" && chooseVehicle(v)}
-                  style={{
-                    borderRadius: 18,
-                    border: state.vehicle?.id === v.id ? "2px solid #52c41a" : "1px solid #eee",
-                    padding: 14,
-                    cursor: "pointer",
-                    background: state.vehicle?.id === v.id ? "#f6ffed" : "#fff",
-                    boxShadow: "0 10px 24px rgba(0,0,0,.06)",
-                  }}
-                >
-                  <div style={{ fontSize: 34 }}>{v.image}</div>
-                  <div style={{ fontWeight: 900, marginTop: 6 }}>{v.title}</div>
-                  <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
-                    {v.capacityTons}t • {v.bodyMeters}m
-                  </div>
-                </div>
-              </Col>
-            ))}
-          </Row>
-
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
-            <Button
-              type="primary"
-              icon={<CheckCircleOutlined />}
-              disabled={!canProceedMode}
-              onClick={() => dispatch({ type: "GO_STEP", step: 2 })}
-            >
-              Davom etish
-            </Button>
-          </div>
-        </Card>
-      ) : null}
-
-      {state.step === 2 ? (
-        <div style={{ display: "grid", gap: 12 }}>
-          <VehiclePassport vehicle={state.vehicle} />
-          <PhotoGallery photos={state.photos} onChange={(photos) => dispatch({ type: "SET_PHOTOS", photos })} />
-
-          {/* MODE CONFIG */}
-          {state.mode === "long-haul" ? (
-            <>
-              <RouteBidBoard
-                route={state.route}
-                onRouteChange={(route) => dispatch({ type: "SET_ROUTE", route })}
-                orders={filtered}
-                onBid={bid}
-              />
-              <TruckLoadVisual fillPct={state.loadFillPct} onChange={(pct) => dispatch({ type: "SET_LOAD_FILL", pct })} />
-              <ReturnTripSetup enabled={state.route.returnTrip} onChange={(v) => dispatch({ type: "SET_RETURN_TRIP", value: v })} />
-            </>
-          ) : null}
-
-          {state.mode === "city-logistics" ? (
-            <>
-              <HourlyRateSetup pricing={state.pricing} onChange={(pricing) => dispatch({ type: "SET_CITY_PRICING", pricing })} />
-              <MoverOption movers={state.movers} onChange={(movers) => dispatch({ type: "SET_MOVERS", movers })} />
-              <QuickOrderMap orders={filtered} />
-            </>
-          ) : null}
-
-          {state.mode === "bulk-materials" ? (
-            <>
-              <MaterialSelector material={state.material} onChange={(material) => dispatch({ type: "SET_MATERIAL", material })} />
-              <VolumePriceInput
-                volume={state.volume}
-                bulkPrice={state.bulkPrice}
-                onVolumeChange={(volume) => dispatch({ type: "SET_VOLUME", volume })}
-                onPriceChange={(bulkPrice) => dispatch({ type: "SET_BULK_PRICE", bulkPrice })}
-              />
-              <QuarryLocator quarry={state.quarry} onChange={(q) => dispatch({ type: "SET_QUARRY", quarry: q })} />
-              <Card size="small" style={{ borderRadius: 16 }}>
-                <div style={{ fontWeight: 900, marginBottom: 6 }}>Hisob (demo)</div>
-                <div style={{ fontSize: 13, color: "#333" }}>
-                  Jami: <b>{bulkTotal.toLocaleString("ru-RU")} so‘m</b>
-                </div>
-                <div style={{ fontSize: 12, color: "#666", marginTop: 6 }}>
-                  (Material + hajm + narx asosida)
-                </div>
-              </Card>
-            </>
-          ) : null}
-
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-            <Button onClick={() => dispatch({ type: "GO_STEP", step: 1 })}>Orqaga</Button>
-            <Button
-              type="primary"
-              icon={<ThunderboltOutlined />}
-              disabled={!canProceedActive}
-              onClick={() => dispatch({ type: "GO_STEP", step: 3 })}
-            >
-              Aktiv bo‘lish
-            </Button>
-          </div>
-        </div>
-      ) : null}
-
-      {state.step === 3 ? (
-        <div style={{ display: "grid", gap: 12 }}>
-          <Card style={{ borderRadius: 18 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-              <div>
-                <div style={{ fontWeight: 900, fontSize: 16 }}>Aktiv feed</div>
-                <div style={{ fontSize: 12, color: "#666" }}>
-                  Sizning mashinangizga mos buyurtmalar ko‘rsatiladi
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <Button icon={<CameraOutlined />} onClick={() => message.info("Tez rasm olish: keyingi bosqichda (kamera)")} />
-                <Button icon={<InfoCircleOutlined />} onClick={() => setWeighOpen(true)} />
-              </div>
-            </div>
-          </Card>
-
-          {state.loadingOrders ? (
-            <Card style={{ borderRadius: 18, textAlign: "center", padding: 24 }}>
-              <Spin />
-              <div style={{ marginTop: 8, color: "#666" }}>Yuklar yuklanmoqda...</div>
-            </Card>
-          ) : (
-            <UnifiedOrdersFeed
-              orders={filtered}
-              onBid={(o) => {
-                if (o?.weight_tons && Number(o.weight_tons) > 10) setHeavyOpen(true);
-                bid(o);
-              }}
-            />
-          )}
-
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-            <Button onClick={() => dispatch({ type: "GO_STEP", step: 2 })}>Sozlamalar</Button>
-            <Button danger onClick={() => dispatch({ type: "GO_STEP", step: 1 })}>Yakunlash</Button>
-          </div>
-        </div>
-      ) : null}
-
-      <HeavyLoadAlert open={heavyOpen} onClose={() => setHeavyOpen(false)} tons={12} />
-      <WeighStationInfo open={weighOpen} onClose={() => setWeighOpen(false)} />
-    </div>
-  );
+  return { pos, refresh, loading };
 }
 
 export default function FreightPage() {
+  const { user } = useAuth();
+
+  const [vehicleId, setVehicleId] = useState(() => {
+    try {
+      return localStorage.getItem("freightVehicleId") || "";
+    } catch {
+      return "";
+    }
+  });
+  const [vehicle, setVehicle] = useState(null);
+
+  const [title, setTitle] = useState("");
+  const [bodyType, setBodyType] = useState("gazelle");
+  const [plateNumber, setPlateNumber] = useState("");
+  const [capacityKg, setCapacityKg] = useState(1500);
+  const [capacityM3, setCapacityM3] = useState(8);
+
+  const [isOnline, setIsOnline] = useState(false);
+  const { pos, refresh: refreshPos, loading: geoLoading } = useGeo();
+
+  const [feed, setFeed] = useState([]);
+  const [feedLoading, setFeedLoading] = useState(false);
+
+  const [offerOpen, setOfferOpen] = useState(false);
+  const [offerCargo, setOfferCargo] = useState(null);
+  const [offerPrice, setOfferPrice] = useState(0);
+  const [offerEta, setOfferEta] = useState(20);
+  const [offerNote, setOfferNote] = useState("");
+
+  const driverId = user?.id || "";
+
+  const canOperate = useMemo(() => !!driverId, [driverId]);
+
+  const saveVehicle = useCallback(async () => {
+    if (!canOperate) return message.error("Avval haydovchi sifatida tizimga kiring");
+    const hide = message.loading("Mashina saqlanmoqda...", 0);
+    try {
+      const payload = {
+        driverId,
+        vehicleId: vehicleId || undefined,
+        title: title || null,
+        bodyType,
+        plateNumber: plateNumber || null,
+        capacityKg: Number(capacityKg || 0),
+        capacityM3: Number(capacityM3 || 0),
+      };
+      const res = await upsertVehicle(payload);
+      const v = res?.data?.data || res?.data || res?.data?.vehicle || null;
+      const id = v?.id || res?.data?.id || res?.id;
+      if (!id) throw new Error("Serverdan vehicleId kelmadi");
+      setVehicleId(String(id));
+      setVehicle(v);
+      try {
+        localStorage.setItem("freightVehicleId", String(id));
+      } catch {}
+      message.success("Mashina saqlandi");
+    } catch (e) {
+      message.error("Xatolik: " + (e?.message || ""));
+    } finally {
+      hide();
+    }
+  }, [canOperate, driverId, vehicleId, title, bodyType, plateNumber, capacityKg, capacityM3]);
+
+  const toggleOnline = useCallback(
+    async (next) => {
+      if (!vehicleId) {
+        message.error("Avval mashinani saqlang");
+        return;
+      }
+      if (next && !pos) {
+        message.error("Online chiqishdan oldin joylashuvni oling");
+        return;
+      }
+      const hide = message.loading(next ? "Online..." : "Offline...", 0);
+      try {
+        const res = await setVehicleOnline({
+          vehicleId,
+          isOnline: !!next,
+          current: pos ? { latlng: pos } : null,
+        });
+        const v = res?.data?.data || res?.data || null;
+        setVehicle(v);
+        setIsOnline(!!v?.is_online);
+        message.success(next ? "Online" : "Offline");
+      } catch (e) {
+        message.error("Xatolik: " + (e?.message || ""));
+      } finally {
+        hide();
+      }
+    },
+    [vehicleId, pos]
+  );
+
+  const refreshFeed = useCallback(async () => {
+    if (!vehicleId) return;
+    setFeedLoading(true);
+    try {
+      const res = await listVehicleCargo({ vehicleId, radiusKm: 30 });
+      const list = res?.data?.data || res?.data || [];
+      setFeed(Array.isArray(list) ? list : []);
+    } catch (e) {
+      message.error(e?.message || "Yuklarni olishda xatolik");
+    } finally {
+      setFeedLoading(false);
+    }
+  }, [vehicleId]);
+
+  useEffect(() => {
+    if (!vehicleId) return;
+    const iid = setInterval(() => {
+      if (isOnline) refreshFeed();
+    }, 6000);
+    return () => clearInterval(iid);
+  }, [vehicleId, isOnline, refreshFeed]);
+
+  const openOffer = useCallback((cargoWrap) => {
+    const c = cargoWrap?.cargo || cargoWrap;
+    setOfferCargo(c);
+    setOfferPrice(Number(c?.budget || 0) || 0);
+    setOfferEta(20);
+    setOfferNote("");
+    setOfferOpen(true);
+  }, []);
+
+  const sendOffer = useCallback(async () => {
+    if (!offerCargo?.id) return;
+    if (!vehicleId || !driverId) return;
+    const p = Number(offerPrice);
+    if (!Number.isFinite(p) || p <= 0) return message.error("Narx noto‘g‘ri");
+
+    const hide = message.loading("Taklif yuborilmoqda...", 0);
+    try {
+      await createOffer({
+        cargoId: offerCargo.id,
+        vehicleId,
+        driverId,
+        price: p,
+        etaMinutes: Number(offerEta || 0) || null,
+        note: offerNote || null,
+      });
+      message.success("Taklif yuborildi");
+      setOfferOpen(false);
+      refreshFeed();
+    } catch (e) {
+      message.error("Xatolik: " + (e?.message || ""));
+    } finally {
+      hide();
+    }
+  }, [offerCargo, vehicleId, driverId, offerPrice, offerEta, offerNote, refreshFeed]);
+
   return (
-    <FreightProvider>
-      <FreightInner />
-    </FreightProvider>
+    <div style={{ padding: 14, maxWidth: 920, margin: "0 auto" }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
+        <div>
+          <Title level={4} style={{ margin: 0 }}>Yuk tashish (haydovchi)</Title>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Mashinani kiriting → Online bo‘ling → Mos yuklarga taklif yuboring.
+          </Text>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <Button icon={<EnvironmentOutlined />} loading={geoLoading} onClick={refreshPos}>Joylashuv</Button>
+          <Button icon={<ReloadOutlined />} onClick={refreshFeed} disabled={!vehicleId} loading={feedLoading} />
+        </div>
+      </div>
+
+      <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
+        <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+            <div style={{ fontWeight: 1000 }}>Mening yuk mashinam</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Text type="secondary">Online</Text>
+              <Switch checked={isOnline} onChange={toggleOnline} disabled={!vehicleId || !pos} />
+            </div>
+          </div>
+          <Divider style={{ margin: "10px 0" }} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div>
+              <div style={{ fontWeight: 900, marginBottom: 6 }}>Nom (ixtiyoriy)</div>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Masalan: Gazel" />
+            </div>
+            <div>
+              <div style={{ fontWeight: 900, marginBottom: 6 }}>Davlat raqami</div>
+              <Input value={plateNumber} onChange={(e) => setPlateNumber(e.target.value)} placeholder="01A123BC" />
+            </div>
+            <div>
+              <div style={{ fontWeight: 900, marginBottom: 6 }}>Turi (text)</div>
+              <Input value={bodyType} onChange={(e) => setBodyType(e.target.value)} placeholder="gazelle / fura / ..." />
+            </div>
+            <div>
+              <div style={{ fontWeight: 900, marginBottom: 6 }}>Sig‘imi</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <InputNumber style={{ width: "100%" }} min={0} value={capacityKg} onChange={(v) => setCapacityKg(Number(v || 0))} addonAfter="kg" />
+                <InputNumber style={{ width: "100%" }} min={0} step={0.1} value={capacityM3} onChange={(v) => setCapacityM3(Number(v || 0))} addonAfter="m³" />
+              </div>
+            </div>
+          </div>
+          <div style={{ marginTop: 12, display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <Button type="primary" onClick={saveVehicle} disabled={!canOperate}>Saqlash</Button>
+          </div>
+          <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>
+            Online uchun: joylashuv kerak. Hozir: {pos ? `${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}` : "—"}
+          </div>
+        </Card>
+
+        <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+            <div style={{ fontWeight: 1000 }}>Mos yuklar (board)</div>
+            {isOnline ? <Tag color="green">Online</Tag> : <Tag>Offline</Tag>}
+          </div>
+          <div style={{ marginTop: 6, fontSize: 12, opacity: 0.75 }}>
+            Yuklar 30 km radius bo‘yicha saralanadi (current location).
+          </div>
+          <Divider style={{ margin: "10px 0" }} />
+
+          <List
+            loading={feedLoading}
+            dataSource={feed}
+            locale={{ emptyText: "Hozircha mos yuk yo‘q" }}
+            renderItem={(item) => {
+              const c = item.cargo;
+              return (
+                <List.Item
+                  actions={[
+                    <Button key="offer" icon={<DollarOutlined />} onClick={() => openOffer(item)}>
+                      Taklif
+                    </Button>,
+                  ]}
+                >
+                  <List.Item.Meta
+                    title={
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                        <span style={{ fontWeight: 900 }}>{c?.title || "Yuk"}</span>
+                        {c?.budget ? <Tag color="blue">budget: {formatUZS(c.budget)}</Tag> : null}
+                        <Tag>{c?.status}</Tag>
+                      </div>
+                    }
+                    description={
+                      <div style={{ fontSize: 12 }}>
+                        <div style={{ opacity: 0.85 }}>
+                          {c?.weight_kg ? `${c.weight_kg} kg` : ""}{c?.volume_m3 ? ` • ${c.volume_m3} m³` : ""}
+                          {Number.isFinite(item.dist_from_km) ? ` • ${item.dist_from_km.toFixed(1)} km` : ""}
+                        </div>
+                        <div style={{ opacity: 0.7 }}>
+                          {c?.from_address ? `📍 ${c.from_address}` : ""}
+                          {c?.to_address ? `  →  ${c.to_address}` : ""}
+                        </div>
+                      </div>
+                    }
+                  />
+                </List.Item>
+              );
+            }}
+          />
+        </Card>
+      </div>
+
+      <Modal
+        open={offerOpen}
+        onCancel={() => setOfferOpen(false)}
+        onOk={sendOffer}
+        okText="Yuborish"
+        cancelText="Bekor"
+        title="Taklif yuborish"
+      >
+        <div style={{ display: "grid", gap: 10 }}>
+          <div style={{ fontSize: 12, opacity: 0.75 }}>
+            Yuk: <b>{offerCargo?.title || "-"}</b>
+          </div>
+          <div>
+            <div style={{ fontWeight: 900, marginBottom: 6 }}>Narx (so‘m)</div>
+            <InputNumber style={{ width: "100%" }} min={0} value={offerPrice} onChange={(v) => setOfferPrice(Number(v || 0))} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 900, marginBottom: 6 }}>Yetib borish (min, ixtiyoriy)</div>
+            <InputNumber style={{ width: "100%" }} min={0} value={offerEta} onChange={(v) => setOfferEta(Number(v || 0))} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 900, marginBottom: 6 }}>Izoh (ixtiyoriy)</div>
+            <Input.TextArea rows={3} value={offerNote} onChange={(e) => setOfferNote(e.target.value)} placeholder="Masalan: 20 daqiqada boraman" />
+          </div>
+        </div>
+      </Modal>
+    </div>
   );
 }

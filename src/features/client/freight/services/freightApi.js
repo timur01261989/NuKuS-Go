@@ -1,17 +1,29 @@
 import api from "@/utils/apiHelper";
 import { nominatimReverse as _nominatimReverse } from "../../shared/geo/nominatim";
 
-
-export async function createFreightOrder(payload) {
-  return api.post("/api/order", { action: "create_freight", ...payload });
+// NEW: Cargo marketplace freight
+export async function createCargo(payload) {
+  return api.post("/api/freight", { action: "create_cargo", ...payload });
 }
 
-export async function cancelFreightOrder(orderId) {
-  return api.post("/api/order", { action: "cancel", orderId });
+export async function cancelCargo({ cargoId, actorId }) {
+  return api.post("/api/freight", { action: "cancel_cargo", cargoId, actorId });
 }
 
-export async function freightStatus(orderId) {
-  return api.post("/api/order", { action: "status", orderId });
+export async function cargoStatus({ cargoId }) {
+  return api.post("/api/freight", { action: "cargo_status", cargoId });
+}
+
+export async function matchVehicles({ cargoId, radiusKm = 30 }) {
+  return api.post("/api/freight", { action: "match_vehicles", cargoId, radiusKm });
+}
+
+export async function listOffers({ cargoId }) {
+  return api.post("/api/freight", { action: "list_offers", cargoId });
+}
+
+export async function acceptOffer({ cargoId, offerId, ownerId }) {
+  return api.post("/api/freight", { action: "accept_offer", cargoId, offerId, ownerId });
 }
 
 export async function nominatimReverse(lat, lng, signal) {

@@ -10,6 +10,9 @@ export function FreightProvider({ children }) {
   const [dropoff, setDropoff] = useState({ latlng: null, address: "" });
 
   const [cargoName, setCargoName] = useState("");
+  const [cargoType, setCargoType] = useState("");
+  const [weightKg, setWeightKg] = useState(0);
+  const [volumeM3, setVolumeM3] = useState(0);
   const [note, setNote] = useState("");
 
   const [photoFile, setPhotoFile] = useState(null);
@@ -38,6 +41,9 @@ export function FreightProvider({ children }) {
       pickup, setPickup,
       dropoff, setDropoff,
       cargoName, setCargoName,
+      cargoType, setCargoType,
+      weightKg, setWeightKg,
+      volumeM3, setVolumeM3,
       note, setNote,
       photoFile, setPhotoFile,
       photoUrl, setPhotoUrl,
@@ -48,7 +54,7 @@ export function FreightProvider({ children }) {
       loadersFee,
       estimatedPrice,
     }),
-    [truckId, truck, pickup, dropoff, cargoName, note, photoFile, photoUrl, loadersEnabled, loadersCount, distanceKm, durationMin, loadersFee, estimatedPrice]
+    [truckId, truck, pickup, dropoff, cargoName, cargoType, weightKg, volumeM3, note, photoFile, photoUrl, loadersEnabled, loadersCount, distanceKm, durationMin, loadersFee, estimatedPrice]
   );
 
   return <FreightContext.Provider value={value}>{children}</FreightContext.Provider>;
