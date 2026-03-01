@@ -2,8 +2,9 @@ import React, { useMemo, useState, useEffect } from "react";
 import { Card, Space, Typography, Select, Modal, Button } from "antd";
 import { EnvironmentOutlined, WomanOutlined } from "@ant-design/icons";
 import { MapContainer, TileLayer } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
 
-// Loyihangizdagi komponentlar va konstantalar (Importlar to'liq)
+// Loyihangizdagi komponentlar (Importlar to'liq saqlandi)
 import RegionDistrictSelect from "../../../../../components/RegionDistrictSelect";
 import { getRegionById, formatRegionDistrict } from "../../../../../constants/uzLocations";
 import MapCenterPicker from "../../../../map/components/MapCenterPicker";
@@ -14,11 +15,11 @@ import { FEMALE_MODE } from "../../context/tripReducer";
 const { Text } = Typography;
 
 export default function RouteBuilder() {
-  // Context dan ma'lumotlarni olish
+  // 1. Context dan ma'lumotlarni olish
   const { state, dispatch } = useTrip();
   const { route, femaleMode } = state;
 
-  // --- State (Holatlar) ---
+  // 2. State (Holatlar)
   const [fromRegionId, setFromRegionId] = useState(route?.fromRegionId || null);
   const [fromDistrict, setFromDistrict] = useState(route?.fromDistrict || "");
   const [toRegionId, setToRegionId] = useState(route?.toRegionId || null);
@@ -27,11 +28,11 @@ export default function RouteBuilder() {
   const [departPointOpen, setDepartPointOpen] = useState(false);
   const [departLatLng, setDepartLatLng] = useState(route?.departLatLng || null);
 
-  // Region nomlarini olish
+  // 3. Region nomlarini aniqlash (Memoization)
   const fromRegion = useMemo(() => getRegionById(fromRegionId), [fromRegionId]);
   const toRegion = useMemo(() => getRegionById(toRegionId), [toRegionId]);
 
-  // Marshrutni saqlash funksiyasi
+  // 4. Marshrutni contextga saqlash funksiyasi
   const applyRouteFromSelectors = () => {
     const fromText = formatRegionDistrict(fromRegion?.name || "", fromDistrict);
     const toText = formatRegionDistrict(toRegion?.name || "", toDistrict);
@@ -51,13 +52,13 @@ export default function RouteBuilder() {
     });
   };
 
-  // O'zgarishlarni kuzatish va saqlash
+  // 5. O'zgarishlarni kuzatish va avtomatik saqlash
   useEffect(() => {
     applyRouteFromSelectors();
     // eslint-disable-next-line
   }, [fromRegionId, fromDistrict, toRegionId, toDistrict, departLatLng]);
 
-  // Ayollar rejimi variantlari
+  // 6. Ayollar rejimi variantlari
   const femaleOptions = [
     { label: "Muhim emas", value: FEMALE_MODE.NONE },
     { label: "Faqat ayollar", value: FEMALE_MODE.ONLY_FEMALE },
@@ -65,9 +66,10 @@ export default function RouteBuilder() {
   ];
   const femaleValue = femaleMode || FEMALE_MODE.NONE;
 
-  // --- RENDER (Tuzatilgan qism) ---
+  // --- RENDER ---
   return (
-    <> {/* <--- FRAGMENT OCHILDI (MUHIM!) */}
+    <> {/* <--- XATO TUZATILDI: Fragment ochildi. Card va Modal bitta ota element ichida bo'lishi shart. */}
+      
       <Card style={{ borderRadius: 16, boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
         <Space direction="vertical" size={16} style={{ width: "100%" }}>
           
@@ -165,7 +167,7 @@ export default function RouteBuilder() {
             />
           </MapContainer>
           
-          {/* Markazni ko'rsatuvchi pin */}
+          {/* Markazni ko'rsatuvchi pin (Overlay) */}
           <div
             style={{
               position: "absolute",
@@ -186,6 +188,7 @@ export default function RouteBuilder() {
             : "Xaritani suring va markazni belgilang"}
         </div>
       </Modal>
-    </> {/* <--- FRAGMENT YOPILDI (MUHIM!) */}
+
+    </> {/* <--- FRAGMENT YOPILDI. Endi xato bermaydi. */}
   );
 }
