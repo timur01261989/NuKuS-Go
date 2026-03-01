@@ -4,11 +4,13 @@ import { EnvironmentOutlined, WomanOutlined } from "@ant-design/icons";
 import { MapContainer, TileLayer } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
-// Loyihangizdagi komponentlar (Importlar to'liq saqlandi)
+// --- LOYIHA KOMPONENTLARI VA KONSTANTALAR ---
+// Iltimos, bu yo'llar to'g'ri ekanligiga ishonch hosil qiling
 import RegionDistrictSelect from "../../../../../components/RegionDistrictSelect";
 import { getRegionById, formatRegionDistrict } from "../../../../../constants/uzLocations";
 import MapCenterPicker from "../../../../map/components/MapCenterPicker";
 
+// --- CONTEXT ---
 import { useTrip } from "../../context/TripContext";
 import { FEMALE_MODE } from "../../context/tripReducer";
 
@@ -17,11 +19,14 @@ const { Text } = Typography;
 export default function RouteBuilder() {
   // 1. Context dan ma'lumotlarni olish
   const { state, dispatch } = useTrip();
-  const { route, femaleMode } = state;
+  
+  // route obyekti bo'sh bo'lsa, xato bermasligi uchun {} beramiz
+  const { route = {}, femaleMode } = state || {};
 
-  // 2. State (Holatlar)
+  // 2. State (Holatlar) - route?.parametr orqali xavfsiz olish
   const [fromRegionId, setFromRegionId] = useState(route?.fromRegionId || null);
   const [fromDistrict, setFromDistrict] = useState(route?.fromDistrict || "");
+  
   const [toRegionId, setToRegionId] = useState(route?.toRegionId || null);
   const [toDistrict, setToDistrict] = useState(route?.toDistrict || "");
 
@@ -34,13 +39,14 @@ export default function RouteBuilder() {
 
   // 4. Marshrutni contextga saqlash funksiyasi
   const applyRouteFromSelectors = () => {
+    // Agar region tanlanmagan bo'lsa, nomini bo'sh qoldiramiz
     const fromText = formatRegionDistrict(fromRegion?.name || "", fromDistrict);
     const toText = formatRegionDistrict(toRegion?.name || "", toDistrict);
 
     dispatch({
       type: "SET_ROUTE",
       payload: {
-        ...route,
+        ...route, // Eski ma'lumotlarni saqlab qolish
         from: fromText,
         to: toText,
         fromRegionId,
@@ -55,7 +61,7 @@ export default function RouteBuilder() {
   // 5. O'zgarishlarni kuzatish va avtomatik saqlash
   useEffect(() => {
     applyRouteFromSelectors();
-    // eslint-disable-next-line
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromRegionId, fromDistrict, toRegionId, toDistrict, departLatLng]);
 
   // 6. Ayollar rejimi variantlari
@@ -64,12 +70,13 @@ export default function RouteBuilder() {
     { label: "Faqat ayollar", value: FEMALE_MODE.ONLY_FEMALE },
     { label: "Ayol oilasi bilan", value: FEMALE_MODE.FEMALE_WITH_FAMILY },
   ];
+  
   const femaleValue = femaleMode || FEMALE_MODE.NONE;
 
   // --- RENDER ---
   return (
-    <> {/* <--- XATO TUZATILDI: Fragment ochildi. Card va Modal bitta ota element ichida bo'lishi shart. */}
-      
+    <>
+      {/* ASOSIY CARD */}
       <Card style={{ borderRadius: 16, boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
         <Space direction="vertical" size={16} style={{ width: "100%" }}>
           
@@ -156,7 +163,7 @@ export default function RouteBuilder() {
         <div style={{ height: 400, width: "100%", position: "relative" }}>
           {/* Xarita komponenti */}
           <MapContainer
-            center={departLatLng || [41.311, 69.24]}
+            center={departLatLng || [41.311, 69.24]} // Default: Tashkent
             zoom={6}
             style={{ width: "100%", height: "100%" }}
           >
@@ -188,7 +195,6 @@ export default function RouteBuilder() {
             : "Xaritani suring va markazni belgilang"}
         </div>
       </Modal>
-
-    </> {/* <--- FRAGMENT YOPILDI. Endi xato bermaydi. */}
+    </>
   );
 }
