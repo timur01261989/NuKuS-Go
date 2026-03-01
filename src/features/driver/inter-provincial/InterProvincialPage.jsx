@@ -7,6 +7,7 @@ import L from "leaflet";
 import RegionDistrictSelect from "@/shared/components/RegionDistrictSelect";
 import { UZ_REGIONS } from "@/shared/constants/uzRegions";
 import { supabase } from "@/services/supabaseClient";
+// 1. IMPORT QOLDIRILDI
 import { osrmRouteDriving, haversineKm } from "@/shared/services/osrm";
 import { useAuth } from "@/shared/auth/AuthProvider";
 
@@ -24,19 +25,8 @@ function getRegionCenter(regionName) {
   return r?.center || null;
 }
 
-function haversineKm(a, b) {
-  if (!a || !b) return 0;
-  const toRad = (x) => (x * Math.PI) / 180;
-  const R = 6371;
-  const dLat = toRad(b[0] - a[0]);
-  const dLon = toRad(b[1] - a[1]);
-  const lat1 = toRad(a[0]);
-  const lat2 = toRad(b[0]);
-  const sinDLat = Math.sin(dLat / 2);
-  const sinDLon = Math.sin(dLon / 2);
-  const c = 2 * Math.asin(Math.sqrt(sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLon * sinDLon));
-  return R * c;
-}
+// 2. ORTIQCHA FUNKSIYA OLIB TASHLANDI
+// function haversineKm(a, b) { ... }  <-- BU FUNKSIYA ENDI YO'Q, CHUNKI IMPORTDAN KELYAPTI
 
 function ClickPicker({ onPick }) {
   useMapEvents({
