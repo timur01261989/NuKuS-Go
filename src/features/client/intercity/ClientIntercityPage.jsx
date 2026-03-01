@@ -5,10 +5,10 @@ import RegionDistrictSelect from "../../../components/RegionDistrictSelect";
 import { getRegionById, formatRegionDistrict } from "../../../constants/uzLocations";
 import IntercityMap from "./map/IntercityMap";
 import { listInterProvTrips, createSeatRequest } from "./services/intercitySupabase";
-import { useAuth } from "../../auth/context/AuthContext";
+import { useAuth } from "../../../shared/auth/AuthProvider";
 
 export default function ClientIntercityPage() {
-  const { user } = useAuth?.() || {};
+  const { user } = useAuth();
   const clientUserId = user?.id || null;
 
   const [fromRegionId, setFromRegionId] = useState(null);
