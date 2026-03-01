@@ -1,14 +1,15 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { Button, DatePicker, Drawer, Empty, Spin, message, Switch, Select, InputNumber, Checkbox, Radio, Tag } from "antd";
+// 1-TUZATISH: useMapEvents qo'shildi
 import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import dayjs from "dayjs";
 
-// Loyihangizdagi importlar (yo'llar to'g'ri ekanligiga ishonch hosil qiling)
 import RegionDistrictSelect from "@/shared/components/RegionDistrictSelect";
 import { UZ_REGIONS } from "@/shared/constants/uzRegions";
 import { supabase } from "@/services/supabaseClient";
-// haversineKm ni pastda local ham e'lon qilganmiz, importdagisi bilan konflikt bo'lmasligi uchun pastdagini ishlatamiz
+
+// 2-TUZATISH: Bu import olib tashlandi, chunki haversineKm pastda e'lon qilingan
 // import { osrmRouteDriving, haversineKm } from "@/shared/services/osrm"; 
 
 import "leaflet/dist/leaflet.css";
@@ -30,6 +31,7 @@ function getRegionCenter(regionName) {
   return r?.center || null;
 }
 
+// 2-TUZATISH: Local funksiya saqlab qolindi
 function haversineKm(a, b) {
   if (!a || !b) return 0;
   const toRad = (x) => (x * Math.PI) / 180;
@@ -93,7 +95,7 @@ function TripCard({ trip, onViewMap, onSelect }) {
       </div>
       <div style={{ display: "flex", gap: 10 }}>
         <Button onClick={() => onViewMap(trip)} block>Yo‘lni ko‘rish</Button>
-        <Button type="primary" block onClick={() => onSelect(trip)}>
+        <Button type="primary" block onClick={() => onSelect && onSelect(trip)}>
           Tanlash
         </Button>
       </div>
@@ -280,7 +282,7 @@ export default function ClientIntercityPage() {
                 key={t.id} 
                 trip={t} 
                 onViewMap={viewTripOnMap} 
-                onSelect={handleSelectTrip} // Tanlash funksiyasi ulandi
+                onSelect={handleSelectTrip}
               />
             ))}
           </div>
