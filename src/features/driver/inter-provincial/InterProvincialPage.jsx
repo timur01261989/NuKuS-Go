@@ -14,8 +14,8 @@ import {
   Radio, 
   Tag, 
   Segmented, 
-  TimePicker, // Vaqt tanlash uchun
-  Typography
+  TimePicker, 
+  Spin
 } from "antd";
 import { 
   EnvironmentOutlined, 
@@ -49,14 +49,14 @@ function getRegionCenter(regionName) {
   return r?.center || null;
 }
 
-// Manzil nomini olish (Nominatim)
+// Manzil nomini aniqlash
 async function getAddressName(lat, lng) {
   try {
     const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=uz`);
     const data = await res.json();
-    return data.display_name || "Noma'lum manzil";
+    return data.display_name || "Belgilangan joy";
   } catch (e) {
-    return "";
+    return "Noma'lum manzil";
   }
 }
 
@@ -86,11 +86,12 @@ function TripRow({ trip, onEdit, onDelete, onShowMap }) {
   const titleFrom = trip.from_district ? `${trip.from_region} • ${trip.from_district}` : trip.from_region;
   const titleTo = trip.to_district ? `${trip.to_region} • ${trip.to_district}` : trip.to_region;
   
-  let priceDisplay = `${trip.price?.toLocaleString()} so'm`;
+  let priceDisplay = "";
   if (trip.vehicle_type === 'car') {
     priceDisplay = `Oldi: ${trip.price_front?.toLocaleString()} | Orqa: ${trip.price_back?.toLocaleString()}`;
-  } else if (trip.vehicle_type === 'bus') {
-    priceDisplay = `${trip.bus_seat_type === 'sleeping' ? 'Yotib' : 'O\'tirib'} - ${trip.price?.toLocaleString()}`;
+  } else {
+    const typeLabel = trip.vehicle_type === 'bus' && trip.bus_seat_type === 'sleeping' ? '(Yotib)' : '';
+    priceDisplay = `${trip.price?.toLocaleString()} so'm ${typeLabel}`;
   }
 
   return (
@@ -126,17 +127,17 @@ export default function InterProvincialPage() {
   const [from, setFrom] = useState({ region: null, district: "" });
   const [to, setTo] = useState({ region: null, district: "" });
   const [travelDate, setTravelDate] = useState(null);
-  const [travelTime, setTravelTime] = useState(null); // Changed to Dayjs object for TimePicker
+  const [travelTime, setTravelTime] = useState(null);
   
   // Details
   const [vehicleType, setVehicleType] = useState("car"); // car, gazel, bus
   const [seats, setSeats] = useState(4);
   
   // Pricing
-  const [price, setPrice] = useState(50000); // Base price (Gazel/Bus)
-  const [priceFront, setPriceFront] = useState(70000); // Car Front
-  const [priceBack, setPriceBack] = useState(50000); // Car Back
-  const [busSeatType, setBusSeatType] = useState("sitting"); // sitting, sleeping
+  const [price, setPrice] = useState(50000); 
+  const [priceFront, setPriceFront] = useState(70000); 
+  const [priceBack, setPriceBack] = useState(50000); 
+  const [busSeatType, setBusSeatType] = useState("sitting"); 
   
   // Features
   const [womenOnly, setWomenOnly] = useState(false);
@@ -175,8 +176,14 @@ export default function InterProvincialPage() {
     }
   }, [fromLL, toLL]);
 
+  // Validatsiya: Tugma qachon yonishini belgilaydi
   const canCreate = Boolean(
-    user?.id && from.region && to.region && travelDate && seats > 0 && 
+    user?.id && 
+    from.region && 
+    to.region && 
+    travelDate && 
+    travelTime && 
+    seats > 0 && 
     ((vehicleType === 'car' && priceFront > 0 && priceBack > 0) || (vehicleType !== 'car' && price > 0))
   );
 
@@ -234,6 +241,7 @@ export default function InterProvincialPage() {
     setNote("");
     setPickupLL(null);
     setPickupAddress("");
+    setEditingTrip(null);
   }, []);
 
   const startEdit = useCallback((trip) => {
@@ -241,7 +249,7 @@ export default function InterProvincialPage() {
     setFrom({ region: trip.from_region, district: trip.from_district || "" });
     setTo({ region: trip.to_region, district: trip.to_district || "" });
     setTravelDate(trip.depart_date ? dayjs(trip.depart_date) : null);
-    setTravelTime(trip.depart_time ? dayjs(trip.depart_time, "HH:mm:ss") : null);
+    setTravelTime(trip.depart_time ? dayjs(trip.depart_time, "HH:mm") : null);
     setSeats(trip.seats || 4);
     setPrice(trip.price || 0);
     setPriceFront(trip.price_front || 0);
@@ -265,7 +273,10 @@ export default function InterProvincialPage() {
   }, []);
 
   const createOrUpdate = useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      message.error("Avtorizatsiyadan o'tilmagan");
+      return;
+    }
     setSaving(true);
     
     const payload = {
@@ -287,8 +298,8 @@ export default function InterProvincialPage() {
       pickup_lat: pickupLL ? pickupLL[0] : null,
       pickup_lng: pickupLL ? pickupLL[1] : null,
       
-      // Yangi maydonlar
-      price: vehicleType === 'car' ? 0 : Number(price), // Car uchun umumiy narx 0, chunki oldi/orqa bor
+      // Pricing Logic
+      price: vehicleType === 'car' ? 0 : Number(price), 
       price_front: vehicleType === 'car' ? Number(priceFront) : null,
       price_back: vehicleType === 'car' ? Number(priceBack) : null,
       bus_seat_type: vehicleType === 'bus' ? busSeatType : null,
@@ -298,22 +309,21 @@ export default function InterProvincialPage() {
       if (editingTrip?.id) {
         const { error } = await supabase.from("interprov_trips").update(payload).eq("id", editingTrip.id);
         if (error) throw error;
-        message.success("Yangilandi");
+        message.success("Reys muvaffaqiyatli yangilandi");
       } else {
         const { error } = await supabase.from("interprov_trips").insert(payload);
         if (error) throw error;
-        message.success("Yaratildi");
+        message.success("Yangi reys yaratildi");
       }
-      setEditingTrip(null);
       resetForm();
       loadMyTrips();
     } catch (e) {
       console.error(e);
-      message.error("Xatolik bo'ldi. Internetni tekshiring.");
+      message.error("Xatolik: " + (e.message || "Baza bilan aloqa yo'q"));
     } finally {
       setSaving(false);
     }
-  }, [user, from, to, travelDate, travelTime, seats, price, priceFront, priceBack, vehicleType, busSeatType, womenOnly, isDelivery, isParcel, hasAC, hasTrunk, note, pickupLL, editingTrip]);
+  }, [user, from, to, travelDate, travelTime, seats, price, priceFront, priceBack, vehicleType, busSeatType, womenOnly, isDelivery, isParcel, hasAC, hasTrunk, note, pickupLL, editingTrip, loadMyTrips, resetForm]);
 
   const deleteTrip = useCallback(async (trip) => {
     Modal.confirm({
@@ -324,6 +334,8 @@ export default function InterProvincialPage() {
         if(!error) {
           message.success("O'chirildi");
           loadMyTrips();
+        } else {
+          message.error("O'chirishda xatolik");
         }
       }
     });
@@ -378,7 +390,7 @@ export default function InterProvincialPage() {
             {pickupLL ? "Manzil belgilandi (O'zgartirish)" : "Ketish joyini xaritadan belgilash"}
           </Button>
           {pickupAddress && (
-            <div style={{ marginTop: 8, fontSize: 12, color: "#666", display: "flex", gap: 6 }}>
+            <div style={{ marginTop: 8, fontSize: 12, color: "#666", display: "flex", gap: 6, alignItems: 'center' }}>
               <EnvironmentOutlined style={{ color: "red" }} /> 
               <span>{pickupAddress}</span>
             </div>
@@ -390,7 +402,7 @@ export default function InterProvincialPage() {
         <div style={{ display: "flex", gap: 10 }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 12, marginBottom: 4 }}>Sana</div>
-            <DatePicker style={{ width: "100%" }} value={travelDate} onChange={setTravelDate} />
+            <DatePicker style={{ width: "100%" }} value={travelDate} onChange={setTravelDate} placeholder="Kunni tanlang" />
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 12, marginBottom: 4 }}>Vaqt</div>
@@ -490,7 +502,7 @@ export default function InterProvincialPage() {
           <Button type="primary" size="large" onClick={createOrUpdate} loading={saving} disabled={!canCreate} block>
             {editingTrip ? "Saqlash" : "Reys yaratish"}
           </Button>
-          <Button size="large" onClick={() => { setEditingTrip(null); resetForm(); }} block>
+          <Button size="large" onClick={resetForm} block>
             Tozalash
           </Button>
         </div>
