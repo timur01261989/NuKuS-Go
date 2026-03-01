@@ -1,12 +1,31 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { 
-  Button, DatePicker, Input, InputNumber, Switch, message, Modal, Drawer, Empty, Select, Checkbox, Radio, Tag, Segmented 
+  Button, 
+  DatePicker, 
+  Input, 
+  InputNumber, 
+  Switch, 
+  message, 
+  Modal, 
+  Drawer, 
+  Empty, 
+  Select, 
+  Checkbox, 
+  Radio, 
+  Tag, 
+  Segmented, 
+  TimePicker, // Vaqt tanlash uchun
+  Typography
 } from "antd";
 import { 
-  EnvironmentOutlined, CarOutlined, ThunderboltOutlined, InboxOutlined, UsergroupAddOutlined 
+  EnvironmentOutlined, 
+  CarOutlined, 
+  ThunderboltOutlined, 
+  InboxOutlined, 
+  ClockCircleOutlined 
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Polyline, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 
 import RegionDistrictSelect from "@/shared/components/RegionDistrictSelect";
@@ -17,7 +36,7 @@ import { useAuth } from "@/shared/auth/AuthProvider";
 
 import "leaflet/dist/leaflet.css";
 
-// Fix icons
+// Marker icon fix
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
@@ -30,13 +49,24 @@ function getRegionCenter(regionName) {
   return r?.center || null;
 }
 
+// Manzil nomini olish (Nominatim)
+async function getAddressName(lat, lng) {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=uz`);
+    const data = await res.json();
+    return data.display_name || "Noma'lum manzil";
+  } catch (e) {
+    return "";
+  }
+}
+
 function loadSavedLocations() {
   try { return JSON.parse(localStorage.getItem("driver_saved_locs") || "[]"); } catch { return []; }
 }
+
 function saveLocation(pt) {
   if(!pt) return;
   const list = loadSavedLocations();
-  // unikal qilish
   const next = [pt, ...list].filter((v, i, a) => a.findIndex(t => (t[0] === v[0] && t[1] === v[1])) === i).slice(0, 6);
   localStorage.setItem("driver_saved_locs", JSON.stringify(next));
 }
@@ -56,20 +86,28 @@ function TripRow({ trip, onEdit, onDelete, onShowMap }) {
   const titleFrom = trip.from_district ? `${trip.from_region} • ${trip.from_district}` : trip.from_region;
   const titleTo = trip.to_district ? `${trip.to_region} • ${trip.to_district}` : trip.to_region;
   
+  let priceDisplay = `${trip.price?.toLocaleString()} so'm`;
+  if (trip.vehicle_type === 'car') {
+    priceDisplay = `Oldi: ${trip.price_front?.toLocaleString()} | Orqa: ${trip.price_back?.toLocaleString()}`;
+  } else if (trip.vehicle_type === 'bus') {
+    priceDisplay = `${trip.bus_seat_type === 'sleeping' ? 'Yotib' : 'O\'tirib'} - ${trip.price?.toLocaleString()}`;
+  }
+
   return (
     <div style={{ border: "1px solid rgba(0,0,0,0.08)", borderRadius: 14, padding: 12, marginBottom: 10, background: "#fff" }}>
       <div style={{ fontWeight: 800, marginBottom: 4, fontSize: 15 }}>{titleFrom} → {titleTo}</div>
       
-      <div style={{ display: "flex", gap: 6, margin: "6px 0" }}>
-        <Tag>{trip.vehicle_type}</Tag>
+      <div style={{ display: "flex", gap: 6, margin: "6px 0", flexWrap: "wrap" }}>
+        <Tag color="blue">{trip.vehicle_type === 'bus' ? 'Avtobus' : trip.vehicle_type === 'gazel' ? 'Gazel' : 'Yengil'}</Tag>
         {trip.has_ac && <Tag color="cyan">AC</Tag>}
         {trip.has_trunk && <Tag color="purple">Yukxona</Tag>}
+        {trip.women_only && <Tag color="magenta">Ayollar</Tag>}
       </div>
 
       <div style={{ fontSize: 13, opacity: 0.8, marginBottom: 10 }}>
         📅 {trip.depart_date} {trip.depart_time ? `⏰ ${String(trip.depart_time).slice(0,5)}` : ""}
         <br/>
-        💰 <b>{trip.price?.toLocaleString()} so'm</b> (1 o'rin) • {trip.seats} o'rin
+        💰 <b>{priceDisplay}</b> • {trip.seats} o'rin
       </div>
 
       <div style={{ display: "flex", gap: 8 }}>
@@ -88,12 +126,17 @@ export default function InterProvincialPage() {
   const [from, setFrom] = useState({ region: null, district: "" });
   const [to, setTo] = useState({ region: null, district: "" });
   const [travelDate, setTravelDate] = useState(null);
-  const [travelTime, setTravelTime] = useState("");
+  const [travelTime, setTravelTime] = useState(null); // Changed to Dayjs object for TimePicker
   
   // Details
-  const [seats, setSeats] = useState(4);
-  const [price, setPrice] = useState(50000);
   const [vehicleType, setVehicleType] = useState("car"); // car, gazel, bus
+  const [seats, setSeats] = useState(4);
+  
+  // Pricing
+  const [price, setPrice] = useState(50000); // Base price (Gazel/Bus)
+  const [priceFront, setPriceFront] = useState(70000); // Car Front
+  const [priceBack, setPriceBack] = useState(50000); // Car Back
+  const [busSeatType, setBusSeatType] = useState("sitting"); // sitting, sleeping
   
   // Features
   const [womenOnly, setWomenOnly] = useState(false);
@@ -105,8 +148,8 @@ export default function InterProvincialPage() {
   const [note, setNote] = useState("");
 
   // Location logic
-  const [departureMode, setDepartureMode] = useState("fixed"); // 'fixed' | 'address'
   const [pickupLL, setPickupLL] = useState(null);
+  const [pickupAddress, setPickupAddress] = useState("");
   
   // Map visualization
   const fromLL = useMemo(() => (from.region ? getRegionCenter(from.region) : null), [from.region]);
@@ -116,7 +159,6 @@ export default function InterProvincialPage() {
   const [routeDist, setRouteDist] = useState(0);
 
   useEffect(() => {
-    // OSRM route calculation for driver preview
     if (fromLL && toLL) {
       osrmRouteDriving([fromLL, toLL]).then(res => {
         if (res) {
@@ -133,7 +175,10 @@ export default function InterProvincialPage() {
     }
   }, [fromLL, toLL]);
 
-  const canCreate = Boolean(user?.id && from.region && to.region && travelDate && seats > 0 && price > 0);
+  const canCreate = Boolean(
+    user?.id && from.region && to.region && travelDate && seats > 0 && 
+    ((vehicleType === 'car' && priceFront > 0 && priceBack > 0) || (vehicleType !== 'car' && price > 0))
+  );
 
   // Data state
   const [saving, setSaving] = useState(false);
@@ -142,10 +187,10 @@ export default function InterProvincialPage() {
   const [editingTrip, setEditingTrip] = useState(null);
 
   // Map Drawers
-  const [mapDrawerOpen, setMapDrawerOpen] = useState(false); // For viewing route
+  const [mapDrawerOpen, setMapDrawerOpen] = useState(false);
   const [mapTrip, setMapTrip] = useState(null);
   
-  const [pickerOpen, setPickerOpen] = useState(false); // For picking location
+  const [pickerOpen, setPickerOpen] = useState(false); 
   const [savedLocs, setSavedLocs] = useState([]);
 
   useEffect(() => { setSavedLocs(loadSavedLocations()); }, []);
@@ -174,10 +219,13 @@ export default function InterProvincialPage() {
     setFrom({ region: null, district: "" });
     setTo({ region: null, district: "" });
     setTravelDate(null);
-    setTravelTime("");
+    setTravelTime(null);
     setSeats(4);
     setPrice(50000);
+    setPriceFront(70000);
+    setPriceBack(50000);
     setVehicleType("car");
+    setBusSeatType("sitting");
     setWomenOnly(false);
     setIsDelivery(false);
     setIsParcel(false);
@@ -185,7 +233,7 @@ export default function InterProvincialPage() {
     setHasTrunk(false);
     setNote("");
     setPickupLL(null);
-    setDepartureMode("fixed");
+    setPickupAddress("");
   }, []);
 
   const startEdit = useCallback((trip) => {
@@ -193,10 +241,13 @@ export default function InterProvincialPage() {
     setFrom({ region: trip.from_region, district: trip.from_district || "" });
     setTo({ region: trip.to_region, district: trip.to_district || "" });
     setTravelDate(trip.depart_date ? dayjs(trip.depart_date) : null);
-    setTravelTime(trip.depart_time ? String(trip.depart_time).slice(0,5) : "");
+    setTravelTime(trip.depart_time ? dayjs(trip.depart_time, "HH:mm:ss") : null);
     setSeats(trip.seats || 4);
     setPrice(trip.price || 0);
+    setPriceFront(trip.price_front || 0);
+    setPriceBack(trip.price_back || 0);
     setVehicleType(trip.vehicle_type || "car");
+    setBusSeatType(trip.bus_seat_type || "sitting");
     setWomenOnly(Boolean(trip.women_only));
     setIsDelivery(Boolean(trip.is_delivery));
     setIsParcel(Boolean(trip.is_parcel));
@@ -206,10 +257,10 @@ export default function InterProvincialPage() {
     
     if (trip.pickup_lat && trip.pickup_lng) {
       setPickupLL([trip.pickup_lat, trip.pickup_lng]);
-      setDepartureMode("address");
+      getAddressName(trip.pickup_lat, trip.pickup_lng).then(setPickupAddress);
     } else {
       setPickupLL(null);
-      setDepartureMode("fixed");
+      setPickupAddress("");
     }
   }, []);
 
@@ -224,9 +275,8 @@ export default function InterProvincialPage() {
       to_region: to.region,
       to_district: to.district || null,
       depart_date: travelDate ? travelDate.format("YYYY-MM-DD") : null,
-      depart_time: travelTime || null,
+      depart_time: travelTime ? travelTime.format("HH:mm") : null,
       seats: Number(seats),
-      price: Number(price),
       vehicle_type: vehicleType,
       women_only: womenOnly,
       is_delivery: isDelivery,
@@ -234,8 +284,14 @@ export default function InterProvincialPage() {
       has_ac: hasAC,
       has_trunk: hasTrunk,
       note: note || null,
-      pickup_lat: departureMode === 'address' && pickupLL ? pickupLL[0] : null,
-      pickup_lng: departureMode === 'address' && pickupLL ? pickupLL[1] : null,
+      pickup_lat: pickupLL ? pickupLL[0] : null,
+      pickup_lng: pickupLL ? pickupLL[1] : null,
+      
+      // Yangi maydonlar
+      price: vehicleType === 'car' ? 0 : Number(price), // Car uchun umumiy narx 0, chunki oldi/orqa bor
+      price_front: vehicleType === 'car' ? Number(priceFront) : null,
+      price_back: vehicleType === 'car' ? Number(priceBack) : null,
+      bus_seat_type: vehicleType === 'bus' ? busSeatType : null,
     };
 
     try {
@@ -253,11 +309,11 @@ export default function InterProvincialPage() {
       loadMyTrips();
     } catch (e) {
       console.error(e);
-      message.error("Xatolik bo'ldi");
+      message.error("Xatolik bo'ldi. Internetni tekshiring.");
     } finally {
       setSaving(false);
     }
-  }, [user, from, to, travelDate, travelTime, seats, price, vehicleType, womenOnly, isDelivery, isParcel, hasAC, hasTrunk, note, pickupLL, departureMode, editingTrip]);
+  }, [user, from, to, travelDate, travelTime, seats, price, priceFront, priceBack, vehicleType, busSeatType, womenOnly, isDelivery, isParcel, hasAC, hasTrunk, note, pickupLL, editingTrip]);
 
   const deleteTrip = useCallback(async (trip) => {
     Modal.confirm({
@@ -274,7 +330,6 @@ export default function InterProvincialPage() {
   }, [loadMyTrips]);
 
   const showRouteMap = (trip) => {
-    // Show route for a specific trip in list
     const f = getRegionCenter(trip.from_region);
     const t = getRegionCenter(trip.to_region);
     if(f && t) {
@@ -289,7 +344,7 @@ export default function InterProvincialPage() {
     <div style={{ padding: 16, maxWidth: 800, margin: "0 auto", paddingBottom: 80 }}>
       <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 16 }}>Haydovchi paneli</div>
 
-      {/* MAP PREVIEW (Create mode) */}
+      {/* MAP PREVIEW */}
       <div style={{ borderRadius: 16, overflow: "hidden", border: "1px solid #ddd", marginBottom: 16 }}>
         <div style={{ height: 220 }}>
           <MapContainer center={fromLL || toLL || [41.31, 69.24]} zoom={6} style={{ height: "100%", width: "100%" }}>
@@ -308,32 +363,25 @@ export default function InterProvincialPage() {
       <div style={{ display: "grid", gap: 12 }}>
         <RegionDistrictSelect label="Qayerdan" region={from.region} district={from.district} onChange={setFrom} allowEmptyDistrict />
         
-        {/* PICKUP LOCATION SELECTOR */}
-        <div style={{ background: "#f0f5ff", padding: 10, borderRadius: 8, border: "1px dashed #1890ff" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-            <span style={{ fontWeight: 600 }}>Jo'nab ketish joyi:</span>
-            <Segmented 
-              size="small"
-              options={[
-                { label: 'Belgilangan (Vokzal)', value: 'fixed' },
-                { label: 'Manzildan', value: 'address' }
-              ]}
-              value={departureMode}
-              onChange={setDepartureMode}
-            />
-          </div>
-          {departureMode === 'address' && (
-            <Button 
-              icon={<EnvironmentOutlined />} 
-              block 
-              onClick={() => {
-                if(!fromLL) { message.warning("Viloyatni tanlang"); return; }
-                setPickupLL(pickupLL || fromLL);
-                setPickerOpen(true);
-              }}
-            >
-              {pickupLL ? "Manzil belgilandi (o'zgartirish)" : "Xaritadan manzilni tanlash"}
-            </Button>
+        {/* PICKUP BUTTON */}
+        <div style={{ background: "#fff", padding: 10, borderRadius: 8, border: "1px solid #d9d9d9" }}>
+          <Button 
+            type={pickupLL ? "primary" : "dashed"}
+            icon={<EnvironmentOutlined />} 
+            block 
+            onClick={() => {
+              if(!fromLL) { message.warning("Avval viloyatni tanlang"); return; }
+              setPickupLL(pickupLL || fromLL);
+              setPickerOpen(true);
+            }}
+          >
+            {pickupLL ? "Manzil belgilandi (O'zgartirish)" : "Ketish joyini xaritadan belgilash"}
+          </Button>
+          {pickupAddress && (
+            <div style={{ marginTop: 8, fontSize: 12, color: "#666", display: "flex", gap: 6 }}>
+              <EnvironmentOutlined style={{ color: "red" }} /> 
+              <span>{pickupAddress}</span>
+            </div>
           )}
         </div>
 
@@ -346,34 +394,86 @@ export default function InterProvincialPage() {
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 12, marginBottom: 4 }}>Vaqt</div>
-            <Input placeholder="08:30" value={travelTime} onChange={e => setTravelTime(e.target.value)} />
+            <TimePicker 
+              style={{ width: "100%" }} 
+              value={travelTime} 
+              onChange={setTravelTime} 
+              format="HH:mm" 
+              placeholder="08:30" 
+            />
           </div>
         </div>
 
+        {/* VEHICLE & PRICE */}
         <div style={{ background: "#fff", padding: 12, borderRadius: 8, border: "1px solid #eee" }}>
-          <div style={{ marginBottom: 10, fontWeight: 600 }}>Mashina va Narx</div>
+          <div style={{ marginBottom: 10, fontWeight: 600 }}>Mashina turi</div>
           <Segmented block value={vehicleType} onChange={setVehicleType} options={[
             { label: 'Yengil', value: 'car' }, { label: 'Gazel', value: 'gazel' }, { label: 'Avtobus', value: 'bus' }
           ]} />
           
-          <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12 }}>O'rinlar soni</div>
-              <InputNumber style={{ width: "100%" }} min={1} max={50} value={seats} onChange={setSeats} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12 }}>Narx (1 o'rin)</div>
-              <InputNumber 
-                style={{ width: "100%" }} 
-                min={0} step={1000} 
-                formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={value => value.replace(/\$\s?|(,*)/g, '')}
-                value={price} onChange={setPrice} 
-              />
-            </div>
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 12, marginBottom: 4 }}>O'rinlar soni</div>
+            <InputNumber style={{ width: "100%" }} min={1} max={55} value={seats} onChange={setSeats} />
+          </div>
+
+          <div style={{ marginTop: 12, borderTop: "1px dashed #eee", paddingTop: 12 }}>
+            {vehicleType === 'car' ? (
+              <div style={{ display: "flex", gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, marginBottom: 2 }}>Oldi o'rindiq narxi</div>
+                  <InputNumber 
+                    style={{ width: "100%" }} 
+                    min={0} step={1000} 
+                    formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                    parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                    value={priceFront} onChange={setPriceFront} 
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, marginBottom: 2 }}>Orqa o'rindiq narxi</div>
+                  <InputNumber 
+                    style={{ width: "100%" }} 
+                    min={0} step={1000} 
+                    formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                    parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                    value={priceBack} onChange={setPriceBack} 
+                  />
+                </div>
+              </div>
+            ) : vehicleType === 'bus' ? (
+              <div>
+                <div style={{ marginBottom: 8 }}>
+                  <span style={{ fontSize: 12, marginRight: 10 }}>Joy turi:</span>
+                  <Radio.Group value={busSeatType} onChange={e => setBusSeatType(e.target.value)} size="small">
+                    <Radio.Button value="sitting">O'tirib ketish</Radio.Button>
+                    <Radio.Button value="sleeping">Yotib ketish</Radio.Button>
+                  </Radio.Group>
+                </div>
+                <div style={{ fontSize: 12, marginBottom: 2 }}>Narx (1 o'rin)</div>
+                <InputNumber 
+                  style={{ width: "100%" }} 
+                  min={0} step={1000} 
+                  formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                  value={price} onChange={setPrice} 
+                />
+              </div>
+            ) : (
+              <div>
+                <div style={{ fontSize: 12, marginBottom: 2 }}>Narx (1 o'rin)</div>
+                <InputNumber 
+                  style={{ width: "100%" }} 
+                  min={0} step={1000} 
+                  formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                  value={price} onChange={setPrice} 
+                />
+              </div>
+            )}
           </div>
         </div>
 
+        {/* FEATURES */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           <Checkbox checked={womenOnly} onChange={e => setWomenOnly(e.target.checked)}>Ayollar uchun</Checkbox>
           <Checkbox checked={isDelivery} onChange={e => setIsDelivery(e.target.checked)}>Pochta / Eltish</Checkbox>
@@ -381,47 +481,65 @@ export default function InterProvincialPage() {
           <Checkbox checked={hasTrunk} onChange={e => setHasTrunk(e.target.checked)}>Yukxona</Checkbox>
         </div>
 
-        <Button type="primary" size="large" onClick={createOrUpdate} loading={saving} disabled={!canCreate}>
-          {editingTrip ? "Saqlash" : "Reys yaratish"}
-        </Button>
-        {editingTrip && <Button onClick={() => { setEditingTrip(null); resetForm(); }}>Bekor qilish</Button>}
+        <div>
+          <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Izoh (ixtiyoriy)</div>
+          <Input.TextArea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Masalan: yo‘lda 1 ta joy, posilka ham olaman..." />
+        </div>
+
+        <div style={{ display: "flex", gap: 12 }}>
+          <Button type="primary" size="large" onClick={createOrUpdate} loading={saving} disabled={!canCreate} block>
+            {editingTrip ? "Saqlash" : "Reys yaratish"}
+          </Button>
+          <Button size="large" onClick={() => { setEditingTrip(null); resetForm(); }} block>
+            Tozalash
+          </Button>
+        </div>
       </div>
 
       <div style={{ marginTop: 20 }}>
         <h3>Mening reyslarim</h3>
-        {loadingTrips ? <Spin /> : trips.map(t => (
+        {loadingTrips ? <div style={{textAlign:'center', padding:20}}><Spin /></div> : trips.map(t => (
           <TripRow key={t.id} trip={t} onEdit={startEdit} onDelete={deleteTrip} onShowMap={showRouteMap} />
         ))}
       </div>
 
       {/* MAP PICKER DRAWER */}
       <Drawer
-        title="Manzilni belgilash"
+        title="Ketish joyini belgilang"
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
-        height="80vh"
+        height="85vh"
         placement="bottom"
       >
         <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, position: "relative" }}>
             <MapContainer center={pickupLL || [41.31, 69.24]} zoom={13} style={{ height: "100%", width: "100%" }}>
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-              <MapPickerEvents onPick={(ll) => {
+              <MapPickerEvents onPick={async (ll) => {
                 setPickupLL(ll);
                 saveLocation(ll);
                 setSavedLocs(loadSavedLocations());
+                const name = await getAddressName(ll[0], ll[1]);
+                setPickupAddress(name);
               }} />
               {pickupLL && <Marker position={pickupLL} />}
             </MapContainer>
+            <div style={{ position: "absolute", top: 10, left: 10, right: 10, zIndex: 1000, background: "rgba(255,255,255,0.9)", padding: 8, borderRadius: 8, fontSize: 12, textAlign: "center", fontWeight: 600 }}>
+              {pickupAddress || "Xaritadan joy ustiga bosing"}
+            </div>
           </div>
-          <div style={{ padding: 10 }}>
-            <div style={{ fontSize: 12, fontWeight: 600 }}>Saqlanganlar:</div>
-            <div style={{ display: "flex", gap: 5, overflowX: "auto", paddingBottom: 5 }}>
+          <div style={{ padding: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Saqlanganlar:</div>
+            <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 10 }}>
               {savedLocs.map((l, i) => (
-                <Tag key={i} onClick={() => setPickupLL(l)}>Manzil {i+1}</Tag>
+                <Tag key={i} onClick={async () => {
+                  setPickupLL(l);
+                  const name = await getAddressName(l[0], l[1]);
+                  setPickupAddress(name);
+                }}>Joy {i+1}</Tag>
               ))}
             </div>
-            <Button type="primary" block onClick={() => setPickerOpen(false)}>Tanlash</Button>
+            <Button type="primary" block size="large" onClick={() => setPickerOpen(false)}>Tasdiqlash</Button>
           </div>
         </div>
       </Drawer>
