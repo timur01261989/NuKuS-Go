@@ -5,8 +5,22 @@ import {
   Drawer, 
   Empty, 
   Spin, 
-  message 
+  message, 
+  Switch, 
+  Select, 
+  InputNumber, 
+  Checkbox, 
+  Radio, 
+  Tag, 
+  Segmented 
 } from "antd";
+import { 
+  EnvironmentOutlined, 
+  CarOutlined, 
+  WomanOutlined, 
+  InboxOutlined, 
+  ThunderboltOutlined 
+} from "@ant-design/icons";
 import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import { useNavigate } from "react-router-dom"; 
@@ -14,18 +28,11 @@ import { useNavigate } from "react-router-dom";
 import RegionDistrictSelect from "@/shared/components/RegionDistrictSelect";
 import { UZ_REGIONS } from "@/shared/constants/uzRegions";
 import { supabase } from "@/services/supabaseClient";
-
-// 1-TUZATISH: haversineKm import qilindi (osrm.js dan)
 import { osrmRouteDriving, haversineKm } from "@/shared/services/osrm"; 
-// Yoki agar sizda alias ishlamasa, nisbiy yo'l: "../../../shared/services/osrm"
-
-// AutoMarketAdsPanel yo'li (Taxi papkasidan olinadi)
-import AutoMarketAdsPanel from "../taxi/components/AutoMarketAdsPanel"; 
-import { listMarketCars } from "../../../services/marketService.js";
 
 import "leaflet/dist/leaflet.css";
 
-// Fix default marker icon (Vite)
+// Marker icon fix
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
@@ -35,15 +42,10 @@ L.Icon.Default.mergeOptions({
 
 const mapTile = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 
-// --- Yordamchi funksiyalar ---
-
 function getRegionCenter(regionName) {
   const r = UZ_REGIONS.find((x) => x.name === regionName);
   return r?.center || null;
 }
-
-// 2-TUZATISH: Pastdagi "function haversineKm(a, b) { ... }" OLIB TASHLANDI.
-// Endi u tepadagi importdan keladi.
 
 function loadSavedPickupPoints() {
   try {
@@ -58,21 +60,20 @@ function savePickupPoint(pt) {
   localStorage.setItem("saved_pickup_points", JSON.stringify(newPts));
 }
 
-// --- Map Componentlari ---
+// --- Map Components ---
 
 function FitBounds({ points }) {
   const map = useMap();
   useEffect(() => {
     if (!map) return;
-    if (!points || points.length < 1) return;
-    const pts = points.filter(Boolean);
-    if (pts.length === 0) return;
-    if (pts.length === 1) {
-      map.setView(pts[0], 9, { animate: true });
+    const validPoints = (points || []).filter(p => Array.isArray(p) && p.length === 2);
+    if (validPoints.length === 0) return;
+    if (validPoints.length === 1) {
+      map.setView(validPoints[0], 9, { animate: true });
       return;
     }
-    const bounds = L.latLngBounds(pts.map((p) => L.latLng(p[0], p[1])));
-    map.fitBounds(bounds.pad(0.3), { animate: true });
+    const bounds = L.latLngBounds(validPoints.map((p) => L.latLng(p[0], p[1])));
+    map.fitBounds(bounds.pad(0.2), { animate: true });
   }, [map, points]);
   return null;
 }
@@ -80,8 +81,7 @@ function FitBounds({ points }) {
 function PickupPicker({ value, onChange, savedPoints }) {
   useMapEvents({
     click(e) {
-      const ll = [e.latlng.lat, e.latlng.lng];
-      onChange(ll);
+      onChange([e.latlng.lat, e.latlng.lng]);
     },
   });
 
@@ -100,42 +100,71 @@ function TripCard({ trip, onViewMap, onSelect }) {
   const titleTo = trip.to_district ? `${trip.to_region} • ${trip.to_district}` : trip.to_region;
 
   return (
-    <div style={{ border: "1px solid rgba(0,0,0,0.08)", borderRadius: 14, padding: 14, marginBottom: 10 }}>
-      <div style={{ fontWeight: 700, marginBottom: 6 }}>{titleFrom} → {titleTo}</div>
-      <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 10 }}>
-        {trip.depart_date}{trip.depart_time ? ` • ${String(trip.depart_time).slice(0,5)}` : ""} • {trip.seats} o‘rin
-        {typeof trip.price === "number" ? ` • ${trip.price} so‘m` : ""}
-        {trip.women_only ? " • Ayollar uchun" : ""}
-        {trip.is_delivery ? " • Eltish" : ""}
-        {trip.is_parcel ? " • Posilka" : ""}
+    <div style={{ border: "1px solid rgba(0,0,0,0.08)", borderRadius: 14, padding: 14, marginBottom: 10, background: "#fff" }}>
+      <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 16 }}>{titleFrom} → {titleTo}</div>
+      
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+        <Tag color="blue">{trip.vehicle_type === 'bus' ? 'Avtobus' : trip.vehicle_type === 'gazel' ? 'Gazel' : 'Yengil'}</Tag>
+        {trip.has_ac && <Tag color="cyan">AC</Tag>}
+        {trip.has_trunk && <Tag color="purple">Yukxona</Tag>}
+        {trip.women_only && <Tag color="magenta">Ayollar</Tag>}
       </div>
+
+      <div style={{ fontSize: 13, opacity: 0.8, marginBottom: 10 }}>
+        <div>📅 {trip.depart_date} {trip.depart_time ? `⏰ ${String(trip.depart_time).slice(0,5)}` : ""}</div>
+        <div style={{ fontWeight: 600, marginTop: 4 }}>
+          💺 {trip.seats} ta joy • {trip.price ? `${trip.price.toLocaleString()} so'm` : "Kelishilgan"}
+        </div>
+      </div>
+
       <div style={{ display: "flex", gap: 10 }}>
-        <Button onClick={() => onViewMap(trip)} block>Yo‘lni ko‘rish</Button>
-        <Button type="primary" block onClick={() => onSelect && onSelect(trip)}>
-          Tanlash
-        </Button>
+        <Button onClick={() => onViewMap(trip)} icon={<EnvironmentOutlined />} block>Yo‘lni ko‘rish</Button>
+        <Button type="primary" onClick={() => onSelect(trip)} block>Tanlash</Button>
       </div>
     </div>
   );
 }
 
-// --- Asosiy Page ---
-
 export default function ClientIntercityPage() {
   const navigate = useNavigate();
+  
+  // Search State
   const [from, setFrom] = useState({ region: null, district: "" });
   const [to, setTo] = useState({ region: null, district: "" });
   const [travelDate, setTravelDate] = useState(null);
-
+  
+  // Filters
+  const [vehicleType, setVehicleType] = useState("all"); // all, car, gazel, bus
+  const [womenOnly, setWomenOnly] = useState(false);
+  const [hasAC, setHasAC] = useState(false);
+  const [hasTrunk, setHasTrunk] = useState(false);
+  
+  // Locations
   const fromLL = useMemo(() => (from.region ? getRegionCenter(from.region) : null), [from.region]);
   const toLL = useMemo(() => (to.region ? getRegionCenter(to.region) : null), [to.region]);
 
-  const polyline = useMemo(() => {
-    if (!fromLL || !toLL) return null;
-    return [fromLL, toLL];
-  }, [fromLL, toLL]);
+  // Route calculation
+  const [routePolyline, setRoutePolyline] = useState(null);
+  const [routeDistance, setRouteDistance] = useState(0);
 
-  const distanceKm = useMemo(() => (fromLL && toLL ? haversineKm(fromLL, toLL) : 0), [fromLL, toLL]);
+  useEffect(() => {
+    // Marshrutni hisoblash (To'g'ri chiziq emas, OSRM yo'l bo'ylab)
+    if (fromLL && toLL) {
+      osrmRouteDriving([fromLL, toLL]).then((res) => {
+        if (res) {
+          setRoutePolyline(res.coords);
+          setRouteDistance(res.distance_m / 1000);
+        } else {
+          // Agar OSRM ishlamasa, to'g'ri chiziq
+          setRoutePolyline([fromLL, toLL]);
+          setRouteDistance(haversineKm(fromLL, toLL));
+        }
+      });
+    } else {
+      setRoutePolyline(null);
+      setRouteDistance(0);
+    }
+  }, [fromLL, toLL]);
 
   const canSearch = Boolean(from.region && to.region);
 
@@ -144,11 +173,12 @@ export default function ClientIntercityPage() {
   const [trips, setTrips] = useState([]);
   const [mapTrip, setMapTrip] = useState(null);
 
-  // Pickup Picker State
+  // Pickup configuration
+  const [pickupMode, setPickupMode] = useState("point"); // 'point' (belgilangan joy) | 'address' (manzildan)
   const [pickupPickerOpen, setPickupPickerOpen] = useState(false);
   const [pickupPoint, setPickupPoint] = useState(null);
   const [savedPickupPoints, setSavedPickupPoints] = useState([]);
-  const [selectedTripForBooking, setSelectedTripForBooking] = useState(null);
+  const [selectedTrip, setSelectedTrip] = useState(null);
 
   useEffect(() => {
     setSavedPickupPoints(loadSavedPickupPoints());
@@ -167,204 +197,256 @@ export default function ClientIntercityPage() {
         .eq("from_region", from.region)
         .eq("to_region", to.region)
         .order("depart_date", { ascending: true })
-        .order("depart_time", { ascending: true })
-        .limit(100);
+        .limit(50);
 
+      // Asosiy filtrlar
       if (from.district) q = q.eq("from_district", from.district);
       if (to.district) q = q.eq("to_district", to.district);
       if (dateStr) q = q.eq("depart_date", dateStr);
+
+      // Qo'shimcha filtrlar (Client tomonda ham filtrlash mumkin, lekin DB da bo'lsa yaxshi)
+      // Hozircha DB so'roviga qo'shamiz (agar ustunlar mavjud bo'lsa)
+      if (vehicleType !== 'all') q = q.eq("vehicle_type", vehicleType);
+      if (womenOnly) q = q.eq("women_only", true);
+      if (hasAC) q = q.eq("has_ac", true);
+      if (hasTrunk) q = q.eq("has_trunk", true);
 
       const { data, error } = await q;
       if (error) throw error;
 
       setTrips(data || []);
       setDrawerOpen(true);
-      if ((data || []).length === 0) message.info("Hozircha reys topilmadi");
+      if ((data || []).length === 0) message.info("Mos reys topilmadi");
     } catch (e) {
       console.error(e);
-      message.error(e?.message || "Xatolik");
+      message.error("Qidirishda xatolik");
     } finally {
       setLoading(false);
     }
-  }, [canSearch, from, to, travelDate]);
+  }, [canSearch, from, to, travelDate, vehicleType, womenOnly, hasAC, hasTrunk]);
 
   const viewTripOnMap = useCallback((trip) => {
-    setMapTrip(trip);
+    // Tanlangan reys uchun yo'lni hisoblash
+    const f = getRegionCenter(trip.from_region);
+    const t = getRegionCenter(trip.to_region);
+    if (f && t) {
+      osrmRouteDriving([f, t]).then(res => {
+        setMapTrip({ 
+          ...trip, 
+          routeLine: res ? res.coords : [f, t],
+          distanceVal: res ? res.distance_m / 1000 : haversineKm(f, t)
+        });
+      });
+    } else {
+      setMapTrip(trip);
+    }
   }, []);
 
-  const handleSelectTrip = useCallback((trip) => {
-    setSelectedTripForBooking(trip);
-    setPickupPoint(fromLL || getRegionCenter(trip.from_region) || [41.31, 69.28]);
-    setPickupPickerOpen(true);
-  }, [fromLL]);
-
-  const tripFromLL = mapTrip ? getRegionCenter(mapTrip.from_region) : null;
-  const tripToLL = mapTrip ? getRegionCenter(mapTrip.to_region) : null;
-  const tripLine = tripFromLL && tripToLL ? [tripFromLL, tripToLL] : null;
-
   return (
-    <div style={{ padding: 16, maxWidth: 820, margin: "0 auto" }}>
-      <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 12 }}>Viloyatlar aro</div>
+    <div style={{ padding: 16, maxWidth: 820, margin: "0 auto", paddingBottom: 80 }}>
+      <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 16 }}>Viloyatlar aro qatnov</div>
 
-      <div style={{ borderRadius: 16, overflow: "hidden", border: "1px solid rgba(0,0,0,0.08)", marginBottom: 14 }}>
-        <div style={{ height: 190 }}>
+      {/* MAP PREVIEW */}
+      <div style={{ borderRadius: 16, overflow: "hidden", border: "1px solid #eee", marginBottom: 16, boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
+        <div style={{ height: 200, position: "relative" }}>
           <MapContainer
-            center={fromLL || toLL || [41.2995, 69.2401]}
-            zoom={7}
+            center={fromLL || toLL || [41.31, 69.24]}
+            zoom={6}
             style={{ height: "100%", width: "100%" }}
+            zoomControl={false}
             scrollWheelZoom={false}
           >
-            <TileLayer
-              url={mapTile}
-              attribution="&copy; OpenStreetMap"
-            />
-            <FitBounds points={[fromLL, toLL]} />
-            {fromLL ? <Marker position={fromLL} /> : null}
-            {toLL ? <Marker position={toLL} /> : null}
-            {polyline ? <Polyline positions={polyline} pathOptions={{ weight: 6, opacity: 0.85 }} /> : null}
+            <TileLayer url={mapTile} />
+            <FitBounds points={routePolyline || [fromLL, toLL]} />
+            {fromLL && <Marker position={fromLL} />}
+            {toLL && <Marker position={toLL} />}
+            {routePolyline && <Polyline positions={routePolyline} pathOptions={{ weight: 5, opacity: 0.8, color: "#1890ff" }} />}
           </MapContainer>
-        </div>
-        <div style={{ padding: 12, fontSize: 12, opacity: 0.85 }}>
-          {canSearch ? `Masofa (taxminiy): ${Math.round(distanceKm)} km` : "Masofa: —"}
+          {routeDistance > 0 && (
+            <div style={{ position: "absolute", bottom: 10, right: 10, background: "rgba(255,255,255,0.9)", padding: "4px 8px", borderRadius: 8, fontSize: 12, fontWeight: 700, zIndex: 500 }}>
+              ~{Math.round(routeDistance)} km
+            </div>
+          )}
         </div>
       </div>
 
-      <div style={{ display: "grid", gap: 12, gridTemplateColumns: "1fr" }}>
+      {/* SEARCH FORM */}
+      <div style={{ display: "grid", gap: 12 }}>
         <RegionDistrictSelect
-          label="Qaerdan"
+          label="Qayerdan"
           region={from.region}
           district={from.district}
-          onChange={({ region, district }) => setFrom({ region, district })}
+          onChange={(val) => setFrom(val)}
           allowEmptyDistrict
         />
+        
+        {/* PICKUP TOGGLE */}
+        <div style={{ background: "#f5f5f5", padding: 10, borderRadius: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: pickupMode === 'address' ? 10 : 0 }}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>Manzildan olib ketish</span>
+            <Switch 
+              checked={pickupMode === 'address'} 
+              onChange={(v) => setPickupMode(v ? 'address' : 'point')} 
+            />
+          </div>
+          {pickupMode === 'address' && (
+            <Button 
+              type={pickupPoint ? "default" : "dashed"} 
+              icon={<EnvironmentOutlined />} 
+              block 
+              onClick={() => {
+                if (!fromLL) { message.warning("Avval viloyatni tanlang"); return; }
+                setPickupPoint(pickupPoint || fromLL); // Default start pos
+                setPickupPickerOpen(true); 
+              }}
+            >
+              {pickupPoint ? "Manzil belgilandi (o'zgartirish)" : "Xaritadan manzilni tanlash"}
+            </Button>
+          )}
+        </div>
 
         <RegionDistrictSelect
           label="Qayerga"
           region={to.region}
           district={to.district}
-          onChange={({ region, district }) => setTo({ region, district })}
+          onChange={(val) => setTo(val)}
           allowEmptyDistrict
         />
 
-        <div>
-          <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Ketish sanasi</div>
-          <DatePicker
-            value={travelDate}
-            onChange={(v) => setTravelDate(v)}
-            style={{ width: "100%" }}
-            placeholder="Sanani tanlang (ixtiyoriy)"
+        <DatePicker 
+          placeholder="Ketish sanasi" 
+          style={{ width: "100%", height: 42, borderRadius: 10 }} 
+          onChange={setTravelDate} 
+        />
+
+        {/* FILTERS */}
+        <div style={{ background: "#fff", padding: 12, borderRadius: 12, border: "1px solid #eee" }}>
+          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, opacity: 0.7 }}>Transport va qulayliklar</div>
+          
+          <Segmented 
+            block 
+            value={vehicleType}
+            onChange={setVehicleType}
+            options={[
+              { label: 'Barchasi', value: 'all' },
+              { label: 'Yengil', value: 'car', icon: <CarOutlined /> },
+              { label: 'Gazel', value: 'gazel' },
+              { label: 'Avtobus', value: 'bus' },
+            ]}
+            style={{ marginBottom: 12 }}
           />
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <Checkbox checked={womenOnly} onChange={e => setWomenOnly(e.target.checked)}>
+              <WomanOutlined style={{ color: "magenta" }} /> Ayollar uchun
+            </Checkbox>
+            <Checkbox checked={hasAC} onChange={e => setHasAC(e.target.checked)}>
+              <ThunderboltOutlined style={{ color: "blue" }} /> Konditsioner
+            </Checkbox>
+            <Checkbox checked={hasTrunk} onChange={e => setHasTrunk(e.target.checked)}>
+              <InboxOutlined /> Yukxona
+            </Checkbox>
+          </div>
         </div>
 
-        <Button type="primary" size="large" onClick={searchTrips} disabled={!canSearch} loading={loading}>
+        <Button type="primary" size="large" onClick={searchTrips} disabled={!canSearch} loading={loading} style={{ height: 48, borderRadius: 12, fontWeight: 700 }}>
           Reys izlash
         </Button>
       </div>
 
+      {/* RESULTS DRAWER */}
       <Drawer
-        title="Topilgan reyslar"
+        title={`Topilgan reyslar (${trips.length})`}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        height="78%"
+        height="85vh"
         placement="bottom"
+        styles={{ body: { padding: 12, background: "#f0f2f5" } }}
       >
-        {loading ? (
-          <div style={{ display: "flex", justifyContent: "center", padding: 24 }}><Spin /></div>
-        ) : trips.length === 0 ? (
-          <Empty description="Reys yo‘q" />
-        ) : (
-          <div>
-            {trips.map((t) => (
-              <TripCard 
-                key={t.id} 
-                trip={t} 
-                onViewMap={viewTripOnMap} 
-                onSelect={handleSelectTrip} 
-              />
-            ))}
-          </div>
-        )}
+        {loading ? <Spin style={{ display: "block", margin: "20px auto" }} /> : 
+         trips.length === 0 ? <Empty description="Reys topilmadi" /> : 
+         trips.map(t => (
+           <TripCard 
+             key={t.id} 
+             trip={t} 
+             onViewMap={viewTripOnMap} 
+             onSelect={(trip) => {
+               setSelectedTrip(trip);
+               message.success("Buyurtma berish oynasi ochilmoqda...");
+               // Bu yerda BookingModal yoki shunga o'xshash logika bo'ladi
+             }} 
+           />
+         ))
+        }
       </Drawer>
 
+      {/* MAP DRAWER (View Route) */}
       <Drawer
-        title="Yo‘l"
+        title="Yo‘nalish xaritasi"
         open={Boolean(mapTrip)}
         onClose={() => setMapTrip(null)}
-        height="78%"
+        height="70vh"
         placement="bottom"
       >
-        {!mapTrip ? null : (
-          <div style={{ borderRadius: 16, overflow: "hidden", border: "1px solid rgba(0,0,0,0.08)" }}>
-            <div style={{ height: 320 }}>
-              <MapContainer
-                center={tripFromLL || [41.2995, 69.2401]}
-                zoom={7}
-                style={{ height: "100%", width: "100%" }}
-              >
-                <TileLayer
-                  url={mapTile}
-                  attribution="&copy; OpenStreetMap"
-                />
-                <FitBounds points={[tripFromLL, tripToLL]} />
-                {tripFromLL ? <Marker position={tripFromLL} /> : null}
-                {tripToLL ? <Marker position={tripToLL} /> : null}
-                {tripLine ? <Polyline positions={tripLine} pathOptions={{ weight: 6, opacity: 0.9 }} /> : null}
-              </MapContainer>
-            </div>
-            <div style={{ padding: 12, fontSize: 12, opacity: 0.85 }}>
-              Masofa (taxminiy): {tripFromLL && tripToLL ? Math.round(haversineKm(tripFromLL, tripToLL)) : "—"} km
+        {mapTrip && (
+          <div style={{ height: "100%", width: "100%", position: "relative" }}>
+            <MapContainer center={[41.31, 69.24]} zoom={6} style={{ height: "100%", width: "100%" }}>
+              <TileLayer url={mapTile} />
+              <FitBounds points={mapTrip.routeLine} />
+              {mapTrip.routeLine && <Polyline positions={mapTrip.routeLine} pathOptions={{ weight: 6, color: "blue" }} />}
+              {/* Start/End Markers could be added here */}
+            </MapContainer>
+            <div style={{ position: "absolute", bottom: 20, left: 20, right: 20, background: "#fff", padding: 12, borderRadius: 12, boxShadow: "0 4px 15px rgba(0,0,0,0.15)", zIndex: 999 }}>
+              <div style={{ fontWeight: 700 }}>{mapTrip.from_region} → {mapTrip.to_region}</div>
+              <div>Masofa: ~{Math.round(mapTrip.distanceVal || 0)} km</div>
             </div>
           </div>
         )}
       </Drawer>
 
+      {/* PICKUP MAP PICKER DRAWER */}
       <Drawer
-        title="Olib ketish manzilini xaritadan tanlang"
+        title="Olib ketish manzilini tanlang"
         open={pickupPickerOpen}
         onClose={() => setPickupPickerOpen(false)}
+        height="85vh"
         placement="bottom"
-        height="75vh"
+        styles={{ body: { padding: 0 } }}
       >
-        <div style={{ height: "55vh", borderRadius: 12, overflow: "hidden" }}>
-          <MapContainer 
-            center={pickupPoint || fromLL || [41.31, 69.28]} 
-            zoom={12} 
-            style={{ height: "100%", width: "100%" }}
-          >
-            <TileLayer url={mapTile} />
-            <PickupPicker
-              value={pickupPoint}
-              onChange={(ll) => {
-                setPickupPoint(ll);
-                savePickupPoint(ll);
-                setSavedPickupPoints(loadSavedPickupPoints());
-              }}
-              savedPoints={savedPickupPoints}
-            />
-          </MapContainer>
+        <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+          <div style={{ flex: 1, position: "relative" }}>
+            <MapContainer center={pickupPoint || [41.31, 69.24]} zoom={13} style={{ height: "100%", width: "100%" }}>
+              <TileLayer url={mapTile} />
+              <PickupPicker 
+                value={pickupPoint} 
+                onChange={(ll) => {
+                  setPickupPoint(ll);
+                  savePickupPoint(ll);
+                  setSavedPickupPoints(loadSavedPickupPoints());
+                }} 
+                savedPoints={savedPickupPoints}
+              />
+            </MapContainer>
+            {/* Center Pin Overlay */}
+            <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -100%)", pointerEvents: "none", zIndex: 1000 }}>
+              <EnvironmentOutlined style={{ fontSize: 32, color: "#faad14", dropShadow: "0 2px 5px rgba(0,0,0,0.3)" }} />
+            </div>
+          </div>
+          <div style={{ padding: 16, background: "#fff" }}>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Saqlangan manzillar:</div>
+            <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8 }}>
+              {savedPickupPoints.map((p, i) => (
+                <Tag key={i} color="blue" onClick={() => setPickupPoint(p)} style={{ padding: "4px 10px" }}>
+                  Manzil {i+1}
+                </Tag>
+              ))}
+            </div>
+            <Button type="primary" block size="large" onClick={() => setPickupPickerOpen(false)}>
+              Manzilni tasdiqlash
+            </Button>
+          </div>
         </div>
-        <Button
-          type="primary"
-          block
-          style={{ marginTop: 12 }}
-          onClick={() => {
-            if (!pickupPoint) { message.error("Xaritadan manzil tanlang"); return; }
-            message.success("Manzil belgilandi! Buyurtma berishga o'tamiz...");
-            setPickupPickerOpen(false);
-          }}
-        >
-          Saqlash
-        </Button>
       </Drawer>
-
-      <div style={{ marginTop: 24 }}>
-        <AutoMarketAdsPanel 
-          title="Avto savdo e’lonlari" 
-          mode="mini" 
-          onOpenAd={(id) => navigate(`/auto-market/ad/${id}`)} 
-          fetchAds={listMarketCars} 
-        />
-      </div>
 
     </div>
   );
