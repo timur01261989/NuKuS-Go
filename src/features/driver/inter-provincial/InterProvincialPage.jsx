@@ -24,8 +24,19 @@ function getRegionCenter(regionName) {
   return r?.center || null;
 }
 
-// ✅ FIXED: haversineKm is now imported from @/shared/services/osrm
-// ❌ REMOVED: Local haversineKm function definition (was here, now imported)
+function haversineKm(a, b) {
+  if (!a || !b) return 0;
+  const toRad = (x) => (x * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(b[0] - a[0]);
+  const dLon = toRad(b[1] - a[1]);
+  const lat1 = toRad(a[0]);
+  const lat2 = toRad(b[0]);
+  const sinDLat = Math.sin(dLat / 2);
+  const sinDLon = Math.sin(dLon / 2);
+  const c = 2 * Math.asin(Math.sqrt(sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLon * sinDLon));
+  return R * c;
+}
 
 function ClickPicker({ onPick }) {
   useMapEvents({
@@ -39,25 +50,25 @@ function ClickPicker({ onPick }) {
 function TripRow({ trip, onEdit, onDelete, onShowMap }) {
   const titleFrom = trip.from_district ? `${trip.from_region} • ${trip.from_district}` : trip.from_region;
   const titleTo = trip.to_district ? `${trip.to_region} • ${trip.to_district}` : trip.to_region;
-  const delDisabled = Boolean(trip.has_booking);
+  const delDisabled = Boolean(trip.has_booking); // server-side set later if you want
 
   return (
     <div style={{ border: "1px solid rgba(0,0,0,0.08)", borderRadius: 14, padding: 12, marginBottom: 10 }}>
       <div style={{ fontWeight: 800, marginBottom: 4 }}>{titleFrom} → {titleTo}</div>
       <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 10 }}>
-        {trip.depart_date}{trip.depart_time ? ` • ${String(trip.depart_time).slice(0,5)}` : ""} • {trip.seats} o'rin • {trip.price} so'm
+        {trip.depart_date}{trip.depart_time ? ` • ${String(trip.depart_time).slice(0,5)}` : ""} • {trip.seats} o‘rin • {trip.price} so‘m
         {trip.women_only ? " • Ayollar" : ""}
         {trip.is_delivery ? " • Eltish" : ""}
         {trip.is_parcel ? " • Posilka" : ""}
       </div>
       <div style={{ display: "flex", gap: 10 }}>
-        <Button onClick={() => onShowMap(trip)} block>Yo'l</Button>
+        <Button onClick={() => onShowMap(trip)} block>Yo‘l</Button>
         <Button onClick={() => onEdit(trip)} block>Tahrirlash</Button>
         <Button danger onClick={() => onDelete(trip)} disabled={delDisabled} block>
-          O'chirish
+          O‘chirish
         </Button>
       </div>
-      {delDisabled ? <div style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>Buyurtma qabul qilingan: o'chirish blok.</div> : null}
+      {delDisabled ? <div style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>Buyurtma qabul qilingan: o‘chirish blok.</div> : null}
     </div>
   );
 }
@@ -69,7 +80,7 @@ export default function InterProvincialPage() {
   const [to, setTo] = useState({ region: null, district: "" });
 
   const [travelDate, setTravelDate] = useState(null);
-  const [travelTime, setTravelTime] = useState("");
+  const [travelTime, setTravelTime] = useState(""); // HH:mm
   const [seats, setSeats] = useState(3);
   const [price, setPrice] = useState(0);
 
@@ -79,13 +90,12 @@ export default function InterProvincialPage() {
 
   const [note, setNote] = useState("");
 
-  const [pickupLL, setPickupLL] = useState(null);
+  const [pickupLL, setPickupLL] = useState(null); // map-picked point (optional)
 
   const fromLL = useMemo(() => (from.region ? getRegionCenter(from.region) : null), [from.region]);
   const toLL = useMemo(() => (to.region ? getRegionCenter(to.region) : null), [to.region]);
 
   const routeLine = useMemo(() => (fromLL && toLL ? [fromLL, toLL] : null), [fromLL, toLL]);
-  // ✅ USES IMPORTED haversineKm (not local definition)
   const distanceKm = useMemo(() => (fromLL && toLL ? haversineKm(fromLL, toLL) : 0), [fromLL, toLL]);
 
   const canCreate = Boolean(user?.id && from.region && to.region && travelDate && seats > 0 && price >= 0);
@@ -205,20 +215,20 @@ export default function InterProvincialPage() {
 
   const deleteTrip = useCallback((trip) => {
     Modal.confirm({
-      title: "Reysni o'chirasizmi?",
-      content: "Agar buyurtma qabul qilingan bo'lsa, o'chirish blok bo'lishi kerak. Hozircha server tekshiruvi yo'q — ehtiyot bo'ling.",
-      okText: "O'chirish",
+      title: "Reysni o‘chirasizmi?",
+      content: "Agar buyurtma qabul qilingan bo‘lsa, o‘chirish blok bo‘lishi kerak. Hozircha server tekshiruvi yo‘q — ehtiyot bo‘ling.",
+      okText: "O‘chirish",
       okButtonProps: { danger: true },
       cancelText: "Bekor",
       async onOk() {
         try {
           const { error } = await supabase.from("interprov_trips").delete().eq("id", trip.id).eq("driver_user_id", user.id);
           if (error) throw error;
-          message.success("O'chirildi");
+          message.success("O‘chirildi");
           await loadMyTrips();
         } catch (e) {
           console.error(e);
-          message.error(e?.message || "O'chirishda xatolik");
+          message.error(e?.message || "O‘chirishda xatolik");
         }
       },
     });
@@ -256,7 +266,7 @@ export default function InterProvincialPage() {
         <div style={{ padding: 12, fontSize: 12, opacity: 0.85 }}>
           <div>Masofa (taxminiy): {fromLL && toLL ? Math.round(distanceKm) : "—"} km</div>
           <div style={{ marginTop: 6, opacity: 0.75 }}>
-            Jo'nab ketish manzilini xaritadan belgilash: xaritani bosing (ixtiyoriy)
+            Jo‘nab ketish manzilini xaritadan belgilash: xaritani bosing (ixtiyoriy)
           </div>
         </div>
       </div>
@@ -290,11 +300,11 @@ export default function InterProvincialPage() {
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div>
-            <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>O'rinlar</div>
+            <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>O‘rinlar</div>
             <InputNumber min={1} max={8} value={seats} onChange={(v) => setSeats(v)} style={{ width: "100%" }} />
           </div>
           <div>
-            <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Narx (so'm)</div>
+            <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Narx (so‘m)</div>
             <InputNumber min={0} value={price} onChange={(v) => setPrice(v)} style={{ width: "100%" }} />
           </div>
         </div>
@@ -318,7 +328,7 @@ export default function InterProvincialPage() {
 
         <div>
           <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Izoh (ixtiyoriy)</div>
-          <Input.TextArea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder="Masalan: yo'lda 1 ta joy, posilka ham olaman..." />
+          <Input.TextArea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder="Masalan: yo‘lda 1 ta joy, posilka ham olaman..." />
         </div>
 
         <div style={{ display: "flex", gap: 12 }}>
@@ -336,7 +346,7 @@ export default function InterProvincialPage() {
       {loadingTrips ? (
         <div style={{ opacity: 0.8 }}>Yuklanmoqda...</div>
       ) : trips.length === 0 ? (
-        <Empty description="Reys yo'q" />
+        <Empty description="Reys yo‘q" />
       ) : (
         <div>
           {trips.map((t) => (
@@ -346,7 +356,7 @@ export default function InterProvincialPage() {
       )}
 
       <Drawer
-        title="Yo'l"
+        title="Yo‘l"
         open={mapDrawerOpen}
         onClose={() => setMapDrawerOpen(false)}
         height="78%"

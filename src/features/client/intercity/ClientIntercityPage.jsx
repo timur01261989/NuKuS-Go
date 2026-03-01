@@ -1,13 +1,43 @@
-import React, { useMemo, useState, useCallback, useEffect } from "react";
-import { Button, DatePicker, Drawer, Empty, Spin, message, Switch, Select, InputNumber, Checkbox, Radio, Tag } from "antd";
-import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
+import React, { useMemo, useState, useCallback, useEffect, useRef } from "react";
+import { Button, DatePicker, Drawer, Empty, Spin, message, Switch, Select, InputNumber, Checkbox, Radio, Tag, Segmented, Input, Divider, Typography } from "antd";
+import {
+  AimOutlined,
+  HomeOutlined,
+  BankOutlined,
+  CarOutlined,
+  CloseOutlined,
+  EnvironmentOutlined,
+  FlagOutlined,
+  PlusOutlined,
+  ShareAltOutlined,
+  PhoneOutlined,
+  ClockCircleOutlined,
+  StarFilled,
+  UserOutlined,
+  CompassOutlined
+} from "@ant-design/icons";
+// 1-TUZATISH: useMapEvents qo'shildi
+import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import dayjs from "dayjs";
+import { useNavigate } from "react-router-dom"; 
 
+import api from "@/utils/apiHelper";
 import RegionDistrictSelect from "@/shared/components/RegionDistrictSelect";
 import { UZ_REGIONS } from "@/shared/constants/uzRegions";
 import { supabase } from "@/services/supabaseClient";
-import { osrmRouteDriving, haversineKm } from "@/shared/services/osrm";
+
+// 2-TUZATISH: haversineKm olib tashlandi (pastda funksiya sifatida bor)
+import { osrmRouteDriving } from "@/shared/services/osrm";
+
+// 3-TUZATISH: AutoMarketAdsPanel yo'li to'g'irlandi. 
+// Agar u "taxi" papkasida bo'lsa, bitta papka yuqoriga chiqib kirish kerak.
+import AutoMarketAdsPanel from "../taxi/components/AutoMarketAdsPanel"; 
+
+// Agar bu importlar boshqa joyda bo'lsa, yo'llarini tekshiring:
+import { listMarketCars } from "../../../services/marketService.js";
+import RatingModal from "@features/shared/components/RatingModal";
+import ClientBonusWidget from "@/features/client/components/ClientBonusWidget";
 
 import "leaflet/dist/leaflet.css";
 
@@ -19,13 +49,44 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
+const mapTile = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+
+// --- Yordamchi funksiyalar ---
+
 function getRegionCenter(regionName) {
   const r = UZ_REGIONS.find((x) => x.name === regionName);
   return r?.center || null;
 }
 
-// ✅ FIXED: haversineKm is now imported from @/shared/services/osrm
-// ❌ REMOVED: Local haversineKm function definition (was here, now imported)
+// Local haversineKm funksiyasi
+function haversineKm(a, b) {
+  if (!a || !b) return 0;
+  const toRad = (x) => (x * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(b[0] - a[0]);
+  const dLon = toRad(b[1] - a[1]);
+  const lat1 = toRad(a[0]);
+  const lat2 = toRad(b[0]);
+  const sinDLat = Math.sin(dLat / 2);
+  const sinDLon = Math.sin(dLon / 2);
+  const c = 2 * Math.asin(Math.sqrt(sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLon * sinDLon));
+  return R * c;
+}
+
+function loadSavedPickupPoints() {
+  try {
+    return JSON.parse(localStorage.getItem("saved_pickup_points") || "[]");
+  } catch { return []; }
+}
+
+function savePickupPoint(pt) {
+  if (!pt) return;
+  const pts = loadSavedPickupPoints();
+  const newPts = [pt, ...pts].filter((v, i, a) => a.findIndex(t => (t[0] === v[0] && t[1] === v[1])) === i).slice(0, 5);
+  localStorage.setItem("saved_pickup_points", JSON.stringify(newPts));
+}
+
+// --- Map Componentlari ---
 
 function FitBounds({ points }) {
   const map = useMap();
@@ -44,7 +105,25 @@ function FitBounds({ points }) {
   return null;
 }
 
-function TripCard({ trip, onViewMap }) {
+function PickupPicker({ value, onChange, savedPoints }) {
+  useMapEvents({
+    click(e) {
+      const ll = [e.latlng.lat, e.latlng.lng];
+      onChange(ll);
+    },
+  });
+
+  return (
+    <>
+      {Array.isArray(savedPoints) ? savedPoints.map((p, idx) => (
+        <Marker key={`sp-${idx}`} position={p} eventHandlers={{ click: () => onChange(p) }} opacity={0.6} />
+      )) : null}
+      {value ? <Marker position={value} /> : null}
+    </>
+  );
+}
+
+function TripCard({ trip, onViewMap, onSelect }) {
   const titleFrom = trip.from_district ? `${trip.from_region} • ${trip.from_district}` : trip.from_region;
   const titleTo = trip.to_district ? `${trip.to_region} • ${trip.to_district}` : trip.to_region;
 
@@ -52,15 +131,15 @@ function TripCard({ trip, onViewMap }) {
     <div style={{ border: "1px solid rgba(0,0,0,0.08)", borderRadius: 14, padding: 14, marginBottom: 10 }}>
       <div style={{ fontWeight: 700, marginBottom: 6 }}>{titleFrom} → {titleTo}</div>
       <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 10 }}>
-        {trip.depart_date}{trip.depart_time ? ` • ${String(trip.depart_time).slice(0,5)}` : ""} • {trip.seats} o'rin
-        {typeof trip.price === "number" ? ` • ${trip.price} so'm` : ""}
+        {trip.depart_date}{trip.depart_time ? ` • ${String(trip.depart_time).slice(0,5)}` : ""} • {trip.seats} o‘rin
+        {typeof trip.price === "number" ? ` • ${trip.price} so‘m` : ""}
         {trip.women_only ? " • Ayollar uchun" : ""}
         {trip.is_delivery ? " • Eltish" : ""}
         {trip.is_parcel ? " • Posilka" : ""}
       </div>
       <div style={{ display: "flex", gap: 10 }}>
-        <Button onClick={() => onViewMap(trip)} block>Yo'lni ko'rish</Button>
-        <Button type="primary" block disabled title="Keyingi bosqich: bron qilish (hozircha faqat ko'rish)">
+        <Button onClick={() => onViewMap(trip)} block>Yo‘lni ko‘rish</Button>
+        <Button type="primary" block onClick={() => onSelect && onSelect(trip)}>
           Tanlash
         </Button>
       </div>
@@ -68,60 +147,10 @@ function TripCard({ trip, onViewMap }) {
   );
 }
 
-function FitRoute({ coords }) {
-  const map = useMap();
-  useEffect(() => {
-    if (!coords || coords.length < 2) return;
-    try {
-      const bounds = L.latLngBounds(coords);
-      map.fitBounds(bounds, { padding: [30, 30] });
-    } catch {}
-  }, [coords, map]);
-  return null;
-}
-
-function PickupPicker({ value, onChange, savedPoints }) {
-  const events = useMemo(() => ({
-    click(e) {
-      const ll = [e.latlng.lat, e.latlng.lng];
-      onChange(ll);
-    },
-  }), [onChange]);
-
-  const MapEvents = () => {
-    useMapEvents(events);
-    return null;
-  };
-
-  return (
-    <>
-      <MapEvents />
-      {Array.isArray(savedPoints) ? savedPoints.map((p, idx) => (
-        <Marker key={`sp-${idx}`} position={p} eventHandlers={{ click: () => onChange(p) }} />
-      )) : null}
-      {value ? <Marker position={value} /> : null}
-    </>
-  );
-}
-
-function loadSavedPickupPoints() {
-  try {
-    return JSON.parse(localStorage.getItem("saved_pickup_points") || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function savePickupPoint(pt) {
-  if (!pt) return;
-  const pts = loadSavedPickupPoints();
-  const newPts = [pt, ...pts]
-    .filter((v, i, a) => a.findIndex(t => t[0] === v[0] && t[1] === v[1]) === i)
-    .slice(0, 5);
-  localStorage.setItem("saved_pickup_points", JSON.stringify(newPts));
-}
+// --- Asosiy Page ---
 
 export default function ClientIntercityPage() {
+  const navigate = useNavigate();
   const [from, setFrom] = useState({ region: null, district: "" });
   const [to, setTo] = useState({ region: null, district: "" });
   const [travelDate, setTravelDate] = useState(null);
@@ -134,7 +163,6 @@ export default function ClientIntercityPage() {
     return [fromLL, toLL];
   }, [fromLL, toLL]);
 
-  // ✅ USES IMPORTED haversineKm (not local definition)
   const distanceKm = useMemo(() => (fromLL && toLL ? haversineKm(fromLL, toLL) : 0), [fromLL, toLL]);
 
   const canSearch = Boolean(from.region && to.region);
@@ -144,9 +172,11 @@ export default function ClientIntercityPage() {
   const [trips, setTrips] = useState([]);
   const [mapTrip, setMapTrip] = useState(null);
 
+  // Pickup Picker State
   const [pickupPickerOpen, setPickupPickerOpen] = useState(false);
   const [pickupPoint, setPickupPoint] = useState(null);
   const [savedPickupPoints, setSavedPickupPoints] = useState([]);
+  const [selectedTripForBooking, setSelectedTripForBooking] = useState(null);
 
   useEffect(() => {
     setSavedPickupPoints(loadSavedPickupPoints());
@@ -190,6 +220,12 @@ export default function ClientIntercityPage() {
     setMapTrip(trip);
   }, []);
 
+  const handleSelectTrip = useCallback((trip) => {
+    setSelectedTripForBooking(trip);
+    setPickupPoint(fromLL || getRegionCenter(trip.from_region) || [41.31, 69.28]);
+    setPickupPickerOpen(true);
+  }, [fromLL]);
+
   const tripFromLL = mapTrip ? getRegionCenter(mapTrip.from_region) : null;
   const tripToLL = mapTrip ? getRegionCenter(mapTrip.to_region) : null;
   const tripLine = tripFromLL && tripToLL ? [tripFromLL, tripToLL] : null;
@@ -207,7 +243,7 @@ export default function ClientIntercityPage() {
             scrollWheelZoom={false}
           >
             <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              url={mapTile}
               attribution="&copy; OpenStreetMap"
             />
             <FitBounds points={[fromLL, toLL]} />
@@ -263,18 +299,23 @@ export default function ClientIntercityPage() {
         {loading ? (
           <div style={{ display: "flex", justifyContent: "center", padding: 24 }}><Spin /></div>
         ) : trips.length === 0 ? (
-          <Empty description="Reys yo'q" />
+          <Empty description="Reys yo‘q" />
         ) : (
           <div>
             {trips.map((t) => (
-              <TripCard key={t.id} trip={t} onViewMap={viewTripOnMap} />
+              <TripCard 
+                key={t.id} 
+                trip={t} 
+                onViewMap={viewTripOnMap} 
+                onSelect={handleSelectTrip} 
+              />
             ))}
           </div>
         )}
       </Drawer>
 
       <Drawer
-        title="Yo'l"
+        title="Yo‘l"
         open={Boolean(mapTrip)}
         onClose={() => setMapTrip(null)}
         height="78%"
@@ -289,7 +330,7 @@ export default function ClientIntercityPage() {
                 style={{ height: "100%", width: "100%" }}
               >
                 <TileLayer
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  url={mapTile}
                   attribution="&copy; OpenStreetMap"
                 />
                 <FitBounds points={[tripFromLL, tripToLL]} />
@@ -313,12 +354,12 @@ export default function ClientIntercityPage() {
         height="75vh"
       >
         <div style={{ height: "55vh", borderRadius: 12, overflow: "hidden" }}>
-          <MapContainer
-            center={pickupPoint || fromLL || [41.31, 69.28]}
-            zoom={12}
+          <MapContainer 
+            center={pickupPoint || [41.31, 69.28]} 
+            zoom={12} 
             style={{ height: "100%", width: "100%" }}
           >
-            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap" />
+            <TileLayer url={mapTile} />
             <PickupPicker
               value={pickupPoint}
               onChange={(ll) => {
@@ -335,16 +376,25 @@ export default function ClientIntercityPage() {
           block
           style={{ marginTop: 12 }}
           onClick={() => {
-            if (!pickupPoint) {
-              message.error("Xaritadan manzil tanlang");
-              return;
-            }
+            if (!pickupPoint) { message.error("Xaritadan manzil tanlang"); return; }
+            message.success("Manzil belgilandi! Buyurtma berishga o'tamiz...");
             setPickupPickerOpen(false);
           }}
         >
-          Saqlash
+          Davom etish
         </Button>
       </Drawer>
+
+      {/* AutoMarketAdsPanel komponenti bu yerda chaqirilmoqda */}
+      <div style={{ marginTop: 24 }}>
+        <AutoMarketAdsPanel 
+          title="Avto savdo e’lonlari" 
+          mode="mini" 
+          onOpenAd={(id) => navigate(`/auto-market/ad/${id}`)} 
+          fetchAds={listMarketCars} 
+        />
+      </div>
+
     </div>
   );
 }
