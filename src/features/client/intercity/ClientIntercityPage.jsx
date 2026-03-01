@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { Button, DatePicker, Drawer, Empty, Spin, message, Switch, Select, InputNumber, Checkbox, Radio, Tag } from "antd";
-// 1-TUZATISH: useMapEvents qo'shildi
+// TUZATISH 1: useMapEvents qo'shildi
 import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import dayjs from "dayjs";
@@ -8,9 +8,8 @@ import dayjs from "dayjs";
 import RegionDistrictSelect from "@/shared/components/RegionDistrictSelect";
 import { UZ_REGIONS } from "@/shared/constants/uzRegions";
 import { supabase } from "@/services/supabaseClient";
-
-// 2-TUZATISH: Bu import olib tashlandi, chunki haversineKm pastda e'lon qilingan
-// import { osrmRouteDriving, haversineKm } from "@/shared/services/osrm"; 
+// TUZATISH 2: haversineKm bu yerdan olib tashlandi (pastda local funksiya borligi uchun)
+import { osrmRouteDriving } from "@/shared/services/osrm"; 
 
 import "leaflet/dist/leaflet.css";
 
@@ -22,16 +21,15 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
+// Map Tile URL
 const mapTile = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
-
-// --- Yordamchi funksiyalar ---
 
 function getRegionCenter(regionName) {
   const r = UZ_REGIONS.find((x) => x.name === regionName);
   return r?.center || null;
 }
 
-// 2-TUZATISH: Local funksiya saqlab qolindi
+// Bu funksiya fayl ichida e'lon qilingani uchun importdan olib tashlandi
 function haversineKm(a, b) {
   if (!a || !b) return 0;
   const toRad = (x) => (x * Math.PI) / 180;
@@ -45,22 +43,6 @@ function haversineKm(a, b) {
   const c = 2 * Math.asin(Math.sqrt(sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLon * sinDLon));
   return R * c;
 }
-
-function loadSavedPickupPoints() {
-  try {
-    return JSON.parse(localStorage.getItem("saved_pickup_points") || "[]");
-  } catch { return []; }
-}
-
-function savePickupPoint(pt) {
-  if (!pt) return;
-  const pts = loadSavedPickupPoints();
-  // Dublikatlarni oldini olish va oxirgi 5 tasini saqlash
-  const newPts = [pt, ...pts].filter((v, i, a) => a.findIndex(t => (t[0] === v[0] && t[1] === v[1])) === i).slice(0, 5);
-  localStorage.setItem("saved_pickup_points", JSON.stringify(newPts));
-}
-
-// --- Komponentlar ---
 
 function FitBounds({ points }) {
   const map = useMap();
@@ -121,7 +103,18 @@ function PickupPicker({ value, onChange, savedPoints }) {
   );
 }
 
-// --- Asosiy Page ---
+function loadSavedPickupPoints() {
+  try {
+    return JSON.parse(localStorage.getItem("saved_pickup_points") || "[]");
+  } catch { return []; }
+}
+
+function savePickupPoint(pt) {
+  if (!pt) return;
+  const pts = loadSavedPickupPoints();
+  const newPts = [pt, ...pts].filter((v, i, a) => a.findIndex(t => (t[0] === v[0] && t[1] === v[1])) === i).slice(0, 5);
+  localStorage.setItem("saved_pickup_points", JSON.stringify(newPts));
+}
 
 export default function ClientIntercityPage() {
   const [from, setFrom] = useState({ region: null, district: "" });
@@ -195,8 +188,6 @@ export default function ClientIntercityPage() {
 
   const handleSelectTrip = useCallback((trip) => {
     setSelectedTripForBooking(trip);
-    // Agar foydalanuvchi qayerdanligini xaritada belgilamagan bo'lsa, taklif qilamiz
-    // Default markaz sifatida 'fromLL' yoki Toshkent koordinatasini olamiz
     setPickupPoint(fromLL || getRegionCenter(trip.from_region) || [41.31, 69.28]);
     setPickupPickerOpen(true);
   }, [fromLL]);
@@ -282,7 +273,7 @@ export default function ClientIntercityPage() {
                 key={t.id} 
                 trip={t} 
                 onViewMap={viewTripOnMap} 
-                onSelect={handleSelectTrip}
+                onSelect={handleSelectTrip} 
               />
             ))}
           </div>
@@ -353,7 +344,6 @@ export default function ClientIntercityPage() {
           onClick={() => {
             if (!pickupPoint) { message.error("Xaritadan manzil tanlang"); return; }
             message.success("Manzil belgilandi! Buyurtma berishga o'tamiz...");
-            // Bu yerda keyingi bosqichga (booking) o'tish logikasi bo'ladi
             setPickupPickerOpen(false);
           }}
         >
