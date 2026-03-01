@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, message } from "antd";
 import { AimOutlined, EnvironmentOutlined, SwapOutlined } from "@ant-design/icons";
-import { MapContainer, Marker, Polyline, TileLayer, useMap } from "react-leaflet";
+import { MapContainer, Marker, Polyline, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -20,6 +20,18 @@ let DefaultIcon = L.icon({
   iconAnchor: [12, 41]
 });
 L.Marker.prototype.options.icon = DefaultIcon;
+
+
+function ClickPicker({ enabled, onPick }) {
+  useMapEvents({
+    click(e) {
+      if (!enabled) return;
+      const { lat, lng } = e.latlng || {};
+      if (typeof lat === "number" && typeof lng === "number") onPick([lat, lng]);
+    }
+  });
+  return null;
+}
 
 function CenterTracker({ enabled, onCenter, setIsDragging }) {
   const map = useMap();
@@ -161,13 +173,15 @@ export default function FreightMap() {
         {/* Xaritani harakatlantirish */}
         <FlyTo target={mapCenter} zoom={15} />
         
-        {/* Markazni kuzatish */}
+        {/* Markazni kuzatish (drag) */}
         <CenterTracker enabled={!!selecting} onCenter={handleCenterPicked} setIsDragging={setIsDragging} />
+        {/* Xarita ustiga bosib tanlash (tap/click) */}
+        <ClickPicker enabled={!!selecting} onPick={handleCenterPicked} />
         
         {/* Markerlar - faqat tanlanmayotgan paytda ko'rsatish mantiqan to'g'ri bo'lishi mumkin, 
             lekin sizning kodingizda har doim ko'rsatilgan */}
-        {pickup?.latlng && selecting !== "pickup" && <Marker position={pickup.latlng} />}
-        {dropoff?.latlng && selecting !== "dropoff" && <Marker position={dropoff.latlng} />}
+        {pickup?.latlng && <Marker position={pickup.latlng} />}
+        {dropoff?.latlng && <Marker position={dropoff.latlng} />}
         
         {/* Yo'nalish chizig'i */}
         {Array.isArray(routeCoords) && routeCoords.length >= 2 && (
@@ -182,7 +196,7 @@ export default function FreightMap() {
         <div className={`fr-centerpin ${isDragging ? "dragging" : ""}`} aria-hidden="true">
           <div style={{ width: 70, height: 80 }} dangerouslySetInnerHTML={{ __html: pinSvg() }} />
           <div className="fr-pinlabel">
-            {selecting === "pickup" ? "Yuklash joyi" : "Tushirish joyi"}
+            {selecting === "pickup" ? "Yuborish joyi" : "Tushirish joyi"}
           </div>
         </div>
       )}
@@ -205,7 +219,7 @@ export default function FreightMap() {
           style={{ flex: 1, borderRadius: 14 }} 
           type={selecting === "pickup" ? "primary" : "default"}
         >
-          Yuklash
+          Yuborish
         </Button>
         <Button 
           icon={<EnvironmentOutlined />} 
@@ -217,6 +231,29 @@ export default function FreightMap() {
         </Button>
         <Button icon={<SwapOutlined />} onClick={swapPoints} style={{ borderRadius: 14 }} />
       </div>
+
+
+      {/* Manzil tanlash (button + mapdan belgilash) */}
+      <div style={{ position: "absolute", left: 12, right: 12, top: 64, zIndex: 800, display: "grid", gap: 8 }}>
+        <Button
+          icon={<EnvironmentOutlined />}
+          onClick={() => setSelecting("pickup")}
+          style={{ borderRadius: 14, textAlign: "left", height: 44, justifyContent: "flex-start" }}
+          type={selecting === "pickup" ? "primary" : "default"}
+        >
+          {pickup?.address ? `Yuborish: ${pickup.address}` : "Yuborish manzilini tanlang"}
+        </Button>
+        <Button
+          icon={<EnvironmentOutlined />}
+          onClick={() => setSelecting("dropoff")}
+          style={{ borderRadius: 14, textAlign: "left", height: 44, justifyContent: "flex-start" }}
+          type={selecting === "dropoff" ? "primary" : "default"}
+        >
+          {dropoff?.address ? `Tushirish: ${dropoff.address}` : "Tushirish manzilini tanlang"}
+        </Button>
+      </div>
+
+
 
       {/* CSS Styles - dangerouslySetInnerHTML bilan xavfsiz */}
       <style dangerouslySetInnerHTML={{ __html: `

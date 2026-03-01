@@ -2,7 +2,7 @@
 -- Bu fayl üçüncü bajarilishi kerak (asosiy schema dan keyin)
 
 -- ============================================================
--- DRIVER LEVELS (haydovchi darajalarii)
+-- DRIVER LEVELS (haydovchi darajalari)
 -- ============================================================
 
 create table if not exists public.driver_levels (
