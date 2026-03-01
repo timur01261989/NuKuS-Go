@@ -10,14 +10,17 @@
       "maxDuration": 30
     }
   },
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api?path=$1"
+      "src": "^/api/(.*)$",
+      "dest": "/api?path=$1"
     },
     {
-      "source": "/((?!api|assets|icons|sounds|config|sw.js|manifest.webmanifest|vite.svg).*)",
-      "destination": "/index.html"
+      "handle": "filesystem"
+    },
+    {
+      "src": "^(.*)$",
+      "dest": "/index.html"
     }
   ],
   "headers": [
