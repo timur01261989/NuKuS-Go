@@ -29,7 +29,7 @@ import L from "leaflet";
 
 import RegionDistrictSelect from "@/shared/components/RegionDistrictSelect";
 import { UZ_REGIONS } from "@/shared/constants/uzRegions";
-import { supabase } from "@/services/supabaseClient";
+import { supabase } from "@/lib/supabase";
 // DIQQAT: haversineKm bu yerdan import qilinadi, pastda qayta yozilmaydi
 import { osrmRouteDriving, haversineKm } from "@/shared/services/osrm";
 import { useAuth } from "@/shared/auth/AuthProvider";

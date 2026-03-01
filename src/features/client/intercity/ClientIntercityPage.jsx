@@ -30,7 +30,7 @@ import { useNavigate } from "react-router-dom";
 
 import RegionDistrictSelect from "@/shared/components/RegionDistrictSelect";
 import { UZ_REGIONS } from "@/shared/constants/uzRegions";
-import { supabase } from "@/services/supabaseClient";
+import { supabase } from "@/lib/supabase";
 import { osrmRouteDriving, haversineKm } from "@/shared/services/osrm"; 
 
 import AutoMarketAdsPanel from "../taxi/components/AutoMarketAdsPanel"; 

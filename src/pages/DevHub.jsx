@@ -142,7 +142,7 @@ export default function DevHub() {
       { key: "pricingService", kind: "service", title: "pricingService", load: () => import("../services/pricingService.js") },
       { key: "promoApi", kind: "service", title: "promoApi", load: () => import("../services/promoApi.js") },
       { key: "soundService", kind: "service", title: "soundService", load: () => import("../services/soundService.js") },
-      { key: "supabaseClient", kind: "service", title: "supabaseClient", load: () => import("../services/supabaseClient.js") },
+      { key: "supabase", kind: "service", title: "supabase", load: () => import("@/lib/supabase.js") },
       { key: "telemetryService", kind: "service", title: "telemetryService", load: () => import("../services/telemetryService.js") },
       { key: "voiceService", kind: "service", title: "voiceService", load: () => import("../services/voiceService.js") },
       { key: "walletApi", kind: "service", title: "walletApi", load: () => import("../services/walletApi.js") },

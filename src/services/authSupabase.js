@@ -1,21 +1,24 @@
-import { assertSupabase } from './supabaseClient.js';
+import { supabase, assertSupabase } from '@/lib/supabase';
 
 export async function requestOtp(phone) {
-  const sb = assertSupabase();
+  assertSupabase();
+  const sb = supabase;
   const { error } = await sb.auth.signInWithOtp({ phone });
   if (error) throw error;
   return { ok: true };
 }
 
 export async function verifyOtp(phone, token) {
-  const sb = assertSupabase();
+  assertSupabase();
+  const sb = supabase;
   const { data, error } = await sb.auth.verifyOtp({ phone, token, type: 'sms' });
   if (error) throw error;
   return { ok: true, session: data?.session, user: data?.user };
 }
 
 export async function signOut() {
-  const sb = assertSupabase();
+  assertSupabase();
+  const sb = supabase;
   const { error } = await sb.auth.signOut();
   if (error) throw error;
   return { ok: true };

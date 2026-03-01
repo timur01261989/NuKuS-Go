@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { message } from 'antd';
-import { supabase } from '../services/supabaseClient';
+import { supabase } from '@/lib/supabase';
 import { listPremiumRequests } from '../services/districtApi';
 
 // Premium rejim: seat requestlar real kelishi

@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Spin } from "antd";
 
-import { supabase } from "../services/supabaseClient";
+import { supabase } from "@/lib/supabase";
 import { useSessionProfile } from "../shared/auth/useSessionProfile";
 // NOTE: keep helper close to routing guards.
 // RootRedirect and RoleGate must agree on the same role → home mapping.

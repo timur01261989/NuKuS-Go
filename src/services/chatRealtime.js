@@ -1,7 +1,8 @@
-import { assertSupabase } from './supabaseClient.js';
+import { supabase, assertSupabase } from '@/lib/supabase';
 
 export function subscribeMessages(orderId, onChange) {
-  const sb = assertSupabase();
+  assertSupabase();
+  const sb = supabase;
   const channel = sb
     .channel(`msg:${orderId}`)
     .on('postgres_changes', { event:'*', schema:'public', table:'messages', filter:`order_id=eq.${orderId}` }, (payload) => onChange?.(payload))

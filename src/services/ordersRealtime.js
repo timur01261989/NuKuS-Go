@@ -1,7 +1,8 @@
-import { assertSupabase } from './supabaseClient.js';
+import { supabase, assertSupabase } from '@/lib/supabase';
 
 export function subscribeOrder(orderId, onChange) {
-  const sb = assertSupabase();
+  assertSupabase();
+  const sb = supabase;
   const channel = sb
     .channel(`order:${orderId}`)
     .on(
@@ -15,7 +16,8 @@ export function subscribeOrder(orderId, onChange) {
 }
 
 export async function subscribeDriverLocation(orderId, onChange) {
-  const sb = assertSupabase();
+  assertSupabase();
+  const sb = supabase;
 
   // We support multiple schema variants:
   // Variant A (order-scoped): driver_locations(order_id, driver_id, lat, lng, updated_at, ...)
