@@ -1,11 +1,13 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
-import { Button, DatePicker, Drawer, Empty, Spin, message } from "antd";
+import { Button, DatePicker, Drawer, Empty, Spin, message, Switch, Select, InputNumber, Checkbox, Radio, Tag } from "antd";
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
+import dayjs from "dayjs";
 
 import RegionDistrictSelect from "@/shared/components/RegionDistrictSelect";
 import { UZ_REGIONS } from "@/shared/constants/uzRegions";
 import { supabase } from "@/services/supabaseClient";
+import { osrmRouteDriving, haversineKm } from "@/shared/services/osrm";
 
 import "leaflet/dist/leaflet.css";
 
@@ -73,7 +75,72 @@ function TripCard({ trip, onViewMap }) {
           Tanlash
         </Button>
       </div>
+<Drawer
+  title="Olib ketish manzilini xaritadan tanlang"
+  open={pickupPickerOpen}
+  onClose={() => setPickupPickerOpen(false)}
+  placement="bottom"
+  height="75vh"
+>
+  <div style={{ height: "55vh", borderRadius: 12, overflow: "hidden" }}>
+    <MapContainer center={pickupPoint || fromPoint || [41.31, 69.28]} zoom={12} style={{ height: "100%", width: "100%" }}>
+      <TileLayer url={mapTile} />
+      <PickupPicker
+        value={pickupPoint}
+        onChange={(ll) => {
+          setPickupPoint(ll);
+          savePickupPoint(ll);
+          setSavedPickupPoints(loadSavedPickupPoints());
+        }}
+        savedPoints={savedPickupPoints}
+      />
+    </MapContainer>
+  </div>
+  <Button
+    type="primary"
+    block
+    style={{ marginTop: 12 }}
+    onClick={() => {
+      if (!pickupPoint) { message.error("Xaritadan manzil tanlang"); return; }
+      setPickupPickerOpen(false);
+    }}
+  >
+    Saqlash
+  </Button>
+</Drawer>
+
     </div>
+  );
+}
+
+
+function FitRoute({ coords }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!coords || coords.length < 2) return;
+    try {
+      const bounds = L.latLngBounds(coords);
+      map.fitBounds(bounds, { padding: [30, 30] });
+    } catch {}
+  }, [coords, map]);
+  return null;
+}
+
+function PickupPicker({ value, onChange, savedPoints }) {
+  useMapEvents({
+    click(e) {
+      const ll = [e.latlng.lat, e.latlng.lng];
+      onChange(ll);
+    },
+  });
+
+  return (
+    <>
+      {Array.isArray(savedPoints) ? savedPoints.map((p, idx) => (
+        <Marker key={`sp-${idx}`} position={p} eventHandlers={{ click: () => onChange(p) }} />
+      )) : null}
+      {value ? <Marker position={value} /> : null}
+    </>
   );
 }
 
@@ -251,6 +318,40 @@ export default function ClientIntercityPage() {
           </div>
         )}
       </Drawer>
+<Drawer
+  title="Olib ketish manzilini xaritadan tanlang"
+  open={pickupPickerOpen}
+  onClose={() => setPickupPickerOpen(false)}
+  placement="bottom"
+  height="75vh"
+>
+  <div style={{ height: "55vh", borderRadius: 12, overflow: "hidden" }}>
+    <MapContainer center={pickupPoint || fromPoint || [41.31, 69.28]} zoom={12} style={{ height: "100%", width: "100%" }}>
+      <TileLayer url={mapTile} />
+      <PickupPicker
+        value={pickupPoint}
+        onChange={(ll) => {
+          setPickupPoint(ll);
+          savePickupPoint(ll);
+          setSavedPickupPoints(loadSavedPickupPoints());
+        }}
+        savedPoints={savedPickupPoints}
+      />
+    </MapContainer>
+  </div>
+  <Button
+    type="primary"
+    block
+    style={{ marginTop: 12 }}
+    onClick={() => {
+      if (!pickupPoint) { message.error("Xaritadan manzil tanlang"); return; }
+      setPickupPickerOpen(false);
+    }}
+  >
+    Saqlash
+  </Button>
+</Drawer>
+
     </div>
   );
 }
