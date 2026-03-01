@@ -22,7 +22,8 @@ import {
   EnvironmentOutlined, 
   CarOutlined, 
   ThunderboltOutlined, 
-  InboxOutlined,
+  InboxOutlined, 
+  ClockCircleOutlined,
   UserOutlined
 } from "@ant-design/icons";
 import dayjs from "dayjs";
@@ -32,7 +33,6 @@ import L from "leaflet";
 import RegionDistrictSelect from "@/shared/components/RegionDistrictSelect";
 import { UZ_REGIONS } from "@/shared/constants/uzRegions";
 import { supabase } from "@/services/supabaseClient";
-// OSRM importi (osrm.js faylingizdan)
 import { osrmRouteDriving, haversineKm } from "@/shared/services/osrm";
 import { useAuth } from "@/shared/auth/AuthProvider";
 
@@ -123,7 +123,28 @@ function TripRow({ trip, onEdit, onDelete, onShowMap }) {
 }
 
 export default function InterProvincialPage() {
-  const { user } = useAuth(); // Userni olish
+  const { user: authUser } = useAuth(); // AuthContext dan user
+  const [currentUser, setCurrentUser] = useState(null); // Haqiqiy user (backup bilan)
+
+  // Userni aniqlash (AuthContext ishlamasa, to'g'ridan-to'g'ri Supabase'dan olamiz)
+  useEffect(() => {
+    const checkUser = async () => {
+      // 1-urinish: Context dagi user
+      if (authUser?.id) {
+        setCurrentUser(authUser);
+        return;
+      }
+      
+      // 2-urinish: Supabase'dan to'g'ridan-to'g'ri so'rash
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        setCurrentUser(data.user);
+      } else {
+        setCurrentUser(null);
+      }
+    };
+    checkUser();
+  }, [authUser]);
 
   // Basic Info
   const [from, setFrom] = useState({ region: null, district: "" });
@@ -178,16 +199,6 @@ export default function InterProvincialPage() {
     }
   }, [fromLL, toLL]);
 
-  // Validatsiya
-  const canCreate = Boolean(
-    from.region && 
-    to.region && 
-    travelDate && 
-    travelTime && 
-    seats > 0 && 
-    ((vehicleType === 'car' && priceFront > 0 && priceBack > 0) || (vehicleType !== 'car' && price > 0))
-  );
-
   // Data state
   const [saving, setSaving] = useState(false);
   const [trips, setTrips] = useState([]);
@@ -203,13 +214,13 @@ export default function InterProvincialPage() {
   useEffect(() => { setSavedLocs(loadSavedLocations()); }, []);
 
   const loadMyTrips = useCallback(async () => {
-    if (!user?.id) return;
+    if (!currentUser?.id) return;
     setLoadingTrips(true);
     try {
       const { data, error } = await supabase
         .from("interprov_trips")
         .select("*")
-        .eq("driver_user_id", user.id)
+        .eq("driver_user_id", currentUser.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
       setTrips(data || []);
@@ -218,7 +229,7 @@ export default function InterProvincialPage() {
     } finally {
       setLoadingTrips(false);
     }
-  }, [user?.id]);
+  }, [currentUser?.id]);
 
   useEffect(() => { loadMyTrips(); }, [loadMyTrips]);
 
@@ -273,17 +284,22 @@ export default function InterProvincialPage() {
   }, []);
 
   const createOrUpdate = useCallback(async () => {
-    // 1. Tizimga kirilganligini tekshirish
-    if (!user?.id) {
-      message.error("Iltimos, avval tizimga kiring!");
-      return;
+    // 1. Userni tekshirish
+    if (!currentUser?.id) {
+      // Qayta urinib ko'rish
+      const { data } = await supabase.auth.getUser();
+      if (!data?.user) {
+        message.error("Tizimga kirilmagan! Iltimos, qayta login qiling.");
+        return;
+      }
     }
     
-    // 2. Maydonlarni tekshirish
-    if (!from.region || !to.region) return message.error("Qayerdan va Qayerga maydonlarini tanlang");
+    const activeUserId = currentUser?.id || (await supabase.auth.getUser()).data.user?.id;
+
+    if (!from.region || !to.region) return message.error("Yo'nalishni (Viloyat) tanlang");
     if (!travelDate) return message.error("Sanani tanlang");
     if (!travelTime) return message.error("Vaqtni tanlang");
-    if (seats <= 0) return message.error("O'rinlar soni xato");
+    if (seats <= 0) return message.error("O'rinlar sonini kiriting");
 
     if (vehicleType === 'car') {
         if (!priceFront || priceFront <= 0) return message.error("Oldi o'rindiq narxini kiriting");
@@ -295,7 +311,7 @@ export default function InterProvincialPage() {
     setSaving(true);
     
     const payload = {
-      driver_user_id: user.id,
+      driver_user_id: activeUserId,
       from_region: from.region,
       from_district: from.district || null,
       to_region: to.region,
@@ -313,7 +329,6 @@ export default function InterProvincialPage() {
       pickup_lat: pickupLL ? pickupLL[0] : null,
       pickup_lng: pickupLL ? pickupLL[1] : null,
       
-      // Yangi ustunlar (SQL da qo'shilgan bo'lishi shart)
       price: vehicleType === 'car' ? 0 : Number(price), 
       price_front: vehicleType === 'car' ? Number(priceFront) : null,
       price_back: vehicleType === 'car' ? Number(priceBack) : null,
@@ -334,11 +349,11 @@ export default function InterProvincialPage() {
       loadMyTrips();
     } catch (e) {
       console.error(e);
-      message.error("Xatolik: " + e.message);
+      message.error("Xatolik: " + (e.message || "Baza bilan ulanishda xato"));
     } finally {
       setSaving(false);
     }
-  }, [user, from, to, travelDate, travelTime, seats, price, priceFront, priceBack, vehicleType, busSeatType, womenOnly, isDelivery, isParcel, hasAC, hasTrunk, note, pickupLL, editingTrip, loadMyTrips, resetForm]);
+  }, [currentUser, from, to, travelDate, travelTime, seats, price, priceFront, priceBack, vehicleType, busSeatType, womenOnly, isDelivery, isParcel, hasAC, hasTrunk, note, pickupLL, editingTrip, loadMyTrips, resetForm]);
 
   const deleteTrip = useCallback(async (trip) => {
     Modal.confirm({
@@ -367,19 +382,28 @@ export default function InterProvincialPage() {
     }
   };
 
+  // Validatsiya
+  const canCreate = Boolean(
+    from.region && 
+    to.region && 
+    travelDate && 
+    travelTime && 
+    seats > 0 && 
+    ((vehicleType === 'car' && priceFront > 0 && priceBack > 0) || (vehicleType !== 'car' && price > 0))
+  );
+
   return (
     <div style={{ padding: 16, maxWidth: 800, margin: "0 auto", paddingBottom: 80 }}>
       <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 16 }}>Haydovchi paneli</div>
 
-      {!user?.id && (
-        <Alert 
-          message="Diqqat" 
-          description="Reys yaratish uchun tizimga kirishingiz kerak (Login)." 
-          type="warning" 
-          showIcon 
-          style={{ marginBottom: 16 }}
-        />
-      )}
+      {/* USER STATUS DEBUG */}
+      <div style={{ marginBottom: 16 }}>
+        {currentUser ? (
+          <Alert message={`Faol haydovchi: ${currentUser.email}`} type="success" showIcon />
+        ) : (
+          <Alert message="Siz tizimga kirmagansiz (Login talab qilinadi)" type="error" showIcon />
+        )}
+      </div>
 
       {/* MAP PREVIEW */}
       <div style={{ borderRadius: 16, overflow: "hidden", border: "1px solid #ddd", marginBottom: 16 }}>
@@ -524,7 +548,8 @@ export default function InterProvincialPage() {
         </div>
 
         <div style={{ display: "flex", gap: 12 }}>
-          <Button type="primary" size="large" onClick={createOrUpdate} loading={saving} disabled={!canCreate} block>
+          {/* TUGMA DISABLED EMAS, BOSILGANDA TEKSHIRADI */}
+          <Button type="primary" size="large" onClick={createOrUpdate} loading={saving} block>
             {editingTrip ? "Saqlash" : "Reys yaratish"}
           </Button>
           <Button size="large" onClick={resetForm} block>
