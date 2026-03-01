@@ -1,36 +1,21 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
-import { 
-  Button, 
-  DatePicker, 
-  Drawer, 
-  Empty, 
-  Spin, 
-  message, 
-  Select 
-} from "antd";
-// 1. TUZATISH: useMapEvents qo'shildi
+import { Button, DatePicker, Drawer, Empty, Spin, message } from "antd";
+// 1-TUZATISH: useMapEvents shu yerga qo'shildi
 import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
-import { useNavigate } from "react-router-dom"; 
+// import dayjs from "dayjs"; // Agar kerak bo'lsa yoqing
 
+// Loyiha importlari
 import RegionDistrictSelect from "@/shared/components/RegionDistrictSelect";
 import { UZ_REGIONS } from "@/shared/constants/uzRegions";
 import { supabase } from "@/services/supabaseClient";
 
-// 2. TUZATISH: haversineKm bu yerdan olib tashlandi (pastda funksiya sifatida bor)
-// import { haversineKm } ... o'rniga faqat kerakli narsalar qoladi yoki bu qator o'chiriladi
-// Agar osrmRouteDriving kerak bo'lmasa, bu qatorni butunlay o'chirish mumkin. 
-// Hozircha xato bermasligi uchun shunday qoldiramiz:
-import { osrmRouteDriving } from "@/shared/services/osrm"; 
-
-// 3. TUZATISH: AutoMarketAdsPanel yo'li to'g'irlandi
-// Intercity papkasidan chiqib (..), taxi papkasiga kiramiz
-import AutoMarketAdsPanel from "../taxi/components/AutoMarketAdsPanel"; 
-import { listMarketCars } from "../../../services/marketService.js";
+// 2-TUZATISH: haversineKm importdan olib tashlandi (pastda funksiya bor)
+import { osrmRouteDriving } from "@/shared/services/osrm";
 
 import "leaflet/dist/leaflet.css";
 
-// Marker icon fix
+// Fix default marker icon
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
@@ -47,7 +32,7 @@ function getRegionCenter(regionName) {
   return r?.center || null;
 }
 
-// BU FUNKSIYA IMPORT QILINMAGAN, SHU YERDA E'LON QILINGAN
+// 2-TUZATISH: Bu funksiya qoldirildi, importdagisi olib tashlandi
 function haversineKm(a, b) {
   if (!a || !b) return 0;
   const toRad = (x) => (x * Math.PI) / 180;
@@ -95,7 +80,7 @@ function FitBounds({ points }) {
 }
 
 function PickupPicker({ value, onChange, savedPoints }) {
-  // useMapEvents endi to'g'ri ishlaydi
+  // 1-TUZATISH: useMapEvents endi ishlaydi
   useMapEvents({
     click(e) {
       const ll = [e.latlng.lat, e.latlng.lng];
@@ -140,7 +125,6 @@ function TripCard({ trip, onViewMap, onSelect }) {
 // --- Asosiy Page ---
 
 export default function ClientIntercityPage() {
-  const navigate = useNavigate();
   const [from, setFrom] = useState({ region: null, district: "" });
   const [to, setTo] = useState({ region: null, district: "" });
   const [travelDate, setTravelDate] = useState(null);
@@ -212,6 +196,7 @@ export default function ClientIntercityPage() {
 
   const handleSelectTrip = useCallback((trip) => {
     setSelectedTripForBooking(trip);
+    // Default markaz sifatida 'fromLL' yoki Toshkent
     setPickupPoint(fromLL || getRegionCenter(trip.from_region) || [41.31, 69.28]);
     setPickupPickerOpen(true);
   }, [fromLL]);
@@ -374,15 +359,6 @@ export default function ClientIntercityPage() {
           Davom etish
         </Button>
       </Drawer>
-
-      <div style={{ marginTop: 24 }}>
-        <AutoMarketAdsPanel 
-          title="Avto savdo e’lonlari" 
-          mode="mini" 
-          onOpenAd={(id) => navigate(`/auto-market/ad/${id}`)} 
-          fetchAds={listMarketCars} 
-        />
-      </div>
 
     </div>
   );
