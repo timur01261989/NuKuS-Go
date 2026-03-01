@@ -16,25 +16,24 @@ import {
   UserOutlined,
   CompassOutlined
 } from "@ant-design/icons";
-// TUZATISH 1: useMapEvents bu yerdan import qilindi
 import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import dayjs from "dayjs";
+import { useNavigate } from "react-router-dom"; 
 
 import api from "@/utils/apiHelper";
 import RegionDistrictSelect from "@/shared/components/RegionDistrictSelect";
 import { UZ_REGIONS } from "@/shared/constants/uzRegions";
 import { supabase } from "@/services/supabaseClient";
-
-// TUZATISH 2: haversineKm importdan olib tashlandi (chunki pastda o'zi yozilgan)
 import { osrmRouteDriving } from "@/shared/services/osrm";
-// import { nominatimReverse as _nominatimReverse } from "@/shared/services/geo"; // Agar kerak bo'lsa
 
-import AutoMarketAdsPanel from "./components/AutoMarketAdsPanel";
+// TUZATISH: AutoMarketAdsPanel import yo'li o'zgartirildi
+// Agar intercity papkasida components bo'lmasa, taxi papkasidan olamiz
+import AutoMarketAdsPanel from "../taxi/components/AutoMarketAdsPanel"; 
+
 import { listMarketCars } from "../../../services/marketService.js";
 import RatingModal from "@features/shared/components/RatingModal";
 import ClientBonusWidget from "@/features/client/components/ClientBonusWidget";
-import { useNavigate } from "react-router-dom"; // Navigation uchun
 
 import "leaflet/dist/leaflet.css";
 
@@ -55,7 +54,6 @@ function getRegionCenter(regionName) {
   return r?.center || null;
 }
 
-// TUZATISH 3: haversineKm funksiyasi shu yerda qoldirildi (importdagisi olib tashlandi)
 function haversineKm(a, b) {
   if (!a || !b) return 0;
   const toRad = (x) => (x * Math.PI) / 180;
@@ -103,7 +101,6 @@ function FitBounds({ points }) {
 }
 
 function PickupPicker({ value, onChange, savedPoints }) {
-  // TUZATISH 4: useMapEvents endi to'g'ri ishlaydi
   useMapEvents({
     click(e) {
       const ll = [e.latlng.lat, e.latlng.lng];
@@ -220,8 +217,6 @@ export default function ClientIntercityPage() {
 
   const handleSelectTrip = useCallback((trip) => {
     setSelectedTripForBooking(trip);
-    // Agar foydalanuvchi qayerdanligini xaritada belgilamagan bo'lsa, taklif qilamiz
-    // Default markaz sifatida 'fromLL' yoki Toshkent koordinatasini olamiz
     setPickupPoint(fromLL || getRegionCenter(trip.from_region) || [41.31, 69.28]);
     setPickupPickerOpen(true);
   }, [fromLL]);
