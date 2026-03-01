@@ -98,34 +98,27 @@ export default function RouteBuilder() {
           />
         </div>
 
-        // Kodning boshi
-<> {/* <--- 1. FRAGMENT OCHILISHI KERAK */}
-  <Card>
-    {/* ... Card ichidagi kodlar ... */}
-    <div style={{ marginTop: 12 }}>
-      <Button onClick={() => setDepartPointOpen(true)} block>
-        Jo‘nab ketish manzilini xaritadan belgilash
-      </Button>
-      {departLatLng ? (
-        <Typography.Text type="secondary" style={{ display: "block", marginTop: 6 }}>
-          Belgilandi: {departLatLng[0].toFixed(6)}, {departLatLng[1].toFixed(6)}
-        </Typography.Text>
-      ) : null}
-    </div>
-  </Card>
+        <div style={{ marginTop: 12 }}>
+          <Button onClick={() => setDepartPointOpen(true)} block>
+            Jo‘nab ketish manzilini xaritadan belgilash
+          </Button>
+          {departLatLng ? (
+            <Typography.Text type="secondary" style={{ display: "block", marginTop: 6 }}>
+              Belgilandi: {departLatLng[0].toFixed(6)}, {departLatLng[1].toFixed(6)}
+            </Typography.Text>
+          ) : null}
+        </div>
+      </Card>
 
-  <Modal
-    open={departPointOpen}
-    title="Jo‘nab ketish manzilini tanlang"
-    onCancel={() => setDepartPointOpen(false)}
-    onOk={() => setDepartPointOpen(false)}
-    okText="Tayyor"
-    cancelText="Bekor"
-    width={720}
-  >
-    {/* Modal ichidagi kontent */}
-  </Modal>
-</> {/* <--- 2. FRAGMENT YOPILISHI KERAK */}
+      <Modal
+        open={departPointOpen}
+        title="Jo‘nab ketish manzilini tanlang"
+        onCancel={() => setDepartPointOpen(false)}
+        onOk={() => setDepartPointOpen(false)}
+        okText="Tayyor"
+        cancelText="Bekor"
+        width={720}
+      >
         <div style={{ height: 420, borderRadius: 12, overflow: "hidden" }}>
           <MapContainer
             center={departLatLng || [42.4602, 59.6156]}
