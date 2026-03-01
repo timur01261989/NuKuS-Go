@@ -15,15 +15,13 @@ import {
   Tag, 
   Segmented, 
   TimePicker, 
-  Spin,
-  Typography
+  Spin
 } from "antd";
 import { 
   EnvironmentOutlined, 
   CarOutlined, 
   ThunderboltOutlined, 
-  InboxOutlined, 
-  ClockCircleOutlined 
+  InboxOutlined 
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { MapContainer, TileLayer, Marker, Polyline, useMapEvents } from "react-leaflet";
@@ -32,12 +30,13 @@ import L from "leaflet";
 import RegionDistrictSelect from "@/shared/components/RegionDistrictSelect";
 import { UZ_REGIONS } from "@/shared/constants/uzRegions";
 import { supabase } from "@/services/supabaseClient";
+// DIQQAT: haversineKm bu yerdan import qilinadi, pastda qayta yozilmaydi
 import { osrmRouteDriving, haversineKm } from "@/shared/services/osrm";
 import { useAuth } from "@/shared/auth/AuthProvider";
 
 import "leaflet/dist/leaflet.css";
 
-// Marker icon fix (Vite uchun)
+// Marker icon fix
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
@@ -50,7 +49,7 @@ function getRegionCenter(regionName) {
   return r?.center || null;
 }
 
-// Manzil nomini aniqlash (Nominatim)
+// Manzil nomini aniqlash
 async function getAddressName(lat, lng) {
   try {
     const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=uz`);
@@ -91,7 +90,7 @@ function TripRow({ trip, onEdit, onDelete, onShowMap }) {
   if (trip.vehicle_type === 'car') {
     priceDisplay = `Oldi: ${trip.price_front?.toLocaleString()} | Orqa: ${trip.price_back?.toLocaleString()}`;
   } else {
-    const typeLabel = trip.vehicle_type === 'bus' && trip.bus_seat_type === 'sleeping' ? '(Yotib)' : '';
+    const typeLabel = trip.vehicle_type === 'bus' && trip.bus_seat_type === 'sleeping' ? '(Yotib)' : '(O\'tirib)';
     priceDisplay = `${trip.price?.toLocaleString()} so'm ${typeLabel}`;
   }
 
@@ -239,7 +238,7 @@ export default function InterProvincialPage() {
     setFrom({ region: trip.from_region, district: trip.from_district || "" });
     setTo({ region: trip.to_region, district: trip.to_district || "" });
     setTravelDate(trip.depart_date ? dayjs(trip.depart_date) : null);
-    setTravelTime(trip.depart_time ? dayjs(trip.depart_time, "HH:mm:ss") : null);
+    setTravelTime(trip.depart_time ? dayjs(trip.depart_time, "HH:mm") : null);
     setSeats(trip.seats || 4);
     setPrice(trip.price || 0);
     setPriceFront(trip.price_front || 0);
@@ -500,7 +499,7 @@ export default function InterProvincialPage() {
         </div>
 
         <div style={{ display: "flex", gap: 12 }}>
-          {/* TUGMA DISABLED EMAS, BOSILGANDA TEKSHIRADI */}
+          {/* TUGMA DISABLED EMAS, BOSILGANDA VALIDATSIYA QILADI */}
           <Button type="primary" size="large" onClick={createOrUpdate} loading={saving} block>
             {editingTrip ? "Saqlash" : "Reys yaratish"}
           </Button>
