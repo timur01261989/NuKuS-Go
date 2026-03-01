@@ -160,6 +160,15 @@ export default function InterProvincialPage() {
   const [routeCoords, setRouteCoords] = useState(null);
   const [routeDist, setRouteDist] = useState(0);
 
+export default function InterProvincialPage() {
+  const { user } = useAuth();
+  
+  // Tekshirish uchun
+  useEffect(() => {
+    console.log("Joriy foydalanuvchi:", user);
+  }, [user]);
+
+  // ... qolgan kodlar
   useEffect(() => {
     if (fromLL && toLL) {
       osrmRouteDriving([fromLL, toLL]).then(res => {
