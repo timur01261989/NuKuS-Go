@@ -1,13 +1,11 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
-import { Button, DatePicker, Drawer, Empty, Spin, message, Switch, Select, InputNumber, Checkbox, Radio, Tag } from "antd";
+import { Button, DatePicker, Drawer, Empty, Spin, message } from "antd";
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
-import dayjs from "dayjs";
 
 import RegionDistrictSelect from "@/shared/components/RegionDistrictSelect";
 import { UZ_REGIONS } from "@/shared/constants/uzRegions";
 import { supabase } from "@/services/supabaseClient";
-import { osrmRouteDriving, haversineKm } from "@/shared/services/osrm";
 
 import "leaflet/dist/leaflet.css";
 
@@ -24,7 +22,9 @@ function getRegionCenter(regionName) {
   return r?.center || null;
 }
 
-function haversineKm(a, b) {
+// NOTE: name is intentionally unique to avoid collisions with any imported util
+// (build error: "haversineKm has already been declared").
+function calcHaversineKm(a, b) {
   if (!a || !b) return 0;
   const toRad = (x) => (x * Math.PI) / 180;
   const R = 6371;
@@ -75,72 +75,7 @@ function TripCard({ trip, onViewMap }) {
           Tanlash
         </Button>
       </div>
-<Drawer
-  title="Olib ketish manzilini xaritadan tanlang"
-  open={pickupPickerOpen}
-  onClose={() => setPickupPickerOpen(false)}
-  placement="bottom"
-  height="75vh"
->
-  <div style={{ height: "55vh", borderRadius: 12, overflow: "hidden" }}>
-    <MapContainer center={pickupPoint || fromPoint || [41.31, 69.28]} zoom={12} style={{ height: "100%", width: "100%" }}>
-      <TileLayer url={mapTile} />
-      <PickupPicker
-        value={pickupPoint}
-        onChange={(ll) => {
-          setPickupPoint(ll);
-          savePickupPoint(ll);
-          setSavedPickupPoints(loadSavedPickupPoints());
-        }}
-        savedPoints={savedPickupPoints}
-      />
-    </MapContainer>
-  </div>
-  <Button
-    type="primary"
-    block
-    style={{ marginTop: 12 }}
-    onClick={() => {
-      if (!pickupPoint) { message.error("Xaritadan manzil tanlang"); return; }
-      setPickupPickerOpen(false);
-    }}
-  >
-    Saqlash
-  </Button>
-</Drawer>
-
     </div>
-  );
-}
-
-
-function FitRoute({ coords }) {
-  const map = useMap();
-  useEffect(() => {
-    if (!coords || coords.length < 2) return;
-    try {
-      const bounds = L.latLngBounds(coords);
-      map.fitBounds(bounds, { padding: [30, 30] });
-    } catch {}
-  }, [coords, map]);
-  return null;
-}
-
-function PickupPicker({ value, onChange, savedPoints }) {
-  useMapEvents({
-    click(e) {
-      const ll = [e.latlng.lat, e.latlng.lng];
-      onChange(ll);
-    },
-  });
-
-  return (
-    <>
-      {Array.isArray(savedPoints) ? savedPoints.map((p, idx) => (
-        <Marker key={`sp-${idx}`} position={p} eventHandlers={{ click: () => onChange(p) }} />
-      )) : null}
-      {value ? <Marker position={value} /> : null}
-    </>
   );
 }
 
@@ -157,7 +92,7 @@ export default function ClientIntercityPage() {
     return [fromLL, toLL];
   }, [fromLL, toLL]);
 
-  const distanceKm = useMemo(() => (fromLL && toLL ? haversineKm(fromLL, toLL) : 0), [fromLL, toLL]);
+  const distanceKm = useMemo(() => (fromLL && toLL ? calcHaversineKm(fromLL, toLL) : 0), [fromLL, toLL]);
 
   const canSearch = Boolean(from.region && to.region);
 
@@ -313,45 +248,11 @@ export default function ClientIntercityPage() {
               </MapContainer>
             </div>
             <div style={{ padding: 12, fontSize: 12, opacity: 0.85 }}>
-              Masofa (taxminiy): {tripFromLL && tripToLL ? Math.round(haversineKm(tripFromLL, tripToLL)) : "—"} km
+              Masofa (taxminiy): {tripFromLL && tripToLL ? Math.round(calcHaversineKm(tripFromLL, tripToLL)) : "—"} km
             </div>
           </div>
         )}
       </Drawer>
-<Drawer
-  title="Olib ketish manzilini xaritadan tanlang"
-  open={pickupPickerOpen}
-  onClose={() => setPickupPickerOpen(false)}
-  placement="bottom"
-  height="75vh"
->
-  <div style={{ height: "55vh", borderRadius: 12, overflow: "hidden" }}>
-    <MapContainer center={pickupPoint || fromPoint || [41.31, 69.28]} zoom={12} style={{ height: "100%", width: "100%" }}>
-      <TileLayer url={mapTile} />
-      <PickupPicker
-        value={pickupPoint}
-        onChange={(ll) => {
-          setPickupPoint(ll);
-          savePickupPoint(ll);
-          setSavedPickupPoints(loadSavedPickupPoints());
-        }}
-        savedPoints={savedPickupPoints}
-      />
-    </MapContainer>
-  </div>
-  <Button
-    type="primary"
-    block
-    style={{ marginTop: 12 }}
-    onClick={() => {
-      if (!pickupPoint) { message.error("Xaritadan manzil tanlang"); return; }
-      setPickupPickerOpen(false);
-    }}
-  >
-    Saqlash
-  </Button>
-</Drawer>
-
     </div>
   );
 }
