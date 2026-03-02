@@ -4,7 +4,7 @@ import { LOADERS_FEE_EACH, TRUCKS } from "../services/truckData";
 const FreightContext = createContext(null);
 
 export function FreightProvider({ children }) {
-  const [truckId, setTruckId] = useState(TRUCKS[0]?.id || "matiz_labo_damas");
+  const [truckId, setTruckId] = useState(TRUCKS[0]?.id || "motoruller");
 
   const [pickup, setPickup] = useState({ latlng: null, address: "" });
   const [dropoff, setDropoff] = useState({ latlng: null, address: "" });

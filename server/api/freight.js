@@ -282,7 +282,10 @@ export default async function freightHandler(req, res) {
       try {
         const { data, error } = await sb.rpc("match_vehicles_for_cargo", { p_cargo_id: cargoId, p_radius_km: radiusKm });
         if (!error && Array.isArray(data)) {
-          const enriched = await enrichMatchesWithVehiclesAndStats(sb, data);
+          let enriched = await enrichMatchesWithVehiclesAndStats(sb, data);
+          if (cargo?.cargo_type) {
+            enriched = (enriched || []).filter((m) => String(m?.vehicle?.body_type || '') === String(cargo.cargo_type));
+          }
           return json(res, 200, { ok: true, data: enriched });
         }
       } catch {
@@ -425,6 +428,7 @@ export default async function freightHandler(req, res) {
       for (const c of cargos || []) {
         if (Number(c.weight_kg || 0) > Number(v.capacity_kg || 0)) continue;
         if (Number(c.volume_m3 || 0) > Number(v.capacity_m3 || 0)) continue;
+        if (c.cargo_type && String(c.cargo_type) !== String(v.body_type)) continue;
 
         const cf = extractLatLng(c.from_point);
         const ct = extractLatLng(c.to_point);
