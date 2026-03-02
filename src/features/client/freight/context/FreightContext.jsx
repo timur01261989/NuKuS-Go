@@ -4,10 +4,13 @@ import { LOADERS_FEE_EACH, TRUCKS } from "../services/truckData";
 const FreightContext = createContext(null);
 
 export function FreightProvider({ children }) {
-  const [truckId, setTruckId] = useState(TRUCKS[0]?.id || "labo");
+  const [truckId, setTruckId] = useState(TRUCKS[0]?.id || "matiz_labo_damas");
 
   const [pickup, setPickup] = useState({ latlng: null, address: "" });
   const [dropoff, setDropoff] = useState({ latlng: null, address: "" });
+
+  // Map selection mode: 'pickup' | 'dropoff' | null
+  const [selecting, setSelecting] = useState(null);
 
   const [cargoName, setCargoName] = useState("");
   const [cargoType, setCargoType] = useState("");
@@ -40,6 +43,7 @@ export function FreightProvider({ children }) {
       truckId, setTruckId, truck,
       pickup, setPickup,
       dropoff, setDropoff,
+      selecting, setSelecting,
       cargoName, setCargoName,
       cargoType, setCargoType,
       weightKg, setWeightKg,
@@ -54,7 +58,7 @@ export function FreightProvider({ children }) {
       loadersFee,
       estimatedPrice,
     }),
-    [truckId, truck, pickup, dropoff, cargoName, cargoType, weightKg, volumeM3, note, photoFile, photoUrl, loadersEnabled, loadersCount, distanceKm, durationMin, loadersFee, estimatedPrice]
+    [truckId, truck, pickup, dropoff, selecting, cargoName, cargoType, weightKg, volumeM3, note, photoFile, photoUrl, loadersEnabled, loadersCount, distanceKm, durationMin, loadersFee, estimatedPrice]
   );
 
   return <FreightContext.Provider value={value}>{children}</FreightContext.Provider>;

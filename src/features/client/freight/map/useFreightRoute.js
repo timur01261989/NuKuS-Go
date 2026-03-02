@@ -35,6 +35,8 @@ export function useFreightRoute(pickupLatLng, dropoffLatLng) {
     const to = dropoffLatLng;
 
     setRouteCoords([from, to]);
+    // Fallback distance (OSRM ishlamasa ham masofa ko'rinsin)
+    try { setDistanceKm(_haversineKm(from, to)); } catch { setDistanceKm(null); }
 
     tRef.current = setTimeout(() => {
       const ctrl = new AbortController();
@@ -45,7 +47,9 @@ export function useFreightRoute(pickupLatLng, dropoffLatLng) {
         setRouteCoords(Array.isArray(r?.coords) ? r.coords : [from, to]);
         setDistanceKm(Number.isFinite(r?.distanceKm) ? r.distanceKm : null);
         setDurationMin(Number.isFinite(r?.durationMin) ? r.durationMin : null);
-      })().catch(() => {});
+      })().catch(() => {
+        try { setDistanceKm(_haversineKm(from, to)); } catch { setDistanceKm(null); }
+      });
     }, 250);
 
     return () => {

@@ -1,33 +1,33 @@
-import api from "@/utils/apiHelper";
+import { freightApi } from "@/services/freightService";
 import { nominatimReverse as _nominatimReverse } from "../../shared/geo/nominatim";
 
-// NEW: Cargo marketplace freight
+// NEW: Cargo marketplace freight (client)
+
 export async function createCargo(payload) {
-  return api.post("/api/freight", { action: "create_cargo", ...payload });
+  return freightApi.createCargo(payload);
 }
 
 export async function cancelCargo({ cargoId, actorId }) {
-  return api.post("/api/freight", { action: "cancel_cargo", cargoId, actorId });
+  return freightApi.cancelCargo({ cargoId, actorId });
 }
 
 export async function cargoStatus({ cargoId }) {
-  return api.post("/api/freight", { action: "cargo_status", cargoId });
+  return freightApi.cargoStatus({ cargoId });
 }
 
 export async function matchVehicles({ cargoId, radiusKm = 30 }) {
-  return api.post("/api/freight", { action: "match_vehicles", cargoId, radiusKm });
+  return freightApi.matchVehicles({ cargoId, radiusKm });
 }
 
 export async function listOffers({ cargoId }) {
-  return api.post("/api/freight", { action: "list_offers", cargoId });
+  return freightApi.listOffers({ cargoId });
 }
 
 export async function acceptOffer({ cargoId, offerId, ownerId }) {
-  return api.post("/api/freight", { action: "accept_offer", cargoId, offerId, ownerId });
+  return freightApi.acceptOffer({ cargoId, offerId, ownerId });
 }
 
 export async function nominatimReverse(lat, lng, signal) {
   // Preserve previous behavior: let errors bubble up
   return _nominatimReverse(lat, lng, { signal, swallowErrors: false });
 }
-

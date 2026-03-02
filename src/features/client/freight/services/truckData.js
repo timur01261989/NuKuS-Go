@@ -2,17 +2,17 @@
 
 export const TRUCKS = [
   {
-    id: "labo",
-    title: "Labo / Damas",
+    id: "matiz_labo_damas",
+    title: "Matiz / Labo / Damas",
     subtitle: "Kichik yuklar, maishiy texnika",
     sizeLabel: "Kichik",
-    capacity: "≈ 450–650 kg",
+    capacity: "≈ 350–650 kg",
     basePrice: 25000,
     perKm: 3500,
     icon: "🚚",
   },
   {
-    id: "gazel",
+    id: "gazel_porter",
     title: "Gazel / Porter",
     subtitle: "Uy ko‘chirish, mebel",
     sizeLabel: "O‘rta",
@@ -22,14 +22,24 @@ export const TRUCKS = [
     icon: "🚛",
   },
   {
-    id: "isuzu",
+    id: "isuzu_kamaz",
     title: "Isuzu / Kamaz",
-    subtitle: "Qurilish mollari",
+    subtitle: "Qurilish mollari, o‘rta-katta yuklar",
     sizeLabel: "Katta",
     capacity: "≈ 3–10 tonna",
     basePrice: 80000,
     perKm: 8500,
     icon: "🚚",
+  },
+  {
+    id: "fura",
+    title: "Fura",
+    subtitle: "Uzoq masofa, katta yuklar",
+    sizeLabel: "Juda katta",
+    capacity: "≈ 20+ tonna",
+    basePrice: 140000,
+    perKm: 12000,
+    icon: "🚛",
   },
 ];
 

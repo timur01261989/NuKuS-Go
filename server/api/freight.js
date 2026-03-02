@@ -15,6 +15,107 @@
 import { getSupabaseAdmin } from "../_shared/supabase.js";
 import { haversineKm } from "../_shared/geo.js";
 
+
+function calcQuickPriceUZS({ distKm = 0, weightKg = 0 }) {
+  const baseFee = 30000;
+  const perKm = 4000;
+  const perTon = 15000;
+  const price = baseFee + Number(distKm || 0) * perKm + (Number(weightKg || 0) / 1000) * perTon;
+  return Math.max(0, Math.round(price / 1000) * 1000);
+}
+
+async function enrichMatchesWithVehiclesAndStats(sb, matches) {
+  const arr = Array.isArray(matches) ? matches : [];
+  if (arr.length === 0) return arr;
+
+  // Attach vehicle object if missing
+  const needVehicles = arr.some((m) => !m.vehicle && (m.vehicle_id || m.vehicleId));
+  if (needVehicles) {
+    const ids = arr.map((m) => m.vehicle_id || m.vehicleId).filter(Boolean);
+    if (ids.length) {
+      const { data: vehicles } = await sb
+        .from("vehicles")
+        .select("id,driver_id,body_type,capacity_kg,capacity_m3,is_online,is_verified,current_point,current_updated_at,route_from_point,route_to_point,route_depart_at,photo_urls,title,plate_number")
+        .in("id", ids);
+      const map = new Map((vehicles || []).map((v) => [v.id, v]));
+      for (const m of arr) {
+        const vid = m.vehicle_id || m.vehicleId;
+        if (!m.vehicle && vid && map.has(vid)) m.vehicle = map.get(vid);
+      }
+    }
+  }
+
+  // Driver trust stats (best effort): rating + delivered count + last active
+  const driverIds = Array.from(
+    new Set(
+      arr
+        .map((m) => m.driver_id || m.driverId || m.vehicle?.driver_id)
+        .filter(Boolean)
+        .map(String)
+    )
+  ).slice(0, 50);
+
+  const stats = Object.create(null);
+
+  // Ratings
+  try {
+    const { data: ratings } = await sb
+      .from("cargo_ratings")
+      .select("to_user,rating")
+      .in("to_user", driverIds)
+      .limit(5000);
+
+    for (const r of ratings || []) {
+      const k = String(r.to_user);
+      if (!stats[k]) stats[k] = { deliveredCount: 0, ratingAvg: null, ratingCount: 0, lastActiveAt: null, isVerified: null };
+      const v = Number(r.rating);
+      if (Number.isFinite(v)) {
+        stats[k].ratingCount += 1;
+        stats[k].ratingAvg = (stats[k].ratingAvg ?? 0) + v;
+      }
+    }
+    for (const k of Object.keys(stats)) {
+      if (stats[k].ratingCount > 0) stats[k].ratingAvg = Number((stats[k].ratingAvg / stats[k].ratingCount).toFixed(2));
+    }
+  } catch {
+    // table bo'lmasa ham ishlayversin
+  }
+
+  // Delivered count via status events (approx, best effort)
+  try {
+    const { data: evs } = await sb
+      .from("cargo_status_events")
+      .select("actor_id,status")
+      .in("actor_id", driverIds)
+      .in("status", ["delivered", "closed"])
+      .limit(5000);
+
+    for (const e of evs || []) {
+      const k = String(e.actor_id);
+      if (!stats[k]) stats[k] = { deliveredCount: 0, ratingAvg: null, ratingCount: 0, lastActiveAt: null, isVerified: null };
+      stats[k].deliveredCount += 1;
+    }
+  } catch {}
+
+  // Last active + verified from vehicles (already in response)
+  for (const m of arr) {
+    const did = String(m.driver_id || m.driverId || m.vehicle?.driver_id || "");
+    if (!did) continue;
+    if (!stats[did]) stats[did] = { deliveredCount: 0, ratingAvg: null, ratingCount: 0, lastActiveAt: null, isVerified: null };
+    const v = m.vehicle || {};
+    if (v.current_updated_at && !stats[did].lastActiveAt) stats[did].lastActiveAt = v.current_updated_at;
+    if (typeof v.is_verified === "boolean") stats[did].isVerified = v.is_verified;
+  }
+
+  for (const m of arr) {
+    const did = String(m.driver_id || m.driverId || m.vehicle?.driver_id || "");
+    if (!did) continue;
+    m.driver_stats = stats[did] || null;
+  }
+  return arr;
+}
+
+
 function json(res, status, payload) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json");
@@ -65,7 +166,7 @@ function extractLatLng(pointVal) {
 async function fallbackMatchVehicles(sb, { cargo, radiusKm = 30 }) {
   const { data: vehicles, error } = await sb
     .from("vehicles")
-    .select("id,driver_id,body_type,capacity_kg,capacity_m3,is_online,route_from_point,route_to_point,current_point,route_depart_at,photo_urls,title,plate_number")
+    .select("id,driver_id,body_type,capacity_kg,capacity_m3,is_online,is_verified,current_point,current_updated_at,route_from_point,route_to_point,route_depart_at,photo_urls,title,plate_number")
     .eq("is_online", true)
     .limit(200);
   if (error) throw error;
@@ -180,7 +281,10 @@ export default async function freightHandler(req, res) {
       // 1) Try RPC if exists
       try {
         const { data, error } = await sb.rpc("match_vehicles_for_cargo", { p_cargo_id: cargoId, p_radius_km: radiusKm });
-        if (!error && Array.isArray(data)) return json(res, 200, { ok: true, data });
+        if (!error && Array.isArray(data)) {
+          const enriched = await enrichMatchesWithVehiclesAndStats(sb, data);
+          return json(res, 200, { ok: true, data: enriched });
+        }
       } catch {
         // ignore
       }
@@ -197,7 +301,8 @@ export default async function freightHandler(req, res) {
         },
         radiusKm,
       });
-      return json(res, 200, { ok: true, data: matched });
+      const enriched = await enrichMatchesWithVehiclesAndStats(sb, matched);
+      return json(res, 200, { ok: true, data: enriched });
     }
 
     if (action === "list_offers") {
@@ -329,12 +434,79 @@ export default async function freightHandler(req, res) {
         if (dFrom > radiusKm) continue;
 
         const dTo = vt && ct ? haversineKm(vt.lat, vt.lng, ct.lat, ct.lng) : 0;
+        const dRoute = ct ? haversineKm(cf.lat, cf.lng, ct.lat, ct.lng) : 0;
         const score = 100 - Math.min(dFrom, 100) - Math.min(dTo, 100);
-        out.push({ cargo: c, score, dist_from_km: dFrom, dist_to_km: dTo });
+        out.push({ cargo: c, score, dist_from_km: dFrom, dist_to_km: dTo, dist_route_km: dRoute });
       }
       out.sort((a, b) => (b.score || 0) - (a.score || 0));
       return json(res, 200, { ok: true, data: out.slice(0, 60) });
     }
+
+    if (action === "quick_offer") {
+      const cargoId = body.cargoId;
+      const vehicleId = body.vehicleId;
+      const driverId = body.driverId;
+      const etaMinutes = body.etaMinutes ?? 20;
+      const note = body.note || "Tez taklif";
+      if (!cargoId || !vehicleId || !driverId) return json(res, 400, { error: "cargoId, vehicleId, driverId required" });
+
+      // Load cargo + vehicle for distance & weight
+      const { data: cargo, error: ce } = await sb
+        .from("cargo_orders")
+        .select("id,weight_kg,from_point,to_point,status")
+        .eq("id", cargoId)
+        .single();
+      if (ce) throw ce;
+
+      const { data: vehicle, error: ve } = await sb
+        .from("vehicles")
+        .select("id,driver_id,current_point,route_from_point,route_to_point")
+        .eq("id", vehicleId)
+        .single();
+      if (ve) throw ve;
+
+      // Compute distance km (best effort)
+      const cf = extractLatLng(cargo.from_point);
+      const ct = extractLatLng(cargo.to_point);
+      const vf = extractLatLng(vehicle.route_from_point) || extractLatLng(vehicle.current_point);
+      const vt = extractLatLng(vehicle.route_to_point);
+
+      const dFrom = (cf && vf) ? haversineKm(cf.lat, cf.lng, vf.lat, vf.lng) : 0;
+      const dRoute = (cf && ct) ? haversineKm(cf.lat, cf.lng, ct.lat, ct.lng) : 0;
+      const dTo = (ct && vt) ? haversineKm(ct.lat, ct.lng, vt.lat, vt.lng) : 0;
+
+      // Use route distance primarily
+      const distKm = Number.isFinite(dRoute) && dRoute > 0 ? dRoute : (Number.isFinite(dFrom) ? dFrom : 0);
+      const price = calcQuickPriceUZS({ distKm, weightKg: cargo.weight_kg });
+
+      const row = {
+        cargo_id: cargoId,
+        vehicle_id: vehicleId,
+        driver_id: driverId,
+        price,
+        eta_minutes: etaMinutes,
+        note,
+        status: "sent",
+      };
+
+      try {
+        const { error } = await sb.from("cargo_offers").insert(row);
+        if (error) throw error;
+      } catch (e) {
+        return json(res, 400, { error: e?.message || "Offer insert error" });
+      }
+
+      // update cargo status if still posted
+      try {
+        if (cargo.status === "posted") {
+          await sb.from("cargo_orders").update({ status: "offering" }).eq("id", cargoId);
+          await insertStatusEvent(sb, { cargoId, status: "offering", actorId: driverId, note: "Offer received" });
+        }
+      } catch {}
+
+      return json(res, 200, { ok: true, data: { price, distKm, distFromKm: dFrom, distToKm: dTo } });
+    }
+
 
     if (action === "create_offer") {
       const cargoId = body.cargoId;

@@ -3,8 +3,10 @@ import { Button, Card, Divider, Input, InputNumber, List, Modal, Switch, Tag, Ty
 import { ReloadOutlined, EnvironmentOutlined, DollarOutlined } from "@ant-design/icons";
 
 import { useAuth } from "@/shared/auth/AuthProvider";
-import { upsertVehicle, setVehicleOnline, listVehicleCargo, createOffer } from "./services/freightApi";
+import { upsertVehicle, setVehicleOnline, listVehicleCargo, createOffer, quickOffer } from "./services/freightApi";
 import { formatUZS } from "@/features/client/freight/services/truckData";
+import { supabase } from "@/lib/supabase";
+import { subscribeDriverFreight, incrementCargoViews, incrementCargoOffers, startDriverHeartbeat } from "@/services/freightService";
 
 const { Title, Text } = Typography;
 
@@ -57,6 +59,9 @@ export default function FreightPage() {
 
   const [feed, setFeed] = useState([]);
   const [feedLoading, setFeedLoading] = useState(false);
+
+  // Fast matching: realtime refresh (3-4x faster than polling)
+  const [rtEnabled, setRtEnabled] = useState(true);
 
   const [offerOpen, setOfferOpen] = useState(false);
   const [offerCargo, setOfferCargo] = useState(null);
@@ -128,6 +133,25 @@ export default function FreightPage() {
     [vehicleId, pos]
   );
 
+
+  // Heartbeat: online payti joylashuvni muntazam yangilab turamiz (fake online bo‘lmasin)
+  useEffect(() => {
+    if (!vehicleId || !isOnline) return;
+    const stop = startDriverHeartbeat({
+      vehicleId,
+      intervalMs: 20000,
+      getPosition: () =>
+        new Promise((resolve) => {
+          if (!navigator?.geolocation) return resolve(null);
+          navigator.geolocation.getCurrentPosition(
+            (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+            () => resolve(null),
+            { enableHighAccuracy: true, maximumAge: 15000, timeout: 8000 }
+          );
+        }),
+    });
+    return () => stop?.();
+  }, [vehicleId, isOnline]);
   const refreshFeed = useCallback(async () => {
     if (!vehicleId) return;
     setFeedLoading(true);
@@ -142,16 +166,90 @@ export default function FreightPage() {
     }
   }, [vehicleId]);
 
+  // Realtime: cargo_orders changes -> refresh feed immediately (only when online)
+  useEffect(() => {
+    if (!vehicleId || !isOnline || !rtEnabled) return;
+
+    let alive = true;
+    let t = null;
+    const safeRefresh = () => {
+      if (!alive) return;
+      // simple debounce (many events at once)
+      if (t) clearTimeout(t);
+      t = setTimeout(() => {
+        if (!alive) return;
+        refreshFeed();
+      }, 600);
+    };
+
+    const unsubscribe = subscribeDriverFreight({
+      vehicleId,
+      onChange: safeRefresh,
+    });
+
+    // initial refresh when go online
+    safeRefresh();
+
+    return () => {
+      alive = false;
+      if (t) clearTimeout(t);
+      unsubscribe();
+    };
+  }, [vehicleId, isOnline, rtEnabled, refreshFeed]);
+
   useEffect(() => {
     if (!vehicleId) return;
     const iid = setInterval(() => {
-      if (isOnline) refreshFeed();
+      // polling fallback (realtime ishlamasa ham), realtime yoq bo'lsa intervalni kamroq ishlatamiz
+      if (isOnline && !rtEnabled) refreshFeed();
     }, 6000);
     return () => clearInterval(iid);
-  }, [vehicleId, isOnline, refreshFeed]);
+  }, [vehicleId, isOnline, rtEnabled, refreshFeed]);
+
+  const calcQuickPrice = useCallback((wrap) => {
+    const c = wrap?.cargo || wrap;
+    const distKm = Number(wrap?.dist_route_km ?? 0) || 0;
+    const weightKg = Number(c?.weight_kg ?? 0) || 0;
+    // Simple, practical formula (can be tuned later)
+    const baseFee = 30000;
+    const perKm = 4000;
+    const perTon = 15000;
+    const price = baseFee + distKm * perKm + (weightKg / 1000) * perTon;
+    // round to nearest 1000
+    return Math.max(0, Math.round(price / 1000) * 1000);
+  }, []);
+
+  const quickOffer = useCallback(
+    async (cargoWrap) => {
+      const c = cargoWrap?.cargo || cargoWrap;
+      if (!c?.id) return;
+      if (!vehicleId || !driverId) return;
+      const hide = message.loading("Tez taklif yuborilmoqda...", 0);
+      try {
+        const resp = await quickOffer({ cargoId: c.id, vehicleId, driverId, etaMinutes: 20, note: "Tez taklif" });
+        const price = resp?.data?.data?.price ?? resp?.data?.price;
+        message.success(price ? `Taklif yuborildi: ${formatUZS(price)}` : "Taklif yuborildi");
+        // Demand pressure: offer yuborildi -> offers_count++
+        incrementCargoOffers(item?.cargo?.id);
+        refreshFeed();
+      } catch (e) {
+        const msg = String(e?.message || "");
+        if (msg.toLowerCase().includes("duplicate") || msg.toLowerCase().includes("unique")) {
+          message.warning("Bu yuk uchun siz allaqachon taklif yuborgansiz");
+        } else {
+          message.error("Xatolik: " + msg);
+        }
+      } finally {
+        hide();
+      }
+    },
+    [vehicleId, driverId, calcQuickPrice, refreshFeed]
+  );
 
   const openOffer = useCallback((cargoWrap) => {
     const c = cargoWrap?.cargo || cargoWrap;
+    // Demand pressure: driver yukni ochdi -> views_count++
+    incrementCargoViews(c?.id);
     setOfferCargo(c);
     setOfferPrice(Number(c?.budget || 0) || 0);
     setOfferEta(20);
@@ -176,6 +274,8 @@ export default function FreightPage() {
         note: offerNote || null,
       });
       message.success("Taklif yuborildi");
+      // Demand pressure: offer yuborildi -> offers_count++
+      incrementCargoOffers(offerCargo.id);
       setOfferOpen(false);
       refreshFeed();
     } catch (e) {
@@ -247,6 +347,15 @@ export default function FreightPage() {
           <div style={{ marginTop: 6, fontSize: 12, opacity: 0.75 }}>
             Yuklar 30 km radius bo‘yicha saralanadi (current location).
           </div>
+          <div style={{ marginTop: 8, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <Tag color={rtEnabled ? "green" : "default"}>{rtEnabled ? "Realtime: ON" : "Realtime: OFF"}</Tag>
+            <Button size="small" onClick={() => setRtEnabled((v) => !v)}>
+              {rtEnabled ? "Realtime o‘chirish" : "Realtime yoqish"}
+            </Button>
+            <span style={{ fontSize: 12, opacity: 0.7 }}>
+              Realtime yoq bo‘lsa yuklar darrov yangilanadi (tezroq driver topadi).
+            </span>
+          </div>
           <Divider style={{ margin: "10px 0" }} />
 
           <List
@@ -255,11 +364,15 @@ export default function FreightPage() {
             locale={{ emptyText: "Hozircha mos yuk yo‘q" }}
             renderItem={(item) => {
               const c = item.cargo;
+              const quickPrice = calcQuickPrice(item);
               return (
                 <List.Item
                   actions={[
-                    <Button key="offer" icon={<DollarOutlined />} onClick={() => openOffer(item)}>
-                      Taklif
+                    <Button key="q" onClick={() => quickOffer(item)} disabled={!isOnline}>
+                      Tez taklif {quickPrice ? `(${formatUZS(quickPrice)})` : ""}
+                    </Button>,
+                    <Button key="offer" icon={<DollarOutlined />} onClick={() => openOffer(item)} disabled={!isOnline}>
+                      Taklif (edit)
                     </Button>,
                   ]}
                 >
@@ -275,7 +388,8 @@ export default function FreightPage() {
                       <div style={{ fontSize: 12 }}>
                         <div style={{ opacity: 0.85 }}>
                           {c?.weight_kg ? `${c.weight_kg} kg` : ""}{c?.volume_m3 ? ` • ${c.volume_m3} m³` : ""}
-                          {Number.isFinite(item.dist_from_km) ? ` • ${item.dist_from_km.toFixed(1)} km` : ""}
+                          {Number.isFinite(item.dist_from_km) ? ` • pickup: ${item.dist_from_km.toFixed(1)} km` : ""}
+                          {Number.isFinite(item.dist_route_km) ? ` • yo‘l: ${Number(item.dist_route_km).toFixed(1)} km` : ""}
                         </div>
                         <div style={{ opacity: 0.7 }}>
                           {c?.from_address ? `📍 ${c.from_address}` : ""}

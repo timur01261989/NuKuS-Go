@@ -140,6 +140,7 @@ export default function DriverHome({ onLogout }) {
           lat: lat ?? undefined,
           lng: lng ?? undefined,
           bearing: bearing ?? undefined,
+          active_service_type: (typeof window !== "undefined" ? localStorage.getItem("driverActiveService") : null),
         });
       }
     } catch {

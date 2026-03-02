@@ -1,30 +1,30 @@
 /**
- * freightApi.js
- * Server bilan aloqa. Sizning loyihangizda `src/utils/apiHelper.js` bor.
- * Shu helper bilan bir xil uslubda ishlatamiz.
+ * freightApi.js (driver)
+ * Freight API wrappers. Real implementation lives in src/services/freightService.js
+ * Other services are untouched.
  */
-import api from "@/utils/apiHelper";
+import { freightApi } from "@/services/freightService";
 
-/**
- * Haydovchiga mos buyurtmalarni olish
- * @param {object} params
- */
 export async function upsertVehicle(payload) {
-  return api.post("/api/freight", { action: "upsert_vehicle", ...payload });
+  return freightApi.upsertVehicle(payload);
 }
 
 export async function setVehicleOnline(payload) {
-  return api.post("/api/freight", { action: "set_vehicle_online", ...payload });
+  return freightApi.setVehicleOnline(payload);
 }
 
 export async function listVehicleCargo(payload) {
-  return api.post("/api/freight", { action: "list_vehicle_cargo", ...payload });
+  return freightApi.listVehicleCargo(payload);
 }
 
 export async function createOffer(payload) {
-  return api.post("/api/freight", { action: "create_offer", ...payload });
+  return freightApi.createOffer(payload);
 }
 
 export async function driverUpdateCargoStatus(payload) {
-  return api.post("/api/freight", { action: "driver_update_status", ...payload });
+  return freightApi.driverUpdateCargoStatus(payload);
+}
+
+export async function quickOffer(payload) {
+  return freightApi.quickOffer(payload);
 }

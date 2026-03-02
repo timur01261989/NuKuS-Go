@@ -12,6 +12,8 @@ import CargoForm from "./components/Details/CargoForm";
 import { createCargo, cancelCargo, cargoStatus, matchVehicles, listOffers, acceptOffer } from "./services/freightApi";
 import { formatUZS } from "./services/truckData";
 import { useAuth } from "@/shared/auth/AuthProvider";
+import { supabase } from "@/lib/supabase";
+import { subscribeClientCargo } from "@/services/freightService";
 
 const { Title, Text } = Typography;
 
@@ -42,6 +44,9 @@ function Inner() {
     loadersEnabled,
     loadersCount,
     estimatedPrice,
+    distanceKm,
+    selecting,
+    setSelecting,
   } = useFreight();
 
   const [cargoId, setCargoId] = useState(() => {
@@ -54,6 +59,7 @@ function Inner() {
   const [cargo, setCargo] = useState(null);
   const [offers, setOffers] = useState([]);
   const [matches, setMatches] = useState([]);
+  const [matchedDrivers, setMatchedDrivers] = useState(0);
   const [loading, setLoading] = useState(false);
 
   const canPost = useMemo(() => {
@@ -92,16 +98,33 @@ function Inner() {
   // Poll offers/status for active cargo
   useEffect(() => {
     if (!cargoId) return;
-    let stopped = false;
-    const tick = async () => {
-      if (stopped) return;
-      await refresh({ silent: true });
+    let alive = true;
+    let t = null;
+
+    const safeRefresh = () => {
+      if (!alive) return;
+      if (t) clearTimeout(t);
+      t = setTimeout(() => {
+        if (!alive) return;
+        refresh({ silent: true });
+      }, 500);
     };
-    const iid = setInterval(tick, 4000);
-    tick();
+
+    // Realtime (fast): offers/status update -> refresh
+    const unsubscribe = subscribeClientCargo({
+      cargoId,
+      onChange: safeRefresh,
+    });
+
+    // Poll fallback (slow)
+    const iid = setInterval(() => safeRefresh(), 12000);
+    safeRefresh();
+
     return () => {
-      stopped = true;
+      alive = false;
+      if (t) clearTimeout(t);
       clearInterval(iid);
+      unsubscribe();
     };
   }, [cargoId, refresh]);
 
@@ -133,6 +156,14 @@ function Inner() {
         localStorage.setItem("activeCargoId", String(id));
       } catch {}
       message.success("Yuk e’loni yaratildi. Endi haydovchilar taklif yuboradi.");
+      // show immediate movement: how many drivers can see it
+      try {
+        const m = await matchVehicles({ cargoId: String(id), radiusKm: 30 });
+        const mm = m?.data?.data || m?.data || [];
+        setMatchedDrivers(Array.isArray(mm) ? mm.length : 0);
+      } catch {
+        setMatchedDrivers(0);
+      }
       await refresh({ silent: true });
     } catch (e) {
       console.error(e);
@@ -201,6 +232,18 @@ function Inner() {
 
         <div style={{ marginTop: 12 }}>
           <FreightMap />
+          <div style={{ marginTop: 8, fontSize: 12, opacity: 0.85 }}>
+            Masofa: <b>{distanceKm ? `${Number(distanceKm).toFixed(1)} km` : "-"}</b>
+          </div>
+          <div style={{ marginTop: 6, fontSize: 12, opacity: 0.85, display: "flex", gap: 14, flexWrap: "wrap" }}>
+            <span>
+              Mos haydovchilar: <b>{matchedDrivers || matches?.length || 0}</b>
+            </span>
+            <span>
+              Takliflar: <b>{activeOffers.length}</b>
+            </span>
+            {activeOffers.length === 0 ? <span style={{ opacity: 0.7 }}>Taklif tezroq kelishi uchun haydovchilar realtime ko‘radi.</span> : null}
+          </div>
         </div>
 
         <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
@@ -278,6 +321,26 @@ function Inner() {
                           {v.body_type ? `Turi: ${v.body_type}` : ""}
                           {Number.isFinite(v.capacity_kg) ? ` • ${v.capacity_kg} kg` : ""}
                         </div>
+                        {m.driver_stats ? (
+                          <div style={{ marginTop: 4, fontSize: 12, display: "flex", gap: 10, flexWrap: "wrap", opacity: 0.85 }}>
+                            {Number.isFinite(m.driver_stats.deliveredCount) ? <span>✔ {m.driver_stats.deliveredCount} ta yetkazilgan</span> : null}
+                            {Number.isFinite(m.driver_stats.ratingAvg) ? <span>⭐ {m.driver_stats.ratingAvg} ({m.driver_stats.ratingCount || 0})</span> : null}
+                            {m.driver_stats.lastActiveAt ? (
+                              <span>
+                                🕒 Oxirgi aktiv:{" "}
+                                {(() => {
+                                  const ms = Date.now() - new Date(m.driver_stats.lastActiveAt).getTime();
+                                  const min = Math.max(0, Math.round(ms / 60000));
+                                  if (!Number.isFinite(min)) return "—";
+                                  if (min < 60) return `${min} min`;
+                                  const h = Math.round(min / 60);
+                                  return `${h} soat`;
+                                })()}
+                              </span>
+                            ) : null}
+                            {m.driver_stats.isVerified ? <span>✅ Tasdiqlangan</span> : null}
+                          </div>
+                        ) : null}
                       </div>
                       <div style={{ textAlign: "right", fontSize: 12, opacity: 0.75 }}>
                         {Number.isFinite(m.dist_from_km) ? `${m.dist_from_km.toFixed(1)} km` : ""}
@@ -314,7 +377,41 @@ function Inner() {
       </div>
 
       <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
+        
         <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
+          <div style={{ fontWeight: 1000, marginBottom: 10 }}>Manzillar</div>
+          <div style={{ display: "grid", gap: 10 }}>
+            <Button
+              size="large"
+              type={selecting === "pickup" ? "primary" : "default"}
+              onClick={() => setSelecting("pickup")}
+              style={{ borderRadius: 16, textAlign: "left", height: "auto", padding: "12px 14px" }}
+            >
+              <div style={{ fontWeight: 900 }}>Yuborish manzili</div>
+              <div style={{ fontSize: 12, opacity: 0.85 }}>
+                {pickup?.address ? pickup.address : "Xaritadan belgilang"}
+              </div>
+            </Button>
+
+            <Button
+              size="large"
+              type={selecting === "dropoff" ? "primary" : "default"}
+              onClick={() => setSelecting("dropoff")}
+              style={{ borderRadius: 16, textAlign: "left", height: "auto", padding: "12px 14px" }}
+            >
+              <div style={{ fontWeight: 900 }}>Tushirish manzili</div>
+              <div style={{ fontSize: 12, opacity: 0.85 }}>
+                {dropoff?.address ? dropoff.address : "Xaritadan belgilang"}
+              </div>
+            </Button>
+          </div>
+
+          <div style={{ fontSize: 12, opacity: 0.75, marginTop: 10 }}>
+            Tugmani bossangiz xarita kattalashadi — pinni joylab <b>Manzilni saqlash</b> ni bosing.
+          </div>
+        </Card>
+
+<Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
           <div style={{ fontWeight: 1000, marginBottom: 10 }}>Mashina sinfi (tavsiya)</div>
           <TruckSelector />
           <div style={{ fontSize: 12, opacity: 0.75, marginTop: 8 }}>
