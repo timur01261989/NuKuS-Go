@@ -17,8 +17,12 @@ export default function MapView({
   onRouteDistanceMeters,
   isSearching
 }) {
-  // ✅ DEBUG: mount check (remove after testing)
-  console.log("MAP MOUNTED"); // 👈 SHU YER: MapView mount bo‘layotganini tekshiradi
+  // ✅ DEBUG: mount/unmount check (remove after testing)
+  useEffect(() => {
+    console.warn("[MAP][MOUNT] MapView mounted");
+    return () => console.warn("[MAP][UNMOUNT] MapView unmounted");
+  }, []);
+  // 👆 SHU YER: MapView qayta mount bo‘layotganini aniq ko‘rasan
 
   const [routePoints, setRoutePoints] = useState([]);
 
