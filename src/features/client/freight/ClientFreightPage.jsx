@@ -37,7 +37,7 @@ function Inner() {
     pickup,
     dropoff,
     cargoName,
-    cargoType: (truck?.bodyType || cargoType || null),
+   cargoType,
     weightKg,
     volumeM3,
     note,
@@ -137,7 +137,7 @@ function Inner() {
         pickup,
         dropoff,
         cargoName,
-        cargoType: (truck?.bodyType || cargoType || null),
+        cargoType: (truck?.bodyType || cargoType) || null,
         weightKg,
         volumeM3,
         note,
@@ -171,7 +171,7 @@ function Inner() {
     } finally {
       hide();
     }
-  }, [canPost, user?.id, pickup, dropoff, cargoName, cargoType: (truck?.bodyType || cargoType || null), weightKg, volumeM3, note, estimatedPrice, loadersEnabled, loadersCount, truck, refresh]);
+  }, [canPost, user?.id, pickup, dropoff, cargoName, cargoType: (truck?.bodyType || cargoType) || null, weightKg, volumeM3, note, estimatedPrice, loadersEnabled, loadersCount, truck, refresh]);
 
   const doCancel = useCallback(async () => {
     if (!cargoId) return;
