@@ -91,6 +91,6 @@ export default function MapView({
 \1
 
       <SearchRadar isVisible={isSearching} />
-    </>
+    </MapContainer>
   );
 }
