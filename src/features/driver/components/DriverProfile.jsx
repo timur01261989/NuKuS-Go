@@ -7,7 +7,7 @@ import {
   TrophyFilled
 } from '@ant-design/icons';
 
-// ✅ TO‘G‘RI IMPORT (sizda src/lib/supabase.js bor)
+// ✅ TO‘G‘RI IMPORT (siizda src/lib/supabase.js bor)
 import { supabase } from '@/lib/supabase';
 
 // Komponentlarni import qilish
