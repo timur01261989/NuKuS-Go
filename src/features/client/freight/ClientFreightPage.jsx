@@ -37,7 +37,7 @@ function Inner() {
     pickup,
     dropoff,
     cargoName,
-    cargoType: (truck?.bodyType || cargoType) || null,
+   cargoType: (truck?.bodyType ?? cargoType ?? null),
     weightKg,
     volumeM3,
     note,
