@@ -6,7 +6,6 @@ import RoleGate from "@shared/routes/RoleGate";
 import "./styles/hdr-taxi.css";
 
 import { appConfig } from "./shared/config/appConfig";
-import MapSingletonLayout from "./features/map/layout/MapSingletonLayout.jsx";
 
 // --- SUPER PRO / LEGACY FEATURES ---
 const GaragePage = lazy(() => import("./pages/SuperPro/GaragePage"));
@@ -82,25 +81,55 @@ export default function App() {
               {/* --- CLIENT --- */}
 
               <Route path="/client" element={<Navigate to="/client/home" replace />} />
-
-              {/* --- CLIENT MAP SINGLETON (services) --- */}
               <Route
-                path="/client"
+                path="/client/home"
                 element={
                   <RoleGate allow={{ client: true, driver: true }}>
-                    <MapSingletonLayout />
+                    <ClientHome />
                   </RoleGate>
                 }
-              >
-                <Route path="home" element={<ClientHome />} />
-                <Route path="taxi" element={<ClientTaxi />} />
-                <Route path="inter-provincial" element={<ClientIntercity />} />
-                <Route path="inter-district" element={<ClientInterDistrict />} />
-                <Route path="freight" element={<ClientFreight />} />
-                <Route path="delivery" element={<ClientDelivery />} />
-              </Route>
-
-<Route
+              />
+              <Route
+                path="/client/taxi"
+                element={
+                  <RoleGate allow={{ client: true, driver: true }}>
+                    <ClientTaxi />
+                  </RoleGate>
+                }
+              />
+              <Route
+                path="/client/inter-provincial"
+                element={
+                  <RoleGate allow={{ client: true, driver: true }}>
+                    <ClientIntercity />
+                  </RoleGate>
+                }
+              />
+              <Route
+                path="/client/inter-district"
+                element={
+                  <RoleGate allow={{ client: true, driver: true }}>
+                    <ClientInterDistrict />
+                  </RoleGate>
+                }
+              />
+              <Route
+                path="/client/freight"
+                element={
+                  <RoleGate allow={{ client: true, driver: true }}>
+                    <ClientFreight />
+                  </RoleGate>
+                }
+              />
+              <Route
+                path="/client/delivery"
+                element={
+                  <RoleGate allow={{ client: true, driver: true }}>
+                    <ClientDelivery />
+                  </RoleGate>
+                }
+              />
+              <Route
                 path="/client/orders"
                 element={
                   <RoleGate allow={{ client: true, driver: true }}>

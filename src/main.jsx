@@ -18,6 +18,7 @@ import "./index.css";
 
 // ✅ Leaflet
 import "leaflet/dist/leaflet.css";
+import QueryProvider from "./providers/QueryProvider.jsx";
 
 /**
  * Supabase access token'ni localStorage'dagi sb-...-auth-token dan olish
@@ -146,7 +147,9 @@ if (typeof window !== "undefined" && "serviceWorker" in navigator) {
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <AuthProvider>
-      <App />
+      <QueryProvider>
+        <App />
+      </QueryProvider>
     </AuthProvider>
   </React.StrictMode>
 );

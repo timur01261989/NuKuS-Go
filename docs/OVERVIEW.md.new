@@ -1,0 +1,13 @@
+# UniGo "Never-Falls-Over" Pack (ORIGINAL, principles inspired by super-apps)
+
+Generated: 2026-03-02T15:23:26.203465Z
+
+This pack extends the earlier principles pack with reliability layers:
+
+- Idempotency keys (no duplicate orders/payments)
+- DB-backed job queue + worker endpoint (async push/dispatch/billing)
+- DB-backed rate limiting (anti-abuse)
+- Double-entry payments ledger foundation
+- Health endpoint + structured logging
+
+This is NOT copied from any third-party app.

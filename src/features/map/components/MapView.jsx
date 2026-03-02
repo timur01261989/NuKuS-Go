@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { MapContainer, TileLayer } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import MapRightControls from "../controls/MapRightControls.jsx";
+import TrafficLayer from "../layers/TrafficLayer.jsx";
+import ParkingLayer from "../layers/ParkingLayer.jsx";
 
 import UserMarker from "./UserMarker";
 import MapCenterPicker from "./MapCenterPicker";
@@ -17,7 +20,10 @@ export default function MapView({
   onRouteDistanceMeters,
   isSearching
 }) {
-  // ✅ DEBUG: mount/unmount check (remove after testing)
+  
+  const [showTraffic, setShowTraffic] = useState(false);
+  const [showParking, setShowParking] = useState(false);
+// ✅ DEBUG: mount/unmount check (remove after testing)
   useEffect(() => {
     window.__MAPVIEW_MOUNT_COUNT__ = (window.__MAPVIEW_MOUNT_COUNT__ || 0) + 1;
     console.warn("[MAPVIEW][MOUNT] count =", window.__MAPVIEW_MOUNT_COUNT__);
@@ -64,16 +70,25 @@ export default function MapView({
   return (
     <>
       <MapContainer center={userLoc} zoom={16} zoomControl={false} style={{ width: "100%", height: "100%" }}>
-        <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-
-        {!selectingFromMap && <UserMarker position={userLoc} />}
+        \1
+        <TrafficLayer enabled={showTraffic} />
+        <ParkingLayer enabled={showParking} />
+{!selectingFromMap && <UserMarker position={userLoc} />}
 
         <MapCenterPicker enabled={selectingFromMap} onPick={onTargetChange} />
 
         {showRoute && routePoints?.length > 1 ? (
           <RouteLine points={routePoints} />
         ) : null}
-      </MapContainer>
+      
+        <MapRightControls
+          trafficOn={showTraffic}
+          parkingOn={showParking}
+          onToggleTraffic={() => setShowTraffic((v) => !v)}
+          onToggleParking={() => setShowParking((v) => !v)}
+          userLoc={userLoc}
+        />
+\1
 
       <SearchRadar isVisible={isSearching} />
     </>

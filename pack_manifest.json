@@ -1,0 +1,12 @@
+{
+  "generated_at": "2026-03-02T15:02:34.289600Z",
+  "contains": [
+    "docs/MOBILE_APK_SETUP.md",
+    "src/native/push.js",
+    "src/native/deviceMeta.js",
+    "src/native/driverHeartbeat.js",
+    "server/api/push.js",
+    "sql/push_tokens.sql",
+    "docs/PRESENCE_PATCH_NOTE.md"
+  ]
+}
