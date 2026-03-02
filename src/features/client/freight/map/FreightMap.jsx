@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, message } from "antd";
 import { AimOutlined, CheckOutlined, CloseOutlined } from "@ant-design/icons";
-import { MapContainer, Marker, Polyline, TileLayer, useMap, useMapEvents } from "react-leaflet";
+import { MapContainer, Marker, Polyline, TileLayer, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -21,35 +21,6 @@ let DefaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
-function CenterTracker({ enabled, onCenter, setIsDragging }) {
-  const map = useMap();
-  useEffect(() => {
-    if (!enabled) return;
-    const onMoveStart = () => setIsDragging(true);
-    const onMoveEnd = () => {
-      setIsDragging(false);
-      const c = map.getCenter();
-      onCenter([c.lat, c.lng]);
-    };
-    map.on("movestart", onMoveStart);
-    map.on("moveend", onMoveEnd);
-    return () => {
-      map.off("movestart", onMoveStart);
-      map.off("moveend", onMoveEnd);
-    };
-  }, [enabled, map, onCenter, setIsDragging]);
-  return null;
-}
-
-function FlyTo({ target, zoom = 16 }) {
-  const map = useMap();
-  useEffect(() => {
-    if (!target) return;
-    map.flyTo(target, zoom, { animate: true, duration: 1.2 });
-  }, [target, zoom, map]);
-  return null;
-}
-
 function MapClickPick({ enabled, onPick }) {
   useMapEvents({
     click(e) {
@@ -60,22 +31,17 @@ function MapClickPick({ enabled, onPick }) {
   return null;
 }
 
-// SVG center pin (selection mode)
-const pinSvg = () => `
-<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="32" cy="32" r="20" fill="#FFD400"/>
-  <path d="M36 19c-4 0-7 3-7 7v10l-2 2v3h14v-3l-2-2V26c0-4-3-7-7-7z" fill="#111"/>
-</svg>`;
-
 export default function FreightMap() {
   const { pickup, setPickup, dropoff, setDropoff, selecting, setSelecting, setDistanceKm, setDurationMin } = useFreight();
 
   const [userLoc, setUserLoc] = useState(null);
-  const [isDragging, setIsDragging] = useState(false);
   const mapRef = useRef(null);
 
   const abortRef = useRef(null);
   const debounceRef = useRef(null);
+
+  // Temporary draggable marker position while selecting (blue marker only)
+  const [draft, setDraft] = useState(null);
 
   const { routeCoords, distanceKm, durationMin } = useFreightRoute(pickup?.latlng || null, dropoff?.latlng || null);
 
@@ -85,14 +51,14 @@ export default function FreightMap() {
   }, [distanceKm, durationMin, setDistanceKm, setDurationMin]);
 
   const defaultCenter = [42.46, 59.61]; // Nukus
-  const mapCenter = useMemo(() => {
-    if (selecting === "pickup" && pickup?.latlng) return pickup.latlng;
-    if (selecting === "dropoff" && dropoff?.latlng) return dropoff.latlng;
+
+  const baseCenter = useMemo(() => {
     if (pickup?.latlng) return pickup.latlng;
     if (userLoc) return userLoc;
     return defaultCenter;
-  }, [pickup?.latlng, dropoff?.latlng, selecting, userLoc]);
+  }, [pickup?.latlng, userLoc]);
 
+  // Get user location once
   useEffect(() => {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
@@ -101,6 +67,26 @@ export default function FreightMap() {
       { enableHighAccuracy: true, timeout: 8000 }
     );
   }, []);
+
+  // When selecting starts, initialize draft marker and gently move map ONCE (no zoom "sakrash")
+  useEffect(() => {
+    if (!selecting) {
+      setDraft(null);
+      return;
+    }
+    const existing = selecting === "pickup" ? pickup?.latlng : dropoff?.latlng;
+    const start = existing || userLoc || pickup?.latlng || defaultCenter;
+    setDraft(start);
+
+    // Move map once when opening selection
+    const m = mapRef.current;
+    if (m) {
+      try {
+        m.setView(start, Math.max(m.getZoom(), 16), { animate: true });
+      } catch {}
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selecting]);
 
   const reverseToAddress = useCallback(
     async (latlng, which) => {
@@ -131,19 +117,18 @@ export default function FreightMap() {
     [setPickup, setDropoff]
   );
 
-  const handleCenterPicked = useCallback(
-    (latlng) => {
-      if (!selecting) return;
-      reverseToAddress(latlng, selecting);
-    },
-    [selecting, reverseToAddress]
-  );
+  const applyDraft = useCallback(() => {
+    if (!selecting || !draft) return;
+    reverseToAddress(draft, selecting);
+  }, [selecting, draft, reverseToAddress]);
 
   const handleTapPicked = useCallback(
     (latlng) => {
       if (!selecting) return;
-      // move map to tapped location, then reverse it
-      mapRef.current?.flyTo(latlng, 16);
+      setDraft(latlng);
+      try {
+        mapRef.current?.panTo(latlng);
+      } catch {}
       reverseToAddress(latlng, selecting);
     },
     [selecting, reverseToAddress]
@@ -155,39 +140,76 @@ export default function FreightMap() {
       (pos) => {
         const p = [pos.coords.latitude, pos.coords.longitude];
         setUserLoc(p);
-        mapRef.current?.flyTo(p, 16);
-        if (selecting) reverseToAddress(p, selecting);
+        if (selecting) {
+          setDraft(p);
+          mapRef.current?.setView(p, 16, { animate: true });
+          reverseToAddress(p, selecting);
+        } else {
+          mapRef.current?.setView(p, 15, { animate: true });
+        }
       },
       () => message.error("Joylashuvni aniqlab bo‘lmadi"),
       { enableHighAccuracy: true, timeout: 8000 }
     );
   };
 
+  // Fit bounds once when both points exist and we are NOT selecting
+  const fittedRef = useRef(false);
+  useEffect(() => {
+    if (selecting) return;
+    if (!pickup?.latlng || !dropoff?.latlng) {
+      fittedRef.current = false;
+      return;
+    }
+    if (fittedRef.current) return;
+    const m = mapRef.current;
+    if (!m) return;
+    try {
+      const b = L.latLngBounds([pickup.latlng, dropoff.latlng]);
+      m.fitBounds(b.pad(0.25), { animate: true });
+      fittedRef.current = true;
+    } catch {}
+  }, [selecting, pickup?.latlng, dropoff?.latlng]);
+
   const height = selecting ? "52vh" : 220;
+  const center = selecting ? (draft || baseCenter) : baseCenter;
 
   return (
     <div style={{ position: "relative", height, borderRadius: 18, overflow: "hidden" }}>
-      <MapContainer center={mapCenter} zoom={14} style={{ height: "100%", width: "100%" }} whenCreated={(m) => (mapRef.current = m)}>
+      <MapContainer
+        center={center}
+        zoom={14}
+        style={{ height: "100%", width: "100%" }}
+        whenCreated={(m) => (mapRef.current = m)}
+      >
         <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
 
-        <FlyTo target={mapCenter} zoom={selecting ? 16 : 13} />
-
-        <CenterTracker enabled={!!selecting} onCenter={handleCenterPicked} setIsDragging={setIsDragging} />
         <MapClickPick enabled={!!selecting} onPick={handleTapPicked} />
 
+        {/* Saved markers */}
         {pickup?.latlng && <Marker position={pickup.latlng} />}
         {dropoff?.latlng && <Marker position={dropoff.latlng} />}
 
-        {Array.isArray(routeCoords) && routeCoords.length >= 2 && <Polyline positions={routeCoords} pathOptions={{ color: "#22c55e", weight: 6, opacity: 1 }} />}
-      </MapContainer>
+        {/* Selecting marker (blue, draggable). No yellow center marker. */}
+        {selecting && draft && (
+          <Marker
+            position={draft}
+            draggable
+            eventHandlers={{
+              dragend: (e) => {
+                const ll = e.target.getLatLng();
+                const next = [ll.lat, ll.lng];
+                setDraft(next);
+                reverseToAddress(next, selecting);
+              },
+            }}
+          />
+        )}
 
-      {/* center pin when selecting */}
-      {selecting && (
-        <div className={`fr-centerpin ${isDragging ? "dragging" : ""}`} aria-hidden="true">
-          <div style={{ width: 70, height: 80 }} dangerouslySetInnerHTML={{ __html: pinSvg() }} />
-          <div className="fr-pinlabel">{selecting === "pickup" ? "Yuborish (yuklash) manzili" : "Tushirish (yetkazish) manzili"}</div>
-        </div>
-      )}
+        {Array.isArray(routeCoords) && routeCoords.length >= 2 && (
+          <Polyline positions={routeCoords} pathOptions={{ color: "#22c55e", weight: 6, opacity: 1 }} />
+        )}
+      </MapContainer>
 
       {/* locate button */}
       <div style={{ position: "absolute", right: 12, top: 12, zIndex: 800 }}>
@@ -207,44 +229,16 @@ export default function FreightMap() {
           <Button
             type="primary"
             icon={<CheckOutlined />}
-            onClick={() => setSelecting(null)}
+            onClick={() => {
+              applyDraft();
+              setSelecting(null);
+            }}
             style={{ flex: 1, borderRadius: 14 }}
           >
             Manzilni saqlash
           </Button>
         </div>
       )}
-
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-        .fr-centerpin {
-          position: absolute;
-          left: 50%;
-          top: 50%;
-          z-index: 850;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 10px;
-          pointer-events: none;
-          transition: transform .2s cubic-bezier(.175,.885,.32,1.275);
-          transform: translate(-50%, -68%);
-        }
-        .fr-centerpin.dragging {
-          transform: translate(-50%, -90%) scale(1.15);
-        }
-        .fr-pinlabel {
-          background: rgba(0,0,0,.75);
-          color: white;
-          padding: 6px 10px;
-          border-radius: 999px;
-          font-size: 12px;
-          font-weight: 700;
-        }
-      `,
-        }}
-      />
     </div>
   );
 }

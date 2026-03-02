@@ -3,10 +3,47 @@ import { Button, Card, Divider, Input, InputNumber, List, Modal, Switch, Tag, Ty
 import { ReloadOutlined, EnvironmentOutlined, DollarOutlined } from "@ant-design/icons";
 
 import { useAuth } from "@/shared/auth/AuthProvider";
-import { upsertVehicle, setVehicleOnline, listVehicleCargo, createOffer, quickOffer } from "./services/freightApi";
+import { upsertVehicle, setVehicleOnline, listVehicleCargo, createOffer, quickOffer as quickOfferApi } from "./services/freightApi";
 import { formatUZS } from "@/features/client/freight/services/truckData";
 import { supabase } from "@/lib/supabase";
 import { subscribeDriverFreight, incrementCargoViews, incrementCargoOffers, startDriverHeartbeat } from "@/services/freightService";
+
+import { MapContainer, Marker, TileLayer, useMapEvents } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import lIcon from "leaflet/dist/images/marker-icon.png";
+import lShadow from "leaflet/dist/images/marker-shadow.png";
+
+// Leaflet marker icon fix (driver map)
+let DriverDefaultIcon = L.icon({
+  iconUrl: lIcon,
+  shadowUrl: lShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+});
+L.Marker.prototype.options.icon = DriverDefaultIcon;
+
+function MapClick({ enabled, onPick }) {
+  useMapEvents({
+    click(e) {
+      if (!enabled) return;
+      onPick([e.latlng.lat, e.latlng.lng]);
+    },
+  });
+  return null;
+}
+
+async function reverseGeocodeNominatim(lat, lng) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&accept-language=uz`;
+    const res = await fetch(url, { headers: { "User-Agent": "UniGo Freight" } });
+    const j = await res.json();
+    return j?.display_name || "";
+  } catch {
+    return "";
+  }
+}
+
 
 const { Title, Text } = Typography;
 
@@ -33,7 +70,7 @@ function useGeo() {
     );
   }, []);
 
-  return { pos, refresh, loading };
+  return { pos, setPos, refresh, loading };
 }
 
 export default function FreightPage() {
@@ -55,13 +92,14 @@ export default function FreightPage() {
   const [capacityM3, setCapacityM3] = useState(8);
 
   const [isOnline, setIsOnline] = useState(false);
-  const { pos, refresh: refreshPos, loading: geoLoading } = useGeo();
+  const { pos, setPos, refresh: refreshPos, loading: geoLoading } = useGeo();
+
+  const [locOpen, setLocOpen] = useState(false);
+  const [locDraft, setLocDraft] = useState(null);
+  const [locAddress, setLocAddress] = useState("");
 
   const [feed, setFeed] = useState([]);
   const [feedLoading, setFeedLoading] = useState(false);
-
-  // Fast matching: realtime refresh (3-4x faster than polling)
-  const [rtEnabled, setRtEnabled] = useState(true);
 
   const [offerOpen, setOfferOpen] = useState(false);
   const [offerCargo, setOfferCargo] = useState(null);
@@ -166,9 +204,9 @@ export default function FreightPage() {
     }
   }, [vehicleId]);
 
-  // Realtime: cargo_orders changes -> refresh feed immediately (only when online)
+  // Realtime: cargo/orders/offers changes -> refresh feed immediately (always ON when online)
   useEffect(() => {
-    if (!vehicleId || !isOnline || !rtEnabled) return;
+    if (!vehicleId || !isOnline) return;
 
     let alive = true;
     let t = null;
@@ -195,16 +233,15 @@ export default function FreightPage() {
       if (t) clearTimeout(t);
       unsubscribe();
     };
-  }, [vehicleId, isOnline, rtEnabled, refreshFeed]);
+  }, [vehicleId, isOnline, refreshFeed]);
 
   useEffect(() => {
-    if (!vehicleId) return;
+    if (!vehicleId || !isOnline) return;
     const iid = setInterval(() => {
-      // polling fallback (realtime ishlamasa ham), realtime yoq bo'lsa intervalni kamroq ishlatamiz
-      if (isOnline && !rtEnabled) refreshFeed();
-    }, 6000);
+      refreshFeed();
+    }, 8000);
     return () => clearInterval(iid);
-  }, [vehicleId, isOnline, rtEnabled, refreshFeed]);
+  }, [vehicleId, isOnline, refreshFeed]);
 
   const calcQuickPrice = useCallback((wrap) => {
     const c = wrap?.cargo || wrap;
@@ -219,18 +256,18 @@ export default function FreightPage() {
     return Math.max(0, Math.round(price / 1000) * 1000);
   }, []);
 
-  const quickOffer = useCallback(
+  const sendQuickOffer = useCallback(
     async (cargoWrap) => {
       const c = cargoWrap?.cargo || cargoWrap;
       if (!c?.id) return;
       if (!vehicleId || !driverId) return;
       const hide = message.loading("Tez taklif yuborilmoqda...", 0);
       try {
-        const resp = await quickOffer({ cargoId: c.id, vehicleId, driverId, etaMinutes: 20, note: "Tez taklif" });
+        const resp = await quickOfferApi({ cargoId: c.id, vehicleId, driverId, etaMinutes: 20, note: "Tez taklif" });
         const price = resp?.data?.data?.price ?? resp?.data?.price;
         message.success(price ? `Taklif yuborildi: ${formatUZS(price)}` : "Taklif yuborildi");
         // Demand pressure: offer yuborildi -> offers_count++
-        incrementCargoOffers(item?.cargo?.id);
+        incrementCargoOffers(c?.id);
         refreshFeed();
       } catch (e) {
         const msg = String(e?.message || "");
@@ -295,7 +332,7 @@ export default function FreightPage() {
           </Text>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <Button icon={<EnvironmentOutlined />} loading={geoLoading} onClick={refreshPos}>Joylashuv</Button>
+          <Button icon={<EnvironmentOutlined />} loading={geoLoading} onClick={() => setLocOpen(true)}>Joylashuv</Button>
           <Button icon={<ReloadOutlined />} onClick={refreshFeed} disabled={!vehicleId} loading={feedLoading} />
         </div>
       </div>
@@ -335,7 +372,7 @@ export default function FreightPage() {
             <Button type="primary" onClick={saveVehicle} disabled={!canOperate}>Saqlash</Button>
           </div>
           <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>
-            Online uchun: joylashuv kerak. Hozir: {pos ? `${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}` : "—"}
+            Online uchun: joylashuv kerak. Hozir: {pos ? (locAddress ? locAddress : `${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`) : "—"}
           </div>
         </Card>
 
@@ -348,12 +385,9 @@ export default function FreightPage() {
             Yuklar 30 km radius bo‘yicha saralanadi (current location).
           </div>
           <div style={{ marginTop: 8, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <Tag color={rtEnabled ? "green" : "default"}>{rtEnabled ? "Realtime: ON" : "Realtime: OFF"}</Tag>
-            <Button size="small" onClick={() => setRtEnabled((v) => !v)}>
-              {rtEnabled ? "Realtime o‘chirish" : "Realtime yoqish"}
-            </Button>
+            <Tag color="green">Realtime: ON</Tag>
             <span style={{ fontSize: 12, opacity: 0.7 }}>
-              Realtime yoq bo‘lsa yuklar darrov yangilanadi (tezroq driver topadi).
+              Yuklar darrov yangilanadi (tezroq driver topadi).
             </span>
           </div>
           <Divider style={{ margin: "10px 0" }} />
@@ -368,7 +402,7 @@ export default function FreightPage() {
               return (
                 <List.Item
                   actions={[
-                    <Button key="q" onClick={() => quickOffer(item)} disabled={!isOnline}>
+                    <Button key="q" onClick={() => sendQuickOffer(item)} disabled={!isOnline}>
                       Tez taklif {quickPrice ? `(${formatUZS(quickPrice)})` : ""}
                     </Button>,
                     <Button key="offer" icon={<DollarOutlined />} onClick={() => openOffer(item)} disabled={!isOnline}>
@@ -404,6 +438,82 @@ export default function FreightPage() {
           />
         </Card>
       </div>
+
+
+      <Modal
+        open={locOpen}
+        onCancel={() => setLocOpen(false)}
+        onOk={async () => {
+          if (!locDraft) return message.error("Xaritadan joy tanlang");
+          const [lat, lng] = locDraft;
+          // set geo pos for online mode
+          setPos({ lat, lng });
+          const addr = await reverseGeocodeNominatim(lat, lng);
+          setLocAddress(addr || "");
+          setLocOpen(false);
+        }}
+        okText="Saqlash"
+        cancelText="Bekor"
+        title="Joylashuvni tanlash"
+      >
+        <div style={{ height: 360, borderRadius: 14, overflow: "hidden" }}>
+          <MapContainer
+            center={locDraft || (pos ? [pos.lat, pos.lng] : [42.46, 59.61])}
+            zoom={15}
+            style={{ height: "100%", width: "100%" }}
+            whenCreated={(m) => {
+              // init draft once when open
+              if (!locDraft) {
+                const c = m.getCenter();
+                setLocDraft([c.lat, c.lng]);
+              }
+            }}
+          >
+            <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
+            <MapClick enabled={true} onPick={(ll) => setLocDraft(ll)} />
+            {locDraft && (
+              <Marker
+                position={locDraft}
+                draggable
+                eventHandlers={{
+                  dragend: (e) => {
+                    const ll = e.target.getLatLng();
+                    setLocDraft([ll.lat, ll.lng]);
+                  },
+                }}
+              />
+            )}
+          </MapContainer>
+        </div>
+        <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>
+          Tanlangan joy: {locAddress ? locAddress : locDraft ? `${locDraft[0].toFixed(5)}, ${locDraft[1].toFixed(5)}` : "—"}
+        </div>
+        <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <Button
+            onClick={() => {
+              // use device geolocation to set draft
+              if (!navigator?.geolocation) return message.error("Geolokatsiya yo‘q");
+              navigator.geolocation.getCurrentPosition(
+                (p) => setLocDraft([p.coords.latitude, p.coords.longitude]),
+                () => message.error("Joylashuvni aniqlab bo‘lmadi"),
+                { enableHighAccuracy: true, timeout: 8000 }
+              );
+            }}
+          >
+            Mening joyim
+          </Button>
+          <Button
+            onClick={async () => {
+              if (!locDraft) return;
+              const [lat, lng] = locDraft;
+              const addr = await reverseGeocodeNominatim(lat, lng);
+              setLocAddress(addr || "");
+            }}
+          >
+            Manzil nomini olish
+          </Button>
+        </div>
+      </Modal>
 
       <Modal
         open={offerOpen}

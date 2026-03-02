@@ -2,8 +2,8 @@
 
 export const TRUCKS = [
   {
-    id: "matiz_labo_damas",
-    title: "Matiz / Labo / Damas",
+    id: "mataruler_labo_damas_vhkz",
+    title: "Mataruler / Labo / Damas (VHKZ)",
     subtitle: "Kichik yuklar, maishiy texnika",
     sizeLabel: "Kichik",
     capacity: "≈ 350–650 kg",

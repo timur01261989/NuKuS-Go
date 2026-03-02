@@ -224,7 +224,7 @@ export function subscribeDriverFreight({ vehicleId, onChange }) {
  * UI’da siz so‘ragan nomlar qoladi, DB’ga shu qiymatlar ketadi.
  */
 export const vehicleTypeMap = {
-  "Matiz / Labo / Damas": "van",
+  "Mataruler / Labo / Damas (VHKZ)": "van",
   "Gazel / Porter": "gazelle",
   "Isuzu / Kamaz": "truck_5t",
   Fura: "fura",
