@@ -17,12 +17,12 @@ export default function MapView({
   onRouteDistanceMeters,
   isSearching
 }) {
-  // ✅ DEBUG: mount/unmount check (remove after testing)
+  // ✅ DEBUG: MapView ishlayaptimi? (remove after testing)
   useEffect(() => {
-    console.warn("[MAP][MOUNT] MapView mounted");
-    return () => console.warn("[MAP][UNMOUNT] MapView unmounted");
+    window.__MAPVIEW_MOUNT_COUNT__ = (window.__MAPVIEW_MOUNT_COUNT__ || 0) + 1;
+    console.error("[MAPVIEW] mounted count =", window.__MAPVIEW_MOUNT_COUNT__);
+    return () => console.error("[MAPVIEW] unmounted");
   }, []);
-  // 👆 SHU YER: MapView qayta mount bo‘layotganini aniq ko‘rasan
 
   const [routePoints, setRoutePoints] = useState([]);
 
@@ -61,6 +61,10 @@ export default function MapView({
   }, [showRoute, userLoc?.lat, userLoc?.lng, targetLoc?.lat, targetLoc?.lng, onRouteDistanceMeters]);
 
   return (
+    <>
+      <div style={{position:"fixed",top:8,right:8,zIndex:999999,background:"rgba(255,0,0,0.85)",color:"#fff",padding:"6px 10px",borderRadius:10,fontSize:12,fontWeight:700}}>
+        MAPVIEW ACTIVE
+      </div>
     <>
       <MapContainer center={userLoc} zoom={16} zoomControl={false} style={{ width: "100%", height: "100%" }}>
         <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
