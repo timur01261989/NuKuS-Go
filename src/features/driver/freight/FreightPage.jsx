@@ -3,10 +3,8 @@ import { Button, Card, Divider, Input, InputNumber, List, Modal, Switch, Typogra
 import { ReloadOutlined, EnvironmentOutlined, DollarOutlined } from "@ant-design/icons";
 
 import { useAuth } from "@/shared/auth/AuthProvider";
-import { upsertVehicle, setVehicleOnline, listVehicleCargo, createOffer, quickOffer } from "./services/freightApi";
 import { formatUZS } from "@/features/client/freight/services/truckData";
 import { supabase } from "@/lib/supabase";
-import { subscribeDriverFreight, incrementCargoViews, incrementCargoOffers, startDriverHeartbeat } from "@/services/freightService";
 
 const { Title, Text } = Typography;
 
