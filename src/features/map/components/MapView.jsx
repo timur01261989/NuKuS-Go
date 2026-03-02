@@ -23,64 +23,39 @@ export default function MapView({
   
   const [showTraffic, setShowTraffic] = useState(false);
   const [showParking, setShowParking] = useState(false);
-// ✅ DEBUG: mount/unmount check (remove after testing)
+
+  // ✅ DEBUG: mount/unmount check (remove after testing)
   useEffect(() => {
     window.__MAPVIEW_MOUNT_COUNT__ = (window.__MAPVIEW_MOUNT_COUNT__ || 0) + 1;
     console.warn("[MAPVIEW][MOUNT] count =", window.__MAPVIEW_MOUNT_COUNT__);
-    return () => console.warn("[MAPVIEW][UNMOUNT]");
-  }, []);
-  // 👆 SHU YER: MapView qayta mount bo‘lsa count oshadi
+    
+  const fallbackCenter = { lat: 42.4600, lng: 59.6100 }; // Nukus (fallback)
 
-  const [routePoints, setRoutePoints] = useState([]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function run() {
-      if (!showRoute) {
-        setRoutePoints([]);
-        if (typeof onRouteDistanceMeters === "function") onRouteDistanceMeters(0);
-        return;
-      }
-      if (!userLoc?.lat || !userLoc?.lng || !targetLoc?.lat || !targetLoc?.lng) return;
-
-      try {
-        const r = await buildRoute({ pickup: userLoc, dropoff: targetLoc });
-        if (cancelled) return;
-
-        const coords = r?.coordinates || r?.geometry?.coordinates || [];
-        setRoutePoints(coords);
-
-        if (typeof onRouteDistanceMeters === "function") {
-          onRouteDistanceMeters(Number(r?.distance_m || 0));
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setRoutePoints([]);
-          if (typeof onRouteDistanceMeters === "function") onRouteDistanceMeters(0);
-          // console.warn("Route build failed:", e);
-        }
-      }
-    }
-
-    run();
-    return () => { cancelled = true; };
-  }, [showRoute, userLoc?.lat, userLoc?.lng, targetLoc?.lat, targetLoc?.lng, onRouteDistanceMeters]);
+  const safeCenter = userLoc?.lat && userLoc?.lng ? userLoc : fallbackCenter;
 
   return (
     <>
-      <MapContainer center={userLoc} zoom={16} zoomControl={false} style={{ width: "100%", height: "100%" }}>
-        \1
+      <MapContainer
+        center={safeCenter}
+        zoom={16}
+        zoomControl={false}
+        style={{ width: "100%", height: "100%" }}
+      >
+        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+
         <TrafficLayer enabled={showTraffic} />
         <ParkingLayer enabled={showParking} />
-{!selectingFromMap && <UserMarker position={userLoc} />}
+
+        {!selectingFromMap && userLoc?.lat && userLoc?.lng ? (
+          <UserMarker position={userLoc} />
+        ) : null}
 
         <MapCenterPicker enabled={selectingFromMap} onPick={onTargetChange} />
 
         {showRoute && routePoints?.length > 1 ? (
           <RouteLine points={routePoints} />
         ) : null}
-      
+
         <MapRightControls
           trafficOn={showTraffic}
           parkingOn={showParking}
@@ -88,9 +63,9 @@ export default function MapView({
           onToggleParking={() => setShowParking((v) => !v)}
           userLoc={userLoc}
         />
-\1
+      </MapContainer>
 
       <SearchRadar isVisible={isSearching} />
-    </MapContainer>
+    </>
   );
 }
