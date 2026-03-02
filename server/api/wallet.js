@@ -79,7 +79,8 @@ export async function wallet_topup_demo_handler(req, res) {
     const auth = await getAuthedUser(req);
     if (!auth.ok) return json(res, auth.status, { ok: false, error: auth.message });
 
-    const body = typeof req.body === 'string' ? JSON.parse(req.body  '{}') : (req.body  {});
+    // TUZATILDI: || operatorlari qo'shildi
+    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
     const amount_uzs = Number(body.amount_uzs || 0);
 
     if (!Number.isFinite(amount_uzs) || amount_uzs <= 0) {
@@ -111,7 +112,7 @@ export async function wallet_topup_demo_handler(req, res) {
       .upsert([{ user_id, balance_uzs: nextBal, updated_at: nowIso() }], { onConflict: 'user_id' });
     if (we) throw we;
 
-const { data: tx, error: te } = await sb
+    const { data: tx, error: te } = await sb
       .from('wallet_transactions')
       .insert([{ user_id, amount_uzs: Math.round(amount_uzs), kind: 'topup', meta: { demo: true } }])
       .select('*')
@@ -133,7 +134,8 @@ export async function cashback_calc_handler(req, res) {
   try {
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Method not allowed' });
 
-    const body = typeof req.body === 'string' ? JSON.parse(req.body  '{}') : (req.body  {});
+    // TUZATILDI: || operatorlari qo'shildi
+    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
     const final_price_uzs = Number(body.final_price_uzs || 0);
     const service_type = String(body.service_type || 'standard').toLowerCase();
 
@@ -156,7 +158,8 @@ export default async function handler(req, res) {
   applyCors(req, res);
   if (req.method === 'OPTIONS') return json(res, 204, { ok: true });
 
-  const rk = req.query?.routeKey  req.routeKey  '';
+  // TUZATILDI: || operatorlari qo'shildi
+  const rk = req.query?.routeKey || req.routeKey || '';
 
   switch (rk) {
     case 'wallet':

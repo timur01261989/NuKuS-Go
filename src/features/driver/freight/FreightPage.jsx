@@ -106,16 +106,6 @@ L.Icon.Default.mergeOptions({
     if (!value) return null;
     return <Marker position={[value.lat, value.lng]} />;
   }
-  function PickOnMap({ value, onChange }) {
-    useMapEvents({
-      click(e) {
-        onChange({ lat: e.latlng.lat, lng: e.latlng.lng });
-      },
-    });
-
-    if (!value) return null;
-    return <Marker position={[value.lat, value.lng]} />;
-  }
 
 
   const [vehicleId, setVehicleId] = useState(() => {
@@ -392,7 +382,8 @@ const [offerOpen, setOfferOpen] = useState(false);
         title="Joylashuvni xaritadan tanlang"
         destroyOnClose
       >
-        <div style={{ height: 320, borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ height: 320, borderRadius: 12, overflow: "hidden", position: "relative" }}>
+          <div style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -100%)", zIndex: 999, pointerEvents: "none", fontSize: 32, filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.45))" }}>📍</div>
           <MapContainer
             center={[
               (tempPos || effectivePos || { lat: 42.4603, lng: 59.6166 }).lat,
