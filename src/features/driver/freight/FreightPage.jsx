@@ -1,648 +1,579 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
-import { nominatimReverse } from "@/features/client/shared/geo/nominatim";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Button, Card, Divider, Input, InputNumber, List, Modal, Switch, Typography, message, Select, Tag } from "antd";
+import { ReloadOutlined, EnvironmentOutlined, DollarOutlined } from "@ant-design/icons";
+
+import { useAuth } from "@/shared/auth/AuthProvider";
+import { upsertVehicle, setVehicleOnline, listVehicleCargo, createOffer, quickOffer } from "./services/freightApi";
+import { formatUZS } from "@/features/client/freight/services/truckData";
 import { supabase } from "@/lib/supabase";
+import { subscribeDriverFreight, incrementCargoViews, incrementCargoOffers, startDriverHeartbeat } from "@/services/freightService";
+import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import L from "leaflet";
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
 
-/**
- * DriverFreight.jsx (FULL)
- * Driver taraf — Yuk tashish:
- * ✅ Mashina turi 5 ta variant
- * ✅ Joylashuvni xaritadan tanlash (pin markazda)
- * ✅ Joylashuv manzil nomi ko‘rinadi (reverse geocode)
- * ✅ Online tugma ishlaydi (online bo‘lish uchun joylashuv shart)
- * ✅ Davlat raqami: max 9 belgi, avtomatik KATTA harf
- *
- * Eslatma:
- * - DBda current_point JSON {lat,lng} sifatida saqlanadi.
- * - Manzil nomi DBga yozilmaydi (schema’da ustun bo‘lmasa). UI’da ko‘rsatiladi.
- */
+const { Title, Text } = Typography;
 
-const BODY_TYPES = [
-  { value: "motoroller", label: "Motoruller" },
-  { value: "labo_damas", label: "Labo / Damas" },
-  { value: "gazel", label: "Gazel" },
-  { value: "isuzu_kamaz", label: "Isuzu / Kamaz" },
-  { value: "fura", label: "Fura" },
-];
+function useGeo() {
+  const [pos, setPos] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-function normalizePoint(point) {
-  if (!point) return null;
-
-  // json {lat,lng}
-  if (typeof point === "object" && !Array.isArray(point)) {
-    const lat = point.lat ?? point.latitude ?? null;
-    const lng = point.lng ?? point.lon ?? point.longitude ?? null;
-    if (lat != null && lng != null) return { lat: Number(lat), lng: Number(lng) };
-  }
-
-  // [lng, lat]
-  if (Array.isArray(point) && point.length >= 2) {
-    return { lng: Number(point[0]), lat: Number(point[1]) };
-  }
-
-  // "POINT(lng lat)"
-  if (typeof point === "string") {
-    const m = point.match(/POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i);
-    if (m) return { lng: Number(m[1]), lat: Number(m[2]) };
-  }
-
-  return null;
-}
-
-function pointToDbValue(p) {
-  if (!p) return null;
-  return { lat: Number(p.lat), lng: Number(p.lng) };
-}
-
-/** ----------------------------- Map helpers ----------------------------- */
-function FlyTo({ target, zoom = 16 }) {
-  const map = useMap();
-  useEffect(() => {
-    if (!target) return;
-    map.flyTo(target, zoom, { animate: true, duration: 1.0 });
-  }, [target, zoom, map]);
-  return null;
-}
-
-function CenterTracker({ enabled, onCenter, setIsDragging }) {
-  const map = useMap();
-  useEffect(() => {
-    if (!enabled) return;
-    const onMoveStart = () => setIsDragging(true);
-    const onMoveEnd = () => {
-      setIsDragging(false);
-      const c = map.getCenter();
-      onCenter({ lat: c.lat, lng: c.lng });
-    };
-    map.on("movestart", onMoveStart);
-    map.on("moveend", onMoveEnd);
-    return () => {
-      map.off("movestart", onMoveStart);
-      map.off("moveend", onMoveEnd);
-    };
-  }, [enabled, map, onCenter, setIsDragging]);
-  return null;
-}
-
-function MapClickPick({ enabled, onPick }) {
-  useMapEvents({
-    click(e) {
-      if (!enabled) return;
-      onPick({ lat: e.latlng.lat, lng: e.latlng.lng });
-    },
-  });
-  return null;
-}
-
-const pinSvg = () => `
-<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="32" cy="32" r="20" fill="#3B82F6"/>
-  <path d="M36 19c-4 0-7 3-7 7v10l-2 2v3h14v-3l-2-2V26c0-4-3-7-7-7z" fill="#fff"/>
-</svg>`;
-
-function LocationPickerModal({ open, initialPoint, onCancel, onSave }) {
-  const [center, setCenter] = useState(() => {
-    if (initialPoint?.lat != null && initialPoint?.lng != null) return [initialPoint.lat, initialPoint.lng];
-    return [41.31, 69.24]; // Tashkent default
-  });
-  const [isDragging, setIsDragging] = useState(false);
-  const [picked, setPicked] = useState(() => (initialPoint ? { ...initialPoint } : null));
-  const [address, setAddress] = useState("");
-  const [addrLoading, setAddrLoading] = useState(false);
-
-  const abortRef = useRef(null);
-  const debounceRef = useRef(null);
-
-  useEffect(() => {
-    if (!open) return;
-    // reverse initial
-    if (initialPoint?.lat != null && initialPoint?.lng != null) {
-      setPicked({ ...initialPoint });
-      setCenter([initialPoint.lat, initialPoint.lng]);
+  const refresh = useCallback(() => {
+    if (!navigator?.geolocation) {
+      message.error("Brauzer geolokatsiyani qo‘llamaydi");
+      return;
     }
-  }, [open, initialPoint]);
-
-  const reverse = useCallback(async (p) => {
-    if (!p) return;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (abortRef.current) {
-      try { abortRef.current.abort(); } catch {}
-      abortRef.current = null;
-    }
-    debounceRef.current = setTimeout(async () => {
-      const ctrl = new AbortController();
-      abortRef.current = ctrl;
-      setAddrLoading(true);
-      try {
-        const a = await nominatimReverse(p.lat, p.lng, { signal: ctrl.signal, swallowErrors: true });
-        if (!ctrl.signal.aborted) setAddress(a || "");
-      } catch {
-        // ignore
-      } finally {
-        if (!ctrl.signal.aborted) setAddrLoading(false);
-      }
-    }, 220);
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    if (picked) reverse(picked);
-  }, [open, picked, reverse]);
-
-  const locateMe = useCallback(() => {
-    if (!navigator.geolocation) return;
+    setLoading(true);
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setPicked(p);
-        setCenter([p.lat, p.lng]);
+      (p) => {
+        setLoading(false);
+        setPos({ lat: p.coords.latitude, lng: p.coords.longitude });
       },
-      () => {},
-      { enableHighAccuracy: true, timeout: 8000 }
+      (err) => {
+        setLoading(false);
+        message.error(err?.message || "Joylashuvni olishda xatolik");
+      },
+      { enableHighAccuracy: true, timeout: 15000 }
     );
   }, []);
 
-  if (!open) return null;
-
-  return (
-    <div className="fixed inset-0 z-[9999] flex items-end md:items-center justify-center bg-black/60">
-      <div className="w-full md:w-[920px] md:rounded-2xl bg-[#0b1220] border border-white/10 overflow-hidden">
-        <div className="px-4 py-3 flex items-center justify-between border-b border-white/10">
-          <div className="font-semibold">Joylashuvni xaritadan tanlang</div>
-          <button onClick={onCancel} className="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/15">Yopish</button>
-        </div>
-
-        <div className="p-3">
-          <div className="relative rounded-xl overflow-hidden border border-white/10" style={{ height: "56vh" }}>
-            <MapContainer center={center} zoom={14} style={{ height: "100%", width: "100%" }}>
-              <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-              <FlyTo target={center} zoom={16} />
-              <CenterTracker
-                enabled={true}
-                setIsDragging={setIsDragging}
-                onCenter={(p) => setPicked(p)}
-              />
-              <MapClickPick
-                enabled={true}
-                onPick={(p) => {
-                  setCenter([p.lat, p.lng]);
-                  setPicked(p);
-                }}
-              />
-            </MapContainer>
-
-            {/* center pin */}
-            <div className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-[calc(50%+18px)] pointer-events-none ${isDragging ? "opacity-80" : "opacity-100"}`}>
-              <div style={{ width: 70, height: 80 }} dangerouslySetInnerHTML={{ __html: pinSvg() }} />
-            </div>
-
-            {/* locate */}
-            <button
-              type="button"
-              onClick={locateMe}
-              className="absolute right-3 top-3 z-[900] px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10"
-            >
-              Men
-            </button>
-          </div>
-
-          <div className="mt-3 rounded-xl border border-white/10 bg-black/20 p-3">
-            <div className="text-sm opacity-80 mb-1">Tanlangan manzil</div>
-            <div className="text-sm">
-              {addrLoading ? "Manzil aniqlanmoqda..." : (address || "—")}
-            </div>
-            {picked && (
-              <div className="mt-1 text-xs opacity-70 font-mono">
-                {picked.lat.toFixed(6)}, {picked.lng.toFixed(6)}
-              </div>
-            )}
-          </div>
-
-          <div className="mt-3 flex gap-2">
-            <button
-              onClick={onCancel}
-              className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10"
-            >
-              Bekor
-            </button>
-            <button
-              onClick={() => onSave(picked, address)}
-              disabled={!picked}
-              className="flex-1 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50"
-            >
-              Manzilni saqlash
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  return { pos, refresh, loading };
 }
 
-/** ----------------------------- Component ----------------------------- */
 export default function FreightPage() {
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [togglingOnline, setTogglingOnline] = useState(false);
+// Leaflet marker icon fix for Vite/Webpack builds (so marker/pin is visible)
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+});
 
-  const [vehicleId, setVehicleId] = useState(null);
+  const { user } = useAuth();
+  const [mapOpen, setMapOpen] = useState(false);
+  const [manualPos, setManualPos] = useState(null);
+  const [manualAddr, setManualAddr] = useState("");
 
-  const [title, setTitle] = useState("");
-  const [plateNumber, setPlateNumber] = useState("");
-  const [bodyType, setBodyType] = useState("gazel");
-  const [capacityKg, setCapacityKg] = useState("");
-  const [capacityM3, setCapacityM3] = useState("");
-  const [isOnline, setIsOnline] = useState(false);
+  const [tempPos, setTempPos] = useState(null);
+  const [tempAddr, setTempAddr] = useState("");
 
-  const [currentPoint, setCurrentPoint] = useState(null);
-  const [currentAddress, setCurrentAddress] = useState("");
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const effectivePos = manualPos || pos;
 
-  const [error, setError] = useState("");
-  const [info, setInfo] = useState("");
-
-  const mountedRef = useRef(false);
-
-  const clearMsgs = useCallback(() => {
-    setError("");
-    setInfo("");
+  const reverseGeocode = useCallback(async (lat, lng) => {
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(
+        lat
+      )}&lon=${encodeURIComponent(lng)}`;
+      const res = await fetch(url, { headers: { Accept: "application/json" } });
+      if (!res.ok) return "";
+      const data = await res.json();
+      return data?.display_name || "";
+    } catch {
+      return "";
+    }
   }, []);
 
-  const loadVehicle = useCallback(async () => {
-    clearMsgs();
-    setLoading(true);
-
-    try {
-      const { data: authData, error: authErr } = await supabase.auth.getUser();
-      if (authErr) throw authErr;
-      const uid = authData?.user?.id;
-      if (!uid) throw new Error("Login bo‘lmagan: user topilmadi.");
-
-      const { data: vehicles, error: vErr } = await supabase
-        .from("vehicles")
-        .select(
-          "id, driver_id, title, plate_number, body_type, capacity_kg, capacity_m3, is_online, current_point, updated_at"
-        )
-        .eq("driver_id", uid)
-        .order("updated_at", { ascending: false })
-        .limit(1);
-
-      if (vErr) throw vErr;
-
-      const v = vehicles?.[0] || null;
-
-      if (!v) {
-        setVehicleId(null);
-        setIsOnline(false);
-        setCurrentPoint(null);
-        setCurrentAddress("");
-        setLoading(false);
+  useEffect(() => {
+    if (!mapOpen) return;
+    const initial = effectivePos || { lat: 42.4603, lng: 59.6166 }; // Nukus default
+    setTempPos(initial);
+    // show saved address if we already have it, otherwise try reverse geocode
+    (async () => {
+      if (manualAddr) {
+        setTempAddr(manualAddr);
         return;
       }
+      const a = await reverseGeocode(initial.lat, initial.lng);
+      setTempAddr(a);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapOpen]);
 
-      setVehicleId(v.id || null);
-      setTitle(v.title || "");
-      setPlateNumber((v.plate_number || "").toUpperCase().slice(0, 9));
-      setBodyType(v.body_type || "gazel");
-      setCapacityKg(v.capacity_kg != null ? String(v.capacity_kg) : "");
-      setCapacityM3(v.capacity_m3 != null ? String(v.capacity_m3) : "");
-      setIsOnline(!!v.is_online);
+  function PickOnMap({ value, onChange }) {
+    useMapEvents({
+      click(e) {
+        const next = { lat: e.latlng.lat, lng: e.latlng.lng };
+        onChange(next);
+        (async () => {
+          const a = await reverseGeocode(next.lat, next.lng);
+          setTempAddr(a);
+        })();
+      },
+    });
 
-      const p = normalizePoint(v.current_point);
-      setCurrentPoint(p);
+    if (!value) return null;
+    return <Marker position={[value.lat, value.lng]} />;
+  }
+  function PickOnMap({ value, onChange }) {
+    useMapEvents({
+      click(e) {
+        onChange({ lat: e.latlng.lat, lng: e.latlng.lng });
+      },
+    });
 
-      // address ni DBdan ololmaymiz (schema yo‘q) — reverse qilib UI’ga chiqaramiz
-      if (p?.lat != null && p?.lng != null) {
-        const addr = await nominatimReverse(p.lat, p.lng, { swallowErrors: true });
-        setCurrentAddress(addr || "");
-      } else {
-        setCurrentAddress("");
-      }
+    if (!value) return null;
+    return <Marker position={[value.lat, value.lng]} />;
+  }
 
-      setLoading(false);
-    } catch (e) {
-      console.error(e);
-      setLoading(false);
-      setError(e?.message || "Xatolik yuz berdi.");
+
+  const [vehicleId, setVehicleId] = useState(() => {
+    try {
+      return localStorage.getItem("freightVehicleId") || "";
+    } catch {
+      return "";
     }
-  }, [clearMsgs]);
+  });
+  const [vehicle, setVehicle] = useState(null);
 
-  useEffect(() => {
-    mountedRef.current = true;
-    loadVehicle();
-    return () => {
-      mountedRef.current = false;
-    };
-  }, [loadVehicle]);
+  const [title, setTitle] = useState("");
+  const [bodyType, setBodyType] = useState("gazelle");
+  const [plateNumber, setPlateNumber] = useState("");
+  const [capacityKg, setCapacityKg] = useState(1500);
+  const [capacityM3, setCapacityM3] = useState(8);
+
+  const [isOnline, setIsOnline] = useState(false);
+  const { pos, refresh: refreshPos, loading: geoLoading } = useGeo();
+
+  const [feed, setFeed] = useState([]);
+  const [feedLoading, setFeedLoading] = useState(false);
+
+  // Fast matching: realtime refresh (3-4x faster than polling)
+  const rtEnabled = true;
+const [offerOpen, setOfferOpen] = useState(false);
+  const [offerCargo, setOfferCargo] = useState(null);
+  const [offerPrice, setOfferPrice] = useState(0);
+  const [offerEta, setOfferEta] = useState(20);
+  const [offerNote, setOfferNote] = useState("");
+
+  const driverId = user?.id || "";
+
+  const canOperate = useMemo(() => !!driverId, [driverId]);
 
   const saveVehicle = useCallback(async () => {
-    clearMsgs();
-    setSaving(true);
-
+    if (!canOperate) return message.error("Avval haydovchi sifatida tizimga kiring");
+    const hide = message.loading("Mashina saqlanmoqda...", 0);
     try {
-      const { data: authData, error: authErr } = await supabase.auth.getUser();
-      if (authErr) throw authErr;
-      const uid = authData?.user?.id;
-      if (!uid) throw new Error("Login bo‘lmagan: user topilmadi.");
-
-      if (!bodyType) throw new Error("Moshina turini tanlang.");
-      if (!plateNumber.trim()) throw new Error("Davlat raqamini kiriting.");
-
       const payload = {
-        driver_id: uid,
-        title: title?.trim() || null,
-        plate_number: plateNumber?.trim().toUpperCase().slice(0, 9),
-        body_type: bodyType,
-        capacity_kg: capacityKg === "" ? null : Number(capacityKg),
-        capacity_m3: capacityM3 === "" ? null : Number(capacityM3),
-        current_point: pointToDbValue(currentPoint),
-        is_online: !!isOnline,
-        updated_at: new Date().toISOString(),
+        driverId,
+        vehicleId: vehicleId || undefined,
+        title: title || null,
+        bodyType,
+        plateNumber: plateNumber || null,
+        capacityKg: Number(capacityKg || 0),
+        capacityM3: Number(capacityM3 || 0),
       };
-
-      if (vehicleId) {
-        const { error: upErr } = await supabase.from("vehicles").update(payload).eq("id", vehicleId);
-        if (upErr) throw upErr;
-        setInfo("Saqlandi.");
-      } else {
-        const { data: ins, error: insErr } = await supabase
-          .from("vehicles")
-          .insert(payload)
-          .select("id")
-          .limit(1)
-          .single();
-
-        if (insErr) throw insErr;
-
-        setVehicleId(ins?.id || null);
-        setInfo("Yangi mashina yaratildi.");
-      }
+      const res = await upsertVehicle(payload);
+      const v = res?.data?.data || res?.data || res?.data?.vehicle || null;
+      const id = v?.id || res?.data?.id || res?.id;
+      if (!id) throw new Error("Serverdan vehicleId kelmadi");
+      setVehicleId(String(id));
+      setVehicle(v);
+      try {
+        localStorage.setItem("freightVehicleId", String(id));
+      } catch {}
+      message.success("Mashina saqlandi");
     } catch (e) {
-      console.error(e);
-      setError(e?.message || "Saqlashda xato.");
+      message.error("Xatolik: " + (e?.message || ""));
     } finally {
-      if (mountedRef.current) setSaving(false);
+      hide();
     }
-  }, [bodyType, capacityKg, capacityM3, clearMsgs, currentPoint, isOnline, plateNumber, title, vehicleId]);
+  }, [canOperate, driverId, vehicleId, title, bodyType, plateNumber, capacityKg, capacityM3]);
 
   const toggleOnline = useCallback(
     async (next) => {
-      clearMsgs();
-
-      if (next === true) {
-        if (!currentPoint) {
-          setError("Online bo‘lish uchun avval Joylashuvni xaritadan tanlang.");
-          return;
-        }
-        if (!vehicleId) {
-          setError("Online yoqishdan oldin avval 'SAQLASH' qilib mashinani yaratib oling.");
-          return;
-        }
+      if (!vehicleId) {
+        message.error("Avval mashinani saqlang");
+        return;
       }
-
-      setTogglingOnline(true);
-
+      if (next && !effectivePos) {
+        message.error("Online chiqishdan oldin joylashuvni oling");
+        return;
+      }
+      const hide = message.loading(next ? "Online..." : "Offline...", 0);
       try {
-        if (!vehicleId) throw new Error("Vehicle topilmadi. Avval 'SAQLASH' qiling.");
-
-        const { error: upErr } = await supabase
-          .from("vehicles")
-          .update({
-            is_online: !!next,
-            current_updated_at: currentPoint ? new Date().toISOString() : null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", vehicleId);
-
-        if (upErr) throw upErr;
-
-        setIsOnline(!!next);
-        setInfo(next ? "Online yoqildi." : "Offline qilindi.");
+        const res = await setVehicleOnline({
+          vehicleId,
+          isOnline: !!next,
+          current: effectivePos ? { latlng: effectivePos } : null,
+        });
+        const v = res?.data?.data || res?.data || null;
+        setVehicle(v);
+        setIsOnline(!!v?.is_online);
+        message.success(next ? "Online" : "Offline");
       } catch (e) {
-        console.error(e);
-        setError(e?.message || "Online o‘zgartirishda xato.");
+        message.error("Xatolik: " + (e?.message || ""));
       } finally {
-        if (mountedRef.current) setTogglingOnline(false);
+        hide();
       }
     },
-    [clearMsgs, currentPoint, vehicleId]
+    [vehicleId, pos]
   );
 
-  const onlineUiDisabled = useMemo(() => loading || saving || togglingOnline, [loading, saving, togglingOnline]);
 
-  const plateHint = useMemo(() => {
-    const v = plateNumber.trim();
-    if (!v) return "Masalan: 01A123BC (9 ta belgigacha)";
-    if (v.length > 9) return "Davlat raqami 9 ta belgidan oshmasligi kerak.";
-    return "9 ta belgigacha, avtomatik KATTA harf.";
-  }, [plateNumber]);
+  // Heartbeat: online payti joylashuvni muntazam yangilab turamiz (fake online bo‘lmasin)
+  useEffect(() => {
+    if (!vehicleId || !isOnline) return;
+    const stop = startDriverHeartbeat({
+      vehicleId,
+      intervalMs: 20000,
+      getPosition: () =>
+        new Promise((resolve) => {
+          if (!navigator?.geolocation) return resolve(null);
+          navigator.geolocation.getCurrentPosition(
+            (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+            () => resolve(null),
+            { enableHighAccuracy: true, maximumAge: 15000, timeout: 8000 }
+          );
+        }),
+    });
+    return () => stop?.();
+  }, [vehicleId, isOnline]);
+  const refreshFeed = useCallback(async () => {
+    if (!vehicleId) return;
+    setFeedLoading(true);
+    try {
+      const res = await listVehicleCargo({ vehicleId, radiusKm: 30 });
+      const list = res?.data?.data || res?.data || [];
+      setFeed(Array.isArray(list) ? list : []);
+    } catch (e) {
+      message.error(e?.message || "Yuklarni olishda xatolik");
+    } finally {
+      setFeedLoading(false);
+    }
+  }, [vehicleId]);
+
+  useEffect(() => {
+    if (!vehicleId || !isOnline || !rtEnabled) return;
+
+    let alive = true;
+    let t = null;
+    const safeRefresh = () => {
+      if (!alive) return;
+      // simple debounce (many events at once)
+      if (t) clearTimeout(t);
+      t = setTimeout(() => {
+        if (!alive) return;
+        refreshFeed();
+      }, 600);
+    };
+
+    const unsubscribe = subscribeDriverFreight({
+      vehicleId,
+      onChange: safeRefresh,
+    });
+
+    // initial refresh when go online
+    safeRefresh();
+
+    return () => {
+      alive = false;
+      if (t) clearTimeout(t);
+      unsubscribe();
+    };
+  }, [vehicleId, isOnline, rtEnabled, refreshFeed]);
+
+  useEffect(() => {
+    if (!vehicleId) return;
+    const iid = setInterval(() => {
+      // polling fallback (realtime ishlamasa ham), realtime yoq bo'lsa intervalni kamroq ishlatamiz
+      if (isOnline && !rtEnabled) refreshFeed();
+    }, 6000);
+    return () => clearInterval(iid);
+  }, [vehicleId, isOnline, rtEnabled, refreshFeed]);
+
+  const calcQuickPrice = useCallback((wrap) => {
+    const c = wrap?.cargo || wrap;
+    const distKm = Number(wrap?.dist_route_km ?? 0) || 0;
+    const weightKg = Number(c?.weight_kg ?? 0) || 0;
+    // Simple, practical formula (can be tuned later)
+    const baseFee = 30000;
+    const perKm = 4000;
+    const perTon = 15000;
+    const price = baseFee + distKm * perKm + (weightKg / 1000) * perTon;
+    // round to nearest 1000
+    return Math.max(0, Math.round(price / 1000) * 1000);
+  }, []);
+
+  const quickOffer = useCallback(
+    async (cargoWrap) => {
+      const c = cargoWrap?.cargo || cargoWrap;
+      if (!c?.id) return;
+      if (!vehicleId || !driverId) return;
+      const hide = message.loading("Tez taklif yuborilmoqda...", 0);
+      try {
+        const resp = await quickOffer({ cargoId: c.id, vehicleId, driverId, etaMinutes: 20, note: "Tez taklif" });
+        const price = resp?.data?.data?.price ?? resp?.data?.price;
+        message.success(price ? `Taklif yuborildi: ${formatUZS(price)}` : "Taklif yuborildi");
+        // Demand pressure: offer yuborildi -> offers_count++
+        incrementCargoOffers(item?.cargo?.id);
+        refreshFeed();
+      } catch (e) {
+        const msg = String(e?.message || "");
+        if (msg.toLowerCase().includes("duplicate") || msg.toLowerCase().includes("unique")) {
+          message.warning("Bu yuk uchun siz allaqachon taklif yuborgansiz");
+        } else {
+          message.error("Xatolik: " + msg);
+        }
+      } finally {
+        hide();
+      }
+    },
+    [vehicleId, driverId, calcQuickPrice, refreshFeed]
+  );
+
+  const openOffer = useCallback((cargoWrap) => {
+    const c = cargoWrap?.cargo || cargoWrap;
+    // Demand pressure: driver yukni ochdi -> views_count++
+    incrementCargoViews(c?.id);
+    setOfferCargo(c);
+    setOfferPrice(Number(c?.budget || 0) || 0);
+    setOfferEta(20);
+    setOfferNote("");
+    setOfferOpen(true);
+  }, []);
+
+  const sendOffer = useCallback(async () => {
+    if (!offerCargo?.id) return;
+    if (!vehicleId || !driverId) return;
+    const p = Number(offerPrice);
+    if (!Number.isFinite(p) || p <= 0) return message.error("Narx noto‘g‘ri");
+
+    const hide = message.loading("Taklif yuborilmoqda...", 0);
+    try {
+      await createOffer({
+        cargoId: offerCargo.id,
+        vehicleId,
+        driverId,
+        price: p,
+        etaMinutes: Number(offerEta || 0) || null,
+        note: offerNote || null,
+      });
+      message.success("Taklif yuborildi");
+      // Demand pressure: offer yuborildi -> offers_count++
+      incrementCargoOffers(offerCargo.id);
+      setOfferOpen(false);
+      refreshFeed();
+    } catch (e) {
+      message.error("Xatolik: " + (e?.message || ""));
+    } finally {
+      hide();
+    }
+  }, [offerCargo, vehicleId, driverId, offerPrice, offerEta, offerNote, refreshFeed]);
 
   return (
-    <div className="w-full max-w-5xl mx-auto p-4">
-      <div className="flex items-start justify-between gap-3 mb-4">
+    <div style={{ padding: 14, maxWidth: 920, margin: "0 auto" }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
         <div>
-          <div className="text-xl font-semibold">YUK TASHISH (HAYDOVCHI)</div>
-          <div className="text-sm opacity-80">Moshina turini tanlang → joylashuvni xaritadan saqlang → online bo‘ling.</div>
+          <Title level={4} style={{ margin: 0 }}>Yuk tashish (haydovchi)</Title>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Mashinani kiriting → Online bo‘ling → Mos yuklarga taklif yuboring.
+          </Text>
         </div>
-
-        <button
-          type="button"
-          onClick={() => setPickerOpen(true)}
-          disabled={loading}
-          className="px-4 py-2 rounded-lg bg-gray-800 text-white disabled:opacity-50"
-        >
-          Joylashuv
-        </button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <Button icon={<EnvironmentOutlined />} loading={geoLoading} onClick={() => setMapOpen(true)}>Joylashuv</Button>
+          <Button icon={<ReloadOutlined />} onClick={refreshFeed} disabled={!vehicleId} loading={feedLoading} />
+        </div>
       </div>
 
-      {(error || info) && (
-        <div className="mb-4 space-y-2">
-          {error && <div className="px-4 py-3 rounded-lg bg-red-900/40 border border-red-500 text-red-100">{error}</div>}
-          {info && <div className="px-4 py-3 rounded-lg bg-green-900/30 border border-green-500 text-green-100">{info}</div>}
+      {(manualAddr || effectivePos) && (
+        <div style={{ marginTop: 6 }}>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Manzil: {manualAddr ? manualAddr : `${effectivePos.lat.toFixed(5)}, ${effectivePos.lng.toFixed(5)}`}
+          </Text>
         </div>
       )}
 
-      <div className="rounded-2xl border border-white/10 bg-black/40 p-4 mb-4">
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <div className="text-lg font-semibold">Mening yuk mashinam</div>
-
-          <div className="flex items-center gap-3">
-            <div className="text-sm opacity-80">ONLINE</div>
-            <button
-              type="button"
-              disabled={onlineUiDisabled}
-              onClick={() => toggleOnline(!isOnline)}
-              className={[
-                "relative inline-flex h-7 w-14 items-center rounded-full transition",
-                onlineUiDisabled ? "opacity-50" : "",
-                isOnline ? "bg-green-600" : "bg-gray-600",
-              ].join(" ")}
-              title={isOnline ? "Online (o‘chirish)" : "Offline (yoqish)"}
-            >
-              <span
-                className={[
-                  "inline-block h-6 w-6 transform rounded-full bg-white transition",
-                  isOnline ? "translate-x-7" : "translate-x-1",
-                ].join(" ")}
-              />
-            </button>
-          </div>
+      <Modal
+        open={mapOpen}
+        onCancel={() => setMapOpen(false)}
+        footer={null}
+        title="Joylashuvni xaritadan tanlang"
+        destroyOnClose
+      >
+        <div style={{ height: 320, borderRadius: 12, overflow: "hidden" }}>
+          <MapContainer
+            center={[
+              (tempPos || effectivePos || { lat: 42.4603, lng: 59.6166 }).lat,
+              (tempPos || effectivePos || { lat: 42.4603, lng: 59.6166 }).lng,
+            ]}
+            zoom={13}
+            style={{ height: "320px", width: "100%" }}
+          >
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            <PickOnMap value={tempPos} onChange={setTempPos} />
+          </MapContainer>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm opacity-80 mb-1">Nom (ixtiyoriy)</label>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/10 outline-none"
-              placeholder="Masalan: Gazel"
-            />
-          </div>
+        <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
+          <Text type="secondary">
+            {tempAddr ? tempAddr : "Xaritada joyni bosing — belgi (pin) chiqadi."}
+          </Text>
 
-          <div>
-            <label className="block text-sm opacity-80 mb-1">Davlat raqami</label>
-            <input
-              value={plateNumber}
-              onChange={(e) => {
-                const v = (e.target.value || "").toUpperCase().replace(/\s+/g, "");
-                setPlateNumber(v.slice(0, 9));
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <Button
+              onClick={async () => {
+                if (!effectivePos) {
+                  message.warning("Avval joylashuvni yoqing (GPS).");
+                  return;
+                }
+                setTempPos(effectivePos);
+                const a = await reverseGeocode(effectivePos.lat, effectivePos.lng);
+                setTempAddr(a);
               }}
-              maxLength={9}
-              className="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/10 outline-none"
-              placeholder="01A123BC"
-            />
-            <div className="text-xs opacity-70 mt-1">{plateHint}</div>
-          </div>
-
-          <div>
-            <label className="block text-sm opacity-80 mb-1">Turi</label>
-            <select
-              value={bodyType}
-              onChange={(e) => setBodyType(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/10 outline-none"
             >
-              {BODY_TYPES.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-            <div className="text-xs opacity-70 mt-1">Faol yuklar siz tanlagan turga qarab keladi.</div>
+              Hozirgi joy
+            </Button>
+
+            <Button
+              type="primary"
+              disabled={!tempPos}
+              onClick={async () => {
+                if (!tempPos) return;
+                setManualPos(tempPos);
+                const a =
+                  tempAddr || (await reverseGeocode(tempPos.lat, tempPos.lng));
+                setManualAddr(a);
+                setMapOpen(false);
+                message.success("Joylashuv tanlandi");
+              }}
+            >
+              Tanlash
+            </Button>
           </div>
+        </div>
+      </Modal>
 
-          <div>
-            <label className="block text-sm opacity-80 mb-1">Sig‘imi</label>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex items-center gap-2">
-                <input
-                  value={capacityKg}
-                  onChange={(e) => setCapacityKg(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/10 outline-none"
-                  placeholder="1500"
-                  inputMode="numeric"
-                />
-                <div className="text-sm opacity-70">kg</div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  value={capacityM3}
-                  onChange={(e) => setCapacityM3(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/10 outline-none"
-                  placeholder="8.0"
-                  inputMode="decimal"
-                />
-                <div className="text-sm opacity-70">m³</div>
+      <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
+        <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+            <div style={{ fontWeight: 1000 }}>Mening yuk mashinam</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Text type="secondary">Online</Text>
+              <Switch checked={isOnline} onChange={toggleOnline} disabled={!vehicleId || !pos} />
+            </div>
+          </div>
+          <Divider style={{ margin: "10px 0" }} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div>
+              <div style={{ fontWeight: 900, marginBottom: 6 }}>Nom (ixtiyoriy)</div>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Masalan: Gazel" />
+            </div>
+            <div>
+              <div style={{ fontWeight: 900, marginBottom: 6 }}>Davlat raqami</div>
+              <Input value={plateNumber} onChange={(e) => setPlateNumber(e.target.value)} placeholder="01A123BC" />
+            </div>
+            <div>
+              <div style={{ fontWeight: 900, marginBottom: 6 }}>Turi (text)</div>
+              <Input value={bodyType} onChange={(e) => setBodyType(e.target.value)} placeholder="gazelle / fura / ..." />
+            </div>
+            <div>
+              <div style={{ fontWeight: 900, marginBottom: 6 }}>Sig‘imi</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <InputNumber style={{ width: "100%" }} min={0} value={capacityKg} onChange={(v) => setCapacityKg(Number(v || 0))} addonAfter="kg" />
+                <InputNumber style={{ width: "100%" }} min={0} step={0.1} value={capacityM3} onChange={(v) => setCapacityM3(Number(v || 0))} addonAfter="m³" />
               </div>
             </div>
           </div>
-        </div>
-
-        <div className="mt-3 rounded-xl border border-white/10 bg-black/20 p-3">
-          <div className="text-sm opacity-80 mb-1">Joylashuv</div>
-          <div className="text-sm">{currentAddress || "—"}</div>
-          {currentPoint && (
-            <div className="mt-1 text-xs opacity-70 font-mono">
-              {currentPoint.lat.toFixed(6)}, {currentPoint.lng.toFixed(6)}
-            </div>
-          )}
-          {!currentPoint && <div className="mt-1 text-xs text-yellow-300">Online bo‘lish uchun joylashuvni tanlang.</div>}
-          <div className="mt-2">
-            <button
-              type="button"
-              onClick={() => setPickerOpen(true)}
-              className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10"
-            >
-              Xaritadan tanlash
-            </button>
+          <div style={{ marginTop: 12, display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <Button type="primary" onClick={saveVehicle} disabled={!canOperate}>Saqlash</Button>
           </div>
-        </div>
+          <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>
+            Online uchun: joylashuv kerak. Hozir: {pos ? `${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}` : "—"}
+          </div>
+        </Card>
 
-        <div className="mt-4 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={loadVehicle}
-            disabled={loading || saving}
-            className="px-4 py-2 rounded-lg bg-gray-700 text-white disabled:opacity-50"
-          >
-            Yangilash
-          </button>
+        <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+            <div style={{ fontWeight: 1000 }}>Mos yuklar (board)</div>
+            {isOnline ? <Tag color="green">Online</Tag> : <Tag>Offline</Tag>}
+          </div>
+          <div style={{ marginTop: 6, fontSize: 12, opacity: 0.75 }}>
+            Yuklar 30 km radius bo‘yicha saralanadi (current location).
+          </div>
+          <div style={{ marginTop: 8, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <Button size="small" onClick={() => true}>
+            </Button>
+            <span style={{ fontSize: 12, opacity: 0.7 }}>
+              
+            </span>
+          </div>
+          <Divider style={{ margin: "10px 0" }} />
 
-          <button
-            type="button"
-            onClick={saveVehicle}
-            disabled={loading || saving}
-            className="px-4 py-2 rounded-lg bg-blue-600 text-white disabled:opacity-50"
-          >
-            {saving ? "Saqlanmoqda..." : "SAQLASH"}
-          </button>
-        </div>
+          <List
+            loading={feedLoading}
+            dataSource={feed}
+            locale={{ emptyText: "Hozircha mos yuk yo‘q" }}
+            renderItem={(item) => {
+              const c = item.cargo;
+              const quickPrice = calcQuickPrice(item);
+              return (
+                <List.Item
+                  actions={[
+                    <Button key="q" onClick={() => quickOffer(item)} disabled={!isOnline}>
+                      Tez taklif {quickPrice ? `(${formatUZS(quickPrice)})` : ""}
+                    </Button>,
+                    <Button key="offer" icon={<DollarOutlined />} onClick={() => openOffer(item)} disabled={!isOnline}>
+                      Taklif (edit)
+                    </Button>,
+                  ]}
+                >
+                  <List.Item.Meta
+                    title={
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                        <span style={{ fontWeight: 900 }}>{c?.title || "Yuk"}</span>
+                        {c?.budget ? <Tag color="blue">budget: {formatUZS(c.budget)}</Tag> : null}
+                        <Tag>{c?.status}</Tag>
+                      </div>
+                    }
+                    description={
+                      <div style={{ fontSize: 12 }}>
+                        <div style={{ opacity: 0.85 }}>
+                          {c?.weight_kg ? `${c.weight_kg} kg` : ""}{c?.volume_m3 ? ` • ${c.volume_m3} m³` : ""}
+                          {Number.isFinite(item.dist_from_km) ? ` • pickup: ${item.dist_from_km.toFixed(1)} km` : ""}
+                          {Number.isFinite(item.dist_route_km) ? ` • yo‘l: ${Number(item.dist_route_km).toFixed(1)} km` : ""}
+                        </div>
+                        <div style={{ opacity: 0.7 }}>
+                          {c?.from_address ? `📍 ${c.from_address}` : ""}
+                          {c?.to_address ? `  →  ${c.to_address}` : ""}
+                        </div>
+                      </div>
+                    }
+                  />
+                </List.Item>
+              );
+            }}
+          />
+        </Card>
       </div>
 
-      <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-        <div className="flex items-center justify-between gap-3 mb-2">
+      <Modal
+        open={offerOpen}
+        onCancel={() => setOfferOpen(false)}
+        onOk={sendOffer}
+        okText="Yuborish"
+        cancelText="Bekor"
+        title="Taklif yuborish"
+      >
+        <div style={{ display: "grid", gap: 10 }}>
+          <div style={{ fontSize: 12, opacity: 0.75 }}>
+            Yuk: <b>{offerCargo?.title || "-"}</b>
+          </div>
           <div>
-            <div className="text-lg font-semibold">Mos yuklar</div>
-            <div className="text-sm opacity-70">Online bo‘lsangiz va tur tanlangan bo‘lsa — mos yuklar chiqadi.</div>
+            <div style={{ fontWeight: 900, marginBottom: 6 }}>Narx (so‘m)</div>
+            <InputNumber style={{ width: "100%" }} min={0} value={offerPrice} onChange={(v) => setOfferPrice(Number(v || 0))} />
           </div>
-          <div className="text-sm px-3 py-1 rounded-full border border-white/10">{isOnline ? "Online" : "Offline"}</div>
+          <div>
+            <div style={{ fontWeight: 900, marginBottom: 6 }}>Yetib borish (min, ixtiyoriy)</div>
+            <InputNumber style={{ width: "100%" }} min={0} value={offerEta} onChange={(v) => setOfferEta(Number(v || 0))} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 900, marginBottom: 6 }}>Izoh (ixtiyoriy)</div>
+            <Input.TextArea rows={3} value={offerNote} onChange={(e) => setOfferNote(e.target.value)} placeholder="Masalan: 20 daqiqada boraman" />
+          </div>
         </div>
-
-        <div className="text-sm opacity-70 mt-2">
-          {isOnline ? "Online: mos yuklar ko‘rinishi kerak." : "Offline: haydovchi topilmasin (yuklar yashirin)."}
-        </div>
-      </div>
-
-      <LocationPickerModal
-        open={pickerOpen}
-        initialPoint={currentPoint}
-        onCancel={() => setPickerOpen(false)}
-        onSave={async (p, addr) => {
-          setPickerOpen(false);
-          if (!p) return;
-
-          setCurrentPoint(p);
-          setCurrentAddress(addr || "");
-
-          // DBga darrov yozish (vehicle bo‘lsa)
-          try {
-            if (vehicleId) {
-              await supabase
-                .from("vehicles")
-                .update({
-                  current_point: pointToDbValue(p),
-                  current_updated_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString(),
-                })
-                .eq("id", vehicleId);
-            }
-          } catch {
-            // ignore
-          }
-        }}
-      />
+      </Modal>
     </div>
   );
 }
