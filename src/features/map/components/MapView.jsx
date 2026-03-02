@@ -17,6 +17,9 @@ export default function MapView({
   onRouteDistanceMeters,
   isSearching
 }) {
+  // ✅ DEBUG: mount check (remove after testing)
+  console.log("MAP MOUNTED"); // 👈 SHU YER: MapView mount bo‘layotganini tekshiradi
+
   const [routePoints, setRoutePoints] = useState([]);
 
   useEffect(() => {
