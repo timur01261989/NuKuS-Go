@@ -62,18 +62,14 @@ async function handleDriverLocation(req, res) {
   // Primary presence table (used for matching)
   const { error: presenceErr } = await supabaseAdmin
     .from('driver_presence')
-    .upsert(
-      {
+    .upsert({
         driver_id: driverId,
         lat,
         lng,
         is_online: !!isOnline,
-        updated_at: new Date().toISOString(),
-        active_service_type: activeServiceType,
-
-      },
-      { onConflict: 'driver_id' }
-    );
+        updated_at: new Date().toISOString(),,
+        active_service_type: activeServiceType
+      }, { onConflict: 'driver_id' });
 
   if (presenceErr) {
     console.error('[driver-location] driver_presence upsert error:', presenceErr);
@@ -91,8 +87,6 @@ async function handleDriverLocation(req, res) {
         lng,
         updated_at: new Date().toISOString(),
         last_seen_at: new Date().toISOString(),
-        active_service_type: activeServiceType,
-
       },
       { onConflict: 'user_id' }
     );
@@ -124,10 +118,7 @@ async function handleDriverHeartbeat(req, res) {
 
   const { error: driversErr } = await supabaseAdmin
     .from('drivers')
-    .upsert(
-      { user_id: driverId, is_online: !!isOnline, last_seen_at: nowIso, updated_at: nowIso, active_service_type: activeServiceType },
-      { onConflict: 'user_id' }
-    );
+    .upsert({ user_id: driverId, is_online: !!isOnline, last_seen_at: nowIso, updated_at: nowIso, active_service_type: activeServiceType }, { onConflict: 'user_id' });
 
   if (driversErr) {
     console.error('[driver-heartbeat] drivers upsert error:', driversErr);
@@ -136,7 +127,7 @@ async function handleDriverHeartbeat(req, res) {
   const { error: presenceErr } = await supabaseAdmin
     .from('driver_presence')
     .upsert(
-      { driver_id: driverId, is_online: !!isOnline, updated_at: nowIso, active_service_type: activeServiceType },
+      { driver_id: driverId, is_online: !!isOnline, updated_at: nowIso },
       { onConflict: 'driver_id' }
     );
 
@@ -166,10 +157,7 @@ async function handleDriverState(req, res) {
 
   const { error: driversErr } = await supabaseAdmin
     .from('drivers')
-    .upsert(
-      { user_id: driverId, is_online: !!isOnline, updated_at: nowIso, last_seen_at: nowIso, active_service_type: activeServiceType },
-      { onConflict: 'user_id' }
-    );
+    .upsert({ user_id: driverId, is_online: !!isOnline, updated_at: nowIso, last_seen_at: nowIso, active_service_type: activeServiceType }, { onConflict: 'user_id' });
 
   if (driversErr) {
     console.error('[driver-state] drivers upsert error:', driversErr);
@@ -178,9 +166,9 @@ async function handleDriverState(req, res) {
   const { error: presenceErr } = await supabaseAdmin
     .from('driver_presence')
     .upsert(
-      { driver_id: driverId, is_online: !!isOnline, updated_at: nowIso, active_service_type: activeServiceType },
-      { onConflict: 'driver_id' }
-    );
+      { driver_id: driverId, is_online: !!isOnline, updated_at: nowIso,
+        active_service_type: activeServiceType
+      }, { onConflict: 'driver_id' });
 
   if (presenceErr) {
     console.error('[driver-state] driver_presence upsert error:', presenceErr);

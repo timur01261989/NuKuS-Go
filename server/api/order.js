@@ -87,6 +87,7 @@ export default async function handler(req, res) {
     const to_location = body.to_location ?? body.to ?? body.toLocation ?? body.to_address ?? null
     const passenger_id = body.passenger_id ?? body.user_id ?? body.passengerId ?? null
     const price = Number(body.price ?? body.fare ?? 0) || 0
+    const service_type = body.service_type ?? body.serviceType ?? body.service ?? 'taxi'
 
     if (!from_location || !to_location) {
       return safeJson(res, 400, {
@@ -101,12 +102,55 @@ export default async function handler(req, res) {
       global: useAnonWithAuth ? { headers: { Authorization: authHeader } } : undefined
     })
 
+
+
+// Admin client for dispatch (needs SERVICE ROLE). If missing, order still creates but no offers are generated.
+const supabaseAdmin = SERVICE_ROLE
+  ? createClient(SUPABASE_URL, SERVICE_ROLE, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+    })
+  : null
+
+async function dispatchOrderToDrivers(orderRow) {
+  if (!supabaseAdmin) return { skipped: true, reason: 'SERVICE_ROLE missing' }
+
+  const svc = orderRow?.service_type || service_type || 'taxi'
+
+  // Find online drivers that are active in this service.
+  // NOTE: We intentionally keep this simple (no distance calc) to avoid column mismatch risks.
+  const { data: drivers, error: dErr } = await supabaseAdmin
+    .from('driver_presence')
+    .select('driver_id,is_online,active_service_type,updated_at')
+    .eq('is_online', true)
+    .eq('active_service_type', svc)
+    .order('updated_at', { ascending: false })
+    .limit(80)
+
+  if (dErr) return { offers: 0, error: dErr.message }
+
+  const list = Array.isArray(drivers) ? drivers : []
+  if (!list.length) return { offers: 0 }
+
+  const rows = list.map((d) => ({
+    order_id: orderRow.id,
+    driver_id: d.driver_id,
+    status: 'sent',
+    service_type: svc
+  }))
+
+  const { error: oErr } = await supabaseAdmin.from('order_offers').insert(rows)
+  if (oErr) return { offers: 0, error: oErr.message }
+
+  return { offers: rows.length }
+}
+
     const insertPayload = {
       passenger_id,
       from_location,
       to_location,
       price,
-      status: body.status ?? 'pending'
+      status: body.status ?? 'pending',
+      service_type
       // created_at: let DB default handle it if column has default now()
     }
 
@@ -127,7 +171,10 @@ export default async function handler(req, res) {
       })
     }
 
-    return safeJson(res, 200, { success: true, order: data })
+        // Fire-and-forget style (await to keep deterministic response content)
+    const dispatchResult = await dispatchOrderToDrivers(data)
+
+    return safeJson(res, 200, { success: true, order: data, dispatch: dispatchResult })
   } catch (err) {
     return safeJson(res, 500, {
       code: 500,
