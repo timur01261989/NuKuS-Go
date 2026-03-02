@@ -30,12 +30,14 @@ export default async function handler(req, res) {
       const lat = body.lat === undefined ? null : Number(body.lat);
       const lng = body.lng === undefined ? null : Number(body.lng);
       const state = String(body.state || 'online');
+      const activeServiceType = body.active_service_type ?? body.service_type ?? body.service ?? null;
 
       const payload = {
         driver_id,
         last_seen_at: nowIso(),
         is_online: true,
         state,
+        active_service_type: activeServiceType,
         updated_at: nowIso(),
       };
       if (Number.isFinite(lat)) payload.lat = lat;
@@ -44,7 +46,7 @@ export default async function handler(req, res) {
       const { data, error } = await sb
         .from('driver_presence')
         .upsert([payload], { onConflict: 'driver_id' })
-        .select('driver_id,last_seen_at,is_online,state,updated_at,lat,lng')
+        .select('driver_id,last_seen_at,is_online,state,active_service_type,updated_at,lat,lng')
         .single();
       if (error) throw error;
 
@@ -54,13 +56,17 @@ export default async function handler(req, res) {
     if (req.method === 'GET' && (sub === 'online' || sub === '')) {
       const seconds = Number(url.searchParams.get('seconds') || 60);
       const since = new Date(Date.now() - Math.max(5, seconds) * 1000).toISOString();
+      const serviceType = url.searchParams.get('service_type') || url.searchParams.get('service') || url.searchParams.get('active_service_type') || '';
 
-      const { data, error } = await sb
+      let q = sb
         .from('driver_presence')
-        .select('driver_id,last_seen_at,is_online,state,updated_at,lat,lng')
+        .select('driver_id,last_seen_at,is_online,state,active_service_type,updated_at,lat,lng')
         .eq('is_online', true)
-        .gte('last_seen_at', since)
-        .limit(5000);
+        .gte('last_seen_at', since);
+
+      if (serviceType) q = q.eq('active_service_type', serviceType);
+
+      const { data, error } = await q.limit(5000);
       if (error) throw error;
 
       return json(res, 200, { ok: true, online: data || [] });

@@ -57,6 +57,7 @@ async function handleDriverLocation(req, res) {
   const lat = safeNumber(body.lat);
   const lng = safeNumber(body.lng);
   const isOnline = body.is_online ?? body.isOnline ?? body.online ?? true;
+  const activeServiceType = body.active_service_type ?? body.service_type ?? body.service ?? null;
 
   // Primary presence table (used for matching)
   const { error: presenceErr } = await supabaseAdmin
@@ -68,6 +69,8 @@ async function handleDriverLocation(req, res) {
         lng,
         is_online: !!isOnline,
         updated_at: new Date().toISOString(),
+        active_service_type: activeServiceType,
+
       },
       { onConflict: 'driver_id' }
     );
@@ -88,6 +91,8 @@ async function handleDriverLocation(req, res) {
         lng,
         updated_at: new Date().toISOString(),
         last_seen_at: new Date().toISOString(),
+        active_service_type: activeServiceType,
+
       },
       { onConflict: 'user_id' }
     );
@@ -115,11 +120,12 @@ async function handleDriverHeartbeat(req, res) {
 
   // Update last_seen + keep online true unless explicitly offlined
   const isOnline = body.is_online ?? body.isOnline ?? true;
+  const activeServiceType = body.active_service_type ?? body.service_type ?? body.service ?? null;
 
   const { error: driversErr } = await supabaseAdmin
     .from('drivers')
     .upsert(
-      { user_id: driverId, is_online: !!isOnline, last_seen_at: nowIso, updated_at: nowIso },
+      { user_id: driverId, is_online: !!isOnline, last_seen_at: nowIso, updated_at: nowIso, active_service_type: activeServiceType },
       { onConflict: 'user_id' }
     );
 
@@ -130,7 +136,7 @@ async function handleDriverHeartbeat(req, res) {
   const { error: presenceErr } = await supabaseAdmin
     .from('driver_presence')
     .upsert(
-      { driver_id: driverId, is_online: !!isOnline, updated_at: nowIso },
+      { driver_id: driverId, is_online: !!isOnline, updated_at: nowIso, active_service_type: activeServiceType },
       { onConflict: 'driver_id' }
     );
 
@@ -153,6 +159,7 @@ async function handleDriverState(req, res) {
   if (!authCheck.ok) return json(res, authCheck.status, { error: authCheck.error });
 
   const isOnline = body.is_online ?? body.isOnline ?? body.online;
+  const activeServiceType = body.active_service_type ?? body.service_type ?? body.service ?? null;
   if (typeof isOnline === 'undefined') return json(res, 400, { error: 'is_online kerak' });
 
   const nowIso = new Date().toISOString();
@@ -160,7 +167,7 @@ async function handleDriverState(req, res) {
   const { error: driversErr } = await supabaseAdmin
     .from('drivers')
     .upsert(
-      { user_id: driverId, is_online: !!isOnline, updated_at: nowIso, last_seen_at: nowIso },
+      { user_id: driverId, is_online: !!isOnline, updated_at: nowIso, last_seen_at: nowIso, active_service_type: activeServiceType },
       { onConflict: 'user_id' }
     );
 
@@ -171,7 +178,7 @@ async function handleDriverState(req, res) {
   const { error: presenceErr } = await supabaseAdmin
     .from('driver_presence')
     .upsert(
-      { driver_id: driverId, is_online: !!isOnline, updated_at: nowIso },
+      { driver_id: driverId, is_online: !!isOnline, updated_at: nowIso, active_service_type: activeServiceType },
       { onConflict: 'driver_id' }
     );
 
