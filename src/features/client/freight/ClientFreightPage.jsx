@@ -48,6 +48,7 @@ function Inner() {
     selecting,
     setSelecting,
   } = useFreight();
+  const effectiveCargoType = truck?.bodyType || cargoType || null;
 
   const [cargoId, setCargoId] = useState(() => {
     try {
@@ -137,7 +138,7 @@ function Inner() {
         pickup,
         dropoff,
         cargoName,
-        cargoType: (truck?.bodyType || cargoType) || null,
+        effectiveCargoType,
         weightKg,
         volumeM3,
         note,
@@ -171,7 +172,7 @@ function Inner() {
     } finally {
       hide();
     }
-  }, [canPost, user?.id, pickup, dropoff, cargoName, cargoType: (truck?.bodyType || cargoType) || null, weightKg, volumeM3, note, estimatedPrice, loadersEnabled, loadersCount, truck, refresh]);
+  }, [canPost, user?.id, pickup, dropoff, cargoName, effectiveCargoType, weightKg, volumeM3, note, estimatedPrice, loadersEnabled, loadersCount, truck, refresh]);
 
   const doCancel = useCallback(async () => {
     if (!cargoId) return;
