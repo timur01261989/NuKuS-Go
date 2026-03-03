@@ -26,11 +26,7 @@ export default function DriverProfile({ onBack, onLogout }) {
   // ✅ Reyting sahifasi
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
-  useEffect(() => {
-    fetchProfileData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
+  // XATONI TO'G'IRLASH: Funksiya useEffect'dan oldin e'lon qilinishi shart
   const fetchProfileData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -57,6 +53,11 @@ export default function DriverProfile({ onBack, onLogout }) {
       });
     }
   };
+
+  useEffect(() => {
+    fetchProfileData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ✅ Wallet ochilsa
   if (walletOpen) {
