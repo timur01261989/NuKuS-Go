@@ -35,19 +35,19 @@ export default function DevHub() {
         kind: "component",
         title: "ChatModule",
         load: () => import("../features/chat/ChatModule.jsx"),
-      }
-{
-  key: "SupportChatPanel",
-  kind: "component",
-  title: "SupportChatPanel (order-linked chat demo)",
-  load: () => import("../features/admin/SupportChatPanel.jsx"),
-},
-{
-  key: "FraudFlagsPanel",
-  kind: "component",
-  title: "FraudFlagsPanel (flags list)",
-  load: () => import("../features/admin/FraudFlagsPanel.jsx"),
-},
+      },
+      {
+      key: "SupportChatPanel",
+      kind: "component",
+      title: "SupportChatPanel (order-linked chat demo)",
+      load: () => import("../features/admin/SupportChatPanel.jsx"),
+      },
+      {
+      key: "FraudFlagsPanel",
+      kind: "component",
+      title: "FraudFlagsPanel (flags list)",
+      load: () => import("../features/admin/FraudFlagsPanel.jsx"),
+      },
 ,
       {
         key: "AddressAutocomplete",
