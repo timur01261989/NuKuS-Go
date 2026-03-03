@@ -125,6 +125,9 @@ export default function Register() {
             id: data.user.id,
             full_name: `${safeName} ${safeSurname}`,
             phone: formData.fullPhone,
+            // non-breaking additions: store verified phone once and reuse everywhere
+            phone_e164: formData.fullPhone,
+            phone_verified_at: registrationTime,
             role: "client",
             created_at: registrationTime,
             last_login: registrationTime,

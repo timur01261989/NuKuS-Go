@@ -8,6 +8,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 import { supabase } from "@/lib/supabase"; 
+import { getOrderOtherPhone } from "@/services/orderPhonesApi";
 
 // --- MAP ICON FIX ---
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -181,6 +182,26 @@ export default function DriverOrderFeed() {
       }
   };
 
+  // Direct PSTN call (numbers visible): driver calls passenger phone.
+  const callPassenger = async (order) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) {
+        message.error("Iltimos, tizimga qayta kiring");
+        return;
+      }
+      const resp = await getOrderOtherPhone({ order_id: order?.id, requester_id: user.id });
+      const phone = resp?.passenger_phone;
+      if (!phone) {
+        message.error("Yo'lovchi raqami topilmadi");
+        return;
+      }
+      window.location.href = `tel:${phone}`;
+    } catch (e) {
+      message.error("Qo'ng'iroq uchun raqam olinmadi: " + (e?.message || 'xatolik'));
+    }
+  };
+
   // Koordinatalarni parsing qilish
   const parseLocation = (locString) => {
       if (!locString) return null;
@@ -213,7 +234,14 @@ export default function DriverOrderFeed() {
                         <Title level={5} style={{ margin: 0 }}>Mijoz kutyapti</Title>
                         <Text type="secondary">{activeOrder.pickup_location}</Text>
                     </div>
-                    <Button shape="circle" size="large" icon={<PhoneOutlined />} type="primary" style={{ background: '#52c41a' }} />
+                    <Button
+                      shape="circle"
+                      size="large"
+                      icon={<PhoneOutlined />}
+                      type="primary"
+                      style={{ background: '#52c41a' }}
+                      onClick={() => callPassenger(activeOrder)}
+                    />
                 </div>
 
                 {activeOrder.status === 'accepted' && (

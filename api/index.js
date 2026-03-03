@@ -69,7 +69,7 @@ function getRouteKey(path) {
   }
 
   if (base === "order") {
-    const map = { "": "order", status: "order-status" };
+    const map = { "": "order", status: "order-status", phones: "order-phones" };
     return map[sub] || "order";
   }
   if (base === "auth") return "auth";

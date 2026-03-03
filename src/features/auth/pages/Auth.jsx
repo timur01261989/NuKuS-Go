@@ -79,6 +79,27 @@ export default function Auth() {
       });
       if (error) throw error;
 
+      // Non-breaking: ensure verified phone is persisted once in profiles and reused everywhere.
+      // If profiles table/columns don't exist yet, this silently no-ops.
+      try {
+        const { data: u } = await supabase.auth.getUser();
+        const user = u?.user;
+        if (user?.id) {
+          const nowIso = new Date().toISOString();
+          await supabase.from("profiles").upsert([
+            {
+              id: user.id,
+              phone: user.phone || fullPhone,
+              phone_e164: user.phone || fullPhone,
+              phone_verified_at: nowIso,
+              last_login: nowIso,
+            },
+          ]);
+        }
+      } catch (e) {
+        // ignore
+      }
+
       message.success(t?.greeting || "Xush kelibsiz!");
 
       // old behavior: default app_mode="client"

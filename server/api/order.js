@@ -26,7 +26,8 @@ function pickEnv(...names) {
 function setCors(res) {
   // Change * to your domain if you want to lock it down
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  // Additive: allow GET for non-mutating subroutes (e.g., order/phones)
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 }
 
@@ -166,11 +167,104 @@ async function readBody(req) {
   try { return JSON.parse(raw) } catch { return { raw } }
 }
 
+// --- Subroute handler: order/phones ---
+// Purpose: return the other party phone for direct PSTN dialing (numbers visible).
+// Security: best-effort check that requester is part of the order.
+async function handleOrderPhones(req, res, sb) {
+  try {
+    const method = String(req.method || 'GET').toUpperCase()
+    const url = new URL(req.url, 'http://localhost')
+    const qp = Object.fromEntries(url.searchParams.entries())
+    const body = method === 'POST' ? await readBody(req) : {}
+
+    const order_id = body.order_id ?? body.orderId ?? qp.order_id ?? qp.orderId
+    const requester_id = body.requester_id ?? body.user_id ?? body.requesterId ?? qp.requester_id ?? qp.user_id
+
+    if (!order_id || !requester_id) {
+      return safeJson(res, 400, {
+        code: 400,
+        message: 'Missing required fields',
+        details: 'order_id and requester_id are required'
+      })
+    }
+
+    const ord = await sb.from('orders').select('id, passenger_id, driver_id, status').eq('id', order_id).maybeSingle()
+    if (ord.error) {
+      return safeJson(res, 500, { code: 500, message: ord.error.message })
+    }
+    const order = ord.data
+    if (!order) {
+      return safeJson(res, 404, { code: 404, message: 'Order not found' })
+    }
+
+    const rid = String(requester_id)
+    const passenger_id = order.passenger_id ? String(order.passenger_id) : ''
+    const driver_id = order.driver_id ? String(order.driver_id) : ''
+
+    const requesterIsPassenger = passenger_id && rid === passenger_id
+    const requesterIsDriver = driver_id && rid === driver_id
+    if (!requesterIsPassenger && !requesterIsDriver) {
+      return safeJson(res, 403, {
+        code: 403,
+        message: 'Forbidden',
+        details: 'Requester is not a participant of this order'
+      })
+    }
+
+    const otherId = requesterIsDriver ? passenger_id : driver_id
+    if (!otherId) {
+      return safeJson(res, 409, {
+        code: 409,
+        message: 'Other party not assigned yet',
+        details: requesterIsDriver ? 'passenger_id missing' : 'driver_id missing'
+      })
+    }
+
+    // Try profiles first
+    let phone = null
+    try {
+      const p = await sb.from('profiles').select('phone_e164, phone').eq('id', otherId).maybeSingle()
+      if (p?.data) phone = p.data.phone_e164 || p.data.phone || null
+    } catch (_) {}
+
+    // Fallback to drivers table variants (if driver isn't in profiles)
+    if (!phone) {
+      try {
+        const d = await sb.from('drivers').select('phone_e164, phone, phone_number').eq('id', otherId).maybeSingle()
+        if (d?.data) phone = d.data.phone_e164 || d.data.phone || d.data.phone_number || null
+      } catch (_) {}
+    }
+
+    if (!phone) {
+      return safeJson(res, 404, {
+        code: 404,
+        message: 'Phone not found',
+        details: 'No phone field found for the other party'
+      })
+    }
+
+    const payload = requesterIsDriver
+      ? { passenger_phone: phone }
+      : { driver_phone: phone }
+
+    return safeJson(res, 200, { ok: true, order_id: order.id, ...payload })
+  } catch (err) {
+    return safeJson(res, 500, { code: 500, message: String(err?.message || err) })
+  }
+}
+
 export default async function handler(req, res) {
   setCors(res)
 
   if (req.method === 'OPTIONS') return res.end()
-  if (req.method !== 'POST') return safeJson(res, 405, { error: 'Method not allowed' })
+  const routeKey = req.routeKey || ''
+  const isPhonesRoute = routeKey === 'order-phones'
+  if (!['POST', 'GET'].includes(String(req.method || '').toUpperCase())) {
+    return safeJson(res, 405, { error: 'Method not allowed' })
+  }
+  if (!isPhonesRoute && String(req.method || '').toUpperCase() !== 'POST') {
+    return safeJson(res, 405, { error: 'Method not allowed' })
+  }
 
   const SUPABASE_URL = pickEnv('SUPABASE_URL', 'VITE_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL')
   const SERVICE_ROLE = pickEnv('SUPABASE_SERVICE_ROLE_KEY')
@@ -200,6 +294,43 @@ export default async function handler(req, res) {
   }
 
   try {
+    // --- Subroute: /api/order/phones ---
+    if (isPhonesRoute) {
+      const SUPABASE_URL = pickEnv('SUPABASE_URL', 'VITE_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL')
+      const SERVICE_ROLE = pickEnv('SUPABASE_SERVICE_ROLE_KEY')
+      const ANON_KEY = pickEnv('SUPABASE_ANON_KEY', 'VITE_SUPABASE_ANON_KEY', 'NEXT_PUBLIC_SUPABASE_ANON_KEY')
+
+      if (!SUPABASE_URL) {
+        return safeJson(res, 500, {
+          code: 500,
+          message: 'Server misconfigured: SUPABASE_URL is missing',
+        })
+      }
+
+      const authHeader = req.headers.authorization || req.headers.Authorization || ''
+      const useAnonWithAuth = Boolean(authHeader && authHeader.toLowerCase().startsWith('bearer '))
+      const supabaseKey = useAnonWithAuth ? ANON_KEY : (SERVICE_ROLE || ANON_KEY)
+      if (!supabaseKey) {
+        return safeJson(res, 500, {
+          code: 500,
+          message: 'Server misconfigured: no Supabase key found',
+        })
+      }
+
+      const supabase = createClient(SUPABASE_URL, supabaseKey, {
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+        global: useAnonWithAuth ? { headers: { Authorization: authHeader } } : undefined
+      })
+
+      const supabaseAdmin = SERVICE_ROLE
+        ? createClient(SUPABASE_URL, SERVICE_ROLE, {
+            auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+          })
+        : null
+
+      return await handleOrderPhones(req, res, supabaseAdmin || supabase)
+    }
+
     const body = await readBody(req)
 
     // Map fields from your client (keep both old/new names)

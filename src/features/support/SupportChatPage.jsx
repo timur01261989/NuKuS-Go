@@ -3,8 +3,6 @@ import { Button, Card, Input, List, Space, Typography, Alert, Tag } from "antd";
 import { useLocation, useParams } from "react-router-dom";
 import { createOrFindSupportThread, getSupportThread, sendSupportMessage } from "../../services/supportApi";
 import { supabase } from "../../lib/supabase";
-import VoipCallModal from "../voip/VoipCallModal.jsx";
-import { startVoipCall } from "../../services/voipApi.js";
 
 const { Title, Text } = Typography;
 
@@ -18,11 +16,10 @@ const { Title, Text } = Typography;
  * - Uses current Supabase auth user.
  * - Server-side support API uses SERVICE_ROLE, so no RLS headaches.
  */
-export default function SupportChatPage({ orderId: orderIdProp }) {
+export default function SupportChatPage({ role, orderId: orderIdProp }) {
   const { orderId: orderIdParam } = useParams();
   const orderId = orderIdProp || orderIdParam;
   const location = useLocation();
-  const role = location.pathname.startsWith("/driver") ? "driver" : "client";
   const qp = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const initialThreadId = qp.get("thread");
 
@@ -94,26 +91,7 @@ export default function SupportChatPage({ orderId: orderIdProp }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me, orderId]);
 
-async function handleStartCall() {
-  try {
-    setVoipSession(null);
-    const session = await startVoipCall({
-      order_id: orderId || null,
-      caller_role: role,
-      caller_id: me?.id || null,
-      callee_role: role === "driver" ? "client" : "driver",
-      callee_id: null,
-      provider: "agora",
-    });
-    setVoipSession(session);
-    setVoipOpen(true);
-  } catch (e) {
-    setVoipSession({ ok: false, provider: "agora", error: e?.message || String(e) });
-    setVoipOpen(true);
-  }
-}
-
-async function onSend() {
+  async function onSend() {
     const text = msg.trim();
     if (!text || !me) return;
     setErr("");
@@ -207,9 +185,6 @@ async function onSend() {
               onPressEnter={onSend}
               disabled={loading}
             />
-            <Button onClick={handleStartCall} disabled={!orderId}>
-              Call
-            </Button>
             <Button type="primary" onClick={onSend} loading={loading}>
               Yuborish
             </Button>
@@ -218,12 +193,7 @@ async function onSend() {
             </Button>
           </Space.Compact>
         </Card>
-          </Space>
-      <VoipCallModal
-        open={voipOpen}
-        onClose={() => setVoipOpen(false)}
-        session={voipSession}
-      />
+      </Space>
     </div>
   );
 }
