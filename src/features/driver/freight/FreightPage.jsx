@@ -52,6 +52,10 @@ L.Icon.Default.mergeOptions({
 });
 
   const { user } = useAuth();
+  
+  // XATONI TO'G'IRLASH: useGeo() va uning ichidagi pos o'zgaruvchisini yuqoriga olib chiqdik
+  const { pos, refresh: refreshPos, loading: geoLoading } = useGeo();
+
   const [mapOpen, setMapOpen] = useState(false);
   const [manualPos, setManualPos] = useState(null);
   const [manualAddr, setManualAddr] = useState("");
@@ -59,6 +63,7 @@ L.Icon.Default.mergeOptions({
   const [tempPos, setTempPos] = useState(null);
   const [tempAddr, setTempAddr] = useState("");
 
+  // Endi pos e'lon qilinganidan keyin bemalol ishlatilishi mumkin
   const effectivePos = manualPos || pos;
 
   const reverseGeocode = useCallback(async (lat, lng) => {
@@ -107,7 +112,6 @@ L.Icon.Default.mergeOptions({
     return <Marker position={[value.lat, value.lng]} />;
   }
 
-
   const [vehicleId, setVehicleId] = useState(() => {
     try {
       return localStorage.getItem("freightVehicleId") || "";
@@ -124,14 +128,13 @@ L.Icon.Default.mergeOptions({
   const [capacityM3, setCapacityM3] = useState(8);
 
   const [isOnline, setIsOnline] = useState(false);
-  const { pos, refresh: refreshPos, loading: geoLoading } = useGeo();
 
   const [feed, setFeed] = useState([]);
   const [feedLoading, setFeedLoading] = useState(false);
 
   // Fast matching: realtime refresh (3-4x faster than polling)
   const rtEnabled = true;
-const [offerOpen, setOfferOpen] = useState(false);
+  const [offerOpen, setOfferOpen] = useState(false);
   const [offerCargo, setOfferCargo] = useState(null);
   const [offerPrice, setOfferPrice] = useState(0);
   const [offerEta, setOfferEta] = useState(20);
@@ -198,9 +201,8 @@ const [offerOpen, setOfferOpen] = useState(false);
         hide();
       }
     },
-    [vehicleId, pos]
+    [vehicleId, effectivePos]
   );
-
 
   // Heartbeat: online payti joylashuvni muntazam yangilab turamiz (fake online bo‘lmasin)
   useEffect(() => {
@@ -220,6 +222,7 @@ const [offerOpen, setOfferOpen] = useState(false);
     });
     return () => stop?.();
   }, [vehicleId, isOnline]);
+  
   const refreshFeed = useCallback(async () => {
     if (!vehicleId) return;
     setFeedLoading(true);
@@ -296,8 +299,8 @@ const [offerOpen, setOfferOpen] = useState(false);
         const resp = await quickOffer({ cargoId: c.id, vehicleId, driverId, etaMinutes: 20, note: "Tez taklif" });
         const price = resp?.data?.data?.price ?? resp?.data?.price;
         message.success(price ? `Taklif yuborildi: ${formatUZS(price)}` : "Taklif yuborildi");
-        // Demand pressure: offer yuborildi -> offers_count++
-        incrementCargoOffers(item?.cargo?.id);
+        // XATONI TO'G'IRLASH: item degan o'zgaruvchi yo'q edi, c.id qilib to'g'irladim
+        incrementCargoOffers(c.id);
         refreshFeed();
       } catch (e) {
         const msg = String(e?.message || "");
