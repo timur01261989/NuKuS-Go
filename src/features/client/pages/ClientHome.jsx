@@ -155,18 +155,21 @@ export default function ClientHome() {
             <span className="text-primaryHome text-sm font-medium">Hammasi</span>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <ServiceCard
-              icon="map"
-              label={t?.interProv || "Viloyatlar aro"}
-              onMouseEnter={{prefetch.intercity}}
-                  onTouchStart={{prefetch.intercity}}
-                  onClick={() => navigate("/client/inter-provincial")} />
-            <ServiceCard
-              icon="distance"
-              label={t?.interDistrict || "Tumanlar aro"}
-              onMouseEnter={{prefetch.interDistrict}}
-                  onTouchStart={{prefetch.interDistrict}}
-                  onClick={() => navigate("/client/inter-district")} />
+  <ServiceCard
+    icon="map"
+    label={t?.interProv || "Viloyatlar aro"}
+    onMouseEnter={prefetch.intercity}
+    onTouchStart={prefetch.intercity}
+    onClick={() => navigate("/client/inter-provincial")} 
+  />
+  <ServiceCard
+    icon="distance"
+    label={t?.interDistrict || "Tumanlar aro"}
+    onMouseEnter={prefetch.interDistrict}
+    onTouchStart={prefetch.interDistrict}
+    onClick={() => navigate("/client/inter-district")} 
+  />
+</div>
             <ServiceCard
               icon="local_shipping"
               label={t?.freight || "Yuk tashish"}
