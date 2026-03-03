@@ -137,9 +137,10 @@ export default function ClientHome() {
                 <button
                   type="button"
                   className="bg-primaryHome hover:bg-primaryHome/90 text-backgroundDark font-bold py-2 px-6 rounded-lg transition-transform active:scale-95 shadow-lg"
-                  onMouseEnter={{prefetch.taxi}}
-                  onTouchStart={{prefetch.taxi}}
-                  onClick={() => navigate("/client/taxi")} >
+                  onMouseEnter={prefetch.taxi}
+                  onTouchStart={prefetch.taxi}
+                  onClick={() => navigate("/client/taxi")}
+                >
                   Buyurtma berish
                 </button>
               </div>
