@@ -160,28 +160,28 @@ export default function ClientHome() {
               label={t?.interProv || "Viloyatlar aro"}
               onMouseEnter={prefetch.intercity}
               onTouchStart={prefetch.intercity}
-              onClick={() => navigate("/client/inter-provincial")}
+              onClick={() => navigate("/client/inter-provincial")} 
             />
             <ServiceCard
               icon="distance"
               label={t?.interDistrict || "Tumanlar aro"}
               onMouseEnter={prefetch.interDistrict}
               onTouchStart={prefetch.interDistrict}
-              onClick={() => navigate("/client/inter-district")}
+              onClick={() => navigate("/client/inter-district")} 
             />
             <ServiceCard
               icon="local_shipping"
               label={t?.freight || "Yuk tashish"}
               onMouseEnter={prefetch.freight}
               onTouchStart={prefetch.freight}
-              onClick={() => navigate("/client/freight")}
+              onClick={() => navigate("/client/freight")} 
             />
             <ServiceCard
               icon="package_2"
               label={t?.delivery || "Eltish xizmati"}
               onMouseEnter={prefetch.delivery}
               onTouchStart={prefetch.delivery}
-              onClick={() => navigate("/client/delivery")}
+              onClick={() => navigate("/client/delivery")} 
             />
           </div>
         </section>
