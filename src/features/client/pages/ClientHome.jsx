@@ -155,35 +155,34 @@ export default function ClientHome() {
             <span className="text-primaryHome text-sm font-medium">Hammasi</span>
           </div>
           <div className="grid grid-cols-2 gap-4">
-  <ServiceCard
-    icon="map"
-    label={t?.interProv || "Viloyatlar aro"}
-    onMouseEnter={prefetch.intercity}
-    onTouchStart={prefetch.intercity}
-    onClick={() => navigate("/client/inter-provincial")} 
-  />
-  <ServiceCard
-    icon="distance"
-    label={t?.interDistrict || "Tumanlar aro"}
-    onMouseEnter={prefetch.interDistrict}
-    onTouchStart={prefetch.interDistrict}
-    onClick={() => navigate("/client/inter-district")} 
-  />
-</div>
             <ServiceCard
-  icon="local_shipping"
-  label={t?.freight || "Yuk tashish"}
-  onMouseEnter={prefetch.freight}
-  onTouchStart={prefetch.freight}
-  onClick={() => navigate("/client/freight")} 
-/>
-<ServiceCard
-  icon="package_2"
-  label={t?.delivery || "Eltish xizmati"}
-  onMouseEnter={prefetch.delivery}
-  onTouchStart={prefetch.delivery}
-  onClick={() => navigate("/client/delivery")} 
-/>
+              icon="map"
+              label={t?.interProv || "Viloyatlar aro"}
+              onMouseEnter={prefetch.intercity}
+              onTouchStart={prefetch.intercity}
+              onClick={() => navigate("/client/inter-provincial")}
+            />
+            <ServiceCard
+              icon="distance"
+              label={t?.interDistrict || "Tumanlar aro"}
+              onMouseEnter={prefetch.interDistrict}
+              onTouchStart={prefetch.interDistrict}
+              onClick={() => navigate("/client/inter-district")}
+            />
+            <ServiceCard
+              icon="local_shipping"
+              label={t?.freight || "Yuk tashish"}
+              onMouseEnter={prefetch.freight}
+              onTouchStart={prefetch.freight}
+              onClick={() => navigate("/client/freight")}
+            />
+            <ServiceCard
+              icon="package_2"
+              label={t?.delivery || "Eltish xizmati"}
+              onMouseEnter={prefetch.delivery}
+              onTouchStart={prefetch.delivery}
+              onClick={() => navigate("/client/delivery")}
+            />
           </div>
         </section>
 
@@ -266,11 +265,13 @@ export default function ClientHome() {
   );
 }
 
-function ServiceCard({ icon, label, onClick }) {
+function ServiceCard({ icon, label, onClick, onMouseEnter, onTouchStart }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      onTouchStart={onTouchStart}
       className="neumorphic-dark p-4 rounded-2xl flex flex-col items-center text-center gap-3 active:scale-95 transition-all"
     >
       <div className="bg-primaryHome/10 p-3 rounded-xl text-primaryHome">
