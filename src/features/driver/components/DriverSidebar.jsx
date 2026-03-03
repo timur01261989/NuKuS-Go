@@ -63,6 +63,7 @@ export default function DriverSidebar({ open, onClose, onLogout }) {
               <MenuItem icon="settings" title="Sozlamalar" onClick={() => go("/driver/settings")} />
               <MenuItem icon="confirmation_number" title="Promokodlar" onClick={() => go("/driver/promo")} />
               <MenuItem icon="help" title="Qo'llanma" onClick={() => go("/driver/guide")} />
+              <MenuItem icon="insights" title="Insights" onClick={() => go("/driver/insights")} />
             </div>
           </div>
 

@@ -54,6 +54,7 @@ export async function driver_ping_handler(req, res) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
 
     const driver_id = normalizeDriverId(body);
+    const active_service_type = body.active_service_type ?? body.activeServiceType ?? body.service_type ?? body.serviceType ?? body.service ?? null;
     const lat = Number(body.lat);
     const lng = Number(body.lng);
     const bearing = body.bearing === undefined ? null : Number(body.bearing);
@@ -69,10 +70,15 @@ export async function driver_ping_handler(req, res) {
     const sb = getSupabaseAdmin();
 
     // update presence
-    const { error: pe } = await sb
-      .from('driver_presence')
-      .upsert([{ driver_id, driver_id, is_online, lat, lng, bearing, updated_at: nowIso() }], { onConflict: 'driver_id' });
-    if (pe) throw pe;
+    const presencePayload = { driver_id, is_online, lat, lng, bearing, updated_at: nowIso() };
+    if (active_service_type) presencePayload.active_service_type = String(active_service_type);
+
+    // NOTE: keep backwards-compatible if DB doesn't yet have active_service_type column.
+    let peRes = await sb.from('driver_presence').upsert([presencePayload], { onConflict: 'driver_id' });
+    if (peRes.error && String(peRes.error.message || '').includes('active_service_type')) {
+      peRes = await sb.from('driver_presence').upsert([{ driver_id, is_online, lat, lng, bearing, updated_at: nowIso() }], { onConflict: 'driver_id' });
+    }
+    if (peRes.error) throw peRes.error;
 
     // check for active offers
     const now = nowIso();

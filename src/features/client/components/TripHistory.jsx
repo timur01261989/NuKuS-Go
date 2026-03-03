@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { List, Card, Typography, Tag, Button, Skeleton, Empty } from 'antd';
 import { 
   ArrowLeftOutlined, EnvironmentOutlined, 
-  ClockCircleOutlined, CarOutlined 
+  ClockCircleOutlined, CarOutlined, CustomerServiceOutlined 
 } from '@ant-design/icons';
 import { supabase } from '@/lib/supabase';
 
@@ -80,7 +80,18 @@ export default function TripHistory({ onBack }) {
               <div style={{ marginTop: 15, paddingTop: 10, borderTop: '1px solid #f0f0f0', display: 'flex', alignItems: 'center' }}>
                 <CarOutlined style={{ marginRight: 8, color: '#888' }} />
                 <Text type="secondary" style={{ fontSize: 13 }}>Taksi xizmati</Text>
+              
+              <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+                <Button
+                  type="default"
+                  icon={<CustomerServiceOutlined />}
+                  style={{ borderRadius: 12, flex: 1 }}
+                  onClick={() => { window.location.href = `/client/support/${trip.id}`; }}
+                >
+                  Support
+                </Button>
               </div>
+</div>
             </Card>
           )}
         />

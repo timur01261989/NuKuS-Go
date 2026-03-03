@@ -40,6 +40,8 @@ const ClientDelivery = lazy(() => import("@features/client/delivery/DeliveryPage
 // --- DRIVER ---
 const DriverOrders = lazy(() => import("@features/driver/pages/DriverOrders"));
 const DriverDashboard = lazy(() => import("@features/driver/pages/DriverDashboard"));
+const DriverInsights = lazy(() => import("@features/driver/pages/DriverInsights"));
+const SupportChatPage = lazy(() => import("./features/support/SupportChatPage"));
 const DriverWalletPage = lazy(() => import("@features/driver/pages/DriverWalletPage"));
 const DriverProfilePage = lazy(() => import("@features/driver/pages/DriverProfilePage"));
 const DriverRegister = lazy(() => import("@features/driver/components/DriverRegister"));
@@ -158,7 +160,15 @@ export default function App() {
               <Route path="/settings" element={<Settings />} />
               <Route path="/support" element={<Support />} />
 
-                            {/* --- DRIVER (PROTECTED) --- */}
+              <Route
+  path="/client/support/:orderId"
+  element={
+    <RoleGate allow={{ client: true, driver: true }}>
+      <SupportChatPage role="client" />
+    </RoleGate>
+  }
+/>
+              {/* --- DRIVER (PROTECTED) --- */}
               <Route path="/driver" element={<Navigate to="/driver/dashboard" replace />} />
               {/* eski menyuda /driver/home ishlatilgan */}
               <Route path="/driver/home" element={<Navigate to="/driver/dashboard" replace />} />
@@ -191,7 +201,24 @@ export default function App() {
                 }
               />
               <Route
-                path="/driver/orders"
+  path="/driver/insights"
+  element={
+    <RoleGate allow={{ client: false, driver: true, requireDriverApproved: true }}>
+      <DriverInsights />
+    </RoleGate>
+  }
+/>
+<Route
+  path="/driver/support/:orderId"
+  element={
+    <RoleGate allow={{ client: false, driver: true, requireDriverApproved: true }}>
+      <SupportChatPage role="driver" />
+    </RoleGate>
+  }
+/>
+
+<Route
+  path="/driver/orders"
                 element={
                   <RoleGate allow={{ client: false, driver: true, requireDriverApproved: true }}>
                     <DriverOrders />

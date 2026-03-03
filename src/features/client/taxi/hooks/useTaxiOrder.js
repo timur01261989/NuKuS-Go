@@ -472,7 +472,10 @@ export function useTaxiOrder() {
       const payloadBase = {
         status: "searching",
         price: Math.round(totalPrice),
-        service_type: tariff.id,
+        // Stage-3: server pricing (final price computed server-side, client price is only an estimate)
+        use_server_pricing: true,
+        service_type: "taxi",
+        tariff_id: tariff.id,
         pickup_location: pickup.address || "Yo'lovchini olish nuqtasi",
         dropoff_location: dest.address || "",
         from_lat: pickup.latlng[0],
@@ -480,6 +483,7 @@ export function useTaxiOrder() {
         to_lat: dest.latlng ? dest.latlng[0] : null,
         to_lng: dest.latlng ? dest.latlng[1] : null,
         distance_km: dest.latlng ? (distanceKm || haversineKm(pickup.latlng, dest.latlng)) : 0,
+        duration_min: dest.latlng ? Math.max(1, Math.round(((distanceKm || haversineKm(pickup.latlng, dest.latlng)) || 0) * 2)) : 0,
         waypoints: waypoints.map((w) => ({
           lat: w.latlng?.[0],
           lng: w.latlng?.[1],

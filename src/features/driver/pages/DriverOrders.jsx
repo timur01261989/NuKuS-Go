@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Card, List, Button, Tag, Typography, message, Empty, Skeleton } from "antd";
 import { 
-  CheckOutlined, EnvironmentOutlined, PhoneOutlined 
+  CheckOutlined, EnvironmentOutlined, PhoneOutlined, CustomerServiceOutlined 
 } from "@ant-design/icons";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -281,6 +281,15 @@ export default function DriverOrderFeed() {
               >
                   QABUL QILISH
               </Button>
+
+              <Button
+                  type="default" block size="large" icon={<CustomerServiceOutlined />}
+                  style={{ marginTop: 10, borderRadius: 12, height: 45 }}
+                  onClick={() => { window.location.href = `/driver/support/${item.id}`; }}
+              >
+                  SUPPORT
+              </Button>
+
             </Card>
           )}
         />

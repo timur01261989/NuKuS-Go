@@ -25,6 +25,7 @@ export default async function handler(req, res) {
     if (req.method === 'POST' && (sub === 'heartbeat' || sub === 'ping' || sub === '')) {
       const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
       const driver_id = String(body.driver_id || body.driver_id || '').trim();
+      const active_service_type = body.active_service_type ?? body.activeServiceType ?? body.service_type ?? body.serviceType ?? null;
       if (!driver_id) return badRequest(res, 'driver_id required');
 
       const lat = body.lat === undefined ? null : Number(body.lat);

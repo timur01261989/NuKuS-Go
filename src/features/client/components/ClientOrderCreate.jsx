@@ -659,7 +659,10 @@ if (st === "searching" && !driver) {
         action: "create",
         status: "searching",
         price: Math.round(totalPrice),
-        service_type: tariff.id,
+        // Stage-3: server pricing (final price computed server-side, client price is only an estimate)
+        use_server_pricing: true,
+        service_type: "taxi",
+        tariff_id: tariff.id,
         pickup_location: pickup.address || "Pickup",
         dropoff_location: dest.address || null,
         from_lat: pickup.latlng[0],
@@ -667,6 +670,7 @@ if (st === "searching" && !driver) {
         to_lat: dest.latlng ? dest.latlng[0] : null,
         to_lng: dest.latlng ? dest.latlng[1] : null,
         distance_km: distanceKm || approxDistanceKm || 0,
+        duration_min: durationMin ? Math.round(durationMin) : (distanceKm || approxDistanceKm) ? Math.max(1, Math.round(((distanceKm || approxDistanceKm) || 0) * 2)) : 0,
       };
 
       const res = await api.post("/api/order", payload);

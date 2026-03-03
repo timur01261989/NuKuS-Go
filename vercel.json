@@ -3,20 +3,34 @@
   "buildCommand": "npm run build",
   "installCommand": "npm install",
   "outputDirectory": "dist",
-
   "functions": {
     "api/index.js": {
       "memory": 512,
       "maxDuration": 30
     }
   },
-
   "rewrites": [
-    { "source": "/api/:path*", "destination": "/api/index.js?path=:path*" },
-
-    { "source": "/manifest.webmanifest", "destination": "/manifest.webmanifest" },
-    { "source": "/sw.js", "destination": "/sw.js" },
-
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/api/:path*",
+      "destination": "/api/index.js?path=:path*"
+    },
+    {
+      "source": "/manifest.webmanifest",
+      "destination": "/manifest.webmanifest"
+    },
+    {
+      "source": "/sw.js",
+      "destination": "/sw.js"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron_heatmap",
+      "schedule": "*/5 * * * *"
+    }
   ]
 }

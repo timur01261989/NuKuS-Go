@@ -60,16 +60,31 @@ async function handleDriverLocation(req, res) {
   const activeServiceType = body.active_service_type ?? body.service_type ?? body.service ?? null;
 
   // Primary presence table (used for matching)
-  const { error: presenceErr } = await supabaseAdmin
+    const presencePayload = {
+    driver_id: driverId,
+    is_online: !!isOnline,
+    updated_at: nowIso,
+  };
+  if (lat !== null) presencePayload.lat = lat;
+  if (lng !== null) presencePayload.lng = lng;
+  if (activeServiceType) presencePayload.active_service_type = String(activeServiceType);
+
+  // Backwards-compatible upsert: if columns aren't migrated yet, retry without them.
+  let presenceRes = await supabaseAdmin
     .from('driver_presence')
-    .upsert({
-        driver_id: driverId,
-        lat,
-        lng,
-        is_online: !!isOnline,
-        updated_at: new Date().toISOString(),,
-        active_service_type: activeServiceType
-      }, { onConflict: 'driver_id' });
+    .upsert(presencePayload, { onConflict: 'driver_id' });
+
+  if (presenceRes.error && String(presenceRes.error.message || '').includes('active_service_type')) {
+    const fb = { ...presencePayload };
+    delete fb.active_service_type;
+    presenceRes = await supabaseAdmin.from('driver_presence').upsert(fb, { onConflict: 'driver_id' });
+  }
+  if (presenceRes.error && (String(presenceRes.error.message || '').includes('lat') || String(presenceRes.error.message || '').includes('lng'))) {
+    const fb2 = { driver_id: driverId, is_online: !!isOnline, updated_at: nowIso };
+    presenceRes = await supabaseAdmin.from('driver_presence').upsert(fb2, { onConflict: 'driver_id' });
+  }
+
+  const presenceErr = presenceRes.error;
 
   if (presenceErr) {
     console.error('[driver-location] driver_presence upsert error:', presenceErr);

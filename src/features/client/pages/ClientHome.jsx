@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { prefetch } from "@/lib/prefetch";
 import { supabase } from "@/lib/supabase";
 import { listMarketCars, formatPriceUZS } from "@services/marketService";
 import { useLanguage } from "@shared/i18n/useLanguage";
@@ -136,8 +137,9 @@ export default function ClientHome() {
                 <button
                   type="button"
                   className="bg-primaryHome hover:bg-primaryHome/90 text-backgroundDark font-bold py-2 px-6 rounded-lg transition-transform active:scale-95 shadow-lg"
-                  onClick={() => navigate("/client/taxi")}
-                >
+                  onMouseEnter={{prefetch.taxi}}
+                  onTouchStart={{prefetch.taxi}}
+                  onClick={() => navigate("/client/taxi")} >
                   Buyurtma berish
                 </button>
               </div>
@@ -155,23 +157,27 @@ export default function ClientHome() {
             <ServiceCard
               icon="map"
               label={t?.interProv || "Viloyatlar aro"}
-              onClick={() => navigate("/client/inter-provincial")}
-            />
+              onMouseEnter={{prefetch.intercity}}
+                  onTouchStart={{prefetch.intercity}}
+                  onClick={() => navigate("/client/inter-provincial")} />
             <ServiceCard
               icon="distance"
               label={t?.interDistrict || "Tumanlar aro"}
-              onClick={() => navigate("/client/inter-district")}
-            />
+              onMouseEnter={{prefetch.interDistrict}}
+                  onTouchStart={{prefetch.interDistrict}}
+                  onClick={() => navigate("/client/inter-district")} />
             <ServiceCard
               icon="local_shipping"
               label={t?.freight || "Yuk tashish"}
-              onClick={() => navigate("/client/freight")}
-            />
+              onMouseEnter={{prefetch.freight}}
+                  onTouchStart={{prefetch.freight}}
+                  onClick={() => navigate("/client/freight")} />
             <ServiceCard
               icon="package_2"
               label={t?.delivery || "Eltish xizmati"}
-              onClick={() => navigate("/client/delivery")}
-            />
+              onMouseEnter={{prefetch.delivery}}
+                  onTouchStart={{prefetch.delivery}}
+                  onClick={() => navigate("/client/delivery")} />
           </div>
         </section>
 

@@ -20,8 +20,9 @@ export function makeChunkPrefetcher(loader) {
  *  onMouseEnter={prefetchTaxi}
  */
 export const prefetch = {
-  taxi: makeChunkPrefetcher(() => import("../pages/client/taxi/TaxiPage.jsx")),
-  freight: makeChunkPrefetcher(() => import("../pages/client/freight/FreightPage.jsx")),
-  intercity: makeChunkPrefetcher(() => import("../pages/client/inter-provincial/InterProvincialPage.jsx")),
-  delivery: makeChunkPrefetcher(() => import("../pages/client/delivery/DeliveryPage.jsx")),
+  taxi: makeChunkPrefetcher(() => import("../features/client/taxi/ClientTaxiPage.jsx")),
+  freight: makeChunkPrefetcher(() => import("../features/client/freight/ClientFreightPage.jsx")),
+  intercity: makeChunkPrefetcher(() => import("../features/client/intercity/ClientIntercityPage.jsx")),
+  interDistrict: makeChunkPrefetcher(() => import("../features/client/interDistrict/ClientInterDistrictPage.jsx")),
+  delivery: makeChunkPrefetcher(() => import("../features/client/delivery/DeliveryPage.jsx")),
 };

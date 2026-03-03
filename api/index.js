@@ -9,6 +9,7 @@
  */
 
 import orderHandler from "../server/api/order.js";
+import orderStatusHandler from "../server/api/order_status.js";
 import authHandler from "../server/api/auth.js";
 import driverHandler from "../server/api/driver.js";
 import dispatchHandler from "../server/api/dispatch.js";
@@ -21,6 +22,10 @@ import notificationsHandler from "../server/api/notifications.js";
 import gamificationHandler from "../server/api/gamification.js";
 import pricingHandler from "../server/api/pricing.js";
 import freightHandler from "../server/api/freight.js";
+import cronHeatmapHandler from "../server/api/cron_heatmap.js";
+import fraudHandler from "../server/api/fraud.js";
+import supportHandler from "../server/api/support.js";
+import voipHandler from "../server/api/voip.js";
 
 function normalizePath(rawPath) {
   // Supports both direct path (/api/order) and rewritten query (?path=order)
@@ -63,10 +68,22 @@ function getRouteKey(path) {
     return map[sub] || "dispatch";
   }
 
-  if (base === "order") return "order";
+  if (base === "order") {
+    const map = { "": "order", status: "order-status" };
+    return map[sub] || "order";
+  }
   if (base === "auth") return "auth";
   if (base === "offer") return "offer";
   if (base === "wallet") return "wallet";
+  if (base === "support") {
+    const map = { "": "support", thread: "support-thread", message: "support-message", list: "support-list" };
+    return map[sub] || "support";
+  }
+  if (base === "voip") {
+    const map = { "": "voip", start: "voip-start", end: "voip-end", log: "voip-log" };
+    return map[sub] || "voip";
+  }
+
   if (base === "sos") return "sos";
 
   // Older flat paths still used by frontend in a few places:
@@ -163,6 +180,10 @@ export default async function handler(req, res) {
     // routeKey for subroutes (used by dispatch/driver modules)
     req.routeKey = getRouteKey(path);
 
+    if (path.startsWith("order/status")) {
+      return await orderStatusHandler(req, res);
+    }
+
     if (path.startsWith("order")) {
       return await orderHandler(req, res);
     }
@@ -181,6 +202,10 @@ export default async function handler(req, res) {
 
     if (path.startsWith("presence")) {
       return await presenceHandler(req, res);
+    }
+
+    if (path.startsWith("cron_heatmap")) {
+      return await cronHeatmapHandler(req, res);
     }
 
     if (path.startsWith("cron_dispatch")) {
@@ -209,6 +234,18 @@ export default async function handler(req, res) {
 
     if (path.startsWith("pricing")) {
       return await pricingHandler(req, res);
+    }
+
+    if (path.startsWith("fraud")) {
+      return await fraudHandler(req, res);
+    }
+
+    if (path.startsWith("support")) {
+      return await supportHandler(req, res);
+    }
+
+    if (path.startsWith("voip")) {
+      return await voipHandler(req, res);
     }
 
     if (path.startsWith("freight")) {
