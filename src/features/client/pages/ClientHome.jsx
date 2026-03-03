@@ -171,17 +171,19 @@ export default function ClientHome() {
   />
 </div>
             <ServiceCard
-              icon="local_shipping"
-              label={t?.freight || "Yuk tashish"}
-              onMouseEnter={{prefetch.freight}}
-                  onTouchStart={{prefetch.freight}}
-                  onClick={() => navigate("/client/freight")} />
-            <ServiceCard
-              icon="package_2"
-              label={t?.delivery || "Eltish xizmati"}
-              onMouseEnter={{prefetch.delivery}}
-                  onTouchStart={{prefetch.delivery}}
-                  onClick={() => navigate("/client/delivery")} />
+  icon="local_shipping"
+  label={t?.freight || "Yuk tashish"}
+  onMouseEnter={prefetch.freight}
+  onTouchStart={prefetch.freight}
+  onClick={() => navigate("/client/freight")} 
+/>
+<ServiceCard
+  icon="package_2"
+  label={t?.delivery || "Eltish xizmati"}
+  onMouseEnter={prefetch.delivery}
+  onTouchStart={prefetch.delivery}
+  onClick={() => navigate("/client/delivery")} 
+/>
           </div>
         </section>
 
