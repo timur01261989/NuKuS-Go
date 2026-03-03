@@ -13,10 +13,7 @@ export default function DriverWallet({ onBack }) {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    fetchWalletData();
-  }, []);
-
+  // XATONI TO'G'IRLASH: Funksiya useEffect'dan oldin e'lon qilinishi shart
   const fetchWalletData = async () => {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
@@ -36,6 +33,11 @@ export default function DriverWallet({ onBack }) {
     }
     setLoading(false);
   };
+
+  useEffect(() => {
+    fetchWalletData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleWithdraw = () => {
     if (balance < 10000) {
