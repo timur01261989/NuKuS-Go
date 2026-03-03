@@ -115,6 +115,15 @@ export default function DriverDashboard() {
   }
 
   return <DriverHome onLogout={onLogout} />;
+}
+
+/**
+ * LegacyDriverDashboard
+ * Old dashboard implementation preserved for reference.
+ * Not used by default to avoid hook/TDZ issues and runtime crashes.
+ */
+function LegacyDriverDashboard() {
+
 
   // =========================
   // STATE
