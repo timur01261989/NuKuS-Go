@@ -16,7 +16,6 @@ import {
   AimOutlined,
 } from "@ant-design/icons";
 import { useDistrict } from "../../context/DistrictContext";
-import { KARAKALPAKSTAN_DISTRICTS } from "../../data/districtData";
 
 /**
  * Viloyatlar ro'yxati
@@ -39,10 +38,10 @@ const REGIONS = [
 ];
 
 /**
- * Viloyatlarga tegishli tuman va shaharlar ro'yxati to'liq kiritildi
+ * Viloyatlarga tegishli tuman va shaharlar ro'yxati
  */
 const DISTRICTS_BY_REGION = {
-  karakalpakstan: KARAKALPAKSTAN_DISTRICTS || [
+  karakalpakstan: [
     "Nukus shahri", "Amudaryo", "Beruniy", "Bo'zatov", "Chimboy", "Ellikqal'a", "Kegeyli", "Mo'ynoq", "Nukus tumani", "Qonliko'l", "Qorao'zak", "Shumanay", "Taxiatosh", "Taxtako'pir", "To'rtko'l", "Xo'jayli"
   ],
   tashkent_city: [
@@ -86,7 +85,7 @@ const DISTRICTS_BY_REGION = {
   ]
 };
 
-export default function DistrictList() {
+export default function DistrictList({ onOpenPicker, onLocateMe }) {
   const {
     regionId,
     setRegionId,
@@ -109,21 +108,18 @@ export default function DistrictList() {
   } = useDistrict();
 
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerType, setPickerType] = useState("pickup"); // 'pickup' | 'dropoff'
+  const [pickerType, setPickerType] = useState("pickup");
 
-  // Hudud (viloyat) o'zgarganda tumanlarni moslab chiqarish
   const districtOptions = useMemo(() => {
     const list = DISTRICTS_BY_REGION[regionId] || [];
     return list.map((d) => ({ value: d, label: d }));
   }, [regionId]);
 
-  // Viloyat o'zgarganda tanlangan tumanlarni tozalash
   useEffect(() => {
     setFromDistrict(null);
     setToDistrict(null);
   }, [regionId, setFromDistrict, setToDistrict]);
 
-  // "Manzildan manzilgacha" rejimi yoqilganda va manzil aniqlanmagan bo'lsa, avtomatik izlash
   useEffect(() => {
     if (doorToDoor && !pickupPoint) {
       handleFindMe();
@@ -148,12 +144,21 @@ export default function DistrictList() {
   };
 
   const openPicker = (type) => {
-    setPickerType(type);
-    setPickerOpen(true);
+    // Agar tashqaridan (MapPicker) ulangan bo'lsa uni ochadi, yo'qsa ichkidagini
+    if (onOpenPicker) {
+      onOpenPicker(type);
+    } else {
+      setPickerType(type);
+      setPickerOpen(true);
+    }
   };
 
-  // 1) Find Me - geolocation API
   const handleFindMe = () => {
+    if (onLocateMe) {
+      onLocateMe();
+      return;
+    }
+
     if (!navigator.geolocation) {
       alert("Geolokatsiya qurilmangizda qo'llab-quvvatlanmaydi.");
       return;
@@ -162,7 +167,6 @@ export default function DistrictList() {
       async (pos) => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
-        // Mock reverse geocode
         const mockAddress = `Mo'ljal: Geolokatsiya bilan topilgan joy (${lat.toFixed(
           3
         )}, ${lng.toFixed(3)})`;
@@ -172,7 +176,6 @@ export default function DistrictList() {
       (err) => {
         console.warn(err);
         alert("Geolokatsiyani aniqlab bo'lmadi. GPS yoniqligini tekshiring.");
-        // openPicker("pickup"); // ixtiyoriy fallback
       },
       { enableHighAccuracy: true }
     );
@@ -188,7 +191,6 @@ export default function DistrictList() {
       }}
     >
       <Space direction="vertical" style={{ width: "100%" }} size={16}>
-        {/* VILOYAT TANLASH */}
         <div>
           <Typography.Text type="secondary" style={{ fontSize: 13, marginBottom: 4, display: "block" }}>
             Hududni tanlang
@@ -202,10 +204,8 @@ export default function DistrictList() {
           />
         </div>
 
-        {/* TUMANLAR / MANZIL */}
         <div style={{ position: "relative" }}>
           <Space direction="vertical" style={{ width: "100%" }} size={12}>
-            {/* FROM */}
             <div>
               <Typography.Text type="secondary" style={{ fontSize: 13 }}>
                 Qayerdan
@@ -238,7 +238,6 @@ export default function DistrictList() {
 
             <Divider style={{ margin: 0 }} />
 
-            {/* TO */}
             <div>
               <Typography.Text type="secondary" style={{ fontSize: 13 }}>
                 Qayerga
@@ -267,7 +266,6 @@ export default function DistrictList() {
             </div>
           </Space>
 
-          {/* SWAP BTN */}
           <Button
             shape="circle"
             icon={<SwapOutlined style={{ transform: "rotate(90deg)", color: "#1677ff" }} />}
@@ -289,28 +287,27 @@ export default function DistrictList() {
         </div>
       </Space>
 
-      {/* LOCATION PICKER MODAL (Mock) */}
-      <LocationPickerModal
-        open={pickerOpen}
-        onClose={() => setPickerOpen(false)}
-        onSelect={(point, address) => {
-          if (pickerType === "pickup") {
-            setPickupPoint(point);
-            setPickupAddress(address);
-          } else {
-            setDropoffPoint(point);
-            setDropoffAddress(address);
-          }
-        }}
-        pickerType={pickerType}
-      />
+      {/* Agar tashqaridan ulanmagan bo'lsa, ichki (dummy) Modal ishlaydi */}
+      {!onOpenPicker && (
+        <LocationPickerModal
+          open={pickerOpen}
+          onClose={() => setPickerOpen(false)}
+          onSelect={(point, address) => {
+            if (pickerType === "pickup") {
+              setPickupPoint(point);
+              setPickupAddress(address);
+            } else {
+              setDropoffPoint(point);
+              setDropoffAddress(address);
+            }
+          }}
+          pickerType={pickerType}
+        />
+      )}
     </Card>
   );
 }
 
-// ----------------------------------------------------
-// Dummy / Mock Modal - keyinchalik haqiqiy xaritaga (Map) ulanadi
-// ----------------------------------------------------
 function LocationPickerModal({ open, onClose, onSelect, pickerType }) {
   if (!open) return null;
   return (
@@ -354,7 +351,7 @@ function LocationPickerModal({ open, onClose, onSelect, pickerType }) {
           }}
         >
           <Typography.Text type="secondary">
-            (Bu yerda Yandex / Google Map bo'ladi. Hozircha "Tanlash" tugmasini bosing)
+            (Bu yerda xarita ko'rinadi. Hozircha "Tanlash" tugmasini bosing)
           </Typography.Text>
         </div>
         <Space>
@@ -362,7 +359,7 @@ function LocationPickerModal({ open, onClose, onSelect, pickerType }) {
           <Button
             type="primary"
             onClick={() => {
-              const rLat = 42.46 + Math.random() * 0.05; // Nukus atrofi
+              const rLat = 42.46 + Math.random() * 0.05;
               const rLng = 59.61 + Math.random() * 0.05;
               onSelect({ lat: rLat, lng: rLng }, `Xaritadan tanlangan manzil (${rLat.toFixed(3)})`);
               onClose();
