@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { MapContainer, TileLayer, Marker, Polyline, Circle } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { useDistrict } from "../../context/DistrictContext"; // 1. Context import qilindi
+import { useDistrict } from "../context/DistrictContext"; // 1. Context import qilindi
 
 /**
  * DistrictMap.jsx (Client)
