@@ -14,7 +14,8 @@ import React, { createContext, useContext, useMemo, useState } from "react";
  * - Map route: polyline + distance/duration
  */
 
-const DistrictContext = createContext(null);
+// Vercel build xatosi va 'null' destructure qulashini oldini olish uchun global xotira va bo'sh obyekt ishlatildi
+const DistrictContext = globalThis.__DISTRICT_CONTEXT__ || (globalThis.__DISTRICT_CONTEXT__ = createContext({}));
 
 export function DistrictProvider({ children }) {
   // Region + districts
@@ -109,6 +110,9 @@ export function DistrictProvider({ children }) {
 
 export function useDistrict() {
   const ctx = useContext(DistrictContext);
-  if (!ctx) throw new Error("useDistrict() must be used inside <DistrictProvider/>");
+  if (!ctx || Object.keys(ctx).length === 0) {
+    console.warn("useDistrict() must be used inside <DistrictProvider/>");
+    return {}; // Destructure xatosini (null) chetlab o'tish uchun bo'sh obyekt qaytaradi
+  }
   return ctx;
 }
