@@ -75,7 +75,7 @@ function Inner({ onBack }) {
         setLoadingOffers(false);
       }
     })();
-  }, [fromDistrict, toDistrict, distanceKm, filters.ac, filt
+  }, [fromDistrict, toDistrict, distanceKm, filters.ac, filters.trunk]);
 
   const doSearchTrips = async () => {
     setLoadingTrips(true);
@@ -106,8 +106,6 @@ function Inner({ onBack }) {
       setLoadingTrips(false);
     }
   };
-
-ers.trunk]);
 
   const handleCreate = async (offer) => {
     if (!toDistrict) return message.error("Tuman tanlang");
