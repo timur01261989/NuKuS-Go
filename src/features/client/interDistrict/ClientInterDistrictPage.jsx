@@ -54,7 +54,7 @@ function Inner({ onBack }) {
     setRouteInfo({ distanceKm, durationMin, price });
   }, [distanceKm, durationMin, price, setRouteInfo]);
 
-  const seatCount = useMemo(() => seatState.selected.size || 1, [seatState.selected]);
+  const seatCount = useMemo(() => seatState?.selected?.size || 1, [seatState?.selected]);
 
   useEffect(() => {
     if (!toDistrict || !distanceKm) {
@@ -75,14 +75,14 @@ function Inner({ onBack }) {
         setLoadingOffers(false);
       }
     })();
-  }, [fromDistrict, toDistrict, distanceKm, filters.ac, filters.trunk]);
+  }, [fromDistrict, toDistrict, distanceKm, filters?.ac, filters?.trunk]);
 
   const doSearchTrips = async () => {
     setLoadingTrips(true);
     try {
       // Basic search by region/from/to + optional depart window
       const payload = {
-        region: region || null,
+        region: typeof region !== 'undefined' ? region : null,
         from_district: fromDistrict || null,
         to_district: toDistrict || null,
         // If you add client-side mode toggle later:
