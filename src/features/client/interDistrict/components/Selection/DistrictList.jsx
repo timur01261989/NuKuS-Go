@@ -1,72 +1,143 @@
 import React, { useMemo } from "react";
-import { Card, Col, Row, Select, Typography } from "antd";
+import { Card, Col, Row, Select, Space, Switch, Typography, Button } from "antd";
 import { EnvironmentOutlined } from "@ant-design/icons";
-import { REGIONS, getDistrictNamesByRegion } from "../../services/districtData";
+import { REGIONS, getDistrictsByRegion } from "../../services/districtData";
 import { useDistrict } from "../../context/DistrictContext";
 
 /**
- * DistrictList.jsx
+ * DistrictList.jsx (Client)
  * -------------------------------------------------------
- * Client (Tumanlar aro) tanlash:
- * - Hudud (viloyat) tanlash
- * - Qaerdan (tuman) tanlash
- * - Qaerga (tuman) tanlash
- *
- * Bu struktura keyin to'liq tumanlar ro'yxati bilan kengaytiriladi.
+ * Talab:
+ * 1) Hududni tanlang (Qoraqalpog‘iston + viloyatlar)
+ * 2) "Qaerdan" -> tanlangan hudud tumanlari
+ * 3) "Qaerga" -> shu hudud tumanlari
+ * 4) "Manzildan manzilgacha" (door-to-door) switch:
+ *    - pickup: avtomatik aniqlanadi (GPS), xaritadan o‘zgartirish mumkin
+ *    - dropoff: ixtiyoriy (majburiy emas)
  */
-export default function DistrictList() {
-  const { region, setRegion, fromDistrict, setFromDistrict, toDistrict, setToDistrict } = useDistrict();
+export default function DistrictList({ onOpenPicker, onLocateMe }) {
+  const {
+    regionId,
+    setRegionId,
+    fromDistrict,
+    setFromDistrict,
+    toDistrict,
+    setToDistrict,
+    doorToDoor,
+    setDoorToDoor,
+    pickupAddress,
+    dropoffAddress,
+  } = useDistrict();
 
-  const regionOptions = useMemo(() => (REGIONS || []).map((r) => ({ value: r, label: r })), []);
+  const districts = useMemo(() => getDistrictsByRegion(regionId), [regionId]);
 
-  const districtOptions = useMemo(() => {
-    const list = getDistrictNamesByRegion(region) || [];
-    return list.map((d) => ({ value: d, label: d }));
-  }, [region]);
+  const optionsRegion = useMemo(
+    () => REGIONS.map((r) => ({ value: r.id, label: r.name })),
+    []
+  );
+
+  const optionsDistrict = useMemo(
+    () => districts.map((d) => ({ value: d.name, label: d.name })),
+    [districts]
+  );
 
   return (
-    <Card style={{ borderRadius: 16, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.10)" }}>
-      <Typography.Title level={5} style={{ marginTop: 0 }}>
-        <EnvironmentOutlined /> Hudud va tumanlar
-      </Typography.Title>
+    <Card style={{ borderRadius: 18 }}>
+      <Typography.Text style={{ fontWeight: 700 }}>Tumanlar aro</Typography.Text>
 
-      <Row gutter={[12, 12]}>
-        <Col span={24}>
-          <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 6 }}>Hududni tanlang</div>
+      <div style={{ marginTop: 12 }}>
+        <Typography.Text style={{ fontSize: 12, opacity: 0.7 }}>Hududni tanlang</Typography.Text>
+        <Select
+          value={regionId}
+          onChange={(v) => {
+            setRegionId(v);
+            setFromDistrict(null);
+            setToDistrict(null);
+          }}
+          options={optionsRegion}
+          style={{ width: "100%", marginTop: 6 }}
+          size="large"
+        />
+      </div>
+
+      <Row gutter={10} style={{ marginTop: 12 }}>
+        <Col span={12}>
+          <Typography.Text style={{ fontSize: 12, opacity: 0.7 }}>Qaerdan</Typography.Text>
           <Select
-            value={region || undefined}
-            onChange={(v) => setRegion?.(v)}
-            style={{ width: "100%" }}
-            options={regionOptions}
-            showSearch
-            placeholder="Hududni tanlang"
+            value={fromDistrict}
+            onChange={(v) => setFromDistrict(v)}
+            options={optionsDistrict}
+            placeholder="Tanlang"
+            style={{ width: "100%", marginTop: 6 }}
+            size="large"
           />
         </Col>
-
         <Col span={12}>
-          <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 6 }}>Qaerdan</div>
+          <Typography.Text style={{ fontSize: 12, opacity: 0.7 }}>Qaerga</Typography.Text>
           <Select
-            value={fromDistrict || undefined}
-            onChange={(v) => setFromDistrict?.(v)}
-            style={{ width: "100%" }}
-            options={districtOptions}
-            showSearch
-            placeholder="Qayerdan (tuman)"
-          />
-        </Col>
-
-        <Col span={12}>
-          <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 6 }}>Qaerga</div>
-          <Select
-            value={toDistrict || undefined}
-            onChange={(v) => setToDistrict?.(v)}
-            style={{ width: "100%" }}
-            options={districtOptions}
-            showSearch
-            placeholder="Qayerga (tuman)"
+            value={toDistrict}
+            onChange={(v) => setToDistrict(v)}
+            options={optionsDistrict}
+            placeholder="Tanlang"
+            style={{ width: "100%", marginTop: 6 }}
+            size="large"
           />
         </Col>
       </Row>
+
+      <div style={{ marginTop: 14 }}>
+        <Space align="center" style={{ width: "100%", justifyContent: "space-between" }}>
+          <Typography.Text style={{ fontWeight: 600 }}>Manzildan manzilgacha</Typography.Text>
+          <Switch
+            checked={doorToDoor}
+            onChange={(v) => {
+              setDoorToDoor(v);
+              // door-to-door yoqilganda pickupni GPS bilan olishga harakat qilamiz
+              if (v) onLocateMe?.();
+            }}
+          />
+        </Space>
+        <Typography.Text style={{ fontSize: 12, opacity: 0.7, display: "block", marginTop: 6 }}>
+          Yoqilsa: siz turgan joy avtomatik aniqlanadi, xohlasangiz xaritadan o‘zgartirasiz.
+          "Qaerga (manzil)" majburiy emas.
+        </Typography.Text>
+      </div>
+
+      {doorToDoor && (
+        <div style={{ marginTop: 12 }}>
+          <Card size="small" style={{ borderRadius: 14, marginBottom: 10 }}>
+            <Space style={{ width: "100%", justifyContent: "space-between" }}>
+              <Space>
+                <EnvironmentOutlined />
+                <div>
+                  <div style={{ fontWeight: 600 }}>Qaerdan (manzil)</div>
+                  <div style={{ fontSize: 12, opacity: 0.7 }}>{pickupAddress || "Aniqlanmagan"}</div>
+                </div>
+              </Space>
+              <Button onClick={() => onOpenPicker?.("pickup")} style={{ borderRadius: 12 }}>
+                Xaritadan
+              </Button>
+            </Space>
+          </Card>
+
+          <Card size="small" style={{ borderRadius: 14 }}>
+            <Space style={{ width: "100%", justifyContent: "space-between" }}>
+              <Space>
+                <EnvironmentOutlined />
+                <div>
+                  <div style={{ fontWeight: 600 }}>Qaerga (manzil)</div>
+                  <div style={{ fontSize: 12, opacity: 0.7 }}>
+                    {dropoffAddress || "Ixtiyoriy (majburiy emas)"}
+                  </div>
+                </div>
+              </Space>
+              <Button onClick={() => onOpenPicker?.("dropoff")} style={{ borderRadius: 12 }}>
+                Xaritadan
+              </Button>
+            </Space>
+          </Card>
+        </div>
+      )}
     </Card>
   );
 }

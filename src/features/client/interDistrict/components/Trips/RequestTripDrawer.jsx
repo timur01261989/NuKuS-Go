@@ -1,113 +1,125 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Button, Drawer, Form, Input, InputNumber, Switch, message } from "antd";
-import { supabase } from "@/lib/supabase";
-import { requestTrip } from "@/features/shared/interDistrictTrips";
+import { Drawer, Button, Space, Typography, Input, Switch } from "antd";
 
-export default function RequestTripDrawer({ open, onClose, trip, defaultPickup, defaultDropoff }) {
-  const [loading, setLoading] = useState(false);
-  const [form] = Form.useForm();
+/**
+ * RequestTripDrawer.jsx
+ * -------------------------------------------------------
+ * Client reysga so‘rov yuboradi.
+ * - pitak: oddiy so‘rov
+ * - door-to-door: pickup/dropoff manzil + full salon + eltish
+ */
+export default function RequestTripDrawer({
+  open,
+  onClose,
+  trip,
+  defaultPickupAddress,
+  defaultDropoffAddress,
+  onSubmit,
+  allowFullSalonDefault = false,
+}) {
+  const [pickupAddress, setPickupAddress] = useState("");
+  const [dropoffAddress, setDropoffAddress] = useState("");
+  const [wantsFullSalon, setWantsFullSalon] = useState(false);
+  const [isDelivery, setIsDelivery] = useState(false);
+  const [deliveryNotes, setDeliveryNotes] = useState("");
 
   useEffect(() => {
-    if (!open) return;
-    form.setFieldsValue({
-      client_name: "",
-      client_phone: "",
-      seats: 1,
-      wants_full_salon: false,
-      pickup_address: defaultPickup || "",
-      dropoff_address: defaultDropoff || "",
-      note: "",
-    });
-  }, [open, defaultPickup, defaultDropoff, form]);
+    setPickupAddress(defaultPickupAddress || "");
+    setDropoffAddress(defaultDropoffAddress || "");
+    setWantsFullSalon(!!allowFullSalonDefault);
+    setIsDelivery(false);
+    setDeliveryNotes("");
+  }, [trip?.id, defaultPickupAddress, defaultDropoffAddress, allowFullSalonDefault]);
 
-  const onSubmit = async () => {
-    const v = await form.validateFields();
-    setLoading(true);
-    try {
-      const { data: auth } = await supabase.auth.getUser();
-      const uid = auth?.user?.id || null;
+  const door = trip?.tariff === "door";
 
-      if (!trip?.id) throw new Error("Trip topilmadi");
-      if (!v.client_phone) throw new Error("Telefon kiriting");
-
-      // Basic seats validation
-      if (v.wants_full_salon) {
-        if (!trip?.allow_full_salon) throw new Error("Bu reysda polni salon yo‘q");
-      } else {
-        const seats = Number(v.seats || 1);
-        if (seats < 1) throw new Error("O‘rindiq soni noto‘g‘ri");
-        if (trip?.seats_available != null && seats > Number(trip.seats_available)) {
-          throw new Error("Bo‘sh joy yetarli emas");
-        }
-      }
-
-      const { error } = await requestTrip({
-        trip_id: trip.id,
-        client_id: uid,
-        client_name: v.client_name || null,
-        client_phone: v.client_phone,
-        seats: Number(v.seats || 1),
-        wants_full_salon: !!v.wants_full_salon,
-        pickup_address: v.pickup_address || null,
-        dropoff_address: v.dropoff_address || null,
-        note: v.note || null,
-      });
-      if (error) throw error;
-
-      message.success("So‘rov yuborildi");
-      onClose?.();
-    } catch (e) {
-      message.error(e?.message || "Xato");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const title = useMemo(() => {
-    if (!trip) return "So‘rov";
-    return `So‘rov: ${trip.from_district} → ${trip.to_district}`;
-  }, [trip]);
+  const canSubmit = useMemo(() => {
+    if (!trip) return false;
+    if (!door) return true;
+    // pickup address bo‘lsa yaxshi, lekin majburiy emas deb so‘ragan — shuning uchun to‘siq qo‘ymaymiz
+    return true;
+  }, [trip, door]);
 
   return (
-    <Drawer open={open} onClose={onClose} title={title} width={520}>
-      <Form layout="vertical" form={form}>
-        <Form.Item name="client_name" label="Ism (ixtiyoriy)">
-          <Input />
-        </Form.Item>
-        <Form.Item name="client_phone" label="Telefon" rules={[{ required: true }]}>
-          <Input placeholder="+998..." />
-        </Form.Item>
+    <Drawer
+      title="So‘rov yuborish"
+      placement="bottom"
+      height={door ? 420 : 240}
+      open={open}
+      onClose={onClose}
+    >
+      {!trip ? (
+        <Typography.Text>Reys tanlanmagan.</Typography.Text>
+      ) : (
+        <>
+          <Typography.Text style={{ fontWeight: 700 }}>
+            {trip.from_district} → {trip.to_district}
+          </Typography.Text>
+          <div style={{ marginTop: 8, color: "#666", fontSize: 12 }}>
+            Ketish: {new Date(trip.depart_at).toLocaleString()}
+          </div>
 
-        <Form.Item name="wants_full_salon" label="Polni salon" valuePropName="checked">
-          <Switch />
-        </Form.Item>
+          {door && (
+            <>
+              <div style={{ marginTop: 14 }}>
+                <Typography.Text style={{ fontSize: 12, opacity: 0.7 }}>Qaerdan (manzil)</Typography.Text>
+                <Input value={pickupAddress} onChange={(e) => setPickupAddress(e.target.value)} placeholder="Ixtiyoriy" />
+              </div>
 
-        <Form.Item shouldUpdate noStyle>
-          {({ getFieldValue }) =>
-            getFieldValue("wants_full_salon") ? null : (
-              <Form.Item name="seats" label="O‘rindiqlar soni" rules={[{ required: true }]}>
-                <InputNumber min={1} max={12} style={{ width: "100%" }} />
-              </Form.Item>
-            )
-          }
-        </Form.Item>
+              <div style={{ marginTop: 10 }}>
+                <Typography.Text style={{ fontSize: 12, opacity: 0.7 }}>Qaerga (manzil)</Typography.Text>
+                <Input value={dropoffAddress} onChange={(e) => setDropoffAddress(e.target.value)} placeholder="Ixtiyoriy (majburiy emas)" />
+              </div>
 
-        <Form.Item name="pickup_address" label="Uyidan olib ketish manzili (ixtiyoriy)">
-          <Input placeholder="Majburiy emas" />
-        </Form.Item>
+              {trip.allow_full_salon && (
+                <div style={{ marginTop: 12 }}>
+                  <Space style={{ width: "100%", justifyContent: "space-between" }} align="center">
+                    <Typography.Text style={{ fontWeight: 600 }}>Butun salon</Typography.Text>
+                    <Switch checked={wantsFullSalon} onChange={setWantsFullSalon} />
+                  </Space>
+                </div>
+              )}
 
-        <Form.Item name="dropoff_address" label="Uyiga olib borish manzili (ixtiyoriy)">
-          <Input placeholder="Majburiy emas" />
-        </Form.Item>
+              {trip.has_delivery && (
+                <div style={{ marginTop: 12 }}>
+                  <Space style={{ width: "100%", justifyContent: "space-between" }} align="center">
+                    <Typography.Text style={{ fontWeight: 600 }}>Eltish (posilka)</Typography.Text>
+                    <Switch checked={isDelivery} onChange={setIsDelivery} />
+                  </Space>
+                  {isDelivery && (
+                    <div style={{ marginTop: 8 }}>
+                      <Typography.Text style={{ fontSize: 12, opacity: 0.7 }}>Eltish izohi</Typography.Text>
+                      <Input.TextArea value={deliveryNotes} onChange={(e) => setDeliveryNotes(e.target.value)} rows={3} placeholder="Masalan: hujjat, kichik quti, vazn..." />
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
 
-        <Form.Item name="note" label="Izoh (ixtiyoriy)">
-          <Input.TextArea rows={3} />
-        </Form.Item>
-
-        <Button type="primary" loading={loading} onClick={onSubmit} block>
-          Yuborish
-        </Button>
-      </Form>
+          <div style={{ marginTop: 18 }}>
+            <Button
+              type="primary"
+              disabled={!canSubmit}
+              onClick={() =>
+                onSubmit?.({
+                  pickup_address: pickupAddress,
+                  dropoff_address: dropoffAddress,
+                  wants_full_salon: wantsFullSalon,
+                  is_delivery: isDelivery,
+                  delivery_notes: deliveryNotes,
+                })
+              }
+              style={{ width: "100%", borderRadius: 16, height: 44 }}
+            >
+              Yuborish
+            </Button>
+            <Button onClick={onClose} style={{ width: "100%", marginTop: 10, borderRadius: 16, height: 44 }}>
+              Bekor qilish
+            </Button>
+          </div>
+        </>
+      )}
     </Drawer>
   );
 }

@@ -6,6 +6,9 @@ import { DistrictProvider, useDistrict } from './context/DistrictContext';
 import ModeSwitchToggle from './components/shared/ModeSwitchToggle';
 import CarSeatVisualizer from './components/shared/CarSeatVisualizer';
 import TripEarnings from './components/shared/TripEarnings';
+import TripCreateModal from './components/shared/TripCreateModal';
+import PitakAdminModal from './components/shared/PitakAdminModal';
+import TripRequestsDrawer from './components/shared/TripRequestsDrawer';
 
 import PitakQueueBoard from './components/modes/standard/PitakQueueBoard';
 import FixedRouteCard from './components/modes/standard/FixedRouteCard';
@@ -16,10 +19,6 @@ import DoorToDoorNav from './components/modes/premium/DoorToDoorNav';
 import DynamicPriceCard from './components/modes/premium/DynamicPriceCard';
 
 import ParcelEntryModal from './components/parcel/ParcelEntryModal';
-
-import TripCreateModal from './components/shared/TripCreateModal';
-import PitakAdminModal from './components/shared/PitakAdminModal';
-import TripRequestsDrawer from './components/shared/TripRequestsDrawer';
 
 import { usePremiumSocket } from './hooks/usePremiumSocket';
 
@@ -33,7 +32,7 @@ function Inner() {
   const [parcelOpen, setParcelOpen] = useState(false);
   const [tripCreateOpen, setTripCreateOpen] = useState(false);
   const [pitakAdminOpen, setPitakAdminOpen] = useState(false);
-  const [reqDrawerOpen, setReqDrawerOpen] = useState(false);
+  const [requestsOpen, setRequestsOpen] = useState(false);
 
   // Premium: realtime requestlar
   usePremiumSocket({
@@ -61,17 +60,18 @@ function Inner() {
             </Text>
           </div>
           <Space>
+            <Button icon={<InboxOutlined />} onClick={() => setParcelOpen(true)}>
+              Posilka
+            </Button>
+
+            <Button onClick={() => setRequestsOpen(true)}>
+              So‘rovlar
+            </Button>
             <Button onClick={() => setTripCreateOpen(true)} type="primary">
               Reys yaratish
             </Button>
-            <Button onClick={() => setReqDrawerOpen(true)}>
-              So‘rovlar
-            </Button>
             <Button onClick={() => setPitakAdminOpen(true)}>
-              Pitak (Admin)
-            </Button>
-            <Button icon={<InboxOutlined />} onClick={() => setParcelOpen(true)}>
-              Posilka
+              Pitak (admin)
             </Button>
             <Button icon={<ReloadOutlined />} onClick={onRefresh}>
               Refresh
@@ -126,11 +126,11 @@ function Inner() {
         </Row>
 
         <ParcelEntryModal open={parcelOpen} onClose={() => setParcelOpen(false)} />
-      <TripCreateModal open={tripCreateOpen} onClose={() => setTripCreateOpen(false)} onCreated={() => { try { locateOnce?.(); } catch {} }} />
-      <PitakAdminModal open={pitakAdminOpen} onClose={() => setPitakAdminOpen(false)} />
-      <TripRequestsDrawer open={reqDrawerOpen} onClose={() => setReqDrawerOpen(false)} />
-
       </Content>
+
+      <TripCreateModal open={tripCreateOpen} onClose={() => setTripCreateOpen(false)} />
+      <PitakAdminModal open={pitakAdminOpen} onClose={() => setPitakAdminOpen(false)} />
+      <TripRequestsDrawer open={requestsOpen} onClose={() => setRequestsOpen(false)} />
     </Layout>
   );
 }

@@ -1,69 +1,88 @@
 import React, { useMemo } from "react";
-import { Button, Card, Space, Tag, Typography } from "antd";
-import dayjs from "dayjs";
+import { Card, Space, Tag, Typography, Button } from "antd";
 
-const { Text } = Typography;
+/**
+ * TripCard.jsx
+ * -------------------------------------------------------
+ * Topilgan reysni ko‘rsatadi.
+ * Talab: haydovchi kiritgan barcha ma'lumotlar ko‘rinsin + "Buyirtma jonatish".
+ */
+const money = (n) => (n == null ? "" : new Intl.NumberFormat("uz-UZ").format(Number(n)));
 
 export default function TripCard({ trip, onRequest }) {
-  const depart = useMemo(() => {
-    try { return dayjs(trip?.depart_at).format("YYYY-MM-DD HH:mm"); } catch { return ""; }
-  }, [trip?.depart_at]);
-
-  const features = useMemo(() => {
-    const f = [];
-    if (trip?.has_ac) f.push(<Tag key="ac">AC</Tag>);
-    if (trip?.has_trunk) f.push(<Tag key="trunk">Yukxona</Tag>);
-    if (trip?.is_lux) f.push(<Tag key="lux">Lux</Tag>);
-    if (trip?.allow_smoking) f.push(<Tag key="smoke">Sigaret</Tag>);
-    if (trip?.has_delivery) f.push(<Tag key="del">Eltish</Tag>);
-    return f;
+  const priceLine = useMemo(() => {
+    if (!trip) return "";
+    if (trip.tariff === "pitak") return `${money(trip.base_price_uzs)} so‘m`;
+    // door-to-door: base + pickup + dropoff (full salon alohida)
+    const base = Number(trip.base_price_uzs || 0);
+    const p = Number(trip.pickup_fee_uzs || 0);
+    const d = Number(trip.dropoff_fee_uzs || 0);
+    const sum = base + p + d;
+    return `${money(sum)} so‘m (bazaviy)`;
   }, [trip]);
 
   return (
-    <Card
-      style={{ borderRadius: 16, background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.08)" }}
-      bodyStyle={{ padding: 14 }}
-    >
-      <Space direction="vertical" style={{ width: "100%" }} size={8}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-          <div>
-            <div style={{ fontWeight: 700 }}>
-              {trip?.from_district} → {trip?.to_district}
-            </div>
-            <div style={{ fontSize: 12, opacity: 0.8 }}>
-              {trip?.region} · {trip?.mode === "pitak" ? "Pitak" : "Manzildan"}
-            </div>
+    <Card style={{ borderRadius: 18, marginBottom: 10 }} bodyStyle={{ padding: 14 }}>
+      <Space style={{ width: "100%", justifyContent: "space-between" }} align="start">
+        <div>
+          <Typography.Text style={{ fontWeight: 800, fontSize: 15 }}>
+            {trip.from_district} → {trip.to_district}
+          </Typography.Text>
+          <div style={{ marginTop: 6 }}>
+            <Tag color={trip.tariff === "pitak" ? "blue" : "gold"}>
+              {trip.tariff === "pitak" ? "Standart (Pitak)" : "Manzildan manzilga"}
+            </Tag>
+            {trip.has_ac && <Tag>❄️ Konditsioner</Tag>}
+            {trip.has_trunk && <Tag>🧳 Yukxona</Tag>}
+            {trip.is_lux && <Tag>✨ Luks</Tag>}
+            {trip.allow_smoking && <Tag>🚬 Sigaret</Tag>}
+            {trip.has_delivery && <Tag>📦 Eltish</Tag>}
           </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontWeight: 700 }}>{depart}</div>
-            <div style={{ fontSize: 12, opacity: 0.8 }}>
-              {trip?.seats_available}/{trip?.seats_total} joy
+
+          {trip.tariff === "pitak" && trip.pitak_id && (
+            <div style={{ marginTop: 6, color: "#555", fontSize: 12 }}>
+              Pitak: <b>{trip.pitak_title || "Tanlangan pitak"}</b>
             </div>
+          )}
+
+          <div style={{ marginTop: 6, color: "#555", fontSize: 12 }}>
+            Ketish: <b>{new Date(trip.depart_at).toLocaleString()}</b>
           </div>
+
+          {trip.tariff === "door" && (
+            <div style={{ marginTop: 6, color: "#555", fontSize: 12 }}>
+              O‘rindiq: <b>{trip.seats_total || "—"}</b>{" "}
+              {trip.allow_full_salon && trip.full_salon_price_uzs != null && (
+                <>
+                  · Butun salon: <b>{money(trip.full_salon_price_uzs)} so‘m</b>
+                </>
+              )}
+            </div>
+          )}
+
+          <div style={{ marginTop: 8 }}>
+            <Typography.Text style={{ fontWeight: 800 }}>{priceLine}</Typography.Text>
+            {trip.tariff === "door" && (
+              <div style={{ color: "#888", fontSize: 12, marginTop: 4 }}>
+                Uyidan olib ketish: {money(trip.pickup_fee_uzs)} · Uyga olib borish: {money(trip.dropoff_fee_uzs)}
+              </div>
+            )}
+            {trip.has_delivery && trip.delivery_price_uzs != null && (
+              <div style={{ color: "#888", fontSize: 12, marginTop: 4 }}>
+                Eltish narxi: {money(trip.delivery_price_uzs)} so‘m
+              </div>
+            )}
+          </div>
+
+          {trip.notes && (
+            <div style={{ marginTop: 8, color: "#666", fontSize: 12 }}>
+              Izoh: {trip.notes}
+            </div>
+          )}
         </div>
 
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{features}</div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 13 }}>
-          <div>
-            <Text type="secondary">Yo‘l haqi:</Text> <b>{Number(trip?.base_price_uzs || 0).toLocaleString()} UZS</b>
-          </div>
-          <div>
-            <Text type="secondary">Polni salon:</Text>{" "}
-            {trip?.allow_full_salon ? <b>{Number(trip?.full_salon_price_uzs || 0).toLocaleString()} UZS</b> : "Yo‘q"}
-          </div>
-          <div>
-            <Text type="secondary">Uyidan olib ketish:</Text> {Number(trip?.pickup_fee_uzs || 0).toLocaleString()} UZS
-          </div>
-          <div>
-            <Text type="secondary">Uyiga olib borish:</Text> {Number(trip?.dropoff_fee_uzs || 0).toLocaleString()} UZS
-          </div>
-        </div>
-
-        {trip?.notes ? <div style={{ fontSize: 12, opacity: 0.85 }}>Izoh: {trip.notes}</div> : null}
-
-        <Button type="primary" onClick={() => onRequest?.(trip)} block>
-          So‘rov yuborish
+        <Button type="primary" onClick={() => onRequest?.(trip)} style={{ borderRadius: 14 }}>
+          Buyirtma jonatish
         </Button>
       </Space>
     </Card>

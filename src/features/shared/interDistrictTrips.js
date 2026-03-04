@@ -2,156 +2,176 @@ import { supabase } from "@/lib/supabase";
 
 /**
  * interDistrictTrips.js
- * DB + API (Supabase) layer for Inter-District (Tumanlar aro) trips.
+ * Supabase DB layer for "Tumanlar aro" (pitak + door-to-door)
  *
- * Tables (see sql/interdistrict_trips_schema.sql):
+ * Tables:
  * - district_pitaks
  * - district_trips
  * - district_trip_requests
- *
- * NOTE: This file uses Supabase directly (client-side).
- * If you want stricter security, you can later proxy via server/api.
  */
 
-const TBL_PITAKS = "district_pitaks";
-const TBL_TRIPS = "district_trips";
-const TBL_REQS = "district_trip_requests";
+export async function listPitaks({ region, from_district, to_district, activeOnly = true } = {}) {
+  let q = supabase.from("district_pitaks").select("*").order("updated_at", { ascending: false });
 
-/** ------------------ Pitak (Admin-managed) ------------------ */
-
-export async function listPitaks({ region, isActive = true }) {
-  if (!supabase) throw new Error("Supabase client topilmadi");
-  let q = supabase.from(TBL_PITAKS).select("*").order("name", { ascending: true });
   if (region) q = q.eq("region", region);
-  if (isActive != null) q = q.eq("is_active", !!isActive);
-  return q;
+  if (from_district) q = q.eq("from_district", from_district);
+  if (to_district) q = q.eq("to_district", to_district);
+  if (activeOnly) q = q.eq("is_active", true);
+
+  const { data, error } = await q;
+  if (error) throw error;
+  return data || [];
 }
 
 export async function upsertPitak(pitak) {
-  if (!supabase) throw new Error("Supabase client topilmadi");
-  // pitak: {id?, region, district?, name, point:{lat,lng}, note?, is_active?}
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  if (userErr) throw userErr;
+  if (!userData?.user?.id) throw new Error("Login qiling");
+
   const payload = {
-    ...pitak,
+    id: pitak?.id || undefined,
+    region: pitak.region,
+    from_district: pitak.from_district,
+    to_district: pitak.to_district,
+    title: pitak.title,
+    location_point: pitak.location_point || null,
+    is_active: pitak.is_active ?? true,
     updated_at: new Date().toISOString(),
   };
-  if (!payload.created_at) payload.created_at = new Date().toISOString();
-  return supabase.from(TBL_PITAKS).upsert(payload).select("*").single();
+
+  const { data, error } = await supabase.from("district_pitaks").upsert(payload).select("*").single();
+  if (error) throw error;
+  return data;
 }
 
 export async function deletePitak(id) {
-  if (!supabase) throw new Error("Supabase client topilmadi");
-  return supabase.from(TBL_PITAKS).delete().eq("id", id);
+  const { error } = await supabase.from("district_pitaks").delete().eq("id", id);
+  if (error) throw error;
+  return true;
 }
-
-/** ------------------ Driver Trips ------------------ */
 
 export async function createTrip(trip) {
-  if (!supabase) throw new Error("Supabase client topilmadi");
+  const { data: authData, error: authErr } = await supabase.auth.getUser();
+  if (authErr) throw authErr;
+  const uid = authData?.user?.id;
+  if (!uid) throw new Error("Login qiling");
+
   const payload = {
-    ...trip,
-    status: trip.status || "open",
-    created_at: new Date().toISOString(),
+    driver_id: uid,
+    region: trip.region,
+    from_district: trip.from_district,
+    to_district: trip.to_district,
+    tariff: trip.tariff, // pitak | door
+    pitak_id: trip.pitak_id || null,
+    from_point: trip.from_point || null,
+    to_point: trip.to_point || null,
+    depart_at: trip.depart_at,
+    seats_total: trip.seats_total ?? null,
+    allow_full_salon: !!trip.allow_full_salon,
+    base_price_uzs: Number(trip.base_price_uzs || 0),
+    pickup_fee_uzs: Number(trip.pickup_fee_uzs || 0),
+    dropoff_fee_uzs: Number(trip.dropoff_fee_uzs || 0),
+    full_salon_price_uzs: trip.full_salon_price_uzs == null ? null : Number(trip.full_salon_price_uzs),
+    has_ac: !!trip.has_ac,
+    has_trunk: !!trip.has_trunk,
+    is_lux: !!trip.is_lux,
+    allow_smoking: !!trip.allow_smoking,
+    has_delivery: !!trip.has_delivery,
+    delivery_price_uzs: trip.delivery_price_uzs == null ? null : Number(trip.delivery_price_uzs),
+    notes: trip.notes || null,
+    status: trip.status || "active",
     updated_at: new Date().toISOString(),
   };
-  return supabase.from(TBL_TRIPS).insert(payload).select("*").single();
-}
 
-export async function updateTrip(id, patch) {
-  if (!supabase) throw new Error("Supabase client topilmadi");
-  const payload = { ...patch, updated_at: new Date().toISOString() };
-  return supabase.from(TBL_TRIPS).update(payload).eq("id", id).select("*").single();
+  const { data, error } = await supabase.from("district_trips").insert(payload).select("*").single();
+  if (error) throw error;
+  return data;
 }
-
-export async function listDriverTrips({ driver_id, status = "open" }) {
-  if (!supabase) throw new Error("Supabase client topilmadi");
-  let q = supabase.from(TBL_TRIPS).select("*").eq("driver_id", driver_id).order("depart_at", { ascending: true });
-  if (status) q = q.eq("status", status);
-  return q;
-}
-
-/** ------------------ Client Search & Request ------------------ */
 
 export async function searchTrips({
   region,
   from_district,
   to_district,
-  mode, // "pitak" | "door"
   depart_from,
   depart_to,
-  filters = {},
-}) {
-  if (!supabase) throw new Error("Supabase client topilmadi");
+  has_ac,
+  has_trunk,
+  tariff, // optional
+  include_delivery = true,
+} = {}) {
   let q = supabase
-    .from(TBL_TRIPS)
+    .from("district_trips")
     .select("*")
-    .eq("status", "open")
+    .eq("status", "active")
     .order("depart_at", { ascending: true });
 
   if (region) q = q.eq("region", region);
   if (from_district) q = q.eq("from_district", from_district);
   if (to_district) q = q.eq("to_district", to_district);
-  if (mode) q = q.eq("mode", mode);
+  if (tariff) q = q.eq("tariff", tariff);
+  if (has_ac === true) q = q.eq("has_ac", true);
+  if (has_trunk === true) q = q.eq("has_trunk", true);
+  if (include_delivery === false) q = q.eq("has_delivery", false);
 
   if (depart_from) q = q.gte("depart_at", depart_from);
   if (depart_to) q = q.lte("depart_at", depart_to);
 
-  if (filters.ac) q = q.eq("has_ac", true);
-  if (filters.trunk) q = q.eq("has_trunk", true);
-  if (filters.smoking === false) q = q.eq("allow_smoking", false);
-
-  return q;
+  const { data, error } = await q;
+  if (error) throw error;
+  return data || [];
 }
 
-export async function requestTrip({
-  trip_id,
-  client_id,
-  client_name,
-  client_phone,
-  seats = 1,
-  wants_full_salon = false,
-  pickup_address = null,
-  pickup_point = null,
-  dropoff_address = null,
-  dropoff_point = null,
-  note = null,
-}) {
-  if (!supabase) throw new Error("Supabase client topilmadi");
+export async function requestTrip(req) {
+  const { data: authData, error: authErr } = await supabase.auth.getUser();
+  if (authErr) throw authErr;
+  const uid = authData?.user?.id;
+  if (!uid) throw new Error("Login qiling");
+
   const payload = {
-    trip_id,
-    client_id,
-    client_name,
-    client_phone,
-    seats,
-    wants_full_salon,
-    pickup_address,
-    pickup_point,
-    dropoff_address,
-    dropoff_point,
-    note,
-    status: "sent",
-    created_at: new Date().toISOString(),
+    trip_id: req.trip_id,
+    passenger_id: uid,
+    seats_requested: req.seats_requested ?? null,
+    wants_full_salon: !!req.wants_full_salon,
+    pickup_address: req.pickup_address || null,
+    dropoff_address: req.dropoff_address || null,
+    pickup_point: req.pickup_point || null,
+    dropoff_point: req.dropoff_point || null,
+    is_delivery: !!req.is_delivery,
+    delivery_notes: req.delivery_notes || null,
+    status: "pending",
+    updated_at: new Date().toISOString(),
   };
-  return supabase.from(TBL_REQS).insert(payload).select("*").single();
+
+  const { data, error } = await supabase.from("district_trip_requests").insert(payload).select("*").single();
+  if (error) throw error;
+  return data;
 }
 
-/** ------------------ Driver: requests inbox ------------------ */
+export async function listDriverRequests({ limit = 50 } = {}) {
+  const { data: authData, error: authErr } = await supabase.auth.getUser();
+  if (authErr) throw authErr;
+  const uid = authData?.user?.id;
+  if (!uid) throw new Error("Login qiling");
 
-export async function listTripRequestsForDriver({ driver_id }) {
-  if (!supabase) throw new Error("Supabase client topilmadi");
-  // Join via trip_id -> trips.driver_id (client-side join is limited). We'll fetch trips then requests.
-  const { data: trips, error: tErr } = await supabase.from(TBL_TRIPS).select("id").eq("driver_id", driver_id);
+  // Join isn't possible directly without foreign key select syntax; we'll do 2-step:
+  const { data: trips, error: tErr } = await supabase.from("district_trips").select("id").eq("driver_id", uid);
   if (tErr) throw tErr;
-  const ids = (trips || []).map((t) => t.id);
-  if (!ids.length) return { data: [], error: null };
-  return supabase
-    .from(TBL_REQS)
+  const tripIds = (trips || []).map((t) => t.id);
+  if (!tripIds.length) return [];
+
+  const { data, error } = await supabase
+    .from("district_trip_requests")
     .select("*")
-    .in("trip_id", ids)
-    .order("created_at", { ascending: false });
+    .in("trip_id", tripIds)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+  return data || [];
 }
 
 export async function respondTripRequest({ request_id, status }) {
-  if (!supabase) throw new Error("Supabase client topilmadi");
-  if (!["accepted", "declined"].includes(status)) throw new Error("status noto'g'ri");
-  return supabase.from(TBL_REQS).update({ status, responded_at: new Date().toISOString() }).eq("id", request_id).select("*").single();
+  const { error } = await supabase.from("district_trip_requests").update({ status, updated_at: new Date().toISOString() }).eq("id", request_id);
+  if (error) throw error;
+  return true;
 }

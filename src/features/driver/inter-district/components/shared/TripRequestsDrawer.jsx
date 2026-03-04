@@ -1,95 +1,80 @@
 import React, { useEffect, useState } from "react";
-import { Button, Drawer, List, Tag, message } from "antd";
-import { supabase } from "@/lib/supabase";
-import { listTripRequestsForDriver, respondTripRequest } from "@/features/shared/interDistrictTrips";
+import { Drawer, Button, List, Space, Tag, Typography, message } from "antd";
+import { listDriverRequests, respondTripRequest } from "@/features/shared/interDistrictTrips";
 
-function statusTag(s) {
-  const map = {
-    sent: <Tag color="blue">Yangi</Tag>,
-    accepted: <Tag color="green">Qabul</Tag>,
-    declined: <Tag color="red">Rad</Tag>,
-    canceled: <Tag>Bekor</Tag>,
-  };
-  return map[s] || <Tag>{String(s || "")}</Tag>;
-}
-
+/**
+ * TripRequestsDrawer.jsx (Driver)
+ * -------------------------------------------------------
+ * Driverga kelgan so‘rovlar (reyslar bo‘yicha).
+ */
 export default function TripRequestsDrawer({ open, onClose }) {
   const [loading, setLoading] = useState(false);
-  const [rows, setRows] = useState([]);
+  const [items, setItems] = useState([]);
 
-  const refresh = async () => {
+  const load = async () => {
     setLoading(true);
     try {
-      const { data: auth } = await supabase.auth.getUser();
-      const uid = auth?.user?.id;
-      if (!uid) throw new Error("Login bo‘ling");
-      const { data, error } = await listTripRequestsForDriver({ driver_id: uid });
-      if (error) throw error;
-      setRows(data || []);
+      const list = await listDriverRequests({ limit: 100 });
+      setItems(list || []);
     } catch (e) {
-      message.error(e?.message || "So‘rovlarni olishda xato");
-      setRows([]);
+      setItems([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (!open) return;
-    refresh();
+    if (open) load();
   }, [open]);
 
-  const act = async (id, status) => {
-    setLoading(true);
+  const respond = async (id, status) => {
+    const hide = message.loading("Saqlanmoqda...", 0);
     try {
-      const { error } = await respondTripRequest({ request_id: id, status });
-      if (error) throw error;
-      message.success(status === "accepted" ? "Qabul qilindi" : "Rad etildi");
-      await refresh();
+      await respondTripRequest({ request_id: id, status });
+      message.success("Yangilandi");
+      load();
     } catch (e) {
-      message.error(e?.message || "Xato");
+      message.error(e?.message || "Xatolik");
     } finally {
-      setLoading(false);
+      hide();
     }
   };
 
   return (
-    <Drawer open={open} onClose={onClose} title="Reys so‘rovlari" width={520}>
-      <div style={{ marginBottom: 12 }}>
-        <Button onClick={refresh} loading={loading}>Yangilash</Button>
-      </div>
+    <Drawer title="So‘rovlar" placement="right" width={420} open={open} onClose={onClose}>
+      <Button onClick={load} style={{ width: "100%", borderRadius: 14 }}>
+        Yangilash
+      </Button>
 
       <List
         loading={loading}
-        dataSource={rows}
+        dataSource={items}
+        style={{ marginTop: 12 }}
         renderItem={(r) => (
-          <List.Item
-            actions={[
-              r.status === "sent" ? (
-                <>
-                  <Button key="acc" type="primary" onClick={() => act(r.id, "accepted")}>Qabul</Button>
-                  <Button key="dec" danger onClick={() => act(r.id, "declined")}>Rad</Button>
-                </>
-              ) : null,
-            ]}
-          >
-            <List.Item.Meta
-              title={
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  {statusTag(r.status)}
-                  <span>{r.client_name || "Mijoz"}</span>
+          <List.Item>
+            <div style={{ width: "100%" }}>
+              <Space style={{ width: "100%", justifyContent: "space-between" }} align="start">
+                <div>
+                  <Typography.Text style={{ fontWeight: 800 }}>{r.status}</Typography.Text>
+                  <div style={{ color: "#666", fontSize: 12, marginTop: 4 }}>
+                    {new Date(r.created_at).toLocaleString()}
+                  </div>
+                  {r.pickup_address && <div style={{ fontSize: 12, marginTop: 6 }}>📍 {r.pickup_address}</div>}
+                  {r.dropoff_address && <div style={{ fontSize: 12, marginTop: 4 }}>🏁 {r.dropoff_address}</div>}
+                  {r.wants_full_salon && <Tag color="gold" style={{ marginTop: 6 }}>Butun salon</Tag>}
+                  {r.is_delivery && <Tag style={{ marginTop: 6 }}>📦 Eltish</Tag>}
                 </div>
-              }
-              description={
-                <div style={{ fontSize: 12, opacity: 0.9 }}>
-                  <div>Tel: {r.client_phone || "—"}</div>
-                  <div>Seats: {r.seats}{r.wants_full_salon ? " (Polni salon)" : ""}</div>
-                  {r.pickup_address ? <div>Pickup: {r.pickup_address}</div> : null}
-                  {r.dropoff_address ? <div>Dropoff: {r.dropoff_address}</div> : null}
-                  {r.note ? <div>Izoh: {r.note}</div> : null}
-                </div>
-              }
-            />
+
+                <Space direction="vertical">
+                  <Button type="primary" onClick={() => respond(r.id, "accepted")}>
+                    Qabul
+                  </Button>
+                  <Button danger onClick={() => respond(r.id, "rejected")}>
+                    Rad
+                  </Button>
+                </Space>
+              </Space>
+            </div>
           </List.Item>
         )}
       />

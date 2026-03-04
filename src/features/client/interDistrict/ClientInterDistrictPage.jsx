@@ -6,147 +6,258 @@ import DepartureTime from "./components/Selection/DepartureTime";
 import CarSeatSchema from "./components/Seats/CarSeatSchema";
 import SeatLegend from "./components/Seats/SeatLegend";
 import FilterBar from "./components/Drivers/FilterBar";
-import DriverOfferCard from "./components/Drivers/DriverOfferCard";
-import TripCard from "./components/Trips/TripCard";
-import RequestTripDrawer from "./components/Trips/RequestTripDrawer";
 import DistrictMap from "./map/DistrictMap";
 import { DistrictProvider, useDistrict } from "./context/DistrictContext";
 import { useDistrictRoute } from "./map/useDistrictRoute";
-import { listDistrictOffers, createInterDistrictOrder } from "./services/districtApi";
-import { searchTrips } from "@/features/shared/interDistrictTrips";
+import TripCard from "./components/Trips/TripCard";
+import RequestTripDrawer from "./components/Trips/RequestTripDrawer";
+import { searchTrips, requestTrip, listPitaks } from "@/features/shared/interDistrictTrips";
+import { nominatimReverse } from "../shared/geo/nominatim";
+
+import { MapContainer, TileLayer, Marker } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 /**
- * ClientInterDistrictPage.jsx
+ * ClientInterDistrictPage.jsx (FULL)
  * -------------------------------------------------------
- * Kirish nuqtasi (Main Entry).
- * Flow:
- * 1) Tuman tanlash
- * 2) Vaqt, o‘rindiq, filter
- * 3) Takliflar (haydovchi) ro‘yxati
- * 4) Buyurtma yaratish
+ * Talab bo‘yicha:
+ * - Hudud -> tumanlar (qaerdan/qaerga)
+ * - "Manzildan manzilgacha" (door-to-door) + map picker + manzil nomi
+ * - OSRM yo‘l chizish + masofa
+ * - Sana/soat
+ * - O‘rindiq + butun salon (door-to-door)
+ * - Filter (konditsioner, yukxona)
+ * - Tugma: "Reys izlash"
+ * - Natija: haydovchi kiritgan reyslar + "Buyirtma jonatish" (so‘rov)
  */
+
+const pinIcon = (color = "#1677ff") =>
+  L.divIcon({
+    className: "",
+    html: `<div style="width:18px;height:18px;border-radius:50%;background:${color};border:3px solid #fff;box-shadow:0 6px 16px rgba(0,0,0,.25)"></div>`,
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+  });
+
+function MapPicker({ open, onClose, initialPoint, onPick }) {
+  const [point, setPoint] = useState(initialPoint || null);
+
+  useEffect(() => setPoint(initialPoint || null), [initialPoint?.lat, initialPoint?.lng, open]);
+
+  const center = useMemo(() => {
+    if (point) return [point.lat, point.lng];
+    return [41.311, 69.2797];
+  }, [point]);
+
+  return (
+    <Drawer title="Xaritadan tanlash" placement="bottom" height={520} open={open} onClose={onClose}>
+      <div style={{ height: 380, borderRadius: 18, overflow: "hidden", border: "1px solid rgba(0,0,0,.08)" }}>
+        <MapContainer center={center} zoom={13} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
+          <TileLayer
+            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+            attribution="&copy; OpenStreetMap &copy; CARTO"
+          />
+          <MapClickSetter onPoint={(p) => setPoint(p)} />
+          {point && <Marker position={[point.lat, point.lng]} icon={pinIcon("#1677ff")} />}
+        </MapContainer>
+      </div>
+
+      <div style={{ marginTop: 14 }}>
+        <Button
+          type="primary"
+          disabled={!point}
+          onClick={() => onPick?.(point)}
+          style={{ width: "100%", borderRadius: 16, height: 44 }}
+        >
+          Manzilni saqlash
+        </Button>
+        <Button onClick={onClose} style={{ width: "100%", marginTop: 10, borderRadius: 16, height: 44 }}>
+          Bekor qilish
+        </Button>
+      </div>
+    </Drawer>
+  );
+}
+
+function MapClickSetter({ onPoint }) {
+  // react-leaflet hook import dynamic to avoid SSR issues in Vercel
+  const { useMapEvents } = require("react-leaflet");
+  useMapEvents({
+    click(e) {
+      onPoint?.({ lat: e.latlng.lat, lng: e.latlng.lng });
+    },
+  });
+  return null;
+}
 
 function Inner({ onBack }) {
   const {
-    region,
+    regionId,
     fromDistrict,
     toDistrict,
-    departureTime,
+    doorToDoor,
+    pickupPoint,
+    setPickupPoint,
+    pickupAddress,
+    setPickupAddress,
+    dropoffPoint,
+    setDropoffPoint,
+    dropoffAddress,
+    setDropoffAddress,
+    departDate,
+    departTime,
     seatState,
+    filters,
     routeInfo,
     setRouteInfo,
-    filters,
   } = useDistrict();
 
-  const { from, to, distanceKm, durationMin, price } = useDistrictRoute(fromDistrict, toDistrict);
-
-  const [loadingOffers, setLoadingOffers] = useState(false);
-  const [offers, setOffers] = useState([]);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-
-  // NEW: Driver yaratgan reyslar (district_trips)
-  const [loadingTrips, setLoadingTrips] = useState(false);
-  const [trips, setTrips] = useState([]);
-  const [reqDrawerOpen, setReqDrawerOpen] = useState(false);
-  const [selectedTrip, setSelectedTrip] = useState(null);
+  const { from, to, distanceKm, durationMin, polyline } = useDistrictRoute({
+    regionId,
+    fromDistrictName: fromDistrict,
+    toDistrictName: toDistrict,
+    doorToDoor,
+    pickupPoint,
+    dropoffPoint,
+  });
 
   useEffect(() => {
-    setRouteInfo({ distanceKm, durationMin, price });
-  }, [distanceKm, durationMin, price, setRouteInfo]);
+    setRouteInfo({ distanceKm, durationMin, polyline });
+  }, [distanceKm, durationMin, polyline, setRouteInfo]);
 
-  const seatCount = useMemo(() => seatState?.selected?.size || 1, [seatState?.selected]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerType, setPickerType] = useState("pickup"); // pickup|dropoff
 
-  useEffect(() => {
-    if (!toDistrict || !distanceKm) {
-      setOffers([]);
-      return;
-    }
-    (async () => {
-      setLoadingOffers(true);
-      try {
-        const list = await listDistrictOffers({
-          fromDistrict,
-          toDistrict,
-          distanceKm,
-          filters,
-        });
-        setOffers(list);
-      } finally {
-        setLoadingOffers(false);
-      }
-    })();
-  }, [fromDistrict, toDistrict, distanceKm, filters?.ac, filters?.trunk]);
+  const openPicker = (type) => {
+    setPickerType(type);
+    setPickerOpen(true);
+  };
 
-  const doSearchTrips = async () => {
-    setLoadingTrips(true);
+  const locateMe = async () => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setPickupPoint(p);
+        try {
+          const r = await nominatimReverse(p.lat, p.lng, { swallowErrors: true });
+          if (r?.display_name) setPickupAddress(r.display_name);
+        } catch (_) {}
+      },
+      () => {},
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  };
+
+  const handlePickPoint = async (p) => {
+    if (pickerType === "pickup") setPickupPoint(p);
+    else setDropoffPoint(p);
+
     try {
-      // Basic search by region/from/to + optional depart window
-      const payload = {
-        region: typeof region !== 'undefined' ? region : null,
-        from_district: fromDistrict || null,
-        to_district: toDistrict || null,
-        // If you add client-side mode toggle later:
-        mode: null,
-        depart_from: departureTime ? new Date(departureTime).toISOString() : null,
-        depart_to: null,
-        filters,
-      };
-
-      const { data, error } = await searchTrips(payload);
-      if (error) throw error;
-      setTrips(Array.isArray(data) ? data : []);
-      if (!data || data.length === 0) {
-        message.info("Reys topilmadi");
-      }
-    } catch (e) {
-      console.warn(e);
-      message.error(e?.message || "Reys izlashda xato");
-      setTrips([]);
+      const r = await nominatimReverse(p.lat, p.lng, { swallowErrors: true });
+      const name = r?.display_name || `${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
+      if (pickerType === "pickup") setPickupAddress(name);
+      else setDropoffAddress(name);
+    } catch (_) {
+      const fallback = `${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
+      if (pickerType === "pickup") setPickupAddress(fallback);
+      else setDropoffAddress(fallback);
     } finally {
-      setLoadingTrips(false);
+      setPickerOpen(false);
     }
   };
 
-  const handleCreate = async (offer) => {
-    if (!toDistrict) return message.error("Tuman tanlang");
-    if (!distanceKm) return message.error("Masofa aniqlanmadi");
-    const p = Math.round(price || 0);
-    if (!p) return message.error("Narx hisoblanmadi");
+  // search results
+  const [searching, setSearching] = useState(false);
+  const [trips, setTrips] = useState([]);
+  const [selectedTrip, setSelectedTrip] = useState(null);
+  const [requestOpen, setRequestOpen] = useState(false);
 
-    const payload = {
-      fromDistrict,
-      toDistrict,
-      seats: seatCount,
-      price: p,
-      distance_km: distanceKm,
-      duration_min: durationMin,
-      departureTime,
-      selectedOfferId: offer?.id || null,
-      filters,
-    };
+  const canSearch = useMemo(() => {
+    if (!regionId || !fromDistrict || !toDistrict) return false;
+    return true;
+  }, [regionId, fromDistrict, toDistrict]);
 
-    const hide = message.loading("Buyurtma yuborilmoqda...", 0);
+  const departIso = useMemo(() => {
+    if (!departDate || !departTime) return null;
     try {
-      const res = await createInterDistrictOrder(payload);
-      const id = res?.id || res?.data?.id || res?.orderId;
-      message.success(id ? `Buyurtma yaratildi (#${id})` : "Buyurtma yaratildi");
-      setDrawerOpen(true);
+      return new Date(`${departDate}T${departTime}:00`).toISOString();
+    } catch {
+      return null;
+    }
+  }, [departDate, departTime]);
+
+  const onSearch = async () => {
+    if (!canSearch) return message.error("Hudud va tumanlarni tanlang");
+    setSearching(true);
+    try {
+      const list = await searchTrips({
+        region: regionId,
+        from_district: fromDistrict,
+        to_district: toDistrict,
+        has_ac: filters.ac ? true : undefined,
+        has_trunk: filters.trunk ? true : undefined,
+        depart_from: departIso ? new Date(new Date(departIso).getTime() - 6 * 3600_000).toISOString() : undefined,
+        depart_to: departIso ? new Date(new Date(departIso).getTime() + 24 * 3600_000).toISOString() : undefined,
+      });
+
+      // pitak title ko‘rsatish uchun pitaklarni bir marta olib, map qilamiz
+      const pitaks = await listPitaks({ region: regionId, from_district: fromDistrict, to_district: toDistrict, activeOnly: false }).catch(() => []);
+      const pitakMap = new Map((pitaks || []).map((p) => [p.id, p.title]));
+      const enriched = (list || []).map((t) => ({ ...t, pitak_title: t.pitak_id ? pitakMap.get(t.pitak_id) : null }));
+      setTrips(enriched);
     } catch (e) {
-      message.error(e?.message || "Xatolik: buyurtma yuborilmadi");
+      message.error(e?.message || "Xatolik: reyslar topilmadi");
+      setTrips([]);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const onRequest = (trip) => {
+    setSelectedTrip(trip);
+    setRequestOpen(true);
+  };
+
+  const submitRequest = async (payload) => {
+    if (!selectedTrip) return;
+    const hide = message.loading("So‘rov yuborilmoqda...", 0);
+    try {
+      await requestTrip({
+        trip_id: selectedTrip.id,
+        wants_full_salon: !!payload.wants_full_salon,
+        pickup_address: payload.pickup_address || (doorToDoor ? pickupAddress : null),
+        dropoff_address: payload.dropoff_address || (doorToDoor ? dropoffAddress : null),
+        pickup_point: doorToDoor ? pickupPoint : null,
+        dropoff_point: doorToDoor ? (dropoffPoint || null) : null,
+        is_delivery: !!payload.is_delivery,
+        delivery_notes: payload.delivery_notes || null,
+      });
+      message.success("So‘rov yuborildi");
+      setRequestOpen(false);
+    } catch (e) {
+      message.error(e?.message || "Xatolik: so‘rov yuborilmadi");
     } finally {
       hide();
     }
   };
 
   return (
-    <div style={{ maxWidth: 520, margin: "0 auto", paddingBottom: 24 }}>
+    <div style={{ maxWidth: 560, margin: "0 auto", paddingBottom: 24 }}>
       <DistrictHeader onBack={onBack} />
 
       <div style={{ padding: "0 14px" }}>
-        <DistrictMap from={from} to={to} />
+        <DistrictMap
+          from={from}
+          to={to}
+          polyline={routeInfo?.polyline}
+          distanceKm={routeInfo?.distanceKm}
+          durationMin={routeInfo?.durationMin}
+        />
 
         <div style={{ marginTop: 12 }}>
-          <DistrictList />
+          <DistrictList onOpenPicker={openPicker} onLocateMe={locateMe} />
         </div>
 
         <div style={{ marginTop: 12 }}>
@@ -167,47 +278,45 @@ function Inner({ onBack }) {
 
         <Divider />
 
-        <Typography.Title level={5} style={{ margin: "6px 0 10px" }}>
-          Haydovchi takliflari
+        <Button
+          type="primary"
+          loading={searching}
+          disabled={!canSearch}
+          onClick={onSearch}
+          style={{ width: "100%", borderRadius: 16, height: 44 }}
+        >
+          Reys izlash
+        </Button>
+
+        <Typography.Title level={5} style={{ margin: "14px 0 10px" }}>
+          Topilgan reyslar
         </Typography.Title>
 
-        {loadingOffers ? (
-          <div style={{ color: "#666" }}>Yuklanmoqda...</div>
-        ) : offers.length ? (
-          offers.map((o) => <DriverOfferCard key={o.id} offer={o} onSelect={handleCreate} />)
+        {searching ? (
+          <div style={{ color: "#666" }}>Qidirilmoqda...</div>
+        ) : trips.length ? (
+          trips.map((t) => <TripCard key={t.id} trip={t} onRequest={onRequest} />)
         ) : (
-          <div style={{ color: "#666" }}>
-            Tuman tanlang — haydovchi takliflari shu yerda ko‘rinadi.
-            <div style={{ marginTop: 12 }}>
-              <Button
-                type="primary"
-                disabled={!toDistrict || !price}
-                onClick={() => handleCreate(null)}
-                style={{ width: "100%", borderRadius: 16, height: 44 }}
-              >
-                Buyurtma berish
-              </Button>
-            </div>
-          </div>
+          <div style={{ color: "#666" }}>Hozircha reys topilmadi.</div>
         )}
       </div>
 
-      <Drawer
-        title="Buyurtma holati"
-        placement="bottom"
-        height={220}
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-      >
-        <Typography.Text>
-          Buyurtma yuborildi. Backend tarafdan statuslar qo‘shilgach, bu yerda real holat ko‘rsatiladi.
-        </Typography.Text>
-        <div style={{ marginTop: 12 }}>
-          <Button danger onClick={() => setDrawerOpen(false)} style={{ borderRadius: 14 }}>
-            Yopish
-          </Button>
-        </div>
-      </Drawer>
+      <MapPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        initialPoint={pickerType === "pickup" ? pickupPoint : dropoffPoint}
+        onPick={handlePickPoint}
+      />
+
+      <RequestTripDrawer
+        open={requestOpen}
+        onClose={() => setRequestOpen(false)}
+        trip={selectedTrip}
+        defaultPickupAddress={doorToDoor ? pickupAddress : ""}
+        defaultDropoffAddress={doorToDoor ? dropoffAddress : ""}
+        allowFullSalonDefault={!!seatState?.wantsFullSalon}
+        onSubmit={submitRequest}
+      />
     </div>
   );
 }
