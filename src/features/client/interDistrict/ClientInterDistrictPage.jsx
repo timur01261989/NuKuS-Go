@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Button, Divider, Drawer, message, Typography } from "antd";
+import { Button, Divider, Drawer, message, Typography, Card, Popconfirm } from "antd"; // Card va Popconfirm qo'shildi
 import DistrictHeader from "./components/Header/DistrictHeader";
 import DistrictList from "./components/Selection/DistrictList";
 import DepartureTime from "./components/Selection/DepartureTime";
@@ -21,15 +21,10 @@ import "leaflet/dist/leaflet.css";
 /**
  * ClientInterDistrictPage.jsx (FULL)
  * -------------------------------------------------------
- * Talab bo‘yicha:
- * - Hudud -> tumanlar (qaerdan/qaerga)
- * - "Manzildan manzilgacha" (door-to-door) + map picker + manzil nomi
- * - OSRM yo‘l chizish + masofa
- * - Sana/soat
- * - O‘rindiq + butun salon (door-to-door)
- * - Filter (konditsioner, yukxona)
- * - Tugma: "Reys izlash"
- * - Natija: haydovchi kiritgan reyslar + "Buyirtma jonatish" (so‘rov)
+ * * "YAGONA REYS" TIZIMI QO'SHIMCHALARI (FINAL):
+ * - ActiveTripPanel (Safar boshlanganda chiquvchi oyna) qo'shildi.
+ * - Yo'lovchi haydovchiga qo'ng'iroq qilishi yoki GPS tekshiruvi bilan safarni bekor qilishi mumkin.
+ * - submitRequest da activeDriver ma'lumotlari saqlanadi.
  */
 
 const pinIcon = (color = "#1677ff") =>
@@ -89,6 +84,70 @@ function MapClickSetter({ onPoint }) {
   return null;
 }
 
+// =====================================================================
+// YANGI KOMPONENT: AKTIV SAFAR PANELI (Safar qabul qilingandan so'ng chiqadi)
+// =====================================================================
+function ActiveTripPanel() {
+  const { tripStatus, setTripStatus, activeDriver } = useDistrict();
+
+  const handleCancel = () => {
+    // API ga cancelTripWithFraudCheck so'rovi ketadi (hozircha UI imitatsiyasi)
+    message.loading({ content: "Bekor qilinmoqda... GPS ma'lumotlari tekshirilmoqda", key: "cancel" });
+    setTimeout(() => {
+      message.error({ content: "Safar bekor qilindi. Agar firibgarlik aniqlansa reyting tushiriladi!", key: "cancel", duration: 4 });
+      setTripStatus('IDLE'); // Qayta qidiruv sahifasiga o'tish
+    }, 2000);
+  };
+
+  return (
+    <Card style={{ borderRadius: 18, marginTop: 12, border: "2px solid #1677ff", boxShadow: "0 4px 12px rgba(22, 119, 255, 0.15)" }} bodyStyle={{ padding: 16 }}>
+      <Typography.Title level={5} style={{ marginTop: 0 }}>Aktiv Safar</Typography.Title>
+      
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: "center", marginTop: 10 }}>
+        <div>
+          <Typography.Text style={{ fontWeight: 800, fontSize: 16 }}>{activeDriver?.name || "Haydovchi ismi"}</Typography.Text>
+          <div style={{ color: "#666", fontSize: 13, marginTop: 4 }}>
+            {activeDriver?.car || "Cobalt"} · <b style={{ color: "#333" }}>{activeDriver?.carNumber || "01A 123 AA"}</b>
+          </div>
+          <div style={{ color: "#fa8c16", fontWeight: 600, marginTop: 4 }}>
+            ★ {activeDriver?.rating || "5.0"} Reyting
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <Typography.Text style={{ fontSize: 12, color: "#888", display: "block" }}>Safar holati:</Typography.Text>
+          <div style={{ fontWeight: 'bold', fontSize: 15, color: tripStatus === 'ON_TRIP' ? '#52c41a' : '#1677ff' }}>
+            {tripStatus === 'WAITING_DRIVER' ? 'Qabul qilindi' : tripStatus === 'PICKING_UP' ? 'Kelmoqda' : 'Yo\'lda'}
+          </div>
+        </div>
+      </div>
+
+      <Divider style={{ margin: "14px 0" }} />
+
+      <div style={{ display: "flex", gap: 10 }}>
+        <Button 
+          type="primary" 
+          style={{ flex: 1, borderRadius: 12, height: 44, backgroundColor: "#52c41a", fontWeight: 600 }} 
+          href={`tel:${activeDriver?.phone || "+998900000000"}`}
+        >
+          📞 Qo'ng'iroq
+        </Button>
+        <Popconfirm 
+          title="Safarni bekor qilasizmi?" 
+          description="GPS orqali haydovchi bilan birga ketayotganingiz aniqlansa jarima yoziladi!"
+          onConfirm={handleCancel} 
+          okText="Ha, bekor qilish" 
+          cancelText="Yo'q"
+        >
+          <Button danger style={{ flex: 1, borderRadius: 12, height: 44, fontWeight: 600 }}>
+            ❌ Bekor qilish
+          </Button>
+        </Popconfirm>
+      </div>
+    </Card>
+  );
+}
+// =====================================================================
+
 function Inner({ onBack }) {
   const {
     regionId,
@@ -109,6 +168,9 @@ function Inner({ onBack }) {
     filters,
     routeInfo,
     setRouteInfo,
+    tripStatus,
+    setTripStatus,
+    setActiveDriver
   } = useDistrict();
 
   const { from, to, distanceKm, durationMin, polyline } = useDistrictRoute({
@@ -125,7 +187,7 @@ function Inner({ onBack }) {
   }, [distanceKm, durationMin, polyline, setRouteInfo]);
 
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerType, setPickerType] = useState("pickup"); // pickup|dropoff
+  const [pickerType, setPickerType] = useState("pickup");
 
   const openPicker = (type) => {
     setPickerType(type);
@@ -166,7 +228,6 @@ function Inner({ onBack }) {
     }
   };
 
-  // search results
   const [searching, setSearching] = useState(false);
   const [trips, setTrips] = useState([]);
   const [selectedTrip, setSelectedTrip] = useState(null);
@@ -189,6 +250,9 @@ function Inner({ onBack }) {
   const onSearch = async () => {
     if (!canSearch) return message.error("Hudud va tumanlarni tanlang");
     setSearching(true);
+    
+    if(setTripStatus) setTripStatus('SEARCHING'); 
+
     try {
       const list = await searchTrips({
         region: regionId,
@@ -200,7 +264,6 @@ function Inner({ onBack }) {
         depart_to: departIso ? new Date(new Date(departIso).getTime() + 24 * 3600_000).toISOString() : undefined,
       });
 
-      // pitak title ko‘rsatish uchun pitaklarni bir marta olib, map qilamiz
       const pitaks = await listPitaks({ region: regionId, from_district: fromDistrict, to_district: toDistrict, activeOnly: false }).catch(() => []);
       const pitakMap = new Map((pitaks || []).map((p) => [p.id, p.title]));
       const enriched = (list || []).map((t) => ({ ...t, pitak_title: t.pitak_id ? pitakMap.get(t.pitak_id) : null }));
@@ -231,15 +294,36 @@ function Inner({ onBack }) {
         dropoff_point: doorToDoor ? (dropoffPoint || null) : null,
         is_delivery: !!payload.is_delivery,
         delivery_notes: payload.delivery_notes || null,
+        weight_category: payload.weight_category || null,
+        payment_method: payload.payment_method || 'cash',
+        final_price: payload.final_price || 0,
+        selected_seats: Array.from(seatState.selected || [])
       });
       message.success("So‘rov yuborildi");
       setRequestOpen(false);
+      
+      // YANGI: Haydovchi ma'lumotlarini Panel uchun saqlab qolamiz va Statusni o'zgartiramiz
+      if(setActiveDriver) {
+        setActiveDriver({
+          id: selectedTrip.driverId || 'id_1',
+          name: selectedTrip.driverName || 'Aziz',
+          car: selectedTrip.car_model || 'Cobalt',
+          carNumber: selectedTrip.carNumber || '01A 123 AA',
+          phone: '+998901234567',
+          rating: selectedTrip.driver_rating || '5.0'
+        });
+      }
+      if(setTripStatus) setTripStatus('WAITING_DRIVER');
+      
     } catch (e) {
       message.error(e?.message || "Xatolik: so‘rov yuborilmadi");
     } finally {
       hide();
     }
   };
+
+  // Safar boshlangandan so'ng qidiruv formalarini yashirish mantiqini aniqlash
+  const isActiveTrip = tripStatus !== 'IDLE' && tripStatus !== 'SEARCHING';
 
   return (
     <div style={{ maxWidth: 560, margin: "0 auto", paddingBottom: 24 }}>
@@ -254,48 +338,55 @@ function Inner({ onBack }) {
           durationMin={routeInfo?.durationMin}
         />
 
-        <div style={{ marginTop: 12 }}>
-          <DistrictList onOpenPicker={openPicker} onLocateMe={locateMe} />
-        </div>
-
-        <div style={{ marginTop: 12 }}>
-          <DepartureTime />
-        </div>
-
-        <div style={{ marginTop: 12 }}>
-          <CarSeatSchema />
-        </div>
-
-        <div style={{ marginTop: 12 }}>
-          <SeatLegend />
-        </div>
-
-        <div style={{ marginTop: 12 }}>
-          <FilterBar />
-        </div>
-
-        <Divider />
-
-        <Button
-          type="primary"
-          loading={searching}
-          disabled={!canSearch}
-          onClick={onSearch}
-          style={{ width: "100%", borderRadius: 16, height: 44 }}
-        >
-          Reys izlash
-        </Button>
-
-        <Typography.Title level={5} style={{ margin: "14px 0 10px" }}>
-          Topilgan reyslar
-        </Typography.Title>
-
-        {searching ? (
-          <div style={{ color: "#666" }}>Qidirilmoqda...</div>
-        ) : trips.length ? (
-          trips.map((t) => <TripCard key={t.id} trip={t} onRequest={onRequest} />)
+        {/* YANGI QISM: Agar safar aktiv bo'lsa Faqat ActiveTripPanel chiqadi, Qidiruv Formalari yashirinadi */}
+        {isActiveTrip ? (
+          <ActiveTripPanel />
         ) : (
-          <div style={{ color: "#666" }}>Hozircha reys topilmadi.</div>
+          <>
+            <div style={{ marginTop: 12 }}>
+              <DistrictList onOpenPicker={openPicker} onLocateMe={locateMe} />
+            </div>
+
+            <div style={{ marginTop: 12 }}>
+              <DepartureTime />
+            </div>
+
+            <div style={{ marginTop: 12 }}>
+              <CarSeatSchema />
+            </div>
+
+            <div style={{ marginTop: 12 }}>
+              <SeatLegend />
+            </div>
+
+            <div style={{ marginTop: 12 }}>
+              <FilterBar />
+            </div>
+
+            <Divider />
+
+            <Button
+              type="primary"
+              loading={searching}
+              disabled={!canSearch}
+              onClick={onSearch}
+              style={{ width: "100%", borderRadius: 16, height: 44 }}
+            >
+              Reys izlash
+            </Button>
+
+            <Typography.Title level={5} style={{ margin: "14px 0 10px" }}>
+              Topilgan reyslar
+            </Typography.Title>
+
+            {searching ? (
+              <div style={{ color: "#666" }}>Qidirilmoqda...</div>
+            ) : trips.length ? (
+              trips.map((t) => <TripCard key={t.id} trip={t} onRequest={onRequest} />)
+            ) : (
+              <div style={{ color: "#666" }}>Hozircha reys topilmadi.</div>
+            )}
+          </>
         )}
       </div>
 

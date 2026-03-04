@@ -1,32 +1,60 @@
 import React from "react";
-import { Card, Switch, Typography } from "antd";
-import { SettingOutlined } from "@ant-design/icons";
+import { Checkbox, Space, Typography, Card } from "antd";
 import { useDistrict } from "../../context/DistrictContext";
 
 /**
  * FilterBar.jsx
  * -------------------------------------------------------
- * Konditsioner, yukxona kabi filterlar.
+ * Qidiruv filtrlari (Konditsioner, yukxona va h.k.)
+ * * "YAGONA REYS" QO'SHIMCHALARI: 
+ * - Ayollar uchun maxsus reys filtri (femaleOnly)
+ * - Faqat pochta oluvchi mashinalarni izlash filtri (delivery)
  */
 export default function FilterBar() {
   const { filters, setFilters } = useDistrict();
 
+  const handleChange = (key, val) => {
+    setFilters((prev) => ({ ...prev, [key]: val }));
+  };
+
   return (
-    <Card style={{ borderRadius: 18 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <SettingOutlined />
-        <Typography.Text style={{ fontWeight: 700 }}>Filtrlar</Typography.Text>
-      </div>
+    <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: "12px 16px" }}>
+      <Typography.Text style={{ fontWeight: 700, display: "block", marginBottom: 10 }}>
+        Qo‘shimcha qulayliklar
+      </Typography.Text>
+      
+      <Space direction="vertical" style={{ width: "100%" }}>
+        {/* Eski filtrlar (o'zgarishsiz qoldi) */}
+        <Checkbox
+          checked={filters.ac}
+          onChange={(e) => handleChange("ac", e.target.checked)}
+        >
+          ❄️ Konditsioner
+        </Checkbox>
+        <Checkbox
+          checked={filters.trunk}
+          onChange={(e) => handleChange("trunk", e.target.checked)}
+        >
+          🧳 Katta yukxona (Bagaj)
+        </Checkbox>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0" }}>
-        <Typography.Text>Konditsioner</Typography.Text>
-        <Switch checked={filters.ac} onChange={(v) => setFilters((p) => ({ ...p, ac: v }))} />
-      </div>
-
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0" }}>
-        <Typography.Text>Yukxona</Typography.Text>
-        <Switch checked={filters.trunk} onChange={(v) => setFilters((p) => ({ ...p, trunk: v }))} />
-      </div>
+        {/* YANGI: Yagona Reys filtrlari */}
+        <Checkbox
+          checked={filters.femaleOnly}
+          onChange={(e) => handleChange("femaleOnly", e.target.checked)}
+          style={{ color: "#eb2f96", fontWeight: 500 }}
+        >
+          👩 Faqat ayollar uchun (Xavfsiz reys)
+        </Checkbox>
+        
+        <Checkbox
+          checked={filters.delivery}
+          onChange={(e) => handleChange("delivery", e.target.checked)}
+          style={{ color: "#52c41a", fontWeight: 500 }}
+        >
+          📦 Pochta olib ketishga rozi
+        </Checkbox>
+      </Space>
     </Card>
   );
 }
