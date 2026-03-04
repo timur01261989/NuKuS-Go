@@ -1,90 +1,102 @@
-import React, { useMemo } from "react";
-import { Card, Space, Tag, Typography, Button } from "antd";
-
-/**
- * TripCard.jsx
- * -------------------------------------------------------
- * Topilgan reysni ko‘rsatadi.
- * Talab: haydovchi kiritgan barcha ma'lumotlar ko‘rinsin + "Buyirtma jonatish".
- */
-const money = (n) => (n == null ? "" : new Intl.NumberFormat("uz-UZ").format(Number(n)));
+import React from "react";
+import { Card, Typography, Button, Space, Divider, Avatar, Tag } from "antd";
+import { UserOutlined, CarOutlined, CheckCircleOutlined } from "@ant-design/icons";
+import dayjs from "dayjs";
 
 export default function TripCard({ trip, onRequest }) {
-  const priceLine = useMemo(() => {
-    if (!trip) return "";
-    if (trip.tariff === "pitak") return `${money(trip.base_price_uzs)} so‘m`;
-    // door-to-door: base + pickup + dropoff (full salon alohida)
-    const base = Number(trip.base_price_uzs || 0);
-    const p = Number(trip.pickup_fee_uzs || 0);
-    const d = Number(trip.dropoff_fee_uzs || 0);
-    const sum = base + p + d;
-    return `${money(sum)} so‘m (bazaviy)`;
-  }, [trip]);
+  if (!trip) return null;
+
+  // Haydovchi, mashina, vaqt va narx ma'lumotlarini bazadan (API'dan) olish
+  const driverName = trip.driver?.full_name || trip.driver?.name || "Haydovchi";
+  const carModel = trip.car?.model || "Noma'lum mashina";
+  const carNumber = trip.car?.plate_number || trip.car?.number || "";
+  const price = trip.price || trip.price_per_seat || 0;
+  const departTime = trip.depart_time || trip.departureTime;
+  const availableSeats = trip.available_seats || trip.seats_available || 4;
+
+  // Qulayliklar (Haydovchi bazaga qanday kiritgan bo'lsa shunday)
+  const hasAc = trip.features?.ac || trip.ac;
+  const hasTrunk = trip.features?.trunk || trip.trunk;
 
   return (
-    <Card style={{ borderRadius: 18, marginBottom: 10 }} bodyStyle={{ padding: 14 }}>
-      <Space style={{ width: "100%", justifyContent: "space-between" }} align="start">
-        <div>
-          <Typography.Text style={{ fontWeight: 800, fontSize: 15 }}>
-            {trip.from_district} → {trip.to_district}
+    <Card
+      bodyStyle={{ padding: "16px" }}
+      style={{
+        borderRadius: 16,
+        marginBottom: 16,
+        boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+        border: "1px solid #f0f0f0",
+      }}
+    >
+      {/* 1. Haydovchi va Mashina ma'lumotlari */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <Space align="start">
+          <Avatar size={48} icon={<UserOutlined />} src={trip.driver?.avatar_url} />
+          <div>
+            <Typography.Text strong style={{ display: "block", fontSize: 16 }}>
+              {driverName}
+            </Typography.Text>
+            <Typography.Text type="secondary" style={{ fontSize: 13, display: "block", marginTop: 2 }}>
+              <CarOutlined style={{ marginRight: 4 }} />
+              {carModel} {carNumber && `• ${carNumber}`}
+            </Typography.Text>
+          </div>
+        </Space>
+        
+        {/* Narx qismi */}
+        <div style={{ textAlign: "right" }}>
+          <Typography.Text strong style={{ display: "block", fontSize: 18, color: "#1677ff" }}>
+            {price.toLocaleString()} so'm
           </Typography.Text>
-          <div style={{ marginTop: 6 }}>
-            <Tag color={trip.tariff === "pitak" ? "blue" : "gold"}>
-              {trip.tariff === "pitak" ? "Standart (Pitak)" : "Manzildan manzilga"}
-            </Tag>
-            {trip.has_ac && <Tag>❄️ Konditsioner</Tag>}
-            {trip.has_trunk && <Tag>🧳 Yukxona</Tag>}
-            {trip.is_lux && <Tag>✨ Luks</Tag>}
-            {trip.allow_smoking && <Tag>🚬 Sigaret</Tag>}
-            {trip.has_delivery && <Tag>📦 Eltish</Tag>}
-          </div>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            1 ta o'rindiq uchun
+          </Typography.Text>
+        </div>
+      </div>
 
-          {trip.tariff === "pitak" && trip.pitak_id && (
-            <div style={{ marginTop: 6, color: "#555", fontSize: 12 }}>
-              Pitak: <b>{trip.pitak_title || "Tanlangan pitak"}</b>
-            </div>
-          )}
+      <Divider style={{ margin: "12px 0" }} />
 
-          <div style={{ marginTop: 6, color: "#555", fontSize: 12 }}>
-            Ketish: <b>{new Date(trip.depart_at).toLocaleString()}</b>
-          </div>
-
-          {trip.tariff === "door" && (
-            <div style={{ marginTop: 6, color: "#555", fontSize: 12 }}>
-              O‘rindiq: <b>{trip.seats_total || "—"}</b>{" "}
-              {trip.allow_full_salon && trip.full_salon_price_uzs != null && (
-                <>
-                  · Butun salon: <b>{money(trip.full_salon_price_uzs)} so‘m</b>
-                </>
-              )}
-            </div>
-          )}
-
-          <div style={{ marginTop: 8 }}>
-            <Typography.Text style={{ fontWeight: 800 }}>{priceLine}</Typography.Text>
-            {trip.tariff === "door" && (
-              <div style={{ color: "#888", fontSize: 12, marginTop: 4 }}>
-                Uyidan olib ketish: {money(trip.pickup_fee_uzs)} · Uyga olib borish: {money(trip.dropoff_fee_uzs)}
-              </div>
-            )}
-            {trip.has_delivery && trip.delivery_price_uzs != null && (
-              <div style={{ color: "#888", fontSize: 12, marginTop: 4 }}>
-                Eltish narxi: {money(trip.delivery_price_uzs)} so‘m
-              </div>
-            )}
-          </div>
-
-          {trip.notes && (
-            <div style={{ marginTop: 8, color: "#666", fontSize: 12 }}>
-              Izoh: {trip.notes}
-            </div>
-          )}
+      {/* 2. Reys detallari */}
+      <Space direction="vertical" style={{ width: "100%" }} size={8}>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <Typography.Text type="secondary">Jo'nash vaqti:</Typography.Text>
+          <Typography.Text strong>
+            {departTime ? dayjs(departTime).format("DD-MMM, HH:mm") : "Kelishilgan vaqtda"}
+          </Typography.Text>
+        </div>
+        
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <Typography.Text type="secondary">Bo'sh o'rindiqlar:</Typography.Text>
+          <Typography.Text strong>{availableSeats} ta</Typography.Text>
         </div>
 
-        <Button type="primary" onClick={() => onRequest?.(trip)} style={{ borderRadius: 14 }}>
-          Buyirtma jonatish
-        </Button>
+        {/* Qulayliklar teglarini chiqarish */}
+        {(hasAc || hasTrunk) && (
+          <div style={{ marginTop: 4 }}>
+            {hasAc && <Tag color="blue">Konditsioner bor</Tag>}
+            {hasTrunk && <Tag color="green">Katta yukxona</Tag>}
+          </div>
+        )}
+        
+        {/* Haydovchining izohi (agar kiritgan bo'lsa) */}
+        {trip.note && (
+          <div style={{ marginTop: 8, padding: 8, backgroundColor: "#f9f9f9", borderRadius: 8 }}>
+            <Typography.Text type="secondary" italic>
+              " {trip.note} "
+            </Typography.Text>
+          </div>
+        )}
       </Space>
+
+      {/* 3. Buyurtma jo'natish tugmasi */}
+      <Button
+        type="primary"
+        style={{ width: "100%", marginTop: 16, height: 44, borderRadius: 12, fontWeight: "bold" }}
+        onClick={() => onRequest(trip)}
+        icon={<CheckCircleOutlined />}
+      >
+        Buyurtma jo'natish
+      </Button>
     </Card>
   );
 }

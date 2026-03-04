@@ -1,21 +1,92 @@
-import React, { useMemo } from "react";
-import { Card, Col, Row, Select, Space, Switch, Typography, Button } from "antd";
-import { EnvironmentOutlined } from "@ant-design/icons";
-import { REGIONS, getDistrictsByRegion } from "../../services/districtData";
+import React, { useMemo, useState, useEffect } from "react";
+import {
+  Card,
+  Select,
+  Typography,
+  Space,
+  Button,
+  Divider,
+  Switch,
+  Input,
+  Tooltip,
+} from "antd";
+import {
+  SwapOutlined,
+  EnvironmentOutlined,
+  AimOutlined,
+} from "@ant-design/icons";
 import { useDistrict } from "../../context/DistrictContext";
+import { KARAKALPAKSTAN_DISTRICTS } from "../../data/districtData";
 
 /**
- * DistrictList.jsx (Client)
- * -------------------------------------------------------
- * Talab:
- * 1) Hududni tanlang (Qoraqalpog‘iston + viloyatlar)
- * 2) "Qaerdan" -> tanlangan hudud tumanlari
- * 3) "Qaerga" -> shu hudud tumanlari
- * 4) "Manzildan manzilgacha" (door-to-door) switch:
- *    - pickup: avtomatik aniqlanadi (GPS), xaritadan o‘zgartirish mumkin
- *    - dropoff: ixtiyoriy (majburiy emas)
+ * Viloyatlar ro'yxati
  */
-export default function DistrictList({ onOpenPicker, onLocateMe }) {
+const REGIONS = [
+  { value: "karakalpakstan", label: "Qoraqalpog'iston Respublikasi" },
+  { value: "tashkent_city", label: "Toshkent shahri" },
+  { value: "tashkent_region", label: "Toshkent viloyati" },
+  { value: "andijan", label: "Andijon viloyati" },
+  { value: "bukhara", label: "Buxoro viloyati" },
+  { value: "fergana", label: "Farg'ona viloyati" },
+  { value: "jizzakh", label: "Jizzax viloyati" },
+  { value: "namangan", label: "Namangan viloyati" },
+  { value: "navoiy", label: "Navoiy viloyati" },
+  { value: "kashkadarya", label: "Qashqadaryo viloyati" },
+  { value: "samarkand", label: "Samarqand viloyati" },
+  { value: "sirdaryo", label: "Sirdaryo viloyati" },
+  { value: "surkhandarya", label: "Surxondaryo viloyati" },
+  { value: "khorazm", label: "Xorazm viloyati" },
+];
+
+/**
+ * Viloyatlarga tegishli tuman va shaharlar ro'yxati to'liq kiritildi
+ */
+const DISTRICTS_BY_REGION = {
+  karakalpakstan: KARAKALPAKSTAN_DISTRICTS || [
+    "Nukus shahri", "Amudaryo", "Beruniy", "Bo'zatov", "Chimboy", "Ellikqal'a", "Kegeyli", "Mo'ynoq", "Nukus tumani", "Qonliko'l", "Qorao'zak", "Shumanay", "Taxiatosh", "Taxtako'pir", "To'rtko'l", "Xo'jayli"
+  ],
+  tashkent_city: [
+    "Bektemir", "Chilonzor", "Mirobod", "Mirzo Ulug'bek", "Olmazor", "Sergeli", "Shayxontohur", "Uchtepa", "Yakkasaroy", "Yashnobod", "Yunusobod", "Yangihayot"
+  ],
+  tashkent_region: [
+    "Nurafshon shahri", "Olmaliq shahri", "Angren shahri", "Bekobod shahri", "Chirchiq shahri", "Ohangaron shahri", "Yangiyo'l shahri", "Oqqo'rg'on", "Ohangaron", "Bekobod", "Bo'stonliq", "Bo'ka", "Chinoz", "Qibray", "Quyi Chirchiq", "O'rta Chirchiq", "Parkent", "Piskent", "Toshkent tumani", "Yangiyo'l", "Yuqori Chirchiq", "Zangiota"
+  ],
+  andijan: [
+    "Andijon shahri", "Xonobod shahri", "Andijon tumani", "Asaka", "Baliqchi", "Bo'ston", "Buloqboshi", "Izboskan", "Jalaquduq", "Marhamat", "Oltinko'l", "Paxtaobod", "Qo'rg'ontepa", "Shahrixon", "Ulug'nor"
+  ],
+  bukhara: [
+    "Buxoro shahri", "Kogon shahri", "Buxoro tumani", "G'ijduvon", "Jondor", "Kogon tumani", "Olot", "Peshku", "Qorako'l", "Qorovulbozor", "Romitan", "Shofirkon", "Vobkent"
+  ],
+  fergana: [
+    "Farg'ona shahri", "Marg'ilon shahri", "Qo'qon shahri", "Quvasoy shahri", "Buvayda", "Dang'ara", "Farg'ona tumani", "Furqat", "O'zbekiston", "Oltiariq", "Qo'shtepa", "Quva", "Rishton", "So'x", "Toshloq", "Uchko'prik", "Yozovon"
+  ],
+  jizzakh: [
+    "Jizzax shahri", "Arnasoy", "Baxmal", "Do'stlik", "Forish", "G'allaorol", "Sharof Rashidov", "Mirzacho'l", "Paxtakor", "Yangiobod", "Zafarobod", "Zarbdor", "Zomin"
+  ],
+  namangan: [
+    "Namangan shahri", "Chortoq", "Chust", "Davlatobod", "Kosonsoy", "Mingbuloq", "Namangan tumani", "Norin", "Pop", "To'raqo'rg'on", "Uchqo'rg'on", "Uychi", "Yangiqo'rg'on"
+  ],
+  navoiy: [
+    "Navoiy shahri", "Zarafshon shahri", "G'ozg'on shahri", "Xatirchi", "Karmana", "Qiziltepa", "Konimex", "Navbahor", "Nurota", "Tomdi", "Uchquduq"
+  ],
+  kashkadarya: [
+    "Qarshi shahri", "Shahrisabz shahri", "Chiroqchi", "Dehqonobod", "G'uzor", "Kasbi", "Kitob", "Ko'kdala", "Koson", "Mirishkor", "Muborak", "Nishon", "Qamashi", "Qarshi tumani", "Shahrisabz tumani", "Yakkabog'"
+  ],
+  samarkand: [
+    "Samarqand shahri", "Kattaqo'rg'on shahri", "Bulung'ur", "Ishtixon", "Jomboy", "Kattaqo'rg'on tumani", "Narpay", "Nurobod", "Oqdaryo", "Pastdarg'om", "Paxtachi", "Payariq", "Qo'shrabot", "Samarqand tumani", "Toyloq", "Urgut"
+  ],
+  sirdaryo: [
+    "Guliston shahri", "Yangiyer shahri", "Shirin shahri", "Boyovut", "Guliston tumani", "Xovos", "Mirzaobod", "Oqoltin", "Sardoba", "Sayxunobod", "Sirdaryo tumani"
+  ],
+  surkhandarya: [
+    "Termiz shahri", "Angor", "Bandixon", "Boysun", "Denov", "Jarqo'rg'on", "Muzrabot", "Oltinsoy", "Qiziriq", "Qumqo'rg'on", "Sariosiyo", "Sherobod", "Sho'rchi", "Termiz tumani", "Uzun"
+  ],
+  khorazm: [
+    "Urganch shahri", "Xiva shahri", "Bog'ot", "Gurlan", "Qo'shko'pir", "Shovot", "Tuproqqal'a", "Urganch tumani", "Xazarasp", "Xiva tumani", "Xonqa", "Yangiariq", "Yangibozor"
+  ]
+};
+
+export default function DistrictList() {
   const {
     regionId,
     setRegionId,
@@ -23,121 +94,284 @@ export default function DistrictList({ onOpenPicker, onLocateMe }) {
     setFromDistrict,
     toDistrict,
     setToDistrict,
+
     doorToDoor,
     setDoorToDoor,
+
     pickupAddress,
+    setPickupAddress,
     dropoffAddress,
+    setDropoffAddress,
+    pickupPoint,
+    setPickupPoint,
+    dropoffPoint,
+    setDropoffPoint,
   } = useDistrict();
 
-  const districts = useMemo(() => getDistrictsByRegion(regionId), [regionId]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerType, setPickerType] = useState("pickup"); // 'pickup' | 'dropoff'
 
-  const optionsRegion = useMemo(
-    () => REGIONS.map((r) => ({ value: r.id, label: r.name })),
-    []
-  );
+  // Hudud (viloyat) o'zgarganda tumanlarni moslab chiqarish
+  const districtOptions = useMemo(() => {
+    const list = DISTRICTS_BY_REGION[regionId] || [];
+    return list.map((d) => ({ value: d, label: d }));
+  }, [regionId]);
 
-  const optionsDistrict = useMemo(
-    () => districts.map((d) => ({ value: d.name, label: d.name })),
-    [districts]
-  );
+  // Viloyat o'zgarganda tanlangan tumanlarni tozalash
+  useEffect(() => {
+    setFromDistrict(null);
+    setToDistrict(null);
+  }, [regionId, setFromDistrict, setToDistrict]);
+
+  // "Manzildan manzilgacha" rejimi yoqilganda va manzil aniqlanmagan bo'lsa, avtomatik izlash
+  useEffect(() => {
+    if (doorToDoor && !pickupPoint) {
+      handleFindMe();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doorToDoor]);
+
+  const handleSwap = () => {
+    const tempD = fromDistrict;
+    setFromDistrict(toDistrict);
+    setToDistrict(tempD);
+
+    if (doorToDoor) {
+      const tempP = pickupPoint;
+      setPickupPoint(dropoffPoint);
+      setDropoffPoint(tempP);
+
+      const tempA = pickupAddress;
+      setPickupAddress(dropoffAddress);
+      setDropoffAddress(tempA);
+    }
+  };
+
+  const openPicker = (type) => {
+    setPickerType(type);
+    setPickerOpen(true);
+  };
+
+  // 1) Find Me - geolocation API
+  const handleFindMe = () => {
+    if (!navigator.geolocation) {
+      alert("Geolokatsiya qurilmangizda qo'llab-quvvatlanmaydi.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        // Mock reverse geocode
+        const mockAddress = `Mo'ljal: Geolokatsiya bilan topilgan joy (${lat.toFixed(
+          3
+        )}, ${lng.toFixed(3)})`;
+        setPickupPoint({ lat, lng });
+        setPickupAddress(mockAddress);
+      },
+      (err) => {
+        console.warn(err);
+        alert("Geolokatsiyani aniqlab bo'lmadi. GPS yoniqligini tekshiring.");
+        // openPicker("pickup"); // ixtiyoriy fallback
+      },
+      { enableHighAccuracy: true }
+    );
+  };
 
   return (
-    <Card style={{ borderRadius: 18 }}>
-      <Typography.Text style={{ fontWeight: 700 }}>Tumanlar aro</Typography.Text>
-
-      <div style={{ marginTop: 12 }}>
-        <Typography.Text style={{ fontSize: 12, opacity: 0.7 }}>Hududni tanlang</Typography.Text>
-        <Select
-          value={regionId}
-          onChange={(v) => {
-            setRegionId(v);
-            setFromDistrict(null);
-            setToDistrict(null);
-          }}
-          options={optionsRegion}
-          style={{ width: "100%", marginTop: 6 }}
-          size="large"
-        />
-      </div>
-
-      <Row gutter={10} style={{ marginTop: 12 }}>
-        <Col span={12}>
-          <Typography.Text style={{ fontSize: 12, opacity: 0.7 }}>Qaerdan</Typography.Text>
+    <Card
+      bodyStyle={{ padding: "16px 12px" }}
+      style={{
+        borderRadius: 16,
+        boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+        border: "none",
+      }}
+    >
+      <Space direction="vertical" style={{ width: "100%" }} size={16}>
+        {/* VILOYAT TANLASH */}
+        <div>
+          <Typography.Text type="secondary" style={{ fontSize: 13, marginBottom: 4, display: "block" }}>
+            Hududni tanlang
+          </Typography.Text>
           <Select
-            value={fromDistrict}
-            onChange={(v) => setFromDistrict(v)}
-            options={optionsDistrict}
-            placeholder="Tanlang"
-            style={{ width: "100%", marginTop: 6 }}
-            size="large"
+            style={{ width: "100%" }}
+            placeholder="Viloyat yoki Respublikani tanlang"
+            value={regionId}
+            onChange={setRegionId}
+            options={REGIONS}
           />
-        </Col>
-        <Col span={12}>
-          <Typography.Text style={{ fontSize: 12, opacity: 0.7 }}>Qaerga</Typography.Text>
-          <Select
-            value={toDistrict}
-            onChange={(v) => setToDistrict(v)}
-            options={optionsDistrict}
-            placeholder="Tanlang"
-            style={{ width: "100%", marginTop: 6 }}
-            size="large"
-          />
-        </Col>
-      </Row>
+        </div>
 
-      <div style={{ marginTop: 14 }}>
-        <Space align="center" style={{ width: "100%", justifyContent: "space-between" }}>
-          <Typography.Text style={{ fontWeight: 600 }}>Manzildan manzilgacha</Typography.Text>
-          <Switch
-            checked={doorToDoor}
-            onChange={(v) => {
-              setDoorToDoor(v);
-              // door-to-door yoqilganda pickupni GPS bilan olishga harakat qilamiz
-              if (v) onLocateMe?.();
+        {/* TUMANLAR / MANZIL */}
+        <div style={{ position: "relative" }}>
+          <Space direction="vertical" style={{ width: "100%" }} size={12}>
+            {/* FROM */}
+            <div>
+              <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                Qayerdan
+              </Typography.Text>
+              <Select
+                showSearch
+                style={{ width: "100%", marginTop: 4 }}
+                placeholder="Tumanni tanlang"
+                value={fromDistrict}
+                onChange={setFromDistrict}
+                options={districtOptions}
+              />
+              {doorToDoor && (
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                  <Input
+                    placeholder="Aniq manzil, ko'cha yoki mo'ljal"
+                    value={pickupAddress}
+                    onChange={(e) => setPickupAddress(e.target.value)}
+                    prefix={<EnvironmentOutlined style={{ color: "#fa8c16" }} />}
+                  />
+                  <Tooltip title="Xaritadan tanlash">
+                    <Button icon={<EnvironmentOutlined />} onClick={() => openPicker("pickup")} />
+                  </Tooltip>
+                  <Tooltip title="Mening joylashuvim">
+                    <Button icon={<AimOutlined />} onClick={handleFindMe} />
+                  </Tooltip>
+                </div>
+              )}
+            </div>
+
+            <Divider style={{ margin: 0 }} />
+
+            {/* TO */}
+            <div>
+              <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                Qayerga
+              </Typography.Text>
+              <Select
+                showSearch
+                style={{ width: "100%", marginTop: 4 }}
+                placeholder="Tumanni tanlang"
+                value={toDistrict}
+                onChange={setToDistrict}
+                options={districtOptions}
+              />
+              {doorToDoor && (
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                  <Input
+                    placeholder="Aniq manzil (Majburiy emas)"
+                    value={dropoffAddress}
+                    onChange={(e) => setDropoffAddress(e.target.value)}
+                    prefix={<EnvironmentOutlined style={{ color: "#52c41a" }} />}
+                  />
+                  <Tooltip title="Xaritadan tanlash">
+                    <Button icon={<EnvironmentOutlined />} onClick={() => openPicker("dropoff")} />
+                  </Tooltip>
+                </div>
+              )}
+            </div>
+          </Space>
+
+          {/* SWAP BTN */}
+          <Button
+            shape="circle"
+            icon={<SwapOutlined style={{ transform: "rotate(90deg)", color: "#1677ff" }} />}
+            onClick={handleSwap}
+            style={{
+              position: "absolute",
+              right: 16,
+              top: "50%",
+              transform: "translateY(-50%)",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+              border: "none",
             }}
           />
-        </Space>
-        <Typography.Text style={{ fontSize: 12, opacity: 0.7, display: "block", marginTop: 6 }}>
-          Yoqilsa: siz turgan joy avtomatik aniqlanadi, xohlasangiz xaritadan o‘zgartirasiz.
-          "Qaerga (manzil)" majburiy emas.
-        </Typography.Text>
-      </div>
-
-      {doorToDoor && (
-        <div style={{ marginTop: 12 }}>
-          <Card size="small" style={{ borderRadius: 14, marginBottom: 10 }}>
-            <Space style={{ width: "100%", justifyContent: "space-between" }}>
-              <Space>
-                <EnvironmentOutlined />
-                <div>
-                  <div style={{ fontWeight: 600 }}>Qaerdan (manzil)</div>
-                  <div style={{ fontSize: 12, opacity: 0.7 }}>{pickupAddress || "Aniqlanmagan"}</div>
-                </div>
-              </Space>
-              <Button onClick={() => onOpenPicker?.("pickup")} style={{ borderRadius: 12 }}>
-                Xaritadan
-              </Button>
-            </Space>
-          </Card>
-
-          <Card size="small" style={{ borderRadius: 14 }}>
-            <Space style={{ width: "100%", justifyContent: "space-between" }}>
-              <Space>
-                <EnvironmentOutlined />
-                <div>
-                  <div style={{ fontWeight: 600 }}>Qaerga (manzil)</div>
-                  <div style={{ fontSize: 12, opacity: 0.7 }}>
-                    {dropoffAddress || "Ixtiyoriy (majburiy emas)"}
-                  </div>
-                </div>
-              </Space>
-              <Button onClick={() => onOpenPicker?.("dropoff")} style={{ borderRadius: 12 }}>
-                Xaritadan
-              </Button>
-            </Space>
-          </Card>
         </div>
-      )}
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <Typography.Text strong>Manzildan manzilgacha</Typography.Text>
+          <Switch checked={doorToDoor} onChange={setDoorToDoor} />
+        </div>
+      </Space>
+
+      {/* LOCATION PICKER MODAL (Mock) */}
+      <LocationPickerModal
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSelect={(point, address) => {
+          if (pickerType === "pickup") {
+            setPickupPoint(point);
+            setPickupAddress(address);
+          } else {
+            setDropoffPoint(point);
+            setDropoffAddress(address);
+          }
+        }}
+        pickerType={pickerType}
+      />
     </Card>
+  );
+}
+
+// ----------------------------------------------------
+// Dummy / Mock Modal - keyinchalik haqiqiy xaritaga (Map) ulanadi
+// ----------------------------------------------------
+function LocationPickerModal({ open, onClose, onSelect, pickerType }) {
+  if (!open) return null;
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0,0,0,0.5)",
+        zIndex: 9999,
+        display: "flex",
+        alignItems: "flex-end",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          backgroundColor: "#fff",
+          height: "60vh",
+          borderTopLeftRadius: 16,
+          borderTopRightRadius: 16,
+          padding: 16,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <Typography.Title level={5}>
+          Xaritadan belgilash ({pickerType === "pickup" ? "Qayerdan" : "Qayerga"})
+        </Typography.Title>
+        <div
+          style={{
+            flex: 1,
+            backgroundColor: "#eee",
+            borderRadius: 8,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: 16,
+          }}
+        >
+          <Typography.Text type="secondary">
+            (Bu yerda Yandex / Google Map bo'ladi. Hozircha "Tanlash" tugmasini bosing)
+          </Typography.Text>
+        </div>
+        <Space>
+          <Button onClick={onClose}>Bekor qilish</Button>
+          <Button
+            type="primary"
+            onClick={() => {
+              const rLat = 42.46 + Math.random() * 0.05; // Nukus atrofi
+              const rLng = 59.61 + Math.random() * 0.05;
+              onSelect({ lat: rLat, lng: rLng }, `Xaritadan tanlangan manzil (${rLat.toFixed(3)})`);
+              onClose();
+            }}
+          >
+            Shu yerni tanlash
+          </Button>
+        </Space>
+      </div>
+    </div>
   );
 }
