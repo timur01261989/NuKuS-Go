@@ -14,7 +14,7 @@ import RequestTripDrawer from "./components/Trips/RequestTripDrawer";
 import { searchTrips, requestTrip, listPitaks } from "@/features/shared/interDistrictTrips";
 import { nominatimReverse } from "../shared/geo/nominatim";
 
-import { MapContainer, TileLayer, Marker } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -82,7 +82,7 @@ function MapPicker({ open, onClose, initialPoint, onPick }) {
 
 function MapClickSetter({ onPoint }) {
   // react-leaflet hook import dynamic to avoid SSR issues in Vercel
-  const { useMapEvents } = require("react-leaflet");
+// removed require() (Vite browser build); useMapEvents is imported above
   useMapEvents({
     click(e) {
       onPoint?.({ lat: e.latlng.lat, lng: e.latlng.lng });
