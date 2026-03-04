@@ -81,8 +81,6 @@ function MapPicker({ open, onClose, initialPoint, onPick }) {
 }
 
 function MapClickSetter({ onPoint }) {
-  // react-leaflet hook import dynamic to avoid SSR issues in Vercel
-// removed require() (Vite browser build); useMapEvents is imported above
   useMapEvents({
     click(e) {
       onPoint?.({ lat: e.latlng.lat, lng: e.latlng.lng });
@@ -93,35 +91,16 @@ function MapClickSetter({ onPoint }) {
 
 function Inner({ onBack }) {
   const {
-  const districtCtx = (() => {
-    try {
-      return useDistrict();
-    } catch (e) {
-      return null;
-    }
-  })();
-
-  if (!districtCtx) {
-    return (
-      <div className="page">
-        <div className="card">
-          <h2>Tumanlar aro</h2>
-          <p>Yuklanmoqda...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const {
     regionId,
-    regionName,
     fromDistrict,
     toDistrict,
     doorToDoor,
     pickupPoint,
-    dropoffPoint,
+    setPickupPoint,
     pickupAddress,
     setPickupAddress,
+    dropoffPoint,
+    setDropoffPoint,
     dropoffAddress,
     setDropoffAddress,
     departDate,
@@ -130,7 +109,7 @@ function Inner({ onBack }) {
     filters,
     routeInfo,
     setRouteInfo,
-  } = districtCtx;
+  } = useDistrict();
 
   const { from, to, distanceKm, durationMin, polyline } = useDistrictRoute({
     regionId,
