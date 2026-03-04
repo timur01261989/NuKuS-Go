@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useMemo, useState } from "react";
+import { REGIONS, getDistrictNamesByRegion } from "../services/districtData";
 
 /**
  * DistrictContext.jsx
@@ -38,9 +39,19 @@ export function DistrictProvider({ children }) {
     trunk: false,
   });
 
+
+  const onRegionChange = (r) => {
+    setRegion(r);
+    // reset selections to avoid mismatched district lists
+    setFromDistrict(null);
+    setToDistrict(null);
+  };
+
   const value = useMemo(
     () => ({
-      fromDistrict,
+      region,
+    setRegion: onRegionChange,
+    fromDistrict,
       setFromDistrict,
       toDistrict,
       setToDistrict,

@@ -7,10 +7,13 @@ import CarSeatSchema from "./components/Seats/CarSeatSchema";
 import SeatLegend from "./components/Seats/SeatLegend";
 import FilterBar from "./components/Drivers/FilterBar";
 import DriverOfferCard from "./components/Drivers/DriverOfferCard";
+import TripCard from "./components/Trips/TripCard";
+import RequestTripDrawer from "./components/Trips/RequestTripDrawer";
 import DistrictMap from "./map/DistrictMap";
 import { DistrictProvider, useDistrict } from "./context/DistrictContext";
 import { useDistrictRoute } from "./map/useDistrictRoute";
 import { listDistrictOffers, createInterDistrictOrder } from "./services/districtApi";
+import { searchTrips } from "@/features/shared/interDistrictTrips";
 
 /**
  * ClientInterDistrictPage.jsx
@@ -25,6 +28,7 @@ import { listDistrictOffers, createInterDistrictOrder } from "./services/distric
 
 function Inner({ onBack }) {
   const {
+    region,
     fromDistrict,
     toDistrict,
     departureTime,
@@ -39,6 +43,12 @@ function Inner({ onBack }) {
   const [loadingOffers, setLoadingOffers] = useState(false);
   const [offers, setOffers] = useState([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // NEW: Driver yaratgan reyslar (district_trips)
+  const [loadingTrips, setLoadingTrips] = useState(false);
+  const [trips, setTrips] = useState([]);
+  const [reqDrawerOpen, setReqDrawerOpen] = useState(false);
+  const [selectedTrip, setSelectedTrip] = useState(null);
 
   useEffect(() => {
     setRouteInfo({ distanceKm, durationMin, price });
@@ -65,7 +75,39 @@ function Inner({ onBack }) {
         setLoadingOffers(false);
       }
     })();
-  }, [fromDistrict, toDistrict, distanceKm, filters.ac, filters.trunk]);
+  }, [fromDistrict, toDistrict, distanceKm, filters.ac, filt
+
+  const doSearchTrips = async () => {
+    setLoadingTrips(true);
+    try {
+      // Basic search by region/from/to + optional depart window
+      const payload = {
+        region: region || null,
+        from_district: fromDistrict || null,
+        to_district: toDistrict || null,
+        // If you add client-side mode toggle later:
+        mode: null,
+        depart_from: departureTime ? new Date(departureTime).toISOString() : null,
+        depart_to: null,
+        filters,
+      };
+
+      const { data, error } = await searchTrips(payload);
+      if (error) throw error;
+      setTrips(Array.isArray(data) ? data : []);
+      if (!data || data.length === 0) {
+        message.info("Reys topilmadi");
+      }
+    } catch (e) {
+      console.warn(e);
+      message.error(e?.message || "Reys izlashda xato");
+      setTrips([]);
+    } finally {
+      setLoadingTrips(false);
+    }
+  };
+
+ers.trunk]);
 
   const handleCreate = async (offer) => {
     if (!toDistrict) return message.error("Tuman tanlang");

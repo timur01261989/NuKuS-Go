@@ -1,43 +1,72 @@
 import React, { useMemo } from "react";
-import { Card, List, Typography } from "antd";
+import { Card, Col, Row, Select, Typography } from "antd";
 import { EnvironmentOutlined } from "@ant-design/icons";
-import { DISTRICTS } from "../../services/districtData";
+import { REGIONS, getDistrictNamesByRegion } from "../../services/districtData";
 import { useDistrict } from "../../context/DistrictContext";
 
 /**
  * DistrictList.jsx
  * -------------------------------------------------------
- * Tumanlar ro'yxati. Tanlanganda toDistrict set bo‘ladi.
+ * Client (Tumanlar aro) tanlash:
+ * - Hudud (viloyat) tanlash
+ * - Qaerdan (tuman) tanlash
+ * - Qaerga (tuman) tanlash
+ *
+ * Bu struktura keyin to'liq tumanlar ro'yxati bilan kengaytiriladi.
  */
 export default function DistrictList() {
-  const { toDistrict, setToDistrict } = useDistrict();
+  const { region, setRegion, fromDistrict, setFromDistrict, toDistrict, setToDistrict } = useDistrict();
 
-  const list = useMemo(() => DISTRICTS.filter((d) => d.name !== "Nukus"), []);
+  const regionOptions = useMemo(() => (REGIONS || []).map((r) => ({ value: r, label: r })), []);
+
+  const districtOptions = useMemo(() => {
+    const list = getDistrictNamesByRegion(region) || [];
+    return list.map((d) => ({ value: d, label: d }));
+  }, [region]);
 
   return (
-    <Card style={{ borderRadius: 18 }}>
-      <Typography.Text style={{ fontWeight: 700 }}>Tuman tanlang</Typography.Text>
-      <List
-        itemLayout="horizontal"
-        dataSource={list}
-        renderItem={(d) => (
-          <List.Item
-            onClick={() => setToDistrict(d.name)}
-            style={{
-              cursor: "pointer",
-              borderRadius: 12,
-              padding: "10px 10px",
-              background: toDistrict === d.name ? "rgba(82,196,26,.08)" : "transparent",
-            }}
-          >
-            <List.Item.Meta
-              avatar={<EnvironmentOutlined style={{ fontSize: 18, color: "#1677ff" }} />}
-              title={<span style={{ fontWeight: 700 }}>{d.name}</span>}
-              description={<span style={{ color: "#666" }}>Tuman markazi</span>}
-            />
-          </List.Item>
-        )}
-      />
+    <Card style={{ borderRadius: 16, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.10)" }}>
+      <Typography.Title level={5} style={{ marginTop: 0 }}>
+        <EnvironmentOutlined /> Hudud va tumanlar
+      </Typography.Title>
+
+      <Row gutter={[12, 12]}>
+        <Col span={24}>
+          <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 6 }}>Hududni tanlang</div>
+          <Select
+            value={region || undefined}
+            onChange={(v) => setRegion?.(v)}
+            style={{ width: "100%" }}
+            options={regionOptions}
+            showSearch
+            placeholder="Hududni tanlang"
+          />
+        </Col>
+
+        <Col span={12}>
+          <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 6 }}>Qaerdan</div>
+          <Select
+            value={fromDistrict || undefined}
+            onChange={(v) => setFromDistrict?.(v)}
+            style={{ width: "100%" }}
+            options={districtOptions}
+            showSearch
+            placeholder="Qayerdan (tuman)"
+          />
+        </Col>
+
+        <Col span={12}>
+          <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 6 }}>Qaerga</div>
+          <Select
+            value={toDistrict || undefined}
+            onChange={(v) => setToDistrict?.(v)}
+            style={{ width: "100%" }}
+            options={districtOptions}
+            showSearch
+            placeholder="Qayerga (tuman)"
+          />
+        </Col>
+      </Row>
     </Card>
   );
 }

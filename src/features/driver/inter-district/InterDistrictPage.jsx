@@ -17,6 +17,10 @@ import DynamicPriceCard from './components/modes/premium/DynamicPriceCard';
 
 import ParcelEntryModal from './components/parcel/ParcelEntryModal';
 
+import TripCreateModal from './components/shared/TripCreateModal';
+import PitakAdminModal from './components/shared/PitakAdminModal';
+import TripRequestsDrawer from './components/shared/TripRequestsDrawer';
+
 import { usePremiumSocket } from './hooks/usePremiumSocket';
 
 import './styles/theme.css';
@@ -27,6 +31,9 @@ const { Title, Text } = Typography;
 function Inner() {
   const { mode, MODES, upsertPremiumClient, lastError, locateOnce } = useDistrict();
   const [parcelOpen, setParcelOpen] = useState(false);
+  const [tripCreateOpen, setTripCreateOpen] = useState(false);
+  const [pitakAdminOpen, setPitakAdminOpen] = useState(false);
+  const [reqDrawerOpen, setReqDrawerOpen] = useState(false);
 
   // Premium: realtime requestlar
   usePremiumSocket({
@@ -54,6 +61,15 @@ function Inner() {
             </Text>
           </div>
           <Space>
+            <Button onClick={() => setTripCreateOpen(true)} type="primary">
+              Reys yaratish
+            </Button>
+            <Button onClick={() => setReqDrawerOpen(true)}>
+              So‘rovlar
+            </Button>
+            <Button onClick={() => setPitakAdminOpen(true)}>
+              Pitak (Admin)
+            </Button>
             <Button icon={<InboxOutlined />} onClick={() => setParcelOpen(true)}>
               Posilka
             </Button>
@@ -110,6 +126,10 @@ function Inner() {
         </Row>
 
         <ParcelEntryModal open={parcelOpen} onClose={() => setParcelOpen(false)} />
+      <TripCreateModal open={tripCreateOpen} onClose={() => setTripCreateOpen(false)} onCreated={() => { try { locateOnce?.(); } catch {} }} />
+      <PitakAdminModal open={pitakAdminOpen} onClose={() => setPitakAdminOpen(false)} />
+      <TripRequestsDrawer open={reqDrawerOpen} onClose={() => setReqDrawerOpen(false)} />
+
       </Content>
     </Layout>
   );
