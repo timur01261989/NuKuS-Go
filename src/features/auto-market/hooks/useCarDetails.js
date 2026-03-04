@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getCarById, priceHistory } from "../services/marketApi";
+import { getCarById, priceHistory } from "../services/marketBackend";
 
 export default function useCarDetails(id) {
   const [car, setCar] = useState(null);

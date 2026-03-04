@@ -8,7 +8,7 @@ import Step3_Photos from "./steps/Step3_Photos";
 import Step4_Desc from "./steps/Step4_Desc";
 import Step5_Contact from "./steps/Step5_Contact";
 import PreviewModal from "./PreviewModal";
-import { createCarAd } from "../../services/marketApi";
+import { createCarAd } from "../../services/marketBackend";
 
 const titles = ["Marka/Model", "Parametrlar", "Rasmlar", "Narx & Tavsif", "Kontakt"];
 

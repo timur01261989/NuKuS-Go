@@ -9,7 +9,7 @@
 import React, { useEffect, useState } from "react";
 import { Card, Spin, Progress } from "antd";
 import { RobotOutlined } from "@ant-design/icons";
-import { analyzeFairPrice } from "../../services/marketApi";
+import { analyzeFairPrice } from "../../services/marketBackend";
 
 export default function FairPriceBlock({ car }) {
   const [result, setResult] = useState(null);

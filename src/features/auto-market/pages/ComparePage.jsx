@@ -3,7 +3,7 @@ import { Button, Spin, Table } from "antd";
 import { ArrowLeftOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { useCompare } from "../context/CompareContext";
-import { getCarById } from "../services/marketApi";
+import { getCarById } from "../services/marketBackend";
 import { formatPrice } from "../services/priceUtils";
 
 export default function ComparePage() {

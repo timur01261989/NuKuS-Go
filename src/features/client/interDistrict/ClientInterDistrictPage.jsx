@@ -93,16 +93,35 @@ function MapClickSetter({ onPoint }) {
 
 function Inner({ onBack }) {
   const {
+  const districtCtx = (() => {
+    try {
+      return useDistrict();
+    } catch (e) {
+      return null;
+    }
+  })();
+
+  if (!districtCtx) {
+    return (
+      <div className="page">
+        <div className="card">
+          <h2>Tumanlar aro</h2>
+          <p>Yuklanmoqda...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const {
     regionId,
+    regionName,
     fromDistrict,
     toDistrict,
     doorToDoor,
     pickupPoint,
-    setPickupPoint,
+    dropoffPoint,
     pickupAddress,
     setPickupAddress,
-    dropoffPoint,
-    setDropoffPoint,
     dropoffAddress,
     setDropoffAddress,
     departDate,
@@ -111,7 +130,7 @@ function Inner({ onBack }) {
     filters,
     routeInfo,
     setRouteInfo,
-  } = useDistrict();
+  } = districtCtx;
 
   const { from, to, distanceKm, durationMin, polyline } = useDistrictRoute({
     regionId,

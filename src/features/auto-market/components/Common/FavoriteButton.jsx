@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { HeartFilled, HeartOutlined } from "@ant-design/icons";
 import { Button } from "antd";
-import { getFavorites, toggleFavorite } from "../../services/marketApi";
+import { getFavorites, toggleFavorite } from "../../services/marketBackend";
 
 export default function FavoriteButton({ adId, size = "middle", onChanged }) {
   const [fav, setFav] = useState(false);

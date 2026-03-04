@@ -1,4 +1,4 @@
-import * as marketApi from "../services/marketApi";
+import * as marketApi from "../services/marketBackend";
 
 /**
  * Cars / Ads service (proxy layer)

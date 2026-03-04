@@ -7,7 +7,7 @@ import React, { useEffect, useState } from "react";
 import { Button, Progress, message, Spin, Empty } from "antd";
 import { ArrowLeftOutlined, FireOutlined, TrophyOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import { listBattles, voteBattle } from "../services/marketApi";
+import { listBattles, voteBattle } from "../services/marketBackend";
 
 function BattleCard({ battle, onVote }) {
   const total    = battle.votes_a + battle.votes_b;

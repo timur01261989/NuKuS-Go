@@ -7,7 +7,7 @@ import React, { useEffect, useState } from "react";
 import { Button, Spin, Empty, Input, Select } from "antd";
 import { ArrowLeftOutlined, CalculatorOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import { listVikupAds } from "../services/marketApi";
+import { listVikupAds } from "../services/marketBackend";
 import { BRANDS } from "../services/staticData";
 import PriceTag from "../components/Common/PriceTag";
 import VikupCalculator from "../components/Details/VikupCalculator";

@@ -1,46 +1,32 @@
 import React from "react";
-import { Card, Space, Switch, Typography } from "antd";
+import { Card, Switch, Typography } from "antd";
+import { SettingOutlined } from "@ant-design/icons";
 import { useDistrict } from "../../context/DistrictContext";
 
+/**
+ * FilterBar.jsx
+ * -------------------------------------------------------
+ * Konditsioner, yukxona kabi filterlar.
+ */
 export default function FilterBar() {
   const { filters, setFilters } = useDistrict();
 
-  const handleChange = (key, checked) => {
-    setFilters((prev) => ({ ...prev, [key]: checked }));
-  };
-
   return (
-    <Card
-      bodyStyle={{ padding: "16px 12px" }}
-      style={{
-        borderRadius: 16,
-        boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
-        border: "none",
-      }}
-    >
-      <Typography.Title level={5} style={{ marginTop: 0, marginBottom: 16 }}>
-        Qo'shimcha qulayliklar
-      </Typography.Title>
-      
-      <Space direction="vertical" style={{ width: "100%" }} size={16}>
-        {/* Konditsioner filtri */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <Typography.Text>Konditsioner</Typography.Text>
-          <Switch
-            checked={filters.ac}
-            onChange={(checked) => handleChange("ac", checked)}
-          />
-        </div>
+    <Card style={{ borderRadius: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <SettingOutlined />
+        <Typography.Text style={{ fontWeight: 700 }}>Filtrlar</Typography.Text>
+      </div>
 
-        {/* Yukxona filtri */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <Typography.Text>Katta yukxona (Bagaj)</Typography.Text>
-          <Switch
-            checked={filters.trunk}
-            onChange={(checked) => handleChange("trunk", checked)}
-          />
-        </div>
-      </Space>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0" }}>
+        <Typography.Text>Konditsioner</Typography.Text>
+        <Switch checked={filters.ac} onChange={(v) => setFilters((p) => ({ ...p, ac: v }))} />
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0" }}>
+        <Typography.Text>Yukxona</Typography.Text>
+        <Switch checked={filters.trunk} onChange={(v) => setFilters((p) => ({ ...p, trunk: v }))} />
+      </div>
     </Card>
   );
 }

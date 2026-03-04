@@ -16,7 +16,7 @@ Arxitektura keyin kengaytirishga qulay: servislar bitta joyda, contextlar ajrati
 - `context/CompareContext.jsx` — solishtirish ro'yxati (max 4 ta), localStorage bilan.
 
 ## Services
-- `services/marketApi.js` — hozircha mock-first (localStorage seed). Keyin Supabase/Backend ulash oson.
+- `services/marketBackend.js` — hozircha mock-first (localStorage seed). Keyin Supabase/Backend ulash oson.
 - `services/staticData.js` — brand/model/fuel/cities va boshqalar.
 - `services/priceUtils.js` — narx formatlash va valyuta konvert (demo).
 

@@ -7,7 +7,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import { Button, Select, Spin, Empty, Tag, message, Input } from "antd";
 import { ArrowLeftOutlined, SwapOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import { listBarterAdsByOfferModel, createBarterOffer } from "../services/marketApi";
+import { listBarterAdsByOfferModel, createBarterOffer } from "../services/marketBackend";
 import { BRANDS, MODELS_BY_BRAND } from "../services/staticData";
 import PriceTag from "../components/Common/PriceTag";
 

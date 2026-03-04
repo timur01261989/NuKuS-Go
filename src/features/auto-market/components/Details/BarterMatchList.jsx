@@ -8,7 +8,7 @@
 import React, { useEffect, useState } from "react";
 import { Button, Select, Spin, Empty, Tag, Drawer } from "antd";
 import { SwapOutlined } from "@ant-design/icons";
-import { listBarterAdsByOfferModel, createBarterOffer } from "../../services/marketApi";
+import { listBarterAdsByOfferModel, createBarterOffer } from "../../services/marketBackend";
 import { BRANDS, MODELS_BY_BRAND } from "../../services/staticData";
 import PriceTag from "../Common/PriceTag";
 

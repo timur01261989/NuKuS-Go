@@ -1,4 +1,4 @@
-import * as marketApi from "../services/marketApi";
+import * as marketApi from "../services/marketBackend";
 
 export const login = (payload) => marketApi.login?.(payload);
 export const logout = () => marketApi.logout?.();

@@ -1,4 +1,4 @@
-import * as marketApi from "../services/marketApi";
+import * as marketApi from "../services/marketBackend";
 
 export const getChats = () => marketApi.getChats?.();
 export const getMessages = (chatId) => marketApi.getMessages?.(chatId);

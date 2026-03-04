@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Button, Spin, Tag } from "antd";
 import { ArrowLeftOutlined, PlusOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import { myAds, markAdStatus } from "../services/marketApi";
+import { myAds, markAdStatus } from "../services/marketBackend";
 import CarCardHorizontal from "../components/Feed/CarCardHorizontal";
 
 export default function MyAdsPage() {

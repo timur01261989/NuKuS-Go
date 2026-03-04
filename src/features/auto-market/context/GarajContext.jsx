@@ -4,7 +4,7 @@
  * addToGaraj / removeFromGaraj / isInGaraj funksiyalari
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { addToGaraj as apiAdd, removeFromGaraj as apiRemove, getGaraj } from "../services/marketApi";
+import { addToGaraj as apiAdd, removeFromGaraj as apiRemove, getGaraj } from "../services/marketBackend";
 
 const GarajContext = createContext(null);
 

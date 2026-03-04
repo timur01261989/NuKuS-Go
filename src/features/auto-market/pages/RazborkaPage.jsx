@@ -8,7 +8,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import { Button, Select, Input, Spin, Empty, Tag, Modal, message } from "antd";
 import { ArrowLeftOutlined, PlusOutlined, PhoneOutlined, ToolOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import { listZapchast, createZapchastAd } from "../services/marketApi";
+import { listZapchast, createZapchastAd } from "../services/marketBackend";
 import { BRANDS, MODELS_BY_BRAND, ZAPCHAST_CATEGORIES } from "../services/staticData";
 
 export default function RazborkaPage() {
