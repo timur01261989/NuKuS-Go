@@ -30,12 +30,13 @@ export default function SellerProfile({ seller, onChat }) {
           type="primary"
           icon={<PhoneOutlined />}
           style={{ borderRadius: 14, flex: 1, background: "#0ea5e9", border: "none" }}
+          disabled={!s.phone}
           onClick={() => {
             if (!s.phone) return;
             window.location.href = `tel:${s.phone}`;
           }}
         >
-          Tel qilish
+          {s.phone ? "Tel qilish" : "Raqam yashirin"}
         </Button>
         <Button
           icon={<MessageOutlined />}
@@ -45,7 +46,11 @@ export default function SellerProfile({ seller, onChat }) {
           Chat
         </Button>
       </div>
-      {s.phone ? <div style={{ fontSize: 12, color: "#64748b", marginTop: 10 }}>Raqam: {s.phone}</div> : null}
+      {s.phone ? <div style={{ fontSize: 12, color: "#64748b", marginTop: 10 }}>Raqam: {s.phone}</div> : (
+        <div style={{ fontSize: 12, color: "#64748b", marginTop: 10 }}>
+          Raqam pullik: pastdagi “Raqamni ko'rish” tugmasi orqali ochiladi.
+        </div>
+      )}
     </Card>
   );
 }

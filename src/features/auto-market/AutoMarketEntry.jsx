@@ -25,6 +25,7 @@ import RazborkaPage       from "./pages/RazborkaPage";
 import AutoBattlePage     from "./pages/AutoBattlePage";
 import PriceAnalyticsPage from "./pages/PriceAnalyticsPage";
 import ServiceBookPage    from "./pages/ServiceBookPage";
+import TopUpPage          from "./pages/TopUpPage";
 
 export default function AutoMarketEntry() {
   return (
@@ -47,6 +48,7 @@ export default function AutoMarketEntry() {
         <Route path="/battle"       element={<AutoBattlePage />} />
         <Route path="/analytics"    element={<PriceAnalyticsPage />} />
         <Route path="/service-book" element={<ServiceBookPage />} />
+        <Route path="/topup"        element={<TopUpPage />} />
 
         <Route path="*" element={<Navigate to="/auto-market" replace />} />
       </Routes>

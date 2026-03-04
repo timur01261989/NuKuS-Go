@@ -26,6 +26,7 @@ import cronHeatmapHandler from "../server/api/cron_heatmap.js";
 import fraudHandler from "../server/api/fraud.js";
 import supportHandler from "../server/api/support.js";
 import voipHandler from "../server/api/voip.js";
+import autoMarketHandler from "../server/api/auto_market.js";
 
 function normalizePath(rawPath) {
   // Supports both direct path (/api/order) and rewritten query (?path=order)
@@ -85,6 +86,18 @@ function getRouteKey(path) {
   }
 
   if (base === "sos") return "sos";
+
+  if (base === "auto-market" || base === "automarket" || base === "market-auto") {
+    // /api/auto-market/payment/create
+    const map = {
+      "": "auto-market",
+      payment: "auto-market-payment",
+      promo: "auto-market-promo",
+      contact: "auto-market-contact",
+      cron: "auto-market-cron",
+    };
+    return map[sub] || "auto-market";
+  }
 
   // Older flat paths still used by frontend in a few places:
   if (base === "driver-state") return "driver-state";
@@ -246,6 +259,10 @@ export default async function handler(req, res) {
 
     if (path.startsWith("voip")) {
       return await voipHandler(req, res);
+    }
+
+    if (path.startsWith("auto-market") || path.startsWith("automarket") || path.startsWith("market-auto")) {
+      return await autoMarketHandler(req, res);
     }
 
     if (path.startsWith("freight")) {

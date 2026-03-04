@@ -24,6 +24,9 @@ import useCarDetails from "../hooks/useCarDetails";
 import useRecentlyViewed from "../hooks/useRecentlyViewed";
 import { useCompare } from "../context/CompareContext";
 import { useGaraj } from "../context/GarajContext";
+import PromoModal from "../components/Payments/PromoModal";
+import { revealPhone } from "../services/marketBackend";
+import useWalletBalance from "../hooks/useWalletBalance";
 
 export default function DetailsPage() {
   const { id } = useParams();
@@ -33,6 +36,9 @@ export default function DetailsPage() {
   const { toggle, has, ids, max } = useCompare();
   const { add: addToGaraj, remove: removeFromGaraj, isIn } = useGaraj();
   const [barterOpen, setBarterOpen] = useState(false);
+  const [promoOpen, setPromoOpen] = useState(false);
+  const [revealedPhone, setRevealedPhone] = useState(null);
+  const { balance, refresh: refreshBalance } = useWalletBalance();
 
   React.useEffect(() => { if (id) push(id); }, [id, push]);
 
@@ -148,20 +154,69 @@ export default function DetailsPage() {
             🔄 Barter
           </Button>
         )}
+
+        {/* OWNER: promo */}
+        {car.is_owner && (
+          <Button
+            onClick={() => setPromoOpen(true)}
+            style={{ borderRadius: 14, flex: 1, background: "#f59e0b", border: "none", color: "#fff" }}
+          >
+            🚀 TOP/VIP
+          </Button>
+        )}
+
         <Button
           type="primary"
-          onClick={() => {
-            if (car?.seller?.phone) window.location.href = `tel:${car.seller.phone}`;
-            else message.info("Raqam yo'q");
+          onClick={async () => {
+            try {
+              if (car.is_owner) {
+                const p = car?.seller?.phone;
+                if (p) window.location.href = `tel:${p}`;
+                else message.info("Raqam yo'q");
+                return;
+              }
+
+              if (revealedPhone) {
+                window.location.href = `tel:${revealedPhone}`;
+                return;
+              }
+
+              const res = await revealPhone({ ad_id: car.id });
+              if (res?.ok && res?.phone) {
+                setRevealedPhone(res.phone);
+                await refreshBalance();
+                message.success(res?.already ? "Raqam allaqachon ochilgan" : "✅ Raqam ochildi");
+                window.location.href = `tel:${res.phone}`;
+                return;
+              }
+              message.info("Raqam yo'q");
+            } catch (e) {
+              const msg = e?.message || "Raqamni ochish xatosi";
+              // server 402 -> balans yetarli emas
+              if (msg.toLowerCase().includes("balans") || msg.toLowerCase().includes("402") || msg.toLowerCase().includes("enough")) {
+                // need paramni serverdan ololmaganimiz uchun minimal UX: 5000
+                nav(`/auto-market/topup?need=5000&next=${encodeURIComponent(`/auto-market/ad/${car.id}`)}`);
+                return;
+              }
+              message.error(msg);
+            }
           }}
           style={{ borderRadius: 14, flex: 1, background:"#0ea5e9", border:"none" }}
         >
-          Tel qilish
+          {car.is_owner ? "Tel qilish" : revealedPhone ? "Tel qilish" : "Raqamni ko'rish"}
         </Button>
       </div>
 
       {/* YANGI: Barter modal */}
       <BarterMatchList car={car} visible={barterOpen} onClose={() => setBarterOpen(false)} />
+
+      <PromoModal
+        open={promoOpen}
+        onClose={() => setPromoOpen(false)}
+        adId={car.id}
+        onNeedTopup={() => nav(`/auto-market/topup?need=50000&next=${encodeURIComponent(`/auto-market/ad/${car.id}`)}`)}
+        onSuccess={() => refreshBalance()}
+      />
     </div>
   );
 }

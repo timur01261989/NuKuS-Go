@@ -11,6 +11,7 @@
 
 import { supabase } from "../../../lib/supabase";
 import * as mock from "./marketApi";
+import { axiosClient } from "../api/axiosClient";
 
 const SB_READY =
   !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -108,6 +109,7 @@ export async function getCarById(id) {
   if (!SB_READY) return mock.getCarById(id);
 
   try {
+    const uid = await getAuthUserId();
     // view increment (best-effort)
     await supabase.rpc("auto_market_inc_view", { p_ad_id: id }).catch(() => {});
 
@@ -120,11 +122,51 @@ export async function getCarById(id) {
     if (error) throw error;
     if (!data) throw new Error("E'lon topilmadi");
 
-    return normalizeAdRow(data);
+    const row = normalizeAdRow(data);
+    // SECURITY/UX: other users do not see phone by default (reveal API orqali)
+    const is_owner = uid && String(row.user_id) === String(uid);
+    return {
+      ...row,
+      is_owner,
+      seller: {
+        ...(row.seller || {}),
+        phone: is_owner ? (row?.seller?.phone || row.seller_phone || null) : null,
+      },
+    };
   } catch (e) {
     if (isMissingRelationError(e)) return mock.getCarById(id);
     throw new Error(e?.message || "Auto Market: getCarById xatosi");
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Wallet / Payments / Paid actions (server-side)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function getWalletBalance() {
+  try {
+    // /api/wallet (default routeKey=wallet)
+    const { data } = await axiosClient.get(`/wallet`);
+    return data?.wallet?.balance_uzs ?? 0;
+  } catch (e) {
+    // fallback: no backend -> 0
+    return 0;
+  }
+}
+
+export async function createPayment({ provider = "demo", amount_uzs, return_url } = {}) {
+  const { data } = await axiosClient.post(`/auto-market/payment/create`, { provider, amount_uzs, return_url });
+  return data;
+}
+
+export async function buyPromotion({ ad_id, promo_type } = {}) {
+  const { data } = await axiosClient.post(`/auto-market/promo/buy`, { ad_id, promo_type });
+  return data;
+}
+
+export async function revealPhone({ ad_id } = {}) {
+  const { data } = await axiosClient.post(`/auto-market/contact/reveal`, { ad_id });
+  return data;
 }
 
 export async function createCarAd(draft) {
