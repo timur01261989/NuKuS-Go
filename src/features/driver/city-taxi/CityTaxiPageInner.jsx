@@ -16,6 +16,7 @@ import { AimOutlined, EnvironmentOutlined } from "@ant-design/icons";
 import { supabase } from "@/lib/supabase";
 
 import { useTaxi } from "./context/TaxiProvider";
+import { useDriverOnline } from "../core/useDriverOnline";
 import { useTaxiSocket } from "./hooks/useTaxiSocket";
 import { useDriverLocation } from "./hooks/useDriverLocation";
 import { useOrderActions } from "./hooks/useOrderActions";
@@ -35,9 +36,15 @@ import DailyMissions from "./components/widgets/DailyMissions";
  */
 export default function CityTaxiPageInner() {
   const { state, dispatch } = useTaxi();
-  const { isOnline, activeOrder, incomingOrder, ui } = state;
+  const { isOnline: globalOnline, activeService } = useDriverOnline();
+  const isOnline = globalOnline && activeService === "taxi";
+  const { activeOrder, incomingOrder, ui } = state;
 
   const actions = useOrderActions();
+
+  useEffect(() => {
+    dispatch({ type: "driver/setOnline", payload: isOnline });
+  }, [dispatch, isOnline]);
   const { earnings } = useEarnings();
 
   // realtime / polling

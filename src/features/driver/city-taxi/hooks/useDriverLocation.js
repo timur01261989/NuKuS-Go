@@ -34,6 +34,11 @@ export function useDriverLocation({ enabled }) {
       const heading = smoothHeading(lastHeadingRef.current, headingRaw);
       lastHeadingRef.current = heading;
 
+      try {
+        window.__driver_lat = lat;
+        window.__driver_lng = lng;
+      } catch {}
+
       dispatch({
         type: "driver/setLocation",
         payload: {

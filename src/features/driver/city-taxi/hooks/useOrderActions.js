@@ -3,6 +3,8 @@ import { message } from "antd";
 import { useTaxi } from "../context/TaxiProvider";
 import { TaxiOrderStatus } from "../context/taxiReducer";
 import { cityTaxiApi } from "../services/cityTaxiApi";
+import { useDriverOnline } from "../../core/useDriverOnline";
+import { canActivateService } from "../../core/serviceGuards";
 
 /**
  * useOrderActions.js
@@ -10,23 +12,33 @@ import { cityTaxiApi } from "../services/cityTaxiApi";
  */
 export function useOrderActions() {
   const { state, dispatch } = useTaxi();
+  const { isOnline: globalOnline, activeService, setOnline, setOffline } = useDriverOnline();
+  const serviceType = "taxi";
 
-  const toggleOnline = useCallback(async () => {
-    const next = !state.isOnline;
-    dispatch({ type: "driver/setOnline", payload: next });
-    dispatch({ type: "ui/toast", payload: next ? "Online" : "Offline" });
-    // optional server state
-    try {
-      await cityTaxiApi.setDriverOnline(next);
-    } catch {
-      // ignore
-    }
-    // turning offline should clear order UI
-    if (!next) {
-      dispatch({ type: "orders/setIncoming", payload: null });
-      dispatch({ type: "orders/setActive", payload: null });
-    }
-  }, [state.isOnline, dispatch]);
+
+const toggleOnline = useCallback(async () => {
+  const next = !(globalOnline && activeService === serviceType);
+  if (next && !canActivateService(activeService, serviceType)) {
+    message.warning("Avval boshqa xizmatni offline qiling");
+    return;
+  }
+
+  dispatch({ type: "driver/setOnline", payload: next });
+  dispatch({ type: "ui/toast", payload: next ? "Online" : "Offline" });
+
+  try {
+    await cityTaxiApi.setDriverOnline(next);
+    if (next) await setOnline(serviceType);
+    else await setOffline();
+  } catch {
+    // ignore
+  }
+
+  if (!next) {
+    dispatch({ type: "orders/setIncoming", payload: null });
+    dispatch({ type: "orders/setActive", payload: null });
+  }
+}, [globalOnline, activeService, dispatch, setOnline, setOffline]);
 
   const accept = useCallback(async (id) => {
     const hide = message.loading("Buyurtma qabul qilinmoqda...", 0);

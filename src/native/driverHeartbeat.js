@@ -1,17 +1,12 @@
 // src/native/driverHeartbeat.js
-// Driver heartbeat loop (foreground-safe). For true background mode, add a foreground service plugin later.
-//
-// Usage:
-//   import { startHeartbeat, stopHeartbeat } from './native/driverHeartbeat';
-//   startHeartbeat({ driverId, baseUrl, getPosition, getServiceType });
-//   stopHeartbeat();
-//
 let timer = null;
 
-async function postJson(url, body) {
+async function postJson(url, body, token) {
+  const headers = { 'content-type': 'application/json' };
+  if (token) headers.authorization = `Bearer ${token}`;
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
@@ -26,6 +21,7 @@ export function startHeartbeat({
   getPosition,
   getServiceType,
   getDeviceMeta,
+  getAuthToken,
 }) {
   stopHeartbeat();
   if (!driverId) throw new Error('driverId required');
@@ -33,27 +29,29 @@ export function startHeartbeat({
 
   const tick = async () => {
     try {
-      const pos = await getPosition(); // { lat, lng }
-      const service_type = (await (getServiceType?.() ?? 'taxi')) || 'taxi';
+      const pos = await getPosition();
+      const service_type = (await (getServiceType?.() ?? (typeof window !== 'undefined' ? localStorage.getItem('driver_active_service') : 'taxi'))) || 'taxi';
       const device = (await (getDeviceMeta?.() ?? null));
+      const token = await (getAuthToken?.() ?? null);
 
       await postJson(`${baseUrl}/api/presence/heartbeat`, {
         driver_id: driverId,
         lat: pos?.lat,
         lng: pos?.lng,
+        speed: pos?.speed,
+        heading: pos?.heading,
         state: 'online',
+        is_online: true,
         active_service_type: service_type,
         device_id: device?.device_id,
         app_version: device?.app_version,
         platform: device?.platform,
-      });
-    } catch (e) {
-      // ignore transient failures; next tick will retry
-      // IMPORTANT: do not spam logs in production
+      }, token);
+    } catch {
+      // ignore transient failures
     }
   };
 
-  // fire immediately
   tick();
   timer = setInterval(tick, Math.max(5000, intervalMs));
 }

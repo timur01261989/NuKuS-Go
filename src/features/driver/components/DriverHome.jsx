@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Drawer, Switch, message } from "antd";
+import { Drawer, message } from "antd";
 
 import { appConfig } from "../../../shared/config/appConfig";
 
@@ -14,7 +14,12 @@ import DriverProfile from "./DriverProfile";
 import DriverSidebar from "./DriverSidebar";
 
 import { supabase } from "../../../lib/supabase";
-import { startTracking } from "./services/locationService";
+import { syncPresenceService } from "../core/driverPresenceManager";
+import { useDriverOnline } from "../core/useDriverOnline";
+import { canActivateService } from "../core/serviceGuards";
+import { useSpeedometer } from "../speed/useSpeedometer";
+import { useRadar } from "../radar/useRadar";
+import RadarMiniOverlay from "./RadarMiniOverlay";
 
 function safeShortId(id) {
   const s = String(id || "");
@@ -24,6 +29,7 @@ function safeShortId(id) {
 
 export default function DriverHome({ onLogout }) {
   const navigate = useNavigate();
+  const { isOnline, activeService, setOnline, setOffline } = useDriverOnline();
 
   // =========================
   // STATE
@@ -40,6 +46,15 @@ export default function DriverHome({ onLogout }) {
     name: "Haydovchi",
     publicId: "----",
     avatarUrl: "",
+  });
+
+  const driveAssistantEnabled = Boolean(isOnline && (activeService || selectedService));
+  const { speedKmh, position, heading } = useSpeedometer({ enabled: driveAssistantEnabled });
+  const { nearestRadar, radarSeverity } = useRadar({
+    enabled: driveAssistantEnabled,
+    position,
+    heading,
+    speedKmh,
   });
 
   // =========================
@@ -87,181 +102,58 @@ export default function DriverHome({ onLogout }) {
     if (typeof window !== "undefined") localStorage.removeItem("driverActiveService");
   };
 
-  // =========================
-  // Online flag (persist)
-  // =========================
-  const [isOnline, setIsOnline] = useState(() => {
-    const v = typeof window !== "undefined" ? localStorage.getItem("driverOnline") : null;
-    return v === "1";
-  });
-
-  const API_BASE = (import.meta?.env?.VITE_API_BASE || "").replace(/\/$/, "");
-
-  // =========================
-  // HEARTBEAT + LOCATION (ONLINE)
-  // =========================
-  const lastGeoRef = useRef({ lat: null, lng: null, bearing: null, speed: null });
-  const watchIdRef = useRef(null);
-  const heartbeatTimerRef = useRef(null);
   const userIdRef = useRef(null);
 
-  const postJson = async (path, body) => {
-    const r = await fetch(`${API_BASE}${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body ?? {}),
-    });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || j?.ok === false) {
-      const msg = j?.error || `HTTP ${r.status}`;
-      throw new Error(msg);
+// ✅ Toggle online/offline (global context)
+const toggleOnline = async (next) => {
+  setLoading(true);
+  try {
+    const targetService = selectedService || activeService || (typeof window !== "undefined" ? localStorage.getItem("driverActiveService") : null) || "taxi";
+    if (next && !canActivateService(activeService, targetService)) {
+      message.warning("Avval boshqa xizmatni offline qiling");
+      return;
     }
-    return j;
-  };
 
-  const sendDriverState = async (driver_id, nextOnline) => {
-    const state = nextOnline ? "online" : "offline";
-    try {
-      if (API_BASE) {
-        await postJson("/api/driver-state", { driver_id, state });
-      }
-    } catch {
-      // ignore
-    }
-  };
+    const { data: u, error: uErr } = await supabase.auth.getUser();
+    if (uErr) throw uErr;
+    const user = u?.user;
+    if (!user) return;
+    userIdRef.current = user.id;
 
-  const sendHeartbeat = async (driver_id, nextOnline) => {
-    const { lat, lng, bearing } = lastGeoRef.current || {};
-    try {
-      if (API_BASE) {
-        await postJson("/api/driver-heartbeat", {
-          driver_id,
-          is_online: !!nextOnline,
-          lat: lat ?? undefined,
-          lng: lng ?? undefined,
-          bearing: bearing ?? undefined,
-      active_service_type: (typeof window !== "undefined" ? localStorage.getItem("driverActiveService") : null),
-    });
-      }
-    } catch {
-      // ignore
-    }
-  };
-
-  const stopTrackingFunc = () => {
-    if (watchIdRef.current !== null && watchIdRef.current !== undefined) {
-      try {
-        navigator.geolocation?.clearWatch?.(watchIdRef.current);
-      } catch {
-        // ignore
-      }
-    }
-    watchIdRef.current = null;
-
-    if (heartbeatTimerRef.current) {
-      clearInterval(heartbeatTimerRef.current);
-      heartbeatTimerRef.current = null;
-    }
-  };
-
-  const startOnlineLoop = async (userId) => {
-    await sendDriverState(userId, true);
-
-    const watchId = startTracking((pos) => {
-      lastGeoRef.current = {
-        lat: pos?.lat ?? null,
-        lng: pos?.lng ?? null,
-        bearing: pos?.heading ?? null,
-        speed: pos?.speed ?? null,
-      };
-    });
-
-    watchIdRef.current = watchId ?? null;
-
-    await sendHeartbeat(userId, true);
-
-    heartbeatTimerRef.current = setInterval(() => {
-      const uid = userIdRef.current;
-      if (!uid) return;
-      sendHeartbeat(uid, true);
-    }, 15000);
-  };
-
-  // ✅ Toggle online/offline (existing principle preserved)
-  const toggleOnline = async (next) => {
-    setLoading(true);
-    try {
-      const { data: u, error: uErr } = await supabase.auth.getUser();
-      if (uErr) throw uErr;
-      const user = u?.user;
-
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
-      userIdRef.current = user.id;
-
-      // 1) Supabase update
-      const { error } = await supabase
-        .from("drivers")
-        .update({
-          is_online: next,
-          last_seen_at: new Date().toISOString(),
-        })
-        .eq("user_id", user.id);
-
-      if (error) throw error;
-
-      // 2) local state
-      setIsOnline(next);
-      if (typeof window !== "undefined") localStorage.setItem("driverOnline", next ? "1" : "0");
-
-      // 3) backend notify
-      await sendDriverState(user.id, next);
-
-      message.success(next ? "Siz Online rejimdasiz" : "Siz Offline rejimdasiz");
-    } catch (err) {
-      console.error("Status update error:", err);
-      message.error("Statusni o'zgartirishda xatolik!");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const { data: u, error: uErr } = await supabase.auth.getUser();
-        if (uErr) throw uErr;
-
-        const user = u?.user;
-        if (!user) return;
-
-        userIdRef.current = user.id;
-
-        if (!isOnline) {
-          await sendDriverState(user.id, false);
-          stopTrackingFunc();
-          return;
-        }
-
-        stopTrackingFunc();
-        await startOnlineLoop(user.id);
-
-        if (cancelled) stopTrackingFunc();
-      } catch {
-        // ignore
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      stopTrackingFunc();
+    const driverPayload = {
+      is_online: next,
+      last_seen_at: new Date().toISOString(),
+      active_service_type: next ? targetService : null,
     };
-  }, [isOnline]);
+
+    const { error } = await supabase
+      .from("drivers")
+      .update(driverPayload)
+      .eq("user_id", user.id);
+
+    if (error) throw error;
+
+    if (next) {
+      await setOnline(targetService);
+      await syncPresenceService(targetService);
+    } else {
+      await setOffline();
+    }
+
+    message.success(next ? "Siz Online rejimdasiz" : "Siz Offline rejimdasiz");
+  } catch (err) {
+    console.error("Status update error:", err);
+    message.error("Statusni o'zgartirishda xatolik!");
+  } finally {
+    setLoading(false);
+  }
+};
+
+useEffect(() => {
+  if (!isOnline) return;
+  const nextService = selectedService || activeService || (typeof window !== "undefined" ? localStorage.getItem("driverActiveService") : null) || "taxi";
+  syncPresenceService(nextService).catch(() => {});
+}, [isOnline, selectedService, activeService]);
 
   // =========================
   // HEADER DATA
@@ -482,7 +374,7 @@ export default function DriverHome({ onLogout }) {
             <div>
               <p className="font-bold text-slate-800">Haydovchi holati</p>
               <p className="text-sm text-slate-500">
-                Siz hozir {isOnline ? "onlayn" : "oflayn"} rejimdasiz
+                Siz hozir {isOnline ? `onlayn${activeService ? ` (${activeService})` : ""}` : "oflayn"} rejimdasiz
               </p>
             </div>
           </div>
@@ -658,8 +550,19 @@ export default function DriverHome({ onLogout }) {
           />
         </div>
       </Drawer>
+
     </div>
   );
 
-  return <div style={{ minHeight: "100vh" }}>{content ? content : menuUi}</div>;
+  return (
+    <div style={{ minHeight: "100vh" }}>
+      {content ? content : menuUi}
+      <RadarMiniOverlay
+        online={driveAssistantEnabled}
+        speedKmh={speedKmh}
+        radar={nearestRadar}
+        severity={radarSeverity}
+      />
+    </div>
+  );
 }

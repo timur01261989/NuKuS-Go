@@ -33,6 +33,7 @@ import { supabase } from "@/lib/supabase";
 // DIQQAT: haversineKm bu yerdan import qilinadi, pastda qayta yozilmaydi
 import { osrmRouteDriving, haversineKm } from "@/shared/services/osrm";
 import { useAuth } from "@/shared/auth/AuthProvider";
+import { getTripSettings, saveTripSettings } from "@/features/client/delivery/services/deliveryStore";
 
 import "leaflet/dist/leaflet.css";
 
@@ -103,6 +104,7 @@ function TripRow({ trip, onEdit, onDelete, onShowMap }) {
         {trip.has_ac && <Tag color="cyan">AC</Tag>}
         {trip.has_trunk && <Tag color="purple">Yukxona</Tag>}
         {trip.women_only && <Tag color="magenta">Ayollar</Tag>}
+        {trip.is_delivery && <Tag color="gold">Eltish</Tag>}
       </div>
 
       <div style={{ fontSize: 13, opacity: 0.8, marginBottom: 10 }}>
@@ -145,6 +147,11 @@ export default function InterProvincialPage() {
   const [isParcel, setIsParcel] = useState(false);
   const [hasAC, setHasAC] = useState(false);
   const [hasTrunk, setHasTrunk] = useState(false);
+  const [deliveryMaxKg, setDeliveryMaxKg] = useState(5);
+  const [deliveryMaxOrders, setDeliveryMaxOrders] = useState(4);
+  const [deliveryMaxTotalKg, setDeliveryMaxTotalKg] = useState(15);
+  const [deliveryPrecisePickup, setDeliveryPrecisePickup] = useState(true);
+  const [deliveryPreciseDropoff, setDeliveryPreciseDropoff] = useState(false);
   
   const [note, setNote] = useState("");
 
@@ -227,6 +234,11 @@ export default function InterProvincialPage() {
     setIsParcel(false);
     setHasAC(false);
     setHasTrunk(false);
+    setDeliveryMaxKg(5);
+    setDeliveryMaxOrders(4);
+    setDeliveryMaxTotalKg(15);
+    setDeliveryPrecisePickup(true);
+    setDeliveryPreciseDropoff(false);
     setNote("");
     setPickupLL(null);
     setPickupAddress("");
@@ -250,6 +262,12 @@ export default function InterProvincialPage() {
     setIsParcel(Boolean(trip.is_parcel));
     setHasAC(Boolean(trip.has_ac));
     setHasTrunk(Boolean(trip.has_trunk));
+    const deliverySettings = getTripSettings(trip.id);
+    setDeliveryMaxKg(Number(deliverySettings?.maxKg || 5));
+    setDeliveryMaxOrders(Number(deliverySettings?.maxOrders || 4));
+    setDeliveryMaxTotalKg(Number(deliverySettings?.maxTotalKg || 15));
+    setDeliveryPrecisePickup(Boolean(deliverySettings?.precisePickup ?? true));
+    setDeliveryPreciseDropoff(Boolean(deliverySettings?.preciseDropoff ?? false));
     setNote(trip.note || "");
     
     if (trip.pickup_lat && trip.pickup_lng) {
@@ -309,10 +327,26 @@ export default function InterProvincialPage() {
       if (editingTrip?.id) {
         const { error } = await supabase.from("interprov_trips").update(payload).eq("id", editingTrip.id);
         if (error) throw error;
+        saveTripSettings(editingTrip.id, {
+          maxKg: deliveryMaxKg,
+          maxOrders: deliveryMaxOrders,
+          maxTotalKg: deliveryMaxTotalKg,
+          precisePickup: deliveryPrecisePickup,
+          preciseDropoff: deliveryPreciseDropoff,
+        });
         message.success("Reys yangilandi");
       } else {
-        const { error } = await supabase.from("interprov_trips").insert(payload);
+        const { data: inserted, error } = await supabase.from("interprov_trips").insert(payload).select("id").single();
         if (error) throw error;
+        if (inserted?.id) {
+          saveTripSettings(inserted.id, {
+            maxKg: deliveryMaxKg,
+            maxOrders: deliveryMaxOrders,
+            maxTotalKg: deliveryMaxTotalKg,
+            precisePickup: deliveryPrecisePickup,
+            preciseDropoff: deliveryPreciseDropoff,
+          });
+        }
         message.success("Reys yaratildi");
       }
       resetForm();
@@ -323,7 +357,7 @@ export default function InterProvincialPage() {
     } finally {
       setSaving(false);
     }
-  }, [user, from, to, travelDate, travelTime, seats, price, priceFront, priceBack, vehicleType, busSeatType, womenOnly, isDelivery, isParcel, hasAC, hasTrunk, note, pickupLL, editingTrip, loadMyTrips, resetForm]);
+  }, [user, from, to, travelDate, travelTime, seats, price, priceFront, priceBack, vehicleType, busSeatType, womenOnly, isDelivery, isParcel, hasAC, hasTrunk, note, pickupLL, editingTrip, loadMyTrips, resetForm, deliveryMaxKg, deliveryMaxOrders, deliveryMaxTotalKg, deliveryPrecisePickup, deliveryPreciseDropoff]);
 
   const deleteTrip = useCallback(async (trip) => {
     Modal.confirm({
@@ -492,6 +526,30 @@ export default function InterProvincialPage() {
           <Checkbox checked={hasAC} onChange={e => setHasAC(e.target.checked)}>Konditsioner</Checkbox>
           <Checkbox checked={hasTrunk} onChange={e => setHasTrunk(e.target.checked)}>Yukxona</Checkbox>
         </div>
+
+        {isDelivery ? (
+          <div style={{ background: "#fff", padding: 12, borderRadius: 8, border: "1px solid #eee" }}>
+            <div style={{ fontWeight: 700, marginBottom: 10 }}>Eltish sozlamalari</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div>
+                <div style={{ fontSize: 12, marginBottom: 4 }}>Bitta buyum max kg</div>
+                <InputNumber style={{ width: "100%" }} min={1} max={20} value={deliveryMaxKg} onChange={setDeliveryMaxKg} />
+              </div>
+              <div>
+                <div style={{ fontSize: 12, marginBottom: 4 }}>Maksimal buyurtma soni</div>
+                <InputNumber style={{ width: "100%" }} min={1} max={10} value={deliveryMaxOrders} onChange={setDeliveryMaxOrders} />
+              </div>
+              <div>
+                <div style={{ fontSize: 12, marginBottom: 4 }}>Jami kg limiti</div>
+                <InputNumber style={{ width: "100%" }} min={1} max={100} value={deliveryMaxTotalKg} onChange={setDeliveryMaxTotalKg} />
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
+              <Checkbox checked={deliveryPrecisePickup} onChange={e => setDeliveryPrecisePickup(e.target.checked)}>Aniq pickup olaman</Checkbox>
+              <Checkbox checked={deliveryPreciseDropoff} onChange={e => setDeliveryPreciseDropoff(e.target.checked)}>Aniq dropoff olib boraman</Checkbox>
+            </div>
+          </div>
+        ) : null}
 
         <div>
           <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Izoh (ixtiyoriy)</div>

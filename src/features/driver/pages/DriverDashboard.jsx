@@ -30,6 +30,7 @@ import { supabase } from "../../../lib/supabase";
 import { useLanguage } from "../../../shared/i18n/useLanguage"; 
 import { startTracking } from "../components/services/locationService";
 import DriverHome from "../components/DriverHome";
+import { DriverOnlineProvider } from "../core/DriverOnlineContext";
 
 const { Title, Text } = Typography;
 
@@ -114,7 +115,11 @@ export default function DriverDashboard() {
     return null;
   }
 
-  return <DriverHome onLogout={onLogout} />;
+  return (
+    <DriverOnlineProvider>
+      <DriverHome onLogout={onLogout} />
+    </DriverOnlineProvider>
+  );
 }
 
 /**

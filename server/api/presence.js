@@ -5,14 +5,6 @@ function hasSupabaseEnv() {
   return !!(process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY));
 }
 
-/**
- * POST /api/presence/heartbeat
- * body: { driver_id, lat?, lng?, state? }
- * Updates driver_presence (driver_id PK) and keeps is_online true.
- *
- * GET /api/presence/online?seconds=60
- * Returns online drivers list (last_seen within threshold).
- */
 export default async function handler(req, res) {
   try {
     const url = new URL(req.url, 'http://localhost');
@@ -24,31 +16,48 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST' && (sub === 'heartbeat' || sub === 'ping' || sub === '')) {
       const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-      const driver_id = String(body.driver_id || body.driver_id || '').trim();
-      const active_service_type = body.active_service_type ?? body.activeServiceType ?? body.service_type ?? body.serviceType ?? null;
+      const driver_id = String(body.driver_id || '').trim();
       if (!driver_id) return badRequest(res, 'driver_id required');
 
       const lat = body.lat === undefined ? null : Number(body.lat);
       const lng = body.lng === undefined ? null : Number(body.lng);
-      const state = String(body.state || 'online');
-      const activeServiceType = body.active_service_type ?? body.service_type ?? body.service ?? null;
+      const speed = body.speed === undefined ? null : Number(body.speed);
+      const bearing = body.bearing === undefined ? (body.heading === undefined ? null : Number(body.heading)) : Number(body.bearing);
+      const state = String(body.state || ((body.is_online === false || body.is_online === 'false') ? 'offline' : 'online'));
+      const isOnline = !(body.is_online === false || body.is_online === 'false' || state === 'offline');
+      const activeServiceType = body.active_service_type ?? body.activeServiceType ?? body.service_type ?? body.serviceType ?? body.service ?? null;
+      const device_id = body.device_id ?? null;
+      const platform = body.platform ?? null;
+      const app_version = body.app_version ?? null;
 
       const payload = {
         driver_id,
         last_seen_at: nowIso(),
-        is_online: true,
+        is_online: isOnline,
         state,
         active_service_type: activeServiceType,
         updated_at: nowIso(),
       };
       if (Number.isFinite(lat)) payload.lat = lat;
       if (Number.isFinite(lng)) payload.lng = lng;
+      if (Number.isFinite(speed)) payload.speed = speed;
+      if (Number.isFinite(bearing)) payload.bearing = bearing;
+      if (device_id) payload.device_id = String(device_id);
+      if (platform) payload.platform = String(platform);
+      if (app_version) payload.app_version = String(app_version);
 
-      const { data, error } = await sb
-        .from('driver_presence')
-        .upsert([payload], { onConflict: 'driver_id' })
-        .select('driver_id,last_seen_at,is_online,state,active_service_type,updated_at,lat,lng')
+      let query = sb.from('driver_presence').upsert([payload], { onConflict: 'driver_id' });
+      let { data, error } = await query
+        .select('driver_id,last_seen_at,is_online,state,active_service_type,updated_at,lat,lng,speed,bearing,device_id,platform,app_version')
         .single();
+      if (error && String(error.message || '').match(/speed|bearing|device_id|platform|app_version/i)) {
+        const fb = { ...payload };
+        delete fb.speed; delete fb.bearing; delete fb.device_id; delete fb.platform; delete fb.app_version;
+        ({ data, error } = await sb.from('driver_presence')
+          .upsert([fb], { onConflict: 'driver_id' })
+          .select('driver_id,last_seen_at,is_online,state,active_service_type,updated_at,lat,lng')
+          .single());
+      }
       if (error) throw error;
 
       return json(res, 200, { ok: true, presence: data });
@@ -61,13 +70,21 @@ export default async function handler(req, res) {
 
       let q = sb
         .from('driver_presence')
-        .select('driver_id,last_seen_at,is_online,state,active_service_type,updated_at,lat,lng')
+        .select('driver_id,last_seen_at,is_online,state,active_service_type,updated_at,lat,lng,speed,bearing,device_id,platform,app_version')
         .eq('is_online', true)
         .gte('last_seen_at', since);
 
       if (serviceType) q = q.eq('active_service_type', serviceType);
 
-      const { data, error } = await q.limit(5000);
+      let { data, error } = await q.limit(5000);
+      if (error && String(error.message || '').match(/speed|bearing|device_id|platform|app_version/i)) {
+        ({ data, error } = await sb
+          .from('driver_presence')
+          .select('driver_id,last_seen_at,is_online,state,active_service_type,updated_at,lat,lng')
+          .eq('is_online', true)
+          .gte('last_seen_at', since)
+          .limit(5000));
+      }
       if (error) throw error;
 
       return json(res, 200, { ok: true, online: data || [] });

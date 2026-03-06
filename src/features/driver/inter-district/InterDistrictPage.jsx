@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { Layout, Row, Col, Space, Typography, Button, message, Switch, Tooltip, Card, Badge } from 'antd';
+import { Layout, Row, Col, Space, Typography, Button, message, Tooltip, Card, Badge } from 'antd';
 import { 
   ReloadOutlined, 
   InboxOutlined, 
@@ -30,6 +30,9 @@ import DynamicPriceCard from './components/modes/premium/DynamicPriceCard';
 import ParcelEntryModal from './components/parcel/ParcelEntryModal';
 
 import { usePremiumSocket } from './hooks/usePremiumSocket';
+import DriverOnlineToggle from '../components/DriverOnlineToggle';
+import { useDriverOnline } from '../core/useDriverOnline';
+import { canActivateService } from '../core/serviceGuards';
 
 import './styles/theme.css';
 
@@ -42,9 +45,11 @@ const { Title, Text } = Typography;
  */
 function Inner() {
   const { mode, MODES, upsertPremiumClient, lastError, locateOnce } = useDistrict();
+  const { isOnline, activeService, setOnline, setOffline } = useDriverOnline();
+  const serviceType = 'interDist';
+  const serviceActive = isOnline && activeService === serviceType;
 
   // State boshqaruvi
-  const [isOnline, setIsOnline] = useState(false);
   const [tripCreateOpen, setTripCreateOpen] = useState(false);
   const [pitakAdminOpen, setPitakAdminOpen] = useState(false);
   const [requestsOpen, setRequestsOpen] = useState(false);
@@ -55,7 +60,7 @@ function Inner() {
 
   // Soket ulanishi (Premium rejim uchun)
   usePremiumSocket({
-    enabled: isOnline && mode === MODES.PREMIUM,
+    enabled: serviceActive && mode === MODES.PREMIUM,
     onClientRequest: (req) => {
       upsertPremiumClient(req);
       message.info("Yangi buyurtma keldi!");
@@ -66,7 +71,7 @@ function Inner() {
   const handleTripCreated = (data) => {
     setActiveTrip(data);
     setTripCreateOpen(false);
-    setIsOnline(true);
+    setOnline(serviceType);
     message.success("Reys muvaffaqiyatli e'lon qilindi!");
   };
 
@@ -102,20 +107,25 @@ function Inner() {
         </Space>
 
         <Space size="middle">
-          <Tooltip title={isOnline ? "Hozir onlaynsiz" : "Oflayn holatdasiz"}>
-            <Switch
-              checked={isOnline}
-              onChange={(v) => {
-                if(v && !activeTrip) {
-                  setTripCreateOpen(true);
-                } else {
-                  setIsOnline(v);
-                }
-              }}
-              checkedChildren="ON"
-              unCheckedChildren="OFF"
-            />
-          </Tooltip>
+
+<Tooltip title={serviceActive ? "Hozir onlaynsiz" : "Oflayn holatdasiz"}>
+  <DriverOnlineToggle
+    serviceType={serviceType}
+    checkedChildren="ON"
+    unCheckedChildren="OFF"
+    onBeforeOnline={() => {
+      if (!canActivateService(activeService, serviceType)) {
+        message.warning("Avval boshqa xizmatni offline qiling");
+        return false;
+      }
+      if (!activeTrip) {
+        setTripCreateOpen(true);
+        return false;
+      }
+      return true;
+    }}
+  />
+</Tooltip>
           
           <Badge count={5} size="small">
             <Button 
@@ -211,7 +221,7 @@ function Inner() {
         <TripCreateModal 
           open={tripCreateOpen} 
           onClose={() => setTripCreateOpen(false)} 
-          isOnline={isOnline}
+          isOnline={serviceActive}
           onSuccess={handleTripCreated}
         />
         

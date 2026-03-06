@@ -1,0 +1,17 @@
+Updated files for global driver online architecture
+
+src/features/driver/core/DriverOnlineContext.jsx
+src/features/driver/core/useDriverOnline.js
+src/features/driver/core/useFloatingDot.js
+src/features/driver/core/serviceGuards.js
+src/features/driver/core/driverPresenceManager.js
+src/features/driver/components/DriverOnlineToggle.jsx
+src/features/driver/pages/DriverDashboard.jsx
+src/features/driver/components/DriverHome.jsx
+src/features/driver/inter-district/InterDistrictPage.jsx
+src/features/driver/freight/FreightPage.jsx
+src/features/driver/city-taxi/hooks/useOrderActions.js
+src/features/driver/city-taxi/CityTaxiPageInner.jsx
+src/features/driver/components/services/locationService.js
+src/features/driver/city-taxi/hooks/useDriverLocation.js
+src/native/driverHeartbeat.js

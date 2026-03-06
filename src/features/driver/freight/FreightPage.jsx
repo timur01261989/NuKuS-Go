@@ -3,6 +3,8 @@ import { MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { nominatimReverse } from "@/features/client/shared/geo/nominatim";
 import { supabase } from "@/lib/supabase";
+import { useDriverOnline } from "../core/useDriverOnline";
+import { canActivateService } from "../core/serviceGuards";
 
 /**
  * DriverFreight.jsx (FULL)
@@ -242,6 +244,8 @@ function LocationPickerModal({ open, initialPoint, onCancel, onSave }) {
 
 /** ----------------------------- Component ----------------------------- */
 export default function FreightPage() {
+  const { isOnline: globalOnline, activeService, setOnline, setOffline } = useDriverOnline();
+  const serviceType = "freight";
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [togglingOnline, setTogglingOnline] = useState(false);
@@ -307,7 +311,7 @@ export default function FreightPage() {
       setBodyType(v.body_type || "gazel");
       setCapacityKg(v.capacity_kg != null ? String(v.capacity_kg) : "");
       setCapacityM3(v.capacity_m3 != null ? String(v.capacity_m3) : "");
-      setIsOnline(!!v.is_online);
+      setIsOnline(!!v.is_online && globalOnline && activeService === serviceType);
 
       const p = normalizePoint(v.current_point);
       setCurrentPoint(p);
@@ -357,7 +361,7 @@ export default function FreightPage() {
         capacity_kg: capacityKg === "" ? null : Number(capacityKg),
         capacity_m3: capacityM3 === "" ? null : Number(capacityM3),
         current_point: pointToDbValue(currentPoint),
-        is_online: !!isOnline,
+        is_online: !!(globalOnline && activeService === serviceType),
         updated_at: new Date().toISOString(),
       };
 
@@ -386,50 +390,62 @@ export default function FreightPage() {
     }
   }, [bodyType, capacityKg, capacityM3, clearMsgs, currentPoint, isOnline, plateNumber, title, vehicleId]);
 
-  const toggleOnline = useCallback(
-    async (next) => {
-      clearMsgs();
 
-      if (next === true) {
-        if (!currentPoint) {
-          setError("Online bo‘lish uchun avval Joylashuvni xaritadan tanlang.");
-          return;
-        }
-        if (!vehicleId) {
-          setError("Online yoqishdan oldin avval 'SAQLASH' qilib mashinani yaratib oling.");
-          return;
-        }
+const toggleOnline = useCallback(
+  async (next) => {
+    clearMsgs();
+
+    if (next === true) {
+      if (!canActivateService(activeService, serviceType)) {
+        setError("Avval boshqa xizmatni offline qiling.");
+        return;
       }
-
-      setTogglingOnline(true);
-
-      try {
-        if (!vehicleId) throw new Error("Vehicle topilmadi. Avval 'SAQLASH' qiling.");
-
-        const { error: upErr } = await supabase
-          .from("vehicles")
-          .update({
-            is_online: !!next,
-            current_updated_at: currentPoint ? new Date().toISOString() : null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", vehicleId);
-
-        if (upErr) throw upErr;
-
-        setIsOnline(!!next);
-        setInfo(next ? "Online yoqildi." : "Offline qilindi.");
-      } catch (e) {
-        console.error(e);
-        setError(e?.message || "Online o‘zgartirishda xato.");
-      } finally {
-        if (mountedRef.current) setTogglingOnline(false);
+      if (!currentPoint) {
+        setError("Online bo‘lish uchun avval Joylashuvni xaritadan tanlang.");
+        return;
       }
-    },
-    [clearMsgs, currentPoint, vehicleId]
-  );
+      if (!vehicleId) {
+        setError("Online yoqishdan oldin avval 'SAQLASH' qilib mashinani yaratib oling.");
+        return;
+      }
+    }
 
-  const onlineUiDisabled = useMemo(() => loading || saving || togglingOnline, [loading, saving, togglingOnline]);
+    setTogglingOnline(true);
+
+    try {
+      if (!vehicleId) throw new Error("Vehicle topilmadi. Avval 'SAQLASH' qiling.");
+
+      const { error: upErr } = await supabase
+        .from("vehicles")
+        .update({
+          is_online: !!next,
+          current_updated_at: currentPoint ? new Date().toISOString() : null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", vehicleId);
+
+      if (upErr) throw upErr;
+
+      if (next) await setOnline(serviceType);
+      else await setOffline();
+
+      setIsOnline(!!next);
+      setInfo(next ? "Online yoqildi." : "Offline qilindi.");
+    } catch (e) {
+      console.error(e);
+      setError(e?.message || "Online o‘zgartirishda xato.");
+    } finally {
+      if (mountedRef.current) setTogglingOnline(false);
+    }
+  },
+  [activeService, clearMsgs, currentPoint, setOffline, setOnline, vehicleId]
+);
+
+useEffect(() => {
+  setIsOnline(!!globalOnline && activeService === serviceType);
+}, [globalOnline, activeService]);
+
+const onlineUiDisabled = useMemo(() => loading || saving || togglingOnline, [loading, saving, togglingOnline]);
 
   const plateHint = useMemo(() => {
     const v = plateNumber.trim();
