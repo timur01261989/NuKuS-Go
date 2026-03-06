@@ -1,6 +1,18 @@
+/**
+ * DriverModeRedirect.jsx - FIXED VERSION
+ * 
+ * Changes:
+ * ✅ Use useAppMode() context instead of localStorage
+ * ✅ Removed hardcoded localStorage.setItem("app_mode", "driver")
+ * 
+ * INSTALLATION:
+ * Replace: src/shared/routes/DriverModeRedirect.jsx
+ */
+
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Spin } from "antd";
+import { useAppMode } from "@/providers/AppModeProvider"; // ✅ ADD THIS
 
 /**
  * DriverModeRedirect
@@ -9,14 +21,11 @@ import { Spin } from "antd";
 export default function DriverModeRedirect() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { setAppMode } = useAppMode(); // ✅ GET FROM CONTEXT
 
   React.useEffect(() => {
-    // user explicitly wants driver mode
-    try {
-      localStorage.setItem("app_mode", "driver");
-    } catch (e) {
-      // ignore storage errors
-    }
+    // ✅ FIXED: Use context instead of localStorage
+    setAppMode("driver");
 
     const fromPath = location.state?.from;
 
@@ -28,7 +37,7 @@ export default function DriverModeRedirect() {
       replace: true,
       state: { from: fromPath },
     });
-  }, [navigate, location]);
+  }, [navigate, location, setAppMode]); // ✅ ADD setAppMode TO DEPS
 
   return (
     <div
