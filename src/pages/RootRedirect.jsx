@@ -1,3 +1,22 @@
+/**
+ * RootRedirect.jsx - FIXED VERSION (COMPLETE - 102 LINES)
+ * 
+ * Location: src/pages/RootRedirect.jsx
+ * 
+ * CRITICAL FIX:
+ * Changed from localStorage.getItem("app_mode") to useAppMode() context
+ * 
+ * Before (BROKEN - Line 30):
+ *   const mode = (localStorage.getItem("app_mode") || "client").toLowerCase();
+ * 
+ * After (FIXED):
+ *   const { appMode } = useAppMode();
+ *   const mode = (appMode || "client").toLowerCase();
+ * 
+ * INSTALLATION:
+ * Replace entire: src/pages/RootRedirect.jsx with this file
+ */
+
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Spin } from "antd";

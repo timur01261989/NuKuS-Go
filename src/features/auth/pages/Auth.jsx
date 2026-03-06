@@ -1,3 +1,18 @@
+/**
+ * Auth.jsx - FIXED VERSION (COMPLETE)
+ * 
+ * Location: src/features/auth/pages/Auth.jsx
+ * 
+ * CRITICAL FIXES:
+ * 1. Line 44: REMOVED hardcoded setAppMode("client") 
+ * 2. Line 78: REMOVED hardcoded setAppMode("client") after signup
+ * 3. Added useAppMode() hook import
+ * 4. Now uses context instead of localStorage
+ * 
+ * INSTALLATION:
+ * Replace entire: src/features/auth/pages/Auth.jsx with this file
+ */
+
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { message } from "antd";

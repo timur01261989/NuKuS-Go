@@ -1,3 +1,18 @@
+/**
+ * DriverRegister.jsx - FIXED VERSION (COMPLETE - 609 LINES)
+ * 
+ * Location: src/features/driver/components/DriverRegister.jsx
+ * 
+ * ENHANCEMENT (OPTIONAL):
+ * Added useAppMode() hook import
+ * Added back button to cancel registration
+ * Users can switch back to client mode
+ * 
+ * INSTALLATION:
+ * Replace entire: src/features/driver/components/DriverRegister.jsx with this file
+ * (Optional but recommended for better UX)
+ */
+
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {

@@ -1,3 +1,22 @@
+/**
+ * RoleGate.jsx - FIXED VERSION (COMPLETE - 352 LINES)
+ * 
+ * Location: src/shared/routes/RoleGate.jsx
+ * 
+ * CRITICAL FIX:
+ * Changed from localStorage.getItem("app_mode") to useAppMode() context
+ * 
+ * Before (BROKEN - Line 83):
+ *   const mode = (localStorage.getItem("app_mode") || "client").toLowerCase();
+ * 
+ * After (FIXED):
+ *   const { appMode } = useAppMode();
+ *   const mode = (appMode || "client").toLowerCase();
+ * 
+ * INSTALLATION:
+ * Replace entire: src/shared/routes/RoleGate.jsx with this file
+ */
+
 import React, { useEffect, useMemo, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { Spin } from "antd";

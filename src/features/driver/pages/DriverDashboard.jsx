@@ -105,7 +105,7 @@ export default function DriverDashboard() {
     if (gateLoading) {
     return (
       <div style={{ padding: 24, textAlign: "center" }}>
-        Yuklanmoqda...
+        <Spin size="large" />
       </div>
     );
   }
@@ -136,6 +136,8 @@ function LegacyDriverDashboard() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profile, setProfile] = useState({ fullName: "", avatarUrl: "", phone: "" });
   const [loading, setLoading] = useState(false); 
+  const navigate = useNavigate();
+  const { t } = useLanguage();
   
   const [isOnline, setIsOnline] = useState(() => {
     const v = localStorage.getItem("driverOnline");

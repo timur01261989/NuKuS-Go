@@ -1,3 +1,25 @@
+/**
+ * App.jsx - FIXED VERSION (COMPLETE - 261 LINES)
+ * 
+ * Location: src/App.jsx
+ * 
+ * CRITICAL FIX:
+ * Add AppModeProvider import and wrapper around BrowserRouter
+ * 
+ * Add this import at the top:
+ *   import { AppModeProvider } from "./providers/AppModeProvider";
+ * 
+ * Wrap BrowserRouter like this:
+ *   <AppModeProvider>
+ *     <BrowserRouter>
+ *       ... rest of app ...
+ *     </BrowserRouter>
+ *   </AppModeProvider>
+ * 
+ * INSTALLATION:
+ * Replace entire: src/App.jsx with this file
+ */
+
 import React, { Suspense, lazy } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ConfigProvider, Spin } from "antd";
