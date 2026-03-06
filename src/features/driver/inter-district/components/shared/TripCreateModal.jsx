@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Modal, Form, Select, InputNumber, Switch, Input, DatePicker, TimePicker, Space, Typography, message } from "antd";
+import { Modal, Form, Select, InputNumber, Switch, Input, DatePicker, TimePicker, Space, Typography, message, Checkbox, Divider } from "antd";
 import dayjs from "dayjs";
 import { REGIONS, getDistrictsByRegion } from "@/features/client/interDistrict/services/districtData";
 import { createTrip, listPitaks } from "@/features/shared/interDistrictTrips";
@@ -11,7 +11,7 @@ import { createTrip, listPitaks } from "@/features/shared/interDistrictTrips";
  * - Standart (Pitak): pitak tanlash + yo‘l haqi + vaqt
  * - Manzildan manzilga: seats + tariflar (pickup/dropoff/full salon) + optionlar + eltish
  */
-export default function TripCreateModal({ open, onClose }) {
+export default function TripCreateModal({ open, onClose, isOnline = true }) {
   const [form] = Form.useForm();
   const [tariff, setTariff] = useState("pitak");
 
@@ -52,11 +52,16 @@ export default function TripCreateModal({ open, onClose }) {
       is_lux: false,
       allow_smoking: false,
       has_delivery: false,
+      pickup_modes: ['station'],
     });
     setTariff("pitak");
   }, [open]);
 
   const onOk = async () => {
+    if (!isOnline) {
+      message.warning('Avval Online bo‘ling');
+      return;
+    }
     try {
       const v = await form.validateFields();
       const depart_at = new Date(`${v.depart_date.format("YYYY-MM-DD")}T${v.depart_time.format("HH:mm")}:00`).toISOString();
@@ -78,9 +83,15 @@ export default function TripCreateModal({ open, onClose }) {
         has_trunk: !!v.has_trunk,
         is_lux: !!v.is_lux,
         allow_smoking: !!v.allow_smoking,
-        has_delivery: !!v.has_delivery,
-        delivery_price_uzs: v.has_delivery ? Number(v.delivery_price_uzs || 0) : null,
-        notes: v.notes || null,
+        has_delivery: !!v.has_delivery || (Array.isArray(v.pickup_modes) && v.pickup_modes.includes('parcel')),
+        delivery_price_uzs: (v.has_delivery || (Array.isArray(v.pickup_modes) && v.pickup_modes.includes('parcel'))) ? Number(v.delivery_price_uzs || 0) : null,
+        notes: (() => {
+          const base = v.notes ? String(v.notes) : '';
+          const modes = Array.isArray(v.pickup_modes) ? v.pickup_modes : [];
+          const meta = { pickup_modes: modes };
+          const tag = `\n---\nMETA:${JSON.stringify(meta)}`;
+          return (base || modes.length) ? (base + tag) : null;
+        })(),
       };
 
       await createTrip(payload);
@@ -115,6 +126,22 @@ export default function TripCreateModal({ open, onClose }) {
             <Select options={districtOptions} placeholder="Tanlang" />
           </Form.Item>
         </Space>
+
+        <Divider style={{ margin: '10px 0' }} />
+        <Form.Item
+          name="pickup_modes"
+          label="Yo‘lovchilarni qayerdan olasiz?"
+          rules={[{ required: true, message: 'Kamida bitta variant tanlang' }]}
+        >
+          <Checkbox.Group
+            options={[
+              { label: 'Uylardan yig\'ish', value: 'home' },
+              { label: 'Vokzal / Stoyanka', value: 'station' },
+              { label: 'Yo\'l-yo\'lakay', value: 'road' },
+              { label: 'Pochta / Posilka ham olaman', value: 'parcel' },
+            ]}
+          />
+        </Form.Item>
 
         <Form.Item name="tariff" label="Tarif turi" rules={[{ required: true }]}>
           <Select

@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { Layout, Row, Col, Space, Typography, Button, message } from 'antd';
+import { Layout, Row, Col, Space, Typography, Button, message, Switch, Tooltip } from 'antd';
 import { ReloadOutlined, InboxOutlined } from '@ant-design/icons';
 
 import { DistrictProvider, useDistrict } from './context/DistrictContext';
@@ -33,6 +33,9 @@ function Inner() {
   const [tripCreateOpen, setTripCreateOpen] = useState(false);
   const [pitakAdminOpen, setPitakAdminOpen] = useState(false);
   const [requestsOpen, setRequestsOpen] = useState(false);
+  const [isOnline, setIsOnline] = useState(() => {
+    try { return localStorage.getItem('inter_district_driver_online') === '1'; } catch { return false; }
+  });
 
   // Premium: realtime requestlar
   usePremiumSocket({
@@ -40,7 +43,7 @@ function Inner() {
     onRequest: (req) => upsertPremiumClient(req),
   });
 
-  const themeClass = useMemo(() => (mode === MODES.PREMIUM ? 'theme-gold' : 'theme-blue'), [mode]);
+  const themeClass = useMemo(() => 'theme-blue', []);
 
   const onRefresh = useCallback(() => {
     locateOnce();
@@ -60,14 +63,27 @@ function Inner() {
             </Text>
           </div>
           <Space>
+            <Tooltip title="Online bo‘lsangiz, reys yaratishingiz va so‘rovlarni qabul qilishingiz mumkin">
+              <Space align="center" size={6}>
+                <Text style={{ color: 'var(--theme-subtext)' }}>Online</Text>
+                <Switch
+                  checked={isOnline}
+                  onChange={(v) => {
+                    setIsOnline(v);
+                    try { localStorage.setItem('inter_district_driver_online', v ? '1' : '0'); } catch {}
+                    if (v) locateOnce();
+                  }}
+                />
+              </Space>
+            </Tooltip>
             <Button icon={<InboxOutlined />} onClick={() => setParcelOpen(true)}>
               Posilka
             </Button>
 
-            <Button onClick={() => setRequestsOpen(true)}>
+            <Button onClick={() => setRequestsOpen(true)} disabled={!isOnline}>
               So‘rovlar
             </Button>
-            <Button onClick={() => setTripCreateOpen(true)} type="primary">
+            <Button onClick={() => setTripCreateOpen(true)} type="primary" disabled={!isOnline}>
               Reys yaratish
             </Button>
             <Button onClick={() => setPitakAdminOpen(true)}>
@@ -128,7 +144,7 @@ function Inner() {
         <ParcelEntryModal open={parcelOpen} onClose={() => setParcelOpen(false)} />
       </Content>
 
-      <TripCreateModal open={tripCreateOpen} onClose={() => setTripCreateOpen(false)} />
+      <TripCreateModal open={tripCreateOpen} onClose={() => setTripCreateOpen(false)} isOnline={isOnline} />
       <PitakAdminModal open={pitakAdminOpen} onClose={() => setPitakAdminOpen(false)} />
       <TripRequestsDrawer open={requestsOpen} onClose={() => setRequestsOpen(false)} />
     </Layout>

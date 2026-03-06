@@ -84,7 +84,7 @@ export function DistrictProvider({ children }) {
           const empty = Math.max(0, maxSeats - takenSeats);
           if (takenSeats > 0 && empty > 0) {
             const emptyCost = empty * baseSeatPrice;
-            total = total + emptyCost; // total increases; UI can display per-client share
+            total = total + emptyCost; /// total increases; UI can display per-client share
           }
         }
 
