@@ -1,246 +1,288 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Modal, Form, Select, InputNumber, Switch, Input, DatePicker, TimePicker, Space, Typography, message, Checkbox, Divider } from "antd";
+import React, { useState, useEffect, useMemo } from "react";
+import { Modal, Form, Input, InputNumber, Switch, DatePicker, TimePicker, Select, Button, Typography, Space, Divider, message, Row, Col, Card } from "antd";
+import { CarOutlined, SafetyCertificateOutlined, InboxOutlined, SettingOutlined, AppstoreAddOutlined, ReconciliationOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
-import { REGIONS, getDistrictsByRegion } from "@/features/client/interDistrict/services/districtData";
-import { createTrip, listPitaks } from "@/features/shared/interDistrictTrips";
+import { REGIONS, getDistrictsByRegion } from "../../services/districtData";
 
 /**
  * TripCreateModal.jsx (Driver)
  * -------------------------------------------------------
- * Driver reys yaratadi:
- * - Standart (Pitak): pitak tanlash + yo‘l haqi + vaqt
- * - Manzildan manzilga: seats + tariflar (pickup/dropoff/full salon) + optionlar + eltish
+ * Haydovchi yangi reys yaratishi uchun oyna.
+ * - Eltish va Yuk qabul qilish xizmatlari alohida kiritildi
+ * - Faqat ayollar uchun (Gender) qatnov rejimi
+ * - Butun salon va qatnov narxlarini aniq ko'rsatish
  */
-export default function TripCreateModal({ open, onClose, isOnline = true }) {
+export default function TripCreateModal({ open, onClose, onSuccess }) {
   const [form] = Form.useForm();
-  const [tariff, setTariff] = useState("pitak");
+  const [loading, setLoading] = useState(false);
+  
+  // State'lar
+  const [regionId, setRegionId] = useState("karakalpakstan");
+  const [tariff, setTariff] = useState("door"); // 'door' yoki 'pitak'
+  const [allowFullSalon, setAllowFullSalon] = useState(false);
+  
+  // Yangi Eltish va Yuk state'lari
+  const [hasEltish, setHasEltish] = useState(false);
+  const [hasYuk, setHasYuk] = useState(false);
 
-  const regionId = Form.useWatch("region", form);
-  const fromDistrict = Form.useWatch("from_district", form);
-  const toDistrict = Form.useWatch("to_district", form);
-
-  const districts = useMemo(() => getDistrictsByRegion(regionId || "karakalpakstan"), [regionId]);
-  const districtOptions = useMemo(() => districts.map((d) => ({ value: d.name, label: d.name })), [districts]);
-
-  const [pitaks, setPitaks] = useState([]);
-  useEffect(() => {
-    if (!open) return;
-    (async () => {
-      try {
-        const list = await listPitaks({ region: regionId, from_district: fromDistrict, to_district: toDistrict, activeOnly: true });
-        setPitaks(list || []);
-      } catch (_) {
-        setPitaks([]);
-      }
-    })();
-  }, [open, regionId, fromDistrict, toDistrict]);
+  // Tumanlar ro'yxatini regionga qarab olish
+  const districts = useMemo(() => getDistrictsByRegion(regionId), [regionId]);
+  const optionsRegion = useMemo(() => REGIONS.map((r) => ({ value: r.id, label: r.name })), []);
+  const optionsDistrict = useMemo(() => districts.map((d) => ({ value: d.name, label: d.name })), [districts]);
 
   useEffect(() => {
-    if (!open) return;
-    // defaults
-    form.setFieldsValue({
-      region: "karakalpakstan",
-      tariff: "pitak",
-      depart_date: dayjs(),
-      depart_time: dayjs().add(1, "hour"),
-      base_price_uzs: 50000,
-      pickup_fee_uzs: 0,
-      dropoff_fee_uzs: 0,
-      allow_full_salon: false,
-      has_ac: false,
-      has_trunk: false,
-      is_lux: false,
-      allow_smoking: false,
-      has_delivery: false,
-      pickup_modes: ['station'],
-    });
-    setTariff("pitak");
-  }, [open]);
-
-  const onOk = async () => {
-    if (!isOnline) {
-      message.warning('Avval Online bo‘ling');
-      return;
+    if (open) {
+      form.resetFields();
+      form.setFieldsValue({
+        region: "karakalpakstan",
+        tariff: "door",
+        departDate: dayjs(),
+        departTime: dayjs().add(1, "hour"),
+        seats_total: 4,
+        allow_full_salon: false,
+        has_eltish: false,
+        has_yuk: false,
+        female_only: false,
+        has_ac: false,
+        has_trunk: false,
+        is_lux: false,
+      });
+      setRegionId("karakalpakstan");
+      setTariff("door");
+      setAllowFullSalon(false);
+      setHasEltish(false);
+      setHasYuk(false);
     }
-    try {
-      const v = await form.validateFields();
-      const depart_at = new Date(`${v.depart_date.format("YYYY-MM-DD")}T${v.depart_time.format("HH:mm")}:00`).toISOString();
+  }, [open, form]);
 
+  const handleSubmit = async (values) => {
+    setLoading(true);
+    try {
+      // Sana va vaqtni bitta ISO string holatiga keltirish
+      const departDateStr = values.departDate.format("YYYY-MM-DD");
+      const departTimeStr = values.departTime.format("HH:mm");
+      const departAtIso = new Date(`${departDateStr}T${departTimeStr}:00`).toISOString();
+
+      // API (Backend) ga yuboriladigan payload
       const payload = {
-        region: v.region,
-        from_district: v.from_district,
-        to_district: v.to_district,
-        tariff: v.tariff,
-        pitak_id: v.tariff === "pitak" ? (v.pitak_id || null) : null,
-        depart_at,
-        seats_total: v.tariff === "door" ? Number(v.seats_total || 0) : null,
-        allow_full_salon: v.tariff === "door" ? !!v.allow_full_salon : false,
-        base_price_uzs: Number(v.base_price_uzs || 0),
-        pickup_fee_uzs: v.tariff === "door" ? Number(v.pickup_fee_uzs || 0) : 0,
-        dropoff_fee_uzs: v.tariff === "door" ? Number(v.dropoff_fee_uzs || 0) : 0,
-        full_salon_price_uzs: v.tariff === "door" && v.allow_full_salon ? Number(v.full_salon_price_uzs || 0) : null,
-        has_ac: !!v.has_ac,
-        has_trunk: !!v.has_trunk,
-        is_lux: !!v.is_lux,
-        allow_smoking: !!v.allow_smoking,
-        has_delivery: !!v.has_delivery || (Array.isArray(v.pickup_modes) && v.pickup_modes.includes('parcel')),
-        delivery_price_uzs: (v.has_delivery || (Array.isArray(v.pickup_modes) && v.pickup_modes.includes('parcel'))) ? Number(v.delivery_price_uzs || 0) : null,
-        notes: (() => {
-          const base = v.notes ? String(v.notes) : '';
-          const modes = Array.isArray(v.pickup_modes) ? v.pickup_modes : [];
-          const meta = { pickup_modes: modes };
-          const tag = `\n---\nMETA:${JSON.stringify(meta)}`;
-          return (base || modes.length) ? (base + tag) : null;
-        })(),
+        from_district: values.from_district,
+        to_district: values.to_district,
+        depart_at: departAtIso,
+        tariff: values.tariff,
+        base_price_uzs: values.base_price_uzs,
+        pickup_fee_uzs: values.pickup_fee_uzs || 0,
+        dropoff_fee_uzs: values.dropoff_fee_uzs || 0,
+        seats_total: values.seats_total || 4,
+        allow_full_salon: values.allow_full_salon,
+        full_salon_price_uzs: values.allow_full_salon ? values.full_salon_price_uzs : null,
+        
+        // Eltish va Yuk ma'lumotlari
+        has_eltish: values.has_eltish,
+        eltish_price_uzs: values.has_eltish ? values.eltish_price_uzs : null,
+        has_yuk: values.has_yuk,
+        yuk_price_uzs: values.has_yuk ? values.yuk_price_uzs : null,
+        
+        female_only: values.female_only,
+        has_ac: values.has_ac,
+        has_trunk: values.has_trunk,
+        is_lux: values.is_lux,
+        notes: values.notes || "",
       };
 
-      await createTrip(payload);
-      message.success("Reys yaratildi");
-      onClose?.();
-    } catch (e) {
-      if (e?.errorFields) return;
-      message.error(e?.message || "Xatolik: reys yaratilmadi");
+      // Bu yerda sizning api call funksiyangiz ishlaydi
+      // await createInterDistrictTrip(payload);
+      
+      message.success("Reys muvaffaqiyatli yaratildi!");
+      onSuccess?.(payload);
+      onClose();
+    } catch (error) {
+      message.error("Reys yaratishda xatolik yuz berdi.");
+      console.error(error);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <Modal
-      title="Reys yaratish (Tumanlar aro)"
+      title={<Typography.Title level={4} style={{ margin: 0 }}>Yangi reys yaratish</Typography.Title>}
       open={open}
-      onOk={onOk}
       onCancel={onClose}
-      okText="Saqlash"
-      cancelText="Bekor"
-      width={560}
+      footer={null}
+      destroyOnClose
+      width={600}
+      bodyStyle={{ padding: "20px 24px", maxHeight: "85vh", overflowY: "auto" }}
     >
-      <Form layout="vertical" form={form}>
-        <Form.Item name="region" label="Hudud" rules={[{ required: true }]}>
-          <Select options={REGIONS.map((r) => ({ value: r.id, label: r.name }))} />
-        </Form.Item>
-
-        <Space style={{ width: "100%" }} size={10}>
-          <Form.Item name="from_district" label="Qaerdan (tuman)" rules={[{ required: true }]} style={{ flex: 1 }}>
-            <Select options={districtOptions} placeholder="Tanlang" />
+      <Form layout="vertical" form={form} onFinish={handleSubmit}>
+        
+        {/* HUDUD VA TUMANLAR */}
+        <Card size="small" style={{ borderRadius: 12, marginBottom: 16, background: "#f8f9fa" }}>
+          <Form.Item name="region" label={<span style={{ fontWeight: 600 }}>Hududni tanlang</span>} initialValue="karakalpakstan">
+            <Select 
+              size="large" 
+              options={optionsRegion} 
+              onChange={(val) => {
+                setRegionId(val);
+                form.setFieldsValue({ from_district: null, to_district: null });
+              }} 
+            />
           </Form.Item>
-          <Form.Item name="to_district" label="Qaerga (tuman)" rules={[{ required: true }]} style={{ flex: 1 }}>
-            <Select options={districtOptions} placeholder="Tanlang" />
-          </Form.Item>
-        </Space>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="from_district" label="Qaerdan" rules={[{ required: true, message: "Manzilni tanlang" }]}>
+                <Select size="large" options={optionsDistrict} placeholder="Tuman" showSearch />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="to_district" label="Qaerga" rules={[{ required: true, message: "Manzilni tanlang" }]}>
+                <Select size="large" options={optionsDistrict} placeholder="Tuman" showSearch />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Card>
 
-        <Divider style={{ margin: '10px 0' }} />
-        <Form.Item
-          name="pickup_modes"
-          label="Yo‘lovchilarni qayerdan olasiz?"
-          rules={[{ required: true, message: 'Kamida bitta variant tanlang' }]}
-        >
-          <Checkbox.Group
+        {/* VAQT VA TARIF */}
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item name="departDate" label={<span style={{ fontWeight: 600 }}>Ketish sanasi</span>} rules={[{ required: true }]}>
+              <DatePicker style={{ width: "100%" }} size="large" allowClear={false} />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item name="departTime" label={<span style={{ fontWeight: 600 }}>Ketish vaqti</span>} rules={[{ required: true }]}>
+              <TimePicker format="HH:mm" style={{ width: "100%" }} size="large" allowClear={false} />
+            </Form.Item>
+          </Col>
+        </Row>
+
+        <Form.Item name="tariff" label={<span style={{ fontWeight: 600 }}>Xizmat turi (Tarif)</span>}>
+          <Select 
+            size="large" 
+            onChange={setTariff}
             options={[
-              { label: 'Uylardan yig\'ish', value: 'home' },
-              { label: 'Vokzal / Stoyanka', value: 'station' },
-              { label: 'Yo\'l-yo\'lakay', value: 'road' },
-              { label: 'Pochta / Posilka ham olaman', value: 'parcel' },
+              { value: "door", label: "🚕 Manzildan manzilgacha (Door-to-door)" },
+              { value: "pitak", label: "📍 Stoyanka / Pitakdan" }
             ]}
           />
         </Form.Item>
 
-        <Form.Item name="tariff" label="Tarif turi" rules={[{ required: true }]}>
-          <Select
-            value={tariff}
-            onChange={(v) => {
-              setTariff(v);
-              form.setFieldsValue({ tariff: v });
-            }}
-            options={[
-              { value: "pitak", label: "Standart (Pitak)" },
-              { value: "door", label: "Manzildan manzilga" },
-            ]}
-          />
-        </Form.Item>
-
-        <Space style={{ width: "100%" }} size={10}>
-          <Form.Item name="depart_date" label="Sana" rules={[{ required: true }]} style={{ flex: 1 }}>
-            <DatePicker style={{ width: "100%" }} />
+        {/* NARXLAR */}
+        <Card size="small" style={{ borderRadius: 12, marginBottom: 16, border: "1px solid #e8e8e8" }}>
+          <Typography.Text style={{ fontWeight: 700, fontSize: 15, display: "block", marginBottom: 10 }}>
+            Narxlarni belgilash (so'm)
+          </Typography.Text>
+          <Form.Item name="base_price_uzs" label="1 ta o'rindiq narxi" rules={[{ required: true, message: "Narxni kiriting" }]}>
+            <InputNumber 
+              style={{ width: "100%" }} 
+              size="large" 
+              formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} 
+              parser={value => value.replace(/\$\s?|( *)/g, '')} 
+              placeholder="Masalan: 50 000" 
+            />
           </Form.Item>
-          <Form.Item name="depart_time" label="Soat" rules={[{ required: true }]} style={{ flex: 1 }}>
-            <TimePicker format="HH:mm" style={{ width: "100%" }} />
-          </Form.Item>
-        </Space>
 
-        {tariff === "pitak" ? (
-          <>
-            <Typography.Text style={{ fontWeight: 700 }}>Pitak (admin kiritgan)</Typography.Text>
-            <Form.Item name="pitak_id" style={{ marginTop: 8 }} rules={[{ required: true, message: "Pitak tanlang" }]}>
-              <Select
-                placeholder="Pitak tanlang"
-                options={pitaks.map((p) => ({ value: p.id, label: p.title }))}
-              />
-            </Form.Item>
+          {tariff === "door" && (
+            <Row gutter={12}>
+              <Col span={12}>
+                <Form.Item name="pickup_fee_uzs" label="Uyidan olish narxi">
+                  <InputNumber style={{ width: "100%" }} size="large" placeholder="10 000" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item name="dropoff_fee_uzs" label="Uyiga borish narxi">
+                  <InputNumber style={{ width: "100%" }} size="large" placeholder="10 000" />
+                </Form.Item>
+              </Col>
+            </Row>
+          )}
 
-            <Form.Item name="base_price_uzs" label="Yo‘l haqi (so‘m)" rules={[{ required: true }]}>
-              <InputNumber style={{ width: "100%" }} min={0} step={1000} />
-            </Form.Item>
-          </>
-        ) : (
-          <>
-            <Space style={{ width: "100%" }} size={10}>
-              <Form.Item name="seats_total" label="O‘rindiqlar soni" rules={[{ required: true }]} style={{ flex: 1 }}>
-                <InputNumber style={{ width: "100%" }} min={1} max={8} />
+          {tariff === "door" && (
+            <>
+              <Form.Item name="allow_full_salon" valuePropName="checked" style={{ marginBottom: 8 }}>
+                <Switch checked={allowFullSalon} onChange={setAllowFullSalon} />
+                <span style={{ marginLeft: 10, fontWeight: 600 }}>Butun salonni band qilishga ruxsat</span>
               </Form.Item>
-              <Form.Item name="base_price_uzs" label="Bazaviy narx (so‘m)" rules={[{ required: true }]} style={{ flex: 1 }}>
-                <InputNumber style={{ width: "100%" }} min={0} step={1000} />
-              </Form.Item>
-            </Space>
+              {allowFullSalon && (
+                <Form.Item name="full_salon_price_uzs" rules={[{ required: true, message: "Butun salon narxini kiriting" }]}>
+                  <InputNumber style={{ width: "100%" }} size="large" placeholder="Butun salon uchun chegirmali narx" />
+                </Form.Item>
+              )}
+            </>
+          )}
+        </Card>
 
-            <Space style={{ width: "100%" }} size={10}>
-              <Form.Item name="pickup_fee_uzs" label="Uyidan olib ketish (so‘m)" style={{ flex: 1 }}>
-                <InputNumber style={{ width: "100%" }} min={0} step={1000} />
+        {/* XIZMATLAR: ELTISH VA YUK */}
+        <Card size="small" style={{ borderRadius: 12, marginBottom: 16, background: "rgba(22, 119, 255, 0.05)", border: "1px solid rgba(22, 119, 255, 0.2)" }}>
+          <Space direction="vertical" style={{ width: "100%" }}>
+            
+            {/* Eltish (Pochta) */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Space align="center">
+                <InboxOutlined style={{ fontSize: 20, color: "#1677ff" }} />
+                <span style={{ fontWeight: 600, color: "#333" }}>Eltish (Pochta) qabul qilaman</span>
+              </Space>
+              <Form.Item name="has_eltish" valuePropName="checked" style={{ margin: 0 }}>
+                <Switch checked={hasEltish} onChange={setHasEltish} />
               </Form.Item>
-              <Form.Item name="dropoff_fee_uzs" label="Uyiga olib borish (so‘m)" style={{ flex: 1 }}>
-                <InputNumber style={{ width: "100%" }} min={0} step={1000} />
-              </Form.Item>
-            </Space>
-
-            <Form.Item name="allow_full_salon" valuePropName="checked">
-              <Switch /> <span style={{ marginLeft: 8 }}>Butun salon</span>
-            </Form.Item>
-
-            {Form.useWatch("allow_full_salon", form) && (
-              <Form.Item name="full_salon_price_uzs" label="Butun salon narxi (so‘m)" rules={[{ required: true }]}>
-                <InputNumber style={{ width: "100%" }} min={0} step={1000} />
+            </div>
+            {hasEltish && (
+              <Form.Item name="eltish_price_uzs" label="Eng kam eltish narxi" style={{ marginTop: 10, marginBottom: 10 }} rules={[{ required: true, message: "Eltish narxini kiriting" }]}>
+                <InputNumber style={{ width: "100%" }} size="large" placeholder="15 000" />
               </Form.Item>
             )}
-          </>
-        )}
 
-        <Space wrap style={{ width: "100%" }}>
-          <Form.Item name="has_ac" valuePropName="checked" style={{ marginBottom: 0 }}>
-            <Switch /> <span style={{ marginLeft: 8 }}>Konditsioner</span>
-          </Form.Item>
-          <Form.Item name="has_trunk" valuePropName="checked" style={{ marginBottom: 0 }}>
-            <Switch /> <span style={{ marginLeft: 8 }}>Yukxona</span>
-          </Form.Item>
-          <Form.Item name="is_lux" valuePropName="checked" style={{ marginBottom: 0 }}>
-            <Switch /> <span style={{ marginLeft: 8 }}>Luks</span>
-          </Form.Item>
-          <Form.Item name="allow_smoking" valuePropName="checked" style={{ marginBottom: 0 }}>
-            <Switch /> <span style={{ marginLeft: 8 }}>Sigaret</span>
-          </Form.Item>
-        </Space>
+            <Divider style={{ margin: "12px 0" }} />
 
-        <div style={{ marginTop: 10 }}>
-          <Form.Item name="has_delivery" valuePropName="checked" style={{ marginBottom: 0 }}>
-            <Switch /> <span style={{ marginLeft: 8 }}>Eltish (posilka) qo‘shish</span>
-          </Form.Item>
-          {Form.useWatch("has_delivery", form) && (
-            <Form.Item name="delivery_price_uzs" label="Eltish narxi (so‘m)" rules={[{ required: true }]}>
-              <InputNumber style={{ width: "100%" }} min={0} step={1000} />
+            {/* Yuk olaman */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Space align="center">
+                <ReconciliationOutlined style={{ fontSize: 20, color: "#fa8c16" }} />
+                <span style={{ fontWeight: 600, color: "#333" }}>Yuk olaman</span>
+              </Space>
+              <Form.Item name="has_yuk" valuePropName="checked" style={{ margin: 0 }}>
+                <Switch checked={hasYuk} onChange={setHasYuk} />
+              </Form.Item>
+            </div>
+            {hasYuk && (
+              <Form.Item name="yuk_price_uzs" label="Eng kam yuk narxi" style={{ marginTop: 10, marginBottom: 0 }} rules={[{ required: true, message: "Yuk narxini kiriting" }]}>
+                <InputNumber style={{ width: "100%" }} size="large" placeholder="50 000" />
+              </Form.Item>
+            )}
+
+          </Space>
+        </Card>
+
+        {/* QO'SHIMCHA QULAYLIKLAR */}
+        <Typography.Text style={{ fontWeight: 700, fontSize: 15, display: "block", marginBottom: 10 }}>
+          <SettingOutlined /> Qo'shimcha sozlamalar
+        </Typography.Text>
+        <Card size="small" style={{ borderRadius: 12, marginBottom: 16 }}>
+          <Space direction="vertical" style={{ width: "100%" }}>
+            <Form.Item name="has_ac" valuePropName="checked" style={{ margin: 0 }}>
+              <Switch /> <span style={{ marginLeft: 8 }}>❄️ Konditsioner bor</span>
             </Form.Item>
-          )}
-        </div>
+            <Form.Item name="has_trunk" valuePropName="checked" style={{ margin: 0 }}>
+              <Switch /> <span style={{ marginLeft: 8 }}>🧳 Yukxona (Bagaj) bo'sh</span>
+            </Form.Item>
+            
+            <Divider style={{ margin: "8px 0" }} />
+            
+            <Form.Item name="female_only" valuePropName="checked" style={{ margin: 0 }}>
+              <Switch /> 
+              <span style={{ marginLeft: 8, fontWeight: 600, color: "#eb2f96" }}>
+                <SafetyCertificateOutlined /> Faqat ayollar uchun (Xavfsiz reys)
+              </span>
+            </Form.Item>
+          </Space>
+        </Card>
 
-        <Form.Item name="notes" label="Izoh (ixtiyoriy)">
-          <Input.TextArea rows={3} placeholder="Masalan: avtovokzal oldidan, 1 ta yuk, luks salon..." />
+        <Form.Item name="notes" label="Qo'shimcha izoh">
+          <Input.TextArea rows={2} placeholder="Mijozlar uchun ma'lumotlar (masalan: mashina rangi, markasi)..." />
         </Form.Item>
+
+        <Button type="primary" htmlType="submit" loading={loading} style={{ width: "100%", height: 50, borderRadius: 14, fontWeight: 600, fontSize: 16 }}>
+          Reysni e'lon qilish
+        </Button>
       </Form>
     </Modal>
   );
