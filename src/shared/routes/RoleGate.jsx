@@ -1,33 +1,35 @@
 /**
- * RoleGate.jsx - MINIMAL FIX VERSION
- * 
- * Location: src/shared/routes/RoleGate.jsx
- * 
- * FIX: Keep original structure, only add useAppMode context
- * DON'T change hook order or add new hooks
+ * RoleGate.jsx - TO'LIQ VA TO'G'IRLANGAN VERSIYA
+ * * Location: src/shared/routes/RoleGate.jsx
+ * * FIX: useAppMode kontekstidan appMode qiymatini olish va 
+ * yo'naltirish (redirect) mantiqini to'liq ishlashini ta'minlash.
  */
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { Spin } from "antd";
 import { supabase } from "@/lib/supabase";
-import { useAppMode } from "@/providers/AppModeProvider"; // ✅ ADD IMPORT ONLY
+import { useAppMode } from "@/providers/AppModeProvider"; // ✅ KONTEKST IMPORTI
 
-// Shared helper: role → home route (exported for RootRedirect)
-// Keep it deterministic: only uses already-fetched records.
+/**
+ * pickHomeForRole - Rol va rejimga qarab mos sahifani aniqlash
+ * Bu funksiya komponentdan tashqarida ham ishlatilishi mumkinligi uchun eksport qilingan.
+ */
 export function pickHomeForRole({ role, driverRow, driverApplication, appMode }) {
   const r = (role || "client").toLowerCase();
-  const mode = (appMode || "client").toLowerCase(); // ✅ USE appMode PARAMETER
+  const mode = (appMode || "client").toLowerCase(); 
 
+  // 1. Agar admin bo'lsa, har doim admin panelga
   if (r === "admin") return "/admin";
 
-  // Default after login is client home.
-  // Driver flow is entered only when app_mode="driver".
+  // 2. Agar ilova rejimi "driver" bo'lmasa, har doim mijoz asosiy sahifasiga
   if (mode !== "driver") return "/client/home";
 
+  // 3. Agar haydovchi rejimida bo'lsa
   if (r === "driver") {
     const appStatus = (driverApplication?.status || "").toLowerCase();
 
+    // Haydovchi tasdiqlanganini tekshirish (turli xil baza variantlari uchun)
     const driverApproved =
       !!driverRow &&
       (String(driverRow.status || "").toLowerCase() === "approved" ||
@@ -36,87 +38,66 @@ export function pickHomeForRole({ role, driverRow, driverApplication, appMode })
         driverRow.approved === true);
 
     if (driverApproved) return "/driver/dashboard";
+    
+    // Agar ariza tasdiqlangan bo'lsa-yu, hali haydovchi jadvalida faol bo'lmasa
     if (appStatus === "approved") return "/driver/dashboard";
-    if (appStatus === "rejected") return "/driver/register";
+    
+    // Agar ariza kutilayotgan bo'lsa
+    if (appStatus === "pending") return "/driver/pending";
+    
+    // Agar ariza rad etilgan bo'lsa
+    if (appStatus === "rejected") return "/driver/pending";
 
-    // pending/submitted/review/unknown
-    return "/driver/pending";
+    // Aks holda ro'yxatdan o'tishga
+    return "/driver/register";
   }
 
-  // In driver mode, but role isn't driver → go to registration
-  return "/driver/register";
+  // Boshqa barcha holatlarda mijoz sahifasiga
+  return "/client/home";
 }
 
 /**
- * RoleGate
- * allow:
- *  - client: true/false
- *  - driver: true/false
- *  - requireDriverApproved: true/false
- *
- * IMPORTANT:
- *  Role truth source MUST be `profiles.role`.
- *  `drivers` table row existence is ONLY for driver registration/approval state,
- *  and must NOT override a user's role.
- *
- *  Why: if you treat "drivers row exists" as role=driver, then any client who once
- *  created a drivers row (or has a leftover row) gets forced into driver routes.
- *
- *  PERFORMANCE: profile, driver_applications va drivers so'rovlari
- *  parallel (Promise.all) yuboriladi — sahifa ochilish 2x tez bo'ladi.
+ * RoleGate - Asosiy komponent
+ * Berilgan 'allow' qoidalariga ko'ra kirishni cheklaydi yoki yo'naltiradi.
  */
 export default function RoleGate({ children, allow, redirectTo = "/login" }) {
-  const { appMode } = useAppMode(); // ✅ ADD ONLY THIS (no reordering)
   const location = useLocation();
+  const { appMode } = useAppMode(); // ✅ KONTEKSTDAN JORIY REJIMNI OLISH
   
-  // Keep original state hooks in same order
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState(null);
   const [driverRow, setDriverRow] = useState(null);
   const [driverApplication, setDriverApplication] = useState(null);
 
-  if (!supabase) {
-    return (
-      <div style={{ padding: 16 }}>
-        <p>Error: Supabase not initialized.</p>
-      </div>
-    );
-  }
-
-  // Fetch user profile, driver, and application in parallel
   useEffect(() => {
+    let isMounted = true;
+
     (async () => {
-      setLoading(true);
       try {
-        // Get current user
-        const { data: authData, error: authError } = await supabase.auth.getUser();
-        if (authError) {
-          console.error("[RoleGate] Auth error:", authError);
-          setRole(null);
-          setLoading(false);
-          return;
-        }
-
+        setLoading(true);
+        
+        // 1. Auth foydalanuvchini olish
+        const { data: authData } = await supabase.auth.getUser();
         const user = authData?.user;
+
         if (!user) {
-          setRole(null);
-          setLoading(false);
+          if (isMounted) {
+            setRole(null);
+            setLoading(false);
+          }
           return;
         }
 
-        // Fetch profile, driver, and driver_applications in parallel
+        // 2. Profil, Haydovchi va Ariza ma'lumotlarini parallel yuklash
         const [profileRes, driverRes, appRes] = await Promise.all([
-          supabase.from("profiles").select("role").eq("id", user.id).single(),
-          supabase.from("drivers").select("*").eq("user_id", user.id).single(),
-          supabase
-            .from("driver_applications")
-            .select("*")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .single(),
+          supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(),
+          supabase.from("drivers").select("*").eq("user_id", user.id).maybeSingle(),
+          supabase.from("driver_applications").select("*").eq("user_id", user.id).maybeSingle()
         ]);
 
+        if (!isMounted) return;
+
+        // Xatoliklarni tekshirish (PGRST116 - ma'lumot topilmagan holat, bu xato emas)
         const profileRole = profileRes.data?.role || "client";
         const driver = driverRes.error?.code === "PGRST116" ? null : driverRes.data;
         const app = appRes.error?.code === "PGRST116" ? null : appRes.data;
@@ -126,51 +107,66 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         setDriverApplication(app);
       } catch (err) {
         console.error("[RoleGate] Fetch error:", err);
-        setRole(null);
+        if (isMounted) setRole(null);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     })();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
+  // Yuklanish jarayoni
   if (loading) {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <Spin size="large" />
+      <div style={{ 
+        minHeight: "100vh", 
+        display: "flex", 
+        alignItems: "center", 
+        justifyContent: "center",
+        background: "#f0f2f5"
+      }}>
+        <Spin size="large" tip="Sahifa yuklanmoqda..." />
       </div>
     );
   }
 
-  // If no role determined, redirect to login
+  // Agar foydalanuvchi tizimga kirmagan bo'lsa (yoki roli yo'q bo'lsa), login sahifasiga
   if (!role) {
     return <Navigate to={redirectTo} state={{ from: location }} replace />;
   }
 
-  // Check if user has access
+  // Foydalanuvchi kirish huquqiga egaligini tekshirish
   const hasAccess = useMemo(() => {
-    const isDriver = role.toLowerCase() === "driver";
-    const isClient = role.toLowerCase() === "client";
-    const isAdmin = role.toLowerCase() === "admin";
+    const userRole = role.toLowerCase();
 
-    // Check allow rules
-    if (allow?.admin && isAdmin) return true;
-    if (allow?.driver && isDriver) return true;
-    if (allow?.client && isClient) return true;
+    // Ruxsat berilgan rollarni tekshirish
+    if (allow?.admin && userRole === "admin") return true;
+    if (allow?.driver && userRole === "driver") return true;
+    if (allow?.client && userRole === "client") return true;
 
     return false;
-  }, [role, allow]); // ✅ KEEP ORIGINAL DEPENDENCIES
+  }, [role, allow]);
 
-  // If not allowed, redirect to home for their role
+  // Agar kirishga ruxsat bo'lmasa, foydalanuvchini o'z rolidan kelib chiqib mos sahifaga yuborish
   if (!hasAccess) {
     const nextRoute = pickHomeForRole({
       role,
       driverRow,
       driverApplication,
-      appMode, // ✅ PASS appMode HERE
+      appMode // ✅ useAppMode dan kelgan qiymat uzatiladi
     });
+
+    // Hozirgi joylashuv va yo'naltirilayotgan joy bir xil bo'lsa, cheksiz sikl oldini olish
+    if (location.pathname === nextRoute) {
+      return children; 
+    }
+
     return <Navigate to={nextRoute} replace />;
   }
 
-  // Allowed - render children
+  // Agar hamma tekshiruvlardan o'tsa, sahifani ko'rsatish
   return children;
 }
