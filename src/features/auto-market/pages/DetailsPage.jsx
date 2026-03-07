@@ -35,7 +35,7 @@ import useCarDetails from "../hooks/useCarDetails";
 import useRecentlyViewed from "../hooks/useRecentlyViewed";
 import { useCompare } from "../context/CompareContext";
 import { useGaraj } from "../context/GarajContext";
-import PromoModal from "../components/Details/PromoModal";
+import PromoModal from "../components/Details/PromoModal.jsx";
 import useWalletBalance from "../hooks/useWalletBalance";
 import { revealSellerPhone } from "../services/marketBackend";
 
