@@ -68,27 +68,14 @@ export const promoteAd = async (adId, promoType) => {
     throw new Error(err.response?.data?.message || "Balans yetarli emas yoki tizim xatosi");
   }
 };
-const marketBackend = {
-  listCars,
-  getCarList,
-  getCarById,
-  getCarDetails,
-  createCarAd,
-  
-  // SHU YERGA QO'SHING:
-  promoteAd,
-  revealSellerPhone,
-  getWalletBalance,
-  
-  // ... qolgan eski funksiyalar (listBattles, analyzeFairPrice va h.k.)
-};
+
 /**
  * Sotuvchi telefon raqamini ko'rish (Pullik xizmat)
  */
 export const revealSellerPhone = async (adId) => {
   try {
     const { data } = await axiosClient.post('/market/reveal-phone', { ad_id: adId });
-    return data; 
+    return data;
   } catch (err) {
     console.error("Reveal Phone Error:", err);
     throw new Error(err.response?.data?.message || "402");
@@ -98,15 +85,17 @@ export const revealSellerPhone = async (adId) => {
 /**
  * Foydalanuvchi hamyon balansini olish
  */
-export const getWalletBalance = async () => {
+export async function getWalletBalance() {
   try {
-    const { data } = await axiosClient.get('/user/wallet');
-    return data; 
+    const { data } = await axiosClient.get('/wallet');
+    if (typeof data === 'number') return data;
+    return data?.wallet?.balance_uzs ?? data?.balance ?? 0;
   } catch (err) {
     console.error("Wallet Balance Fetch Error:", err);
-    return { balance: 0 };
+    return 0;
   }
-};
+}
+
 export async function listCars(filters = {}, { page = 1, pageSize = 12 } = {}) {
   if (!SB_READY) return mock.listCars(filters, { page, pageSize });
 
@@ -201,17 +190,6 @@ export async function getCarById(id) {
 // Wallet / Payments / Paid actions (server-side)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function getWalletBalance() {
-  try {
-    // /api/wallet (default routeKey=wallet)
-    const { data } = await axiosClient.get(`/wallet`);
-    return data?.wallet?.balance_uzs ?? 0;
-  } catch (e) {
-    // fallback: no backend -> 0
-    return 0;
-  }
-}
-
 export async function createPayment({ provider = "demo", amount_uzs, return_url } = {}) {
   const { data } = await axiosClient.post(`/auto-market/payment/create`, { provider, amount_uzs, return_url });
   return data;
@@ -238,6 +216,7 @@ export async function createCarAd(draft) {
 
     // Anti-spam: bir kunda 10 tadan ko'p e'lon bermaslik
     const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
     const { count: dailyCount } = await supabase
       .from("auto_ads")
       .select("id", { count: "exact", head: true })
@@ -689,3 +668,45 @@ export function getCarList(params = {}) {
 export function getCarDetails(id) {
   return getCarById(id);
 }
+
+const marketBackend = {
+  listCars,
+  getCarList,
+  getCarById,
+  getCarDetails,
+  createCarAd,
+  myAds,
+  markAdStatus,
+  priceHistory,
+  promoteAd,
+  revealSellerPhone,
+  getWalletBalance,
+  createPayment,
+  buyPromotion,
+  revealPhone,
+  getFavorites,
+  toggleFavorite,
+  listFavoriteCars,
+  getGaraj,
+  addToGaraj,
+  removeFromGaraj,
+  isInGaraj,
+  getServiceBooks,
+  createServiceBook,
+  addServiceRecord,
+  updateServiceBook,
+  getVikupByAdId,
+  createVikup,
+  listVikupAds,
+  createBarterOffer,
+  listBarterAds,
+  listBarterAdsByOfferModel,
+  listZapchast,
+  createZapchastAd,
+  listBattles,
+  getBattleById,
+  voteBattle,
+  analyzeFairPrice,
+};
+
+export default marketBackend;
