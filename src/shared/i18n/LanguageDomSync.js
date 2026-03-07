@@ -15,7 +15,6 @@ const SKIP_TAGS = new Set([
   'IMG',
   'INPUT',
   'OPTION',
-  'I',
 ]);
 
 const ICON_SELECTOR = [
@@ -34,21 +33,6 @@ const ICON_SELECTOR = [
   'svg',
 ].join(', ');
 
-const ICON_LIGATURES = new Set([
-  'menu','close','search','settings','logout','person','account_circle','history','wallet',
-  'payments','help','support','local_taxi','arrow_back','arrow_forward','distance','map',
-  'home','favorite','favorite_border','star','location_on','navigation','phone','chat',
-  'shopping_bag','directions_car','sell','inventory_2','support_agent'
-]);
-
-function looksLikeIconText(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return false;
-  if (ICON_LIGATURES.has(raw)) return true;
-  if (/^[a-z0-9_]{2,32}$/.test(raw) && !/[\s]/.test(raw)) return true;
-  return false;
-}
-
 const textOriginals = new WeakMap();
 const attrOriginals = new WeakMap();
 
@@ -58,10 +42,7 @@ function shouldSkipElement(el) {
   if (el.closest?.(ICON_SELECTOR)) return true;
   if (el.isContentEditable) return true;
   const className = typeof el.className === 'string' ? el.className : '';
-  if (/leaflet-control|leaflet-marker|mapboxgl|gm-style|icon|symbol/i.test(className)) return true;
-  const dataRole = `${el.getAttribute?.('data-role') || ''} ${el.getAttribute?.('data-icon') || ''}`;
-  if (/icon|symbol/i.test(dataRole)) return true;
-  if (looksLikeIconText(el.textContent) && (el.children?.length === 0 || el.childElementCount === 0)) return true;
+  if (/leaflet-control|leaflet-marker|mapboxgl|gm-style/i.test(className)) return true;
   return false;
 }
 
@@ -75,7 +56,6 @@ function translateTextNode(node, language) {
   if (!node || node.nodeType !== TEXT_NODE || shouldSkipNode(node)) return;
   const current = node.nodeValue ?? '';
   if (!current.trim()) return;
-  if (looksLikeIconText(current)) return;
 
   if (!textOriginals.has(node)) {
     textOriginals.set(node, current);

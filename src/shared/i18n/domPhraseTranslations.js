@@ -956,28 +956,6 @@ function replaceWholePhrase(out, phrase, translated) {
   return out;
 }
 
-
-function containsCyrillic(text) {
-  return /[Ѐ-ӿ]/.test(String(text || ''));
-}
-
-function looksUnsafeForAutoTranslate(text) {
-  const raw = String(text || '').trim();
-  if (!raw) return true;
-  if (/^[a-z0-9_]{2,32}$/i.test(raw) && !/\s/.test(raw)) return true;
-  if (/[A-Z][a-z]+[A-Z]/.test(raw)) return true;
-  if (/__|::|=>|<\/?[A-Za-z]|\{\{?|\}\}?/.test(raw)) return true;
-  if (/^[\w.-]+\.[A-Za-z]{2,}$/.test(raw)) return true;
-  return false;
-}
-
-function canTransliterate(text) {
-  const raw = String(text || '').trim();
-  if (!raw || containsCyrillic(raw)) return false;
-  if (looksUnsafeForAutoTranslate(raw)) return false;
-  return /^[\p{L}\p{M}\s0-9'ʻʼ‘’()\-–—.,:;!?/]+$/u.test(raw);
-}
-
 function translitUzToCyrl(text) {
   return String(text || '')
     .replace(/O‘|O'|Oʻ/g, 'Ў').replace(/o‘|o'|oʻ/g, 'ў')
@@ -1019,7 +997,7 @@ function translateTokens(language, input) {
     }
   }
 
-  if ((language === 'uz_kirill' || language === 'qq_kirill') && /[A-Za-zʻʼ‘’]/.test(out) && canTransliterate(out)) {
+  if ((language === 'uz_kirill' || language === 'qq_kirill') && /[A-Za-zʻʼ‘’]/.test(out)) {
     out = translitUzToCyrl(out);
   }
 
@@ -1029,7 +1007,6 @@ function translateTokens(language, input) {
 export function translatePhrase(language, input) {
   const text = String(input ?? '');
   if (!text || !language || language === 'uz_lotin') return text;
-  if (looksUnsafeForAutoTranslate(text)) return text;
 
   const normalizedText = normalizeSpaces(text);
 
