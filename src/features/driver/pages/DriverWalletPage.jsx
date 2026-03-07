@@ -1,23 +1,16 @@
-import React from "react";
-import { useNavigate } from "react-router-dom";
+import React from 'react';
+import { useLanguage } from '@shared/i18n/useLanguage';
+import PageBackButton from '@/shared/components/PageBackButton';
 
 export default function DriverWalletPage() {
-  const navigate = useNavigate();
+  const { t } = useLanguage();
   return (
     <div className="min-h-screen bg-white">
       <div className="p-4 flex items-center gap-3 border-b">
-        <button
-          className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center active:scale-95"
-          onClick={() => navigate(-1)}
-        >
-          <span className="material-symbols-rounded">arrow_back</span>
-        </button>
-        <div className="font-extrabold">Hisobni to‘ldirish</div>
+        <PageBackButton fallback="/driver/dashboard" />
+        <div className="font-extrabold">{t.wallet}</div>
       </div>
-
-      <div className="p-4 text-sm text-gray-600">
-        Bu sahifa hozir placeholder. Keyin shu faylga to‘lov usullari va balans logikasini qo‘shasan.
-      </div>
+      <div className="p-4 text-sm text-gray-600">{t.demoPlaceholder} Keyin shu faylga to‘lov usullari va balans logikasini qo‘shasan.</div>
     </div>
   );
 }

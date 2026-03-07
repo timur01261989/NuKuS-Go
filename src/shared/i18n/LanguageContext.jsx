@@ -1,37 +1,74 @@
-import React, { createContext, useCallback, useEffect, useMemo, useState } from "react";
-import { translations } from "@i18n/translations";
+import React, { createContext, useCallback, useEffect, useMemo, useState } from 'react';
+import { translations } from '@i18n/translations';
+import { createTranslator } from './createTranslator';
+import { AVAILABLE_LANGUAGES, DEFAULT_LANGUAGE, normalizeLanguageKey, getLanguageMeta } from './languages';
 
-const STORAGE_KEY = "appLang";
+const STORAGE_KEY = 'appLang';
 
 export const LanguageContext = createContext({
-  langKey: "uz_lotin",
+  language: DEFAULT_LANGUAGE,
+  langKey: DEFAULT_LANGUAGE,
+  setLanguage: (_k) => {},
   setLangKey: (_k) => {},
-  t: translations.uz_lotin || {},
+  t: translations[DEFAULT_LANGUAGE] || {},
+  tr: (key, fallback = '') => fallback || key,
+  availableLanguages: AVAILABLE_LANGUAGES,
+  currentLanguageMeta: getLanguageMeta(DEFAULT_LANGUAGE),
 });
 
 export function LanguageProvider({ children }) {
-  const [langKey, setLangKeyState] = useState(() => localStorage.getItem(STORAGE_KEY) || "uz_lotin");
+  const [language, setLanguageState] = useState(() => {
+    try {
+      return normalizeLanguageKey(localStorage.getItem(STORAGE_KEY) || DEFAULT_LANGUAGE);
+    } catch {
+      return DEFAULT_LANGUAGE;
+    }
+  });
 
-  const setLangKey = useCallback((key) => {
-    setLangKeyState(key);
-    localStorage.setItem(STORAGE_KEY, key);
-    // same-tab listeners
-    window.dispatchEvent(new CustomEvent("appLangChanged", { detail: { key } }));
+  const setLanguage = useCallback((key) => {
+    const normalized = normalizeLanguageKey(key);
+    setLanguageState(normalized);
+    try {
+      localStorage.setItem(STORAGE_KEY, normalized);
+    } catch {}
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = normalized;
+    }
+    window.dispatchEvent(new CustomEvent('appLangChanged', { detail: { key: normalized } }));
   }, []);
 
   useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = language;
+    }
+  }, [language]);
+
+  useEffect(() => {
     const onExternal = (e) => {
-      const k = e?.detail?.key || localStorage.getItem(STORAGE_KEY) || "uz_lotin";
-      setLangKeyState(k);
+      const next = normalizeLanguageKey(e?.detail?.key || localStorage.getItem(STORAGE_KEY) || DEFAULT_LANGUAGE);
+      setLanguageState(next);
     };
-    window.addEventListener("appLangChanged", onExternal);
-    return () => window.removeEventListener("appLangChanged", onExternal);
+    window.addEventListener('appLangChanged', onExternal);
+    window.addEventListener('storage', onExternal);
+    return () => {
+      window.removeEventListener('appLangChanged', onExternal);
+      window.removeEventListener('storage', onExternal);
+    };
   }, []);
 
   const value = useMemo(() => {
-    const t = translations[langKey] || translations.uz_lotin || {};
-    return { langKey, setLangKey, t };
-  }, [langKey, setLangKey]);
+    const { tr, proxy } = createTranslator(translations, language);
+    return {
+      language,
+      langKey: language,
+      setLanguage,
+      setLangKey: setLanguage,
+      t: proxy,
+      tr,
+      availableLanguages: AVAILABLE_LANGUAGES,
+      currentLanguageMeta: getLanguageMeta(language),
+    };
+  }, [language, setLanguage]);
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }

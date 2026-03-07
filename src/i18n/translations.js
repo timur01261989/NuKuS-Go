@@ -1,6 +1,13 @@
 export const translations = {
   uz_lotin: {
-    // LOGIN & RO'YXATDAN O'TISH
+
+    appName: "UniGo", loginTitle: "Tizimga kirish", appTagline: "Yagona Yechim", language: "Til", languageChanged: "Til o'zgartirildi",
+    settingsTitle: "Sozlamalar", notifications: "Bildirishnomalar", notificationsOn: "Bildirishnomalar yoqildi", notificationsOff: "Bildirishnomalar o'chirildi",
+    notificationsHint: "Hozircha UI holati saqlanadi", nightMode: "Tungi rejim", nightModeHint: "Auto / On / Off", nightModeAuto: "Tungi rejim: Avto", nightModeOn: "Tungi rejim: Yoqildi", nightModeOff: "Tungi rejim: O'chirildi",
+    current: "Hozir", auto: "Auto", on: "On", off: "Off", welcome: "Xush kelibsiz", cityTaxi: "Shahar ichida taksi", cityTaxiHint: "Tez va ishonchli xizmat", orderNow: "Buyurtma berish",
+    services: "Xizmatlar", all: "Hammasi", autoMarketTitle: "Avto Savdo", autoMarketHint: "Mashina sotib oling va soting", newCars: "Yangi qo'shilgan mashinalar", viewAll: "Barchasi",
+    home: "Asosiy", orders: "Buyurtmalar", wallet: "Hamyon", profile: "Profil", passenger: "Yo'lovchi", balance: "Balans", rating: "Reyting", myAddresses: "Mening manzillarim", paymentMethods: "To'lov usullari", promos: "Promokodlar", help: "Yordam",
+    phoneLabel: "Telefon raqam", phoneRequired: "Telefon raqamni to'liq kiriting (9 ta raqam).", passwordRequired: "Parolni kiriting.", invalidLogin: "Telefon raqam yoki parol noto'g'ri!", forgotPassword: "Parolni unutdingizmi?", signup: "Ro'yxatdan o'tish", loading: "Kutilmoqda...", sending: "Yuborilmoqda...", saving: "Saqlanmoqda...", enterPhoneFull: "Telefon raqamni to'liq kiriting (9 ta raqam).", codeMustBe4: "Kod 4 ta raqam bo'lishi kerak.", passwordMin6: "Parol kamida 6 ta belgi bo'lsin.", veryWeak: "Juda oddiy", medium: "O'rtacha", strongPassword: "Kuchli parol", demoPlaceholder: "Bu sahifa hozir placeholder.",    // LOGIN & RO'YXATDAN O'TISH
     greeting: "Xayrli kun!", appSubtitle: "Haydovchi va yo'lovchilar uchun",
     phonePlaceholder: "90 123 45 67", password: "Parol",
     remember: "Eslab qolish", forgot: "Parolni unutdingizmi?",
@@ -81,7 +88,14 @@ export const translations = {
   },
 
   uz_kirill: {
-    greeting: "Хайрли кун!", appSubtitle: "Ҳайдовчи ва йўловчилар учун",
+
+    appName: "UniGo", loginTitle: "Тизимга кириш", appTagline: "Ягона Ечим", language: "Тил", languageChanged: "Тил ўзгартирилди",
+    settingsTitle: "Созламалар", notifications: "Билдиришномалар", notificationsOn: "Билдиришномалар ёқилди", notificationsOff: "Билдиришномалар ўчирилди",
+    notificationsHint: "Ҳозирча UI ҳолати сақланади", nightMode: "Тунги режим", nightModeHint: "Auto / On / Off", nightModeAuto: "Тунги режим: Авто", nightModeOn: "Тунги режим: Ёқилди", nightModeOff: "Тунги режим: Ўчирилди",
+    current: "Ҳозир", auto: "Авто", on: "Ёқиш", off: "Ўчириш", welcome: "Хуш келибсиз", cityTaxi: "Шаҳар ичида такси", cityTaxiHint: "Тез ва ишончли хизмат", orderNow: "Буюртма бериш",
+    services: "Хизматлар", all: "Ҳаммаси", autoMarketTitle: "Авто Савдо", autoMarketHint: "Машина сотиб олинг ва сотинг", newCars: "Янги қўшилган машиналар", viewAll: "Барчаси",
+    home: "Асосий", orders: "Буюртмалар", wallet: "Ҳамён", profile: "Профиль", passenger: "Йўловчи", balance: "Баланс", rating: "Рейтинг", myAddresses: "Менинг манзилларим", paymentMethods: "Тўлов усуллари", promos: "Промокодлар", help: "Ёрдам",
+    phoneLabel: "Телефон рақам", phoneRequired: "Телефон рақамни тўлиқ киритинг (9 та рақам).", passwordRequired: "Паролни киритинг.", invalidLogin: "Телефон рақам ёки парол нотўғри!", forgotPassword: "Паролни унутдингизми?", signup: "Рўйхатдан ўтиш", loading: "Кутилмоқда...", sending: "Юборилмоқда...", saving: "Сақланмоқда...", enterPhoneFull: "Телефон рақамни тўлиқ киритинг (9 та рақам).", codeMustBe4: "Код 4 та рақам бўлиши керак.", passwordMin6: "Парол камида 6 та белги бўлсин.", veryWeak: "Жуда оддий", medium: "Ўртача", strongPassword: "Кучли парол", demoPlaceholder: "Бу саҳифа ҳозир placeholder.",    greeting: "Хайрли кун!", appSubtitle: "Ҳайдовчи ва йўловчилар учун",
     phonePlaceholder: "90 123 45 67", password: "Пароль",
     remember: "Эслаб қолиш", forgot: "Паролни унутдингизми?",
     login: "КИРИШ", noAccount: "Ҳисобингиз йўқми?", register: "Рўйхатдан ўтиш",
@@ -146,7 +160,8 @@ export const translations = {
   },
 
   qq_lotin: {
-    greeting: "Xayrli kún!", appSubtitle: "Aydawshı hám jolawshılar ushın",
+
+    appName: "UniGo", loginTitle: "Sistemaǵa kiriw", appTagline: "Yagona Yechim", language: "Til", languageChanged: "Til ózgertildi", settingsTitle: "Sazlawlar", notifications: "Bildiriwler", notificationsOn: "Bildiriwler jaqıldı", notificationsOff: "Bildiriwler óshirildi", current: "Házir", auto: "Auto", on: "On", off: "Off", welcome: "Xosh kelipsiz", cityTaxi: "Qala ishinde taksi", cityTaxiHint: "Tez hám isenimli xızmet", orderNow: "Buyırtpa beriw", services: "Xızmetler", all: "Hámmesi", autoMarketTitle: "Avto Sawdo", autoMarketHint: "Mashina satıp alıń hám satıń", newCars: "Jańa qosılǵan mashinalar", viewAll: "Bárshesi", home: "Tiykarǵı", orders: "Buyırtpalar", wallet: "Hamyan", profile: "Profil", passenger: "Jolawshı", balance: "Balans", rating: "Reyting", myAddresses: "Meniń mánzillerim", paymentMethods: "Tólew usılları", promos: "Promokodlar", help: "Járdem", phoneLabel: "Telefon nomeri", phoneRequired: "Telefon nomerin tolıq kiritiń (9 san).", passwordRequired: "Paroldi kiritiń.", invalidLogin: "Telefon nomeri yamasa parol qáte!", forgotPassword: "Paroldi umıttıńız ba?", signup: "Dizimnen ótiw", loading: "Kútilmekte...", sending: "Jiberilmekte...", saving: "Saqlanbaqta...", enterPhoneFull: "Telefon nomerin tolıq kiritiń (9 san).", codeMustBe4: "Kod 4 san bolıwı kerek.", passwordMin6: "Parol keminde 6 belgili bolsin.", veryWeak: "Ábden ápiwayi", medium: "Orta", strongPassword: "Kúshli parol", demoPlaceholder: "Bul bet házir placeholder.",    greeting: "Xayrli kún!", appSubtitle: "Aydawshı hám jolawshılar ushın",
     phonePlaceholder: "90 123 45 67", password: "Parol",
     remember: "Este saqlaw", forgot: "Paroldi umıttıńızba?",
     login: "KIRIW", noAccount: "Esabız joqpa?", register: "Dizimnen ótiw",
@@ -210,7 +225,8 @@ export const translations = {
   },
 
   qq_kirill: {
-    greeting: "Хайрлы күн!", appSubtitle: "Айдаўшы ҳәм жолаўшылар ушын",
+
+    appName: "UniGo", loginTitle: "Системаға кириў", appTagline: "Ягона Ечим", language: "Тил", languageChanged: "Тил өзгертилди", settingsTitle: "Сазлаўлар", notifications: "Билдириўлер", notificationsOn: "Билдириўлер жағылды", notificationsOff: "Билдириўлер өширилди", current: "Ҳәзир", auto: "Авто", on: "On", off: "Off", welcome: "Хош келипсиз", cityTaxi: "Қала ишинде такси", cityTaxiHint: "Тез ҳәм исенимли хызмет", orderNow: "Буйыртпа бериў", services: "Хызметлер", all: "Ҳәммеси", autoMarketTitle: "Авто Савдо", autoMarketHint: "Машина сатып алың ҳәм сатың", newCars: "Жаңа қосылған машиналар", viewAll: "Баршасы", home: "Тийкарғы", orders: "Буйыртпалар", wallet: "Ҳамян", profile: "Профиль", passenger: "Жолаўшы", balance: "Баланс", rating: "Рейтинг", myAddresses: "Мениң мәнзиллерим", paymentMethods: "Төлеў усыллары", promos: "Промокодлар", help: "Жәрдем", phoneLabel: "Телефон номери", phoneRequired: "Телефон номерин толық киритиң (9 сан).", passwordRequired: "Парольди киритиң.", invalidLogin: "Телефон номери ямаса пароль қәте!", forgotPassword: "Парольди умыттыңыз ба?", signup: "Дизимнен өтиў", loading: "Күтилиўде...", sending: "Жиберилмекте...", saving: "Сақланбақта...", enterPhoneFull: "Телефон номерин толық киритиң (9 сан).", codeMustBe4: "Код 4 сан болыўы керек.", passwordMin6: "Пароль кеминде 6 белгили болсын.", veryWeak: "Әбден әпиўайы", medium: "Орта", strongPassword: "Күшли пароль", demoPlaceholder: "Бул бет ҳәзир placeholder.",    greeting: "Хайрлы күн!", appSubtitle: "Айдаўшы ҳәм жолаўшылар ушын",
     phonePlaceholder: "90 123 45 67", password: "Пароль",
     remember: "Эсте сақлаў", forgot: "Парольди умыттыңызба?",
     login: "КИРИЎ", noAccount: "Есабыз жоқпа?", register: "Дизимнен өтиў",
@@ -274,7 +290,12 @@ export const translations = {
   },
 
   ru: {
-    greeting: "Добрый день!", appSubtitle: "Для водителей и пассажиров",
+
+    appName: "UniGo", loginTitle: "Вход в систему", appTagline: "Единое решение", language: "Язык", languageChanged: "Язык изменён",
+    settingsTitle: "Настройки", notifications: "Уведомления", notificationsOn: "Уведомления включены", notificationsOff: "Уведомления отключены", notificationsHint: "Пока сохраняется только состояние UI", nightMode: "Ночной режим", nightModeHint: "Auto / On / Off", nightModeAuto: "Ночной режим: Авто", nightModeOn: "Ночной режим: Включён", nightModeOff: "Ночной режим: Выключен",
+    current: "Сейчас", auto: "Авто", on: "Вкл", off: "Выкл", welcome: "Добро пожаловать", cityTaxi: "Городское такси", cityTaxiHint: "Быстро и надёжно", orderNow: "Заказать",
+    services: "Услуги", all: "Все", autoMarketTitle: "Авто рынок", autoMarketHint: "Покупайте и продавайте машины", newCars: "Новые автомобили", viewAll: "Все", home: "Главная", orders: "Заказы", wallet: "Кошелёк", profile: "Профиль", passenger: "Пассажир", balance: "Баланс", rating: "Рейтинг", myAddresses: "Мои адреса", paymentMethods: "Способы оплаты", promos: "Промокоды", help: "Помощь",
+    phoneLabel: "Телефон", phoneRequired: "Введите телефон полностью (9 цифр).", passwordRequired: "Введите пароль.", invalidLogin: "Неверный телефон или пароль!", forgotPassword: "Забыли пароль?", signup: "Регистрация", loading: "Загрузка...", sending: "Отправка...", saving: "Сохранение...", enterPhoneFull: "Введите телефон полностью (9 цифр).", codeMustBe4: "Код должен состоять из 4 цифр.", passwordMin6: "Пароль должен быть не меньше 6 символов.", veryWeak: "Очень слабый", medium: "Средний", strongPassword: "Сильный пароль", demoPlaceholder: "Эта страница пока placeholder.",    greeting: "Добрый день!", appSubtitle: "Для водителей и пассажиров",
     phonePlaceholder: "90 123 45 67", password: "Пароль",
     remember: "Запомнить меня", forgot: "Забыли пароль?",
     login: "ВОЙТИ", noAccount: "Нет аккаунта?", register: "Регистрация",
@@ -337,7 +358,12 @@ export const translations = {
   },
 
   en: {
-    greeting: "Good day!", appSubtitle: "For drivers and passengers",
+
+    appName: "UniGo", loginTitle: "Sign in", appTagline: "One solution", language: "Language", languageChanged: "Language changed",
+    settingsTitle: "Settings", notifications: "Notifications", notificationsOn: "Notifications enabled", notificationsOff: "Notifications disabled", notificationsHint: "Only UI state is stored for now", nightMode: "Night mode", nightModeHint: "Auto / On / Off", nightModeAuto: "Night mode: Auto", nightModeOn: "Night mode: On", nightModeOff: "Night mode: Off",
+    current: "Current", auto: "Auto", on: "On", off: "Off", welcome: "Welcome", cityTaxi: "City taxi", cityTaxiHint: "Fast and reliable service", orderNow: "Order now",
+    services: "Services", all: "All", autoMarketTitle: "Auto Market", autoMarketHint: "Buy and sell cars", newCars: "Newly added cars", viewAll: "View all", home: "Home", orders: "Orders", wallet: "Wallet", profile: "Profile", passenger: "Passenger", balance: "Balance", rating: "Rating", myAddresses: "My addresses", paymentMethods: "Payment methods", promos: "Promos", help: "Help",
+    phoneLabel: "Phone number", phoneRequired: "Enter the full phone number (9 digits).", passwordRequired: "Enter your password.", invalidLogin: "Incorrect phone number or password!", forgotPassword: "Forgot password?", signup: "Sign up", loading: "Loading...", sending: "Sending...", saving: "Saving...", enterPhoneFull: "Enter the full phone number (9 digits).", codeMustBe4: "The code must be 4 digits.", passwordMin6: "Password must be at least 6 characters.", veryWeak: "Very weak", medium: "Medium", strongPassword: "Strong password", demoPlaceholder: "This page is currently a placeholder.",    greeting: "Good day!", appSubtitle: "For drivers and passengers",
     phonePlaceholder: "90 123 45 67", password: "Password",
     remember: "Remember me", forgot: "Forgot password?",
     login: "LOGIN", noAccount: "No account?", register: "Register",

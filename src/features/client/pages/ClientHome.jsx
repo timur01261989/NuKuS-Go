@@ -18,7 +18,7 @@ export default function ClientHome() {
   const { t } = useLanguage();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [profile, setProfile] = useState({ fullName: "Foydalanuvchi", avatarUrl: "" });
+  const [profile, setProfile] = useState({ fullName: t.passenger, avatarUrl: "" });
   const [cars, setCars] = useState([]);
 
   useEffect(() => {
@@ -108,14 +108,19 @@ export default function ClientHome() {
             )}
           </div>
           <div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Xush kelibsiz</p>
-            <h1 className="text-lg font-bold leading-none tracking-tight">{t?.appName || "UniGo"}</h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{t.welcome}</p>
+            <h1 className="text-lg font-bold leading-none tracking-tight">{t.appName}</h1>
           </div>
         </button>
 
-        <button type="button" className="neumorphic-dark p-2 rounded-xl text-primaryHome">
-          <span className="material-symbols-outlined">notifications</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button type="button" className="neumorphic-dark p-2 rounded-xl text-primaryHome" onClick={() => navigate('/settings')}>
+            <span className="material-symbols-outlined">settings</span>
+          </button>
+          <button type="button" className="neumorphic-dark p-2 rounded-xl text-primaryHome">
+            <span className="material-symbols-outlined">notifications</span>
+          </button>
+        </div>
       </header>
 
       <main className="px-4 space-y-6">
@@ -131,8 +136,8 @@ export default function ClientHome() {
               <div className="absolute inset-0 bg-gradient-to-t from-backgroundDark/90 to-transparent" />
               <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end">
                 <div>
-                  <h2 className="text-xl font-bold text-white">{t?.cityTaxi || "Shahar ichida taksi"}</h2>
-                  <p className="text-slate-300 text-sm">{t?.cityTaxiHint || "Tez va ishonchli xizmat"}</p>
+                  <h2 className="text-xl font-bold text-white">{t.cityTaxi}</h2>
+                  <p className="text-slate-300 text-sm">{t.cityTaxiHint}</p>
                 </div>
                 <button
                   type="button"
@@ -141,7 +146,7 @@ export default function ClientHome() {
                   onTouchStart={prefetch.taxi}
                   onClick={() => navigate("/client/taxi")}
                 >
-                  Buyurtma berish
+                  {t.orderNow}
                 </button>
               </div>
             </div>
@@ -151,8 +156,8 @@ export default function ClientHome() {
         {/* Service Grid */}
         <section>
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold">Xizmatlar</h3>
-            <span className="text-primaryHome text-sm font-medium">Hammasi</span>
+            <h3 className="text-lg font-bold">{t.services}</h3>
+            <span className="text-primaryHome text-sm font-medium">{t.all}</span>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <ServiceCard
@@ -194,8 +199,8 @@ export default function ClientHome() {
             onClick={() => navigate("/auto-market")}
           >
             <div className="space-y-1">
-              <h3 className="text-xl font-bold">Avto Savdo</h3>
-              <p className="text-sm text-slate-400">Mashina sotib oling va soting</p>
+              <h3 className="text-xl font-bold">{t.autoMarketTitle}</h3>
+              <p className="text-sm text-slate-400">{t.autoMarketHint}</p>
             </div>
             <div className="text-primaryHome">
               <span className="material-symbols-outlined text-4xl">directions_car</span>
@@ -206,13 +211,13 @@ export default function ClientHome() {
         {/* New Cars */}
         <section className="pb-8">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold">Yangi qo'shilgan mashinalar</h3>
+            <h3 className="text-lg font-bold">{t.newCars}</h3>
             <button
               type="button"
               className="text-primaryHome text-sm font-medium"
               onClick={() => navigate("/auto-market")}
             >
-              Barchasi
+              {t.viewAll}
             </button>
           </div>
 
@@ -239,22 +244,22 @@ export default function ClientHome() {
           <BottomNavItem
             active
             icon="home"
-            label="Asosiy"
+            label={t.home}
             onClick={() => navigate("/client/home")}
           />
           <BottomNavItem
             icon="receipt_long"
-            label="Buyurtmalar"
+            label={t.orders}
             onClick={() => navigate("/client/orders")}
           />
           <BottomNavItem
             icon="account_balance_wallet"
-            label="Hamyon"
+            label={t.wallet}
             onClick={() => navigate("/client/wallet")}
           />
           <BottomNavItem
             icon="person"
-            label="Profil"
+            label={t.profile}
             onClick={() => navigate("/client/profile")}
           />
         </div>
