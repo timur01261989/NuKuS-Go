@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { useClientText } from "../../shared/i18n_clientLocalize";
+import { useClientText } from "../../../shared/i18n_clientLocalize";
 import { Card, Space, Tag, Typography, Button, Divider } from "antd";
 
 /**
