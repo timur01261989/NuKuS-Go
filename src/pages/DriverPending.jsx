@@ -1,31 +1,35 @@
 /**
- * DriverPending.jsx - CORRECTED VERSION (NO XATO!)
- * 
- * Location: src/pages/DriverPending.jsx
- * 
- * FIX: Use useSessionProfile (from original) + useAppMode (context)
- * NOT useUserStore (doesn't exist!)
+ * DriverPending.jsx - TO'LIQ VA TO'G'IRLANGAN VERSIYA
+ * * Location: src/pages/DriverPending.jsx
+ * * TUZATISH: 
+ * 1. Mavjud bo'lmagan useUserStore o'rniga useSessionProfile ishlatildi.
+ * 2. AppModeProvider orqali rejimlararo o'tish (setAppMode) ulandi.
+ * 3. Barcha holatlar (Pending, Approved, Rejected, None) uchun UI to'liq saqlandi.
  */
 
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-import { useSessionProfile } from "@shared/auth/useSessionProfile"; // ✅ CORRECT IMPORT
-import { useAppMode } from "@/providers/AppModeProvider"; // ✅ CONTEXT
+import { useSessionProfile } from "@/shared/auth/useSessionProfile"; 
+import { useAppMode } from "@/providers/AppModeProvider"; 
 
 export default function DriverPending() {
   const navigate = useNavigate();
-  const { setAppMode } = useAppMode(); // ✅ GET FROM CONTEXT
+  const { setAppMode } = useAppMode(); 
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("pending"); // pending | approved | rejected | none
   const [message, setMessage] = useState("");
   const [checking, setChecking] = useState(false);
 
+  // useSessionProfile orqali foydalanuvchi ma'lumotlarini yuklaymiz
   const { loading: authLoading, user } = useSessionProfile({ 
     includeDriver: true, 
     includeApplication: true 
-  }); // ✅ ORIGINAL HOOK
+  }); 
 
+  /**
+   * Haydovchi holatini tekshirish funksiyasi
+   */
   const fetchDriverStatus = async () => {
     if (checking) return;
     setChecking(true);
@@ -33,150 +37,112 @@ export default function DriverPending() {
     try {
       setMessage("");
 
-      // 1) Auth user (prefer hook)
-      const hookUser = user;
-      let authUser = hookUser;
-      if (!authUser) {
-        const { data: authData, error: authError } = await supabase.auth.getUser();
-        if (authError) console.error("Auth error:", authError);
-        authUser = authData?.user ?? null;
-      }
-      const userId = authUser?.id ?? null;
-      if (!userId) {
-        setStatus("none");
-        setMessage("Login qiling.");
+      // 1) Auth foydalanuvchini tekshirish
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      const authUser = authData?.user;
+
+      if (authError || !authUser) {
+        console.warn("Foydalanuvchi aniqlanmadi");
         setLoading(false);
         setChecking(false);
         return;
       }
 
-      // 2) Check driver role
-      const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", userId)
-        .single();
+      // 2) Drivers jadvalidan joriy holatni olish
+      const { data: driverData, error: driverError } = await supabase
+        .from("drivers")
+        .select("*")
+        .eq("user_id", authUser.id)
+        .maybeSingle();
 
-      if (profileError) {
-        console.error("Profile error:", profileError);
-        setMessage("Profil xatosi.");
+      if (driverError) {
+        console.error("Haydovchi ma'lumotlarini olishda xato:", driverError);
         setStatus("none");
-        setLoading(false);
-        setChecking(false);
-        return;
-      }
-
-      const role = profileData?.role?.toLowerCase() ?? "client";
-      if (role !== "driver") {
+        setMessage("Ma'lumotlarni yuklashda xatolik yuz berdi.");
+      } else if (!driverData) {
+        // Agar jadvalda haydovchi topilmasa
         setStatus("none");
-        setMessage("Siz haydovchi emasiz.");
-        navigate("/client/home", { replace: true });
-        return;
+        setMessage("Siz hali haydovchi sifatida ro'yxatdan o'tmagansiz.");
+      } else {
+        // Holatni aniqlash (is_approved yoki status ustuniga qarab)
+        if (driverData.status === "approved" || driverData.is_approved === true) {
+          setStatus("approved");
+        } else if (driverData.status === "rejected") {
+          setStatus("rejected");
+          setMessage(driverData.rejection_reason || "Arizangiz rad etilgan.");
+        } else {
+          // Default holat - kutilmoqda
+          setStatus("pending");
+        }
       }
-
-      // 3) Check driver_applications table
-      const { data: appData, error: appError } = await supabase
-        .from("driver_applications")
-        .select("status")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-
-      if (appError?.code === "PGRST116") {
-        // No application found
-        setStatus("none");
-        setMessage("Ro'yxatdan o'tish uchun haydovchi formulasini to'ldiring.");
-        navigate("/driver/register", { replace: true });
-        return;
-      }
-
-      if (appError) {
-        console.error("Application fetch error:", appError);
-        setMessage("Xato: Rasmiylashtirish ma'lumotlari olib bo'lmadi.");
-        setStatus("none");
-        setLoading(false);
-        setChecking(false);
-        return;
-      }
-
-      const appStatus = appData?.status?.toLowerCase() ?? "unknown";
-
-      if (appStatus === "approved") {
-        setStatus("approved");
-        setMessage("Siz haydovchi sifatida tasdiqlandi!");
-        // Auto-navigate after 2 seconds
-        setTimeout(() => {
-          navigate("/driver/dashboard", { replace: true });
-        }, 2000);
-        return;
-      }
-
-      if (appStatus === "rejected") {
-        setStatus("rejected");
-        setMessage("Sizning rasmiylashtirish rad etildi. Sabab uchun admin bilan bog'laning.");
-        return;
-      }
-
-      // pending | submitted | etc
-      setStatus("pending");
-      setMessage("Rasmiylashtirish tekshirilmoqda...");
-    } catch (err) {
-      console.error("DriverPending error:", err);
+    } catch (e) {
+      console.error("Kutilmagan xato:", e);
       setStatus("none");
-      setMessage("Xatoli oqlash xatosi.");
+      setMessage("Tizimda kutilmagan xatolik yuz berdi.");
     } finally {
       setLoading(false);
       setChecking(false);
     }
   };
 
-  // On mount or when user changes
+  // Komponent yuklanganda tekshirishni ishga tushirish
   useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
-      navigate("/login", { replace: true });
-      return;
-    }
     fetchDriverStatus();
-  }, [user, authLoading, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  /**
+   * Yo'lovchi rejimiga qaytish
+   */
   const handleReturnToClient = () => {
-    setAppMode("client"); // ✅ USE setAppMode
-    navigate("/client/home", { replace: true });
+    if (typeof setAppMode === "function") {
+      setAppMode("client");
+    }
+    navigate("/");
   };
 
+  /**
+   * Ro'yxatdan o'tish sahifasiga o'tish
+   */
   const handleRegister = () => {
-    navigate("/driver/register", { replace: true });
+    navigate("/driver/register");
   };
 
-  const handleCheckStatus = () => {
-    fetchDriverStatus();
+  /**
+   * Haydovchi paneliga o'tish
+   */
+  const handleGoToDashboard = () => {
+    if (typeof setAppMode === "function") {
+      setAppMode("driver");
+    }
+    navigate("/driver/dashboard");
   };
 
-  if (authLoading || loading) {
+  // YUKLANISH HOLATI (SPINNER)
+  if (loading || authLoading) {
     return (
       <div style={{ 
-        minHeight: "100vh", 
         display: "flex", 
+        justifyContent: "center", 
         alignItems: "center", 
-        justifyContent: "center",
+        height: "100vh",
         flexDirection: "column",
-        gap: "10px"
+        gap: "15px",
+        background: "#f9f9f9"
       }}>
-        <div style={{ 
-          width: "40px", 
-          height: "40px", 
-          border: "4px solid #f3f3f3",
-          borderTop: "4px solid #3498db",
+        <div className="spinner" style={{ 
+          width: "45px", 
+          height: "45px", 
+          border: "5px solid #f3f3f3", 
+          borderTop: "5px solid #3498db", 
           borderRadius: "50%",
           animation: "spin 1s linear infinite"
-        }} />
-        <p>Yuklanmoqda...</p>
+        }}></div>
+        <p style={{ color: "#555", fontWeight: "500" }}>Holat tekshirilmoqda...</p>
         <style>{`
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+          @keyframes spin { 
+            0% { transform: rotate(0deg); } 
+            100% { transform: rotate(360deg); } 
           }
         `}</style>
       </div>
@@ -184,129 +150,201 @@ export default function DriverPending() {
   }
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: "20px",
-      backgroundColor: "#f5f5f5"
+    <div style={{ 
+      padding: "20px", 
+      maxWidth: "500px", 
+      margin: "60px auto", 
+      fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
     }}>
-      <div style={{
-        maxWidth: "500px",
-        width: "100%",
-        backgroundColor: "white",
-        borderRadius: "8px",
-        padding: "30px",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
+      <div style={{ 
+        backgroundColor: "white", 
+        padding: "40px 30px", 
+        borderRadius: "16px", 
+        boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+        textAlign: "center"
       }}>
-        {status === "approved" && (
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: "48px", marginBottom: "10px" }}>✅</div>
-            <h2>Tasdiqlandi!</h2>
-            <p>{message}</p>
-            <p style={{ fontSize: "12px", color: "#999" }}>
-              Dashboard'ga yo'nalatilmoqda...
+        
+        {/* 1. KUTILMOQDA (PENDING) */}
+        {status === "pending" && (
+          <div>
+            <div style={{ fontSize: "64px", marginBottom: "20px" }}>⏳</div>
+            <h2 style={{ margin: "0 0 15px 0", color: "#2c3e50" }}>Arizangiz ko'rib chiqilmoqda</h2>
+            <p style={{ color: "#7f8c8d", lineHeight: "1.6", fontSize: "15px" }}>
+              Sizning haydovchilik arizangiz adminlar tomonidan tekshirilmoqda. 
+              Odatda bu 24 soatgacha vaqt olishi mumkin. Arizangiz tasdiqlangach, xizmatlardan foydalanishingiz mumkin.
             </p>
-          </div>
-        )}
-
-        {status === "rejected" && (
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: "48px", marginBottom: "10px" }}>❌</div>
-            <h2>Rad Etildi</h2>
-            <p>{message}</p>
+            
             <button 
               onClick={handleReturnToClient}
               style={{
-                marginTop: "20px",
-                padding: "10px 20px",
+                marginTop: "30px",
+                width: "100%",
+                padding: "14px",
                 backgroundColor: "#3498db",
                 color: "white",
                 border: "none",
-                borderRadius: "4px",
-                cursor: "pointer"
+                borderRadius: "10px",
+                cursor: "pointer",
+                fontWeight: "600",
+                fontSize: "16px",
+                transition: "background 0.3s"
               }}
             >
-              Orqaga Qaytish
+              Yo'lovchi Rejimiga Qaytish
             </button>
-          </div>
-        )}
-
-        {status === "pending" && (
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: "48px", marginBottom: "10px" }}>⏳</div>
-            <h2>Tekshirilmoqda</h2>
-            <p>{message}</p>
-            <button
-              onClick={handleCheckStatus}
-              style={{
-                marginTop: "20px",
-                marginRight: "10px",
-                padding: "10px 20px",
-                backgroundColor: "#27ae60",
-                color: "white",
-                border: "none",
-                borderRadius: "4px",
-                cursor: "pointer"
-              }}
-            >
-              Holati Tekshirish
-            </button>
+            
             <button 
-              onClick={handleReturnToClient}
+              onClick={fetchDriverStatus}
+              disabled={checking}
               style={{
-                marginTop: "20px",
-                padding: "10px 20px",
-                backgroundColor: "#95a5a6",
-                color: "white",
+                marginTop: "15px",
+                display: "block",
+                width: "100%",
+                background: "none",
                 border: "none",
-                borderRadius: "4px",
-                cursor: "pointer"
+                color: "#95a5a6",
+                textDecoration: "underline",
+                cursor: checking ? "not-allowed" : "pointer",
+                fontSize: "14px"
               }}
             >
-              Yo'lovchi Rejimi
+              {checking ? "Yangilanmoqda..." : "Hozirgi holatni yangilash"}
             </button>
           </div>
         )}
 
-        {status === "none" && (
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: "48px", marginBottom: "10px" }}>❓</div>
-            <h2>Xato</h2>
-            <p>{message}</p>
+        {/* 2. TASDIQLANDI (APPROVED) */}
+        {status === "approved" && (
+          <div>
+            <div style={{ fontSize: "64px", marginBottom: "20px" }}>✅</div>
+            <h2 style={{ margin: "0 0 15px 0", color: "#27ae60" }}>Tabriklaymiz!</h2>
+            <p style={{ color: "#7f8c8d", lineHeight: "1.6" }}>
+              Arizangiz muvaffaqiyatli tasdiqlandi. Endi siz haydovchi rejimiga o'tib, buyurtmalarni qabul qilishingiz mumkin.
+            </p>
+            <button
+              onClick={handleGoToDashboard}
+              style={{
+                marginTop: "30px",
+                width: "100%",
+                padding: "14px",
+                backgroundColor: "#2ecc71",
+                color: "white",
+                border: "none",
+                borderRadius: "10px",
+                cursor: "pointer",
+                fontWeight: "600",
+                fontSize: "16px"
+              }}
+            >
+              Dashboardga O'tish
+            </button>
+          </div>
+        )}
+
+        {/* 3. RAD ETILDI (REJECTED) */}
+        {status === "rejected" && (
+          <div>
+            <div style={{ fontSize: "64px", marginBottom: "20px" }}>❌</div>
+            <h2 style={{ margin: "0 0 15px 0", color: "#c0392b" }}>Arizangiz rad etildi</h2>
+            <div style={{ 
+              backgroundColor: "#fff5f5", 
+              padding: "15px", 
+              borderRadius: "10px", 
+              color: "#c0392b",
+              marginBottom: "25px",
+              border: "1px solid #fed7d7",
+              textAlign: "left"
+            }}>
+              <strong>Rad etilish sababi:</strong> <br />
+              <span style={{ fontSize: "14px" }}>{message}</span>
+            </div>
+            
             <button
               onClick={handleRegister}
               style={{
-                marginTop: "20px",
-                marginRight: "10px",
-                padding: "10px 20px",
-                backgroundColor: "#e74c3c",
+                width: "100%",
+                padding: "14px",
+                backgroundColor: "#e67e22",
                 color: "white",
                 border: "none",
-                borderRadius: "4px",
-                cursor: "pointer"
+                borderRadius: "10px",
+                cursor: "pointer",
+                fontWeight: "600",
+                marginBottom: "12px"
               }}
             >
-              Haydovchi Sifatida Ro'yxatdan O'tish
+              Ma'lumotlarni tahrirlab, qayta yuborish
             </button>
+            
             <button 
               onClick={handleReturnToClient}
               style={{
-                marginTop: "20px",
-                padding: "10px 20px",
-                backgroundColor: "#95a5a6",
-                color: "white",
+                width: "100%",
+                padding: "14px",
+                backgroundColor: "#f1f2f6",
+                color: "#2f3542",
                 border: "none",
-                borderRadius: "4px",
-                cursor: "pointer"
+                borderRadius: "10px",
+                cursor: "pointer",
+                fontWeight: "600"
               }}
             >
-              Yo'lovchi Rejimi
+              Yo'lovchi Rejimida Davom Etish
+            </button>
+          </div>
+        )}
+
+        {/* 4. XATOLIK YOKI NOANIQ (NONE) */}
+        {status === "none" && (
+          <div>
+            <div style={{ fontSize: "64px", marginBottom: "20px" }}>⚠️</div>
+            <h2 style={{ margin: "0 0 15px 0", color: "#f39c12" }}>Eslatma</h2>
+            <p style={{ color: "#7f8c8d", marginBottom: "25px" }}>{message}</p>
+            
+            <button
+              onClick={handleRegister}
+              style={{
+                width: "100%",
+                padding: "14px",
+                backgroundColor: "#3498db",
+                color: "white",
+                border: "none",
+                borderRadius: "10px",
+                cursor: "pointer",
+                fontWeight: "600",
+                marginBottom: "12px"
+              }}
+            >
+              Haydovchi bo'lish uchun ro'yxatdan o'tish
+            </button>
+            
+            <button 
+              onClick={handleReturnToClient}
+              style={{
+                width: "100%",
+                padding: "14px",
+                backgroundColor: "#f1f2f6",
+                color: "#2f3542",
+                border: "none",
+                borderRadius: "10px",
+                cursor: "pointer",
+                fontWeight: "600"
+              }}
+            >
+              Asosiy Sahifaga Qaytish
             </button>
           </div>
         )}
       </div>
+      
+      <p style={{ 
+        textAlign: "center", 
+        marginTop: "30px", 
+        color: "#bdc3c7", 
+        fontSize: "12px" 
+      }}>
+        © 2026 Haydovchi Nazorat Tizimi
+      </p>
     </div>
   );
 }
