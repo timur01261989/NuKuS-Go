@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useClientText } from "../../shared/i18n_clientLocalize";
 import { Button, Drawer, Input, message, Skeleton, Typography } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import { useIntercity } from "../../context/IntercityContext";
@@ -27,7 +28,7 @@ export default function DriverOfferList() {
       setOffers(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error(e);
-      message.error("Reyslar ro'yxatini olishda xatolik");
+      message.error(cp("Reyslar ro'yxatini olishda xatolik"));
       setOffers([]);
     } finally {
       setLoading(false);
@@ -60,7 +61,7 @@ export default function DriverOfferList() {
       </Button>
 
       <Drawer
-        title="Haydovchilar reyslari"
+        title=cp("Haydovchilar reyslari")
         placement="bottom"
         height="86vh"
         open={open}
@@ -71,7 +72,7 @@ export default function DriverOfferList() {
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Haydovchi / mashina bo'yicha qidirish..."
+            placeholder=cp("Haydovchi / mashina bo'yicha qidirish...")
             style={{ height: 46, borderRadius: 14 }}
             allowClear
           />
@@ -103,7 +104,7 @@ export default function DriverOfferList() {
                   selected={selectedOffer?.id === offer.id}
                   onSelect={() => {
                     setSelectedOffer(offer);
-                    message.success("Haydovchi tanlandi");
+                    message.success(cp("Haydovchi tanlandi"));
                     setOpen(false);
                   }}
                 />

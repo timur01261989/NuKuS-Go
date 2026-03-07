@@ -1,15 +1,17 @@
 import React, { useState } from "react";
+import { useClientText } from "../../shared/i18n_clientLocalize";
 import { Button } from "antd";
 import { AimOutlined, LoadingOutlined } from "@ant-design/icons";
 
 /**
  * LocateButton
- * - "Mening joylashuvim" tugmasi (🎯)
+ * - cp("Mening joylashuvim") tugmasi (🎯)
  * - Bosilganda:
  *   1) onRequestLocate() chaqiradi (GPS ni yangilash uchun)
  *   2) userLoc bo'lsa xaritani userLoc ga flyTo qiladi
  */
 export default function LocateButton({ mapRef, userLoc, bottom = 240, onRequestLocate }) {
+  const { cp } = useClientText();
   const [loading, setLoading] = useState(false);
 
   const fly = (loc) => {

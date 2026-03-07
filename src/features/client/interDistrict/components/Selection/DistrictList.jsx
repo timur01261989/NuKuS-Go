@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { useClientText } from "../../shared/i18n_clientLocalize";
 import { Card, Col, Row, Select, Space, Switch, Typography, Button } from "antd";
 import { EnvironmentOutlined } from "@ant-design/icons";
 import { REGIONS, getDistrictsByRegion } from "../../services/districtData";
@@ -11,11 +12,12 @@ import { useDistrict } from "../../context/DistrictContext";
  * 1) Hududni tanlang (Qoraqalpog‘iston + viloyatlar)
  * 2) "Qaerdan" -> tanlangan hudud tumanlari
  * 3) "Qaerga" -> shu hudud tumanlari
- * 4) "Manzildan manzilgacha" (door-to-door) switch:
+ * 4) cp("Manzildan manzilgacha") (door-to-door) switch:
  *    - pickup: avtomatik aniqlanadi (GPS), xaritadan o‘zgartirish mumkin
  *    - dropoff: ixtiyoriy (majburiy emas)
  */
 export default function DistrictList({ onOpenPicker, onLocateMe }) {
+  const { cp } = useClientText();
   const {
     regionId,
     setRegionId,
@@ -99,7 +101,7 @@ export default function DistrictList({ onOpenPicker, onLocateMe }) {
         </Space>
         <Typography.Text style={{ fontSize: 12, opacity: 0.7, display: "block", marginTop: 6 }}>
           Yoqilsa: siz turgan joy avtomatik aniqlanadi, xohlasangiz xaritadan o‘zgartirasiz.
-          "Qaerga (manzil)" majburiy emas.
+          cp("Qaerga (manzil)") majburiy emas.
         </Typography.Text>
       </div>
 
@@ -127,7 +129,7 @@ export default function DistrictList({ onOpenPicker, onLocateMe }) {
                 <div>
                   <div style={{ fontWeight: 600 }}>Qaerga (manzil)</div>
                   <div style={{ fontSize: 12, opacity: 0.7 }}>
-                    {dropoffAddress || "Ixtiyoriy (majburiy emas)"}
+                    {dropoffAddress || cp("Ixtiyoriy (majburiy emas)")}
                   </div>
                 </div>
               </Space>

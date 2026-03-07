@@ -1,4 +1,5 @@
 import React from "react";
+import { useClientText } from "../../shared/i18n_clientLocalize";
 import { Button, Drawer, DatePicker, Typography } from "antd";
 import { CalendarOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
@@ -21,7 +22,7 @@ export default function DatePickerSheet() {
       </Button>
 
       <Drawer
-        title="Sana tanlash"
+        title=cp("Sana tanlash")
         placement="bottom"
         height={320}
         open={open}

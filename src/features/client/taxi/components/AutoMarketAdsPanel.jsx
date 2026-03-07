@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useClientText } from "../../shared/i18n_clientLocalize";
 import { Button, Spin } from "antd";
 import { RightOutlined, ReloadOutlined } from "@ant-design/icons";
 
 /**
  * AutoMarketAdsPanel
- * - Shows Auto-Market listings as "reklama e’lonlar"
+ * - Shows Auto-Market listings as cp("reklama e’lonlar")
  * - Infinite-ish: increases visible items on scroll, re-fetches with larger limit
  *
  * Props:
@@ -13,7 +14,9 @@ import { RightOutlined, ReloadOutlined } from "@ant-design/icons";
  *  - fetchAds: async ({limit, sort}) => listings[]
  *  - onOpenAd: (id) => void
  */
-export default function AutoMarketAdsPanel({ title = "E’lonlar", mode = "inline", fetchAds, onOpenAd }) {
+export default function AutoMarketAdsPanel({ title, mode = "inline", fetchAds, onOpenAd }) {
+  const { cp } = useClientText();
+  const resolvedTitle = title || cp("E’lonlar");
   const [items, setItems] = useState([]);
   const [limit, setLimit] = useState(8);
   const [loading, setLoading] = useState(false);
@@ -30,7 +33,7 @@ export default function AutoMarketAdsPanel({ title = "E’lonlar", mode = "inlin
       const list = await fetchAds({ limit: nextLimit, sort: "newest" });
       setItems(Array.isArray(list) ? list : []);
     } catch (e) {
-      setErr("E’lonlarni yuklab bo‘lmadi");
+      setErr(cp("E’lonlarni yuklab bo‘lmadi"));
     } finally {
       setLoading(false);
     }
@@ -61,7 +64,7 @@ export default function AutoMarketAdsPanel({ title = "E’lonlar", mode = "inlin
   return (
     <div style={{ borderRadius: 16, padding: compact ? 10 : 12, background: "rgba(0,0,0,0.03)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-        <div style={{ fontWeight: 900 }}>{title}</div>
+        <div style={{ fontWeight: 900 }}>{resolvedTitle}</div>
         <Button
           size="small"
           icon={<ReloadOutlined />}
@@ -94,7 +97,7 @@ export default function AutoMarketAdsPanel({ title = "E’lonlar", mode = "inlin
         >
           {visible.map((it) => {
             const id = it?.id ?? it?.listing_id ?? it?.uuid;
-            const title = it?.title || it?.name || "E’lon";
+            const title = it?.title || it?.name || cp("E’lon");
             const price = it?.price ? String(it.price) : (it?.price_uzs ? String(it.price_uzs) : "");
             const img = it?.image || it?.img || it?.photo || (Array.isArray(it?.images) ? it.images[0] : null);
 
@@ -128,7 +131,7 @@ export default function AutoMarketAdsPanel({ title = "E’lonlar", mode = "inlin
                     {img ? (
                       <img
                         src={img}
-                        alt={title}
+                        alt={resolvedTitle}
                         style={{ width: "100%", height: "100%", objectFit: "cover" }}
                         loading="lazy"
                       />
@@ -137,10 +140,10 @@ export default function AutoMarketAdsPanel({ title = "E’lonlar", mode = "inlin
 
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 800, fontSize: 13, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {title}
+                      {resolvedTitle}
                     </div>
                     <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8 }}>
-                      {price ? `${price} so‘m` : "Narx: —"}
+                      {price ? `${price} so‘m` : cp("Narx: —")}
                     </div>
                   </div>
 

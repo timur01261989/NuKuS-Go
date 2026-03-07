@@ -1,11 +1,12 @@
 import React, { useMemo } from "react";
+import { useClientText } from "../../shared/i18n_clientLocalize";
 import { Card, Space, Tag, Typography, Button, Divider } from "antd";
 
 /**
  * TripCard.jsx
  * -------------------------------------------------------
  * Topilgan reysni ko‘rsatadi.
- * Talab: haydovchi kiritgan barcha ma'lumotlar ko‘rinsin + "Buyirtma jonatish".
+ * Talab: haydovchi kiritgan barcha ma'lumotlar ko‘rinsin + cp("Buyirtma jonatish").
  * * "YAGONA REYS" TIZIMI QO'SHIMCHALARI:
  * - Pochta qabul qilinishi (ajratib ko'rsatildi)
  * - Ayollar uchun maxsus reys (Gender filtri belgisi)
@@ -15,6 +16,7 @@ import { Card, Space, Tag, Typography, Button, Divider } from "antd";
 const money = (n) => (n == null ? "" : new Intl.NumberFormat("uz-UZ").format(Number(n)));
 
 export default function TripCard({ trip, onRequest }) {
+  const { cp } = useClientText();
   const priceLine = useMemo(() => {
     if (!trip) return "";
     if (trip.tariff === "pitak") return `${money(trip.base_price_uzs)} so‘m`;
@@ -37,7 +39,7 @@ export default function TripCard({ trip, onRequest }) {
           {/* YANGI: Haydovchi va Mashina ma'lumotlari (Agar API'dan kelsa) */}
           <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: "8px" }}>
             <span style={{ fontSize: 13, color: "#555", fontWeight: 600 }}>
-              {trip.car_model || "Avtomobil nomi yo'q"} 
+              {trip.car_model || cp("Avtomobil nomi yo'q")} 
             </span>
             <span style={{ fontSize: 13, color: "#888" }}>•</span>
             <span style={{ fontSize: 13, color: "#fa8c16", fontWeight: 600 }}>
@@ -47,7 +49,7 @@ export default function TripCard({ trip, onRequest }) {
 
           <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: "6px" }}>
             <Tag color={trip.tariff === "pitak" ? "blue" : "gold"} style={{ border: 0, fontWeight: 600 }}>
-              {trip.tariff === "pitak" ? "Standart (Pitak)" : "Manzildan manzilga"}
+              {trip.tariff === "pitak" ? cp("Standart (Pitak)") : cp("Manzildan manzilga")}
             </Tag>
             
             {/* Eski filtrlar */}
@@ -65,7 +67,7 @@ export default function TripCard({ trip, onRequest }) {
 
           {trip.tariff === "pitak" && trip.pitak_id && (
             <div style={{ marginTop: 8, color: "#555", fontSize: 13 }}>
-              Stoyanka (Pitak): <b style={{ color: "#333" }}>{trip.pitak_title || "Tanlangan pitak"}</b>
+              Stoyanka (Pitak): <b style={{ color: "#333" }}>{trip.pitak_title || cp("Tanlangan pitak")}</b>
             </div>
           )}
 

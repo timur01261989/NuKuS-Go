@@ -1,10 +1,12 @@
 import React from "react";
+import { useClientText } from "../../shared/i18n_clientLocalize";
 import { Button, Card, Typography } from "antd";
 import { LoadingOutlined, StopOutlined } from "@ant-design/icons";
 import { useFreight } from "../../context/FreightContext";
 const { Text } = Typography;
 
-export default function ActiveFreightPanel({ mode, onCancel }) {
+export default function ActiveFreightPanel({
+ mode, onCancel }) {
   const { truck, pickup, dropoff } = useFreight();
   if (!mode) return null;
 
@@ -12,7 +14,7 @@ export default function ActiveFreightPanel({ mode, onCancel }) {
     <Card style={{ borderRadius: 18, background: "rgba(255,255,255,.95)" }} bodyStyle={{ padding: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 1000, fontSize: 14 }}>{mode === "searching" ? "Haydovchi qidirilmoqda..." : "Haydovchi kelmoqda..."}</div>
+          <div style={{ fontWeight: 1000, fontSize: 14 }}>{mode === "searching" ? cp("Haydovchi qidirilmoqda...") : cp("Haydovchi kelmoqda...")}</div>
           <Text type="secondary" style={{ fontSize: 12 }}>{truck?.title} • {pickup?.address || "Yuklash"} → {dropoff?.address || "Tushirish"}</Text>
         </div>
         <div style={{ fontSize: 20 }}><LoadingOutlined spin /></div>

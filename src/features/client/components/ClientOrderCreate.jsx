@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useClientText } from '../shared/i18n_clientLocalize';
 import { osrmRoute } from "../shared/geo/osrm";
 import { haversineKm } from "../shared/geo/haversine";
 import { nominatimReverse as _nominatimReverse } from "../shared/geo/nominatim";
@@ -649,7 +650,7 @@ if (st === "searching" && !driver) {
   // handleOrder funksiyasini barqaror qilish:
   const handleOrder = useCallback(async () => {
     if (!pickup.latlng) {
-      message.error("Manzilingiz aniqlanmadi");
+      message.error(cp("Manzil topilmadi"));
       return;
     }
 
@@ -695,7 +696,7 @@ if (st === "searching" && !driver) {
         if (d?.error) throw new Error(d.error);
       } catch (e) {
         console.error("Dispatch error:", e);
-        message.error("Haydovchi qidirishda xatolik");
+        message.error(cp("Qidirishda xatolik"));
       }
     } catch (e) {
       console.error("Order error:", e);
@@ -764,7 +765,7 @@ if (st === "searching" && !driver) {
 
   /** ----------------------------- UI derived values ----------------------------- */
 
-  const pickupTitle = pickup.address ? pickup.address.split(",")[0] : "Manzilingiz aniqlanmoqda...";
+  const pickupTitle = pickup.address ? pickup.address.split(",")[0] : cp("Manzilingiz aniqlanmoqda...");
   const destTitle = dest.address ? dest.address.split(",")[0] : "Qayerga borasiz?";
 
   const bottomPad = stage === "home" ? 280 : 330;
@@ -850,7 +851,7 @@ if (st === "searching" && !driver) {
               style={{ position: "relative", width: 70, height: 86 }}
               dangerouslySetInnerHTML={{ __html: stage === "dest_map" ? svgDestPin : svgPickupPin }}
             />
-            <div className="yg-pinlabel">{stage === "dest_map" ? "Yakuniy nuqta" : "Qayerdan ketasiz?"}</div>
+            <div className="yg-pinlabel">{stage === "dest_map" ? cp("Yakuniy nuqta") : cp("Qayerdan ketasiz?")}</div>
           </div>
         )}
 
@@ -984,7 +985,7 @@ if (st === "searching" && !driver) {
                 <span>{durationMin ? `${Math.round(durationMin)} daq` : distanceKm ? `${Math.round(distanceKm * 2)} daq` : "—"}</span>
               </div>
               <div className="yg-routePill" style={{ fontWeight: 800 }}>
-                {fmtMoney(totalPrice)} so'm
+                {fmtMoney(totalPrice)} {cp("so'm")}
               </div>
             </div>
 
@@ -1004,7 +1005,7 @@ if (st === "searching" && !driver) {
                   <div className="yg-tariffEta">{t.etaMin} daq</div>
                   <div className="yg-tariffName">{t.name}</div>
                   <div className="yg-tariffPrice">
-                    {fmtMoney(t.base + ((distanceKm ?? approxDistanceKm) || 0) * t.perKm)} so'm
+                    {fmtMoney(t.base + ((distanceKm ?? approxDistanceKm) || 0) * t.perKm)} {cp("so'm")}
                   </div>
                 </div>
               ))}
@@ -1091,7 +1092,7 @@ if (st === "searching" && !driver) {
         <div className="yg-miniCard">
           <div className="yg-miniPrice">
             <div className="yg-miniTime">{durationMin ? `${Math.round(durationMin)} daq` : "—"}</div>
-            <div className="yg-miniMoney">{fmtMoney(totalPrice)} so'm</div>
+            <div className="yg-miniMoney">{fmtMoney(totalPrice)} {cp("so'm")}</div>
           </div>
           <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
             <Button danger icon={<CloseOutlined />} onClick={goBackToHome}>
@@ -1254,7 +1255,7 @@ if (st === "searching" && !driver) {
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Avatar src={assignedDriver?.avatar_url} icon={<UserOutlined />} />
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>{assignedDriver?.first_name || "Haydovchi"}</div>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>{assignedDriver?.first_name || cp("Haydovchi")}</div>
               <div style={{ fontSize: 11, color: "#888" }}>{assignedDriver?.car_model}</div>
             </div>
           </div>

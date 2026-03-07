@@ -1,4 +1,5 @@
 import React from "react";
+import { useClientText } from "../../shared/i18n_clientLocalize";
 import { Card, Form, Input, Typography } from "antd";
 const { Text } = Typography;
 
@@ -10,7 +11,7 @@ export default function SenderForm({ value, onChange }) {
     <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
       <div style={{ fontWeight: 1000, marginBottom: 10 }}>Yuboruvchi</div>
       <Form layout="vertical">
-        <Form.Item label="Telefon raqam" required>
+        <Form.Item label={cp("Telefon raqam")} required>
           <Input value={v.phone || ""} onChange={(e) => set({ phone: e.target.value })} placeholder="+998..." />
         </Form.Item>
 

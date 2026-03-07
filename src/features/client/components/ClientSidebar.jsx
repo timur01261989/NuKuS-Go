@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useLanguage } from '@shared/i18n/useLanguage';
+import { formatClientMoney } from '../shared/i18n_clientLocalize';
 
 function cx(...xs) {
   return xs.filter(Boolean).join(' ');
@@ -10,7 +11,7 @@ function cx(...xs) {
 export default function ClientSidebar({ open, onClose, profile }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [balanceUZS, setBalanceUZS] = useState(null);
 
   const fullName = profile?.fullName || t.userLabel;
@@ -46,7 +47,7 @@ export default function ClientSidebar({ open, onClose, profile }) {
     navigate(path, opts);
   };
 
-  const balanceLabel = typeof balanceUZS === 'number' ? new Intl.NumberFormat('uz-UZ').format(balanceUZS) + " so'm" : '—';
+  const balanceLabel = formatClientMoney(language, balanceUZS);
   if (!open) return null;
 
   return (

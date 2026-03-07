@@ -31,6 +31,7 @@ import L from "leaflet";
 
 import { useAuth } from "@/shared/auth/AuthProvider";
 import { useLanguage } from "@/shared/i18n/useLanguage";
+import { useClientText } from "../shared/i18n_clientLocalize";
 import RegionDistrictSelect from "@/shared/components/RegionDistrictSelect";
 import { useContacts } from "./hooks/useContacts";
 import {
@@ -114,7 +115,7 @@ function MapPickerEvents({ onPick }) {
 }
 
 function PhoneField({ value, onChange, placeholder = "90 123 45 67", onSelectContact }) {
-  const { t } = useLanguage();
+  const { t, cp } = useClientText();
   return (
     <div style={{ display: "grid", gridTemplateColumns: "92px 1fr auto", gap: 8 }}>
       <Input value="+998" disabled style={{ textAlign: "center", fontWeight: 800 }} />
@@ -132,7 +133,7 @@ function PhoneField({ value, onChange, placeholder = "90 123 45 67", onSelectCon
 }
 
 function ContactPickerModal({ open, onClose, contacts, onPick, loading }) {
-  const { t } = useLanguage();
+  const { t, cp } = useClientText();
   return (
     <Modal title={t.contactSelect} open={open} footer={null} onCancel={onClose}>
       <List
@@ -163,7 +164,7 @@ function LocationPickerDrawer({
   onClose,
   onConfirm,
 }) {
-  const { t } = useLanguage();
+  const { t, cp } = useClientText();
   const [point, setPoint] = useState(value || null);
 
   useEffect(() => {
@@ -188,7 +189,7 @@ function LocationPickerDrawer({
 }
 
 function ServiceInfoCard({ serviceMode, pickupMode, dropoffMode, matchedTripTitle }) {
-  const { t } = useLanguage();
+  const { t, cp } = useClientText();
   const label = DELIVERY_SERVICE_MODES.find((item) => item.key === serviceMode)?.label || t.deliveryTitle;
   return (
     <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
@@ -209,7 +210,7 @@ function ServiceInfoCard({ serviceMode, pickupMode, dropoffMode, matchedTripTitl
 }
 
 function OrderCard({ order, onEdit, onDelete }) {
-  const { t } = useLanguage();
+  const { t, cp } = useClientText();
   const steps = getDeliveryStatusSteps(order.status);
   return (
     <Card
@@ -319,14 +320,14 @@ export default function DeliveryPage({ onBack }) {
 
   const pickupLabel = useMemo(() => {
     if (pickupMode === "precise") {
-      return pickup.label || "Xaritadan aniq olish manzili";
+      return pickup.label || cp("Xaritadan aniq olish manzili");
     }
     return getStandardPointLabel(pickup.region, pickup.district);
   }, [pickupMode, pickup.label, pickup.region, pickup.district]);
 
   const dropoffLabel = useMemo(() => {
     if (dropoffMode === "precise") {
-      return dropoff.label || "Xaritadan aniq topshirish manzili";
+      return dropoff.label || cp("Xaritadan aniq topshirish manzili");
     }
     return getStandardPointLabel(dropoff.region, dropoff.district);
   }, [dropoffMode, dropoff.label, dropoff.region, dropoff.district]);
@@ -441,7 +442,7 @@ export default function DeliveryPage({ onBack }) {
       if (editingId) {
         const updated = await updateDeliveryOrder(editingId, payloadFromState());
         setOrders((prev) => prev.map((item) => (item.id === editingId ? updated : item)));
-        message.success("Buyurtma yangilandi");
+        message.success(cp("Buyurtma yangilandi"));
       } else {
         const order = await createDeliveryOrder(payloadFromState());
         setOrders((prev) => [order, ...prev]);
@@ -450,7 +451,7 @@ export default function DeliveryPage({ onBack }) {
       resetForm();
     } catch (error) {
       console.error(error);
-      message.error("Buyurtma saqlanmadi");
+      message.error(cp("Buyurtma saqlanmadi"));
     } finally {
       setLoading(false);
     }
@@ -493,7 +494,7 @@ export default function DeliveryPage({ onBack }) {
         await deleteDeliveryOrder(order.id);
         setOrders((prev) => prev.filter((item) => item.id !== order.id));
         if (editingId === order.id) resetForm();
-        message.success("Buyurtma o‘chirildi");
+        message.success(cp("Buyurtma o‘chirildi"));
       },
     });
   };
@@ -518,7 +519,7 @@ export default function DeliveryPage({ onBack }) {
       >
         <Space direction="vertical" size={14} style={{ width: "100%" }}>
           <div>
-            <Title level={4} style={{ margin: 0 }}>{editingId ? "Buyurtmani tahrirlash" : "Eltish xizmati"}</Title>
+            <Title level={4} style={{ margin: 0 }}>{editingId ? cp("Buyurtmani tahrirlash") : cp("Eltish xizmati")}</Title>
             <Text type="secondary">Shahar, tumanlar aro va viloyatlar aro eltish bir joyda boshqariladi.</Text>
           </div>
 
@@ -536,12 +537,12 @@ export default function DeliveryPage({ onBack }) {
               <Radio.Group value={pickupMode} onChange={(e) => setPickupMode(e.target.value)}>
                 <Space direction="vertical">
                   <Radio value="standard" disabled={serviceMode === "city"}>Standart nuqta</Radio>
-                  <Radio value="precise">Xaritadan aniq manzil</Radio>
+                  <Radio value="precise">{cp("Xaritadan aniq manzil")}</Radio>
                 </Space>
               </Radio.Group>
               {pickupMode === "precise" ? (
                 <Button icon={<EnvironmentOutlined />} onClick={() => openMap("pickup")}>
-                  {pickup.point ? "Manzilni o‘zgartirish" : "Xaritadan tanlash"}
+                  {pickup.point ? cp("Manzilni o‘zgartirish") : cp("Xaritadan tanlash")}
                 </Button>
               ) : null}
               <Text type="secondary">{pickupLabel}</Text>
@@ -550,17 +551,17 @@ export default function DeliveryPage({ onBack }) {
 
           <Card size="small" style={{ borderRadius: 18, background: "#f8fbff", border: "1px solid rgba(87,119,255,0.1)" }}>
             <Space direction="vertical" size={12} style={{ width: "100%" }}>
-              <div style={{ fontWeight: 700 }}>Qaerga topshirish</div>
+              <div style={{ fontWeight: 700 }}>{cp("Qaerga topshirish")}</div>
               <RegionDistrictSelect region={dropoff.region} district={dropoff.district} onChange={(next) => setDropoff((prev) => ({ ...prev, ...next }))} allowEmptyDistrict={serviceMode === "city"} />
               <Radio.Group value={dropoffMode} onChange={(e) => setDropoffMode(e.target.value)}>
                 <Space direction="vertical">
                   <Radio value="standard" disabled={serviceMode === "city"}>Standart nuqta</Radio>
-                  <Radio value="precise">Aniq manzil</Radio>
+                  <Radio value="precise">{cp("Aniq manzil")}</Radio>
                 </Space>
               </Radio.Group>
               {dropoffMode === "precise" ? (
                 <Button icon={<EnvironmentOutlined />} onClick={() => openMap("dropoff")}>
-                  {dropoff.point ? "Manzilni o‘zgartirish" : "Xaritadan tanlash"}
+                  {dropoff.point ? cp("Manzilni o‘zgartirish") : cp("Xaritadan tanlash")}
                 </Button>
               ) : null}
               <Text type="secondary">{dropoffLabel}</Text>
@@ -591,7 +592,7 @@ export default function DeliveryPage({ onBack }) {
               <Form.Item label="Qabul qiluvchi telefon" style={{ marginBottom: 12 }}>
                 <PhoneField value={receiverPhone} onChange={setReceiverPhone} onSelectContact={() => openContacts("receiver")} />
               </Form.Item>
-              <Form.Item label="Izoh" style={{ marginBottom: 0 }}>
+              <Form.Item label={cp("Izoh")} style={{ marginBottom: 0 }}>
                 <Input.TextArea rows={3} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Masalan: Toshkentda avtovokzalda kutib oladi" />
               </Form.Item>
             </Form>
@@ -600,7 +601,7 @@ export default function DeliveryPage({ onBack }) {
           {serviceMode === "region" ? (
             <Card size="small" style={{ borderRadius: 18 }}>
               <Space direction="vertical" size={6} style={{ width: "100%" }}>
-                <div style={{ fontWeight: 700 }}>Mos viloyatlar aro reys</div>
+                <div style={{ fontWeight: 700 }}>{cp("Mos viloyatlar aro reys")}</div>
                 {matchedTrip ? (
                   <Text>
                     {matchedTrip.from_region} {matchedTrip.from_district ? `• ${matchedTrip.from_district}` : ""} → {matchedTrip.to_region} {matchedTrip.to_district ? `• ${matchedTrip.to_district}` : ""}
@@ -659,7 +660,7 @@ export default function DeliveryPage({ onBack }) {
 
       <LocationPickerDrawer
         open={Boolean(mapTarget)}
-        title={mapTarget === "pickup" ? "Olish manzilini tanlang" : "Topshirish manzilini tanlang"}
+        title={mapTarget === "pickup" ? cp("Olish manzilini tanlang") : cp("Topshirish manzilini tanlang")}
         center={currentCenter}
         value={mapTarget === "pickup" ? pickup.point : dropoff.point}
         onClose={() => setMapTarget(null)}

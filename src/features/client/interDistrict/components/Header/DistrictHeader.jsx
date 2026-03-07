@@ -1,13 +1,15 @@
 import React from "react";
+import { useClientText } from "../../shared/i18n_clientLocalize";
 import { Button, Typography } from "antd";
 import { ArrowLeftOutlined } from "@ant-design/icons";
 
 /**
  * DistrictHeader.jsx
  * -------------------------------------------------------
- * "Nukusdan qayerga?" sarlavhasi va orqaga tugma.
+ * cp("{cp("Nukusdan qayerga?")}") sarlavhasi va orqaga tugma.
  */
 export default function DistrictHeader({ onBack }) {
+  const { cp } = useClientText();
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px" }}>
       <Button icon={<ArrowLeftOutlined />} onClick={onBack} />

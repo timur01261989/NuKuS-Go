@@ -28,6 +28,7 @@ import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from 
 import L from "leaflet";
 import { useNavigate } from "react-router-dom"; 
 import { useLanguage } from "@/shared/i18n/useLanguage";
+import { useClientText } from "../shared/i18n_clientLocalize";
 
 import RegionDistrictSelect from "@/shared/components/RegionDistrictSelect";
 import { UZ_REGIONS } from "@/shared/constants/uzRegions";
@@ -74,9 +75,9 @@ async function getAddressName(lat, lng) {
   try {
     const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=uz`);
     const data = await res.json();
-    return data.display_name || "Noma'lum manzil";
+    return data.display_name || cp("Noma'lum manzil");
   } catch (e) {
-    return "Manzilni aniqlab bo'lmadi";
+    return cp("Manzilni aniqlab bo'lmadi");
   }
 }
 
@@ -117,7 +118,7 @@ function PickupPicker({ value, onChange, savedPoints }) {
 
 // --- O'rindiq Tanlash Komponenti ---
 function SeatSelector({ trip, selectedSeats, onToggleSeat }) {
-  const { t } = useLanguage();
+  const { t, cp } = useClientText();
   const isCar = trip.vehicle_type === 'car' || !trip.vehicle_type; // Default yengil
   const totalSeats = trip.seats || 4;
 
@@ -142,7 +143,7 @@ function SeatSelector({ trip, selectedSeats, onToggleSeat }) {
   if (isCar) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "center", background: "#f0f2f5", padding: 16, borderRadius: 12 }}>
-        <div style={{ fontWeight: 600, marginBottom: 4 }}>{t.lightCar} sxemasi</div>
+        <div style={{ fontWeight: 600, marginBottom: 4 }}>{`${t.lightCar} ${cp("sxemasi")}`}</div>
         {/* Oldi qator */}
         <div style={{ display: "flex", gap: 20 }}>
           <div style={driverSeatStyle}>Rul</div>
@@ -162,7 +163,7 @@ function SeatSelector({ trip, selectedSeats, onToggleSeat }) {
   return (
     <div style={{ background: "#f0f2f5", padding: 16, borderRadius: 12 }}>
       <div style={{ fontWeight: 600, marginBottom: 8, textAlign: "center" }}>
-        {trip.vehicle_type === 'bus' ? t.bus : `${t.gazelle}/Mikroavtobus`} ({totalSeats} o'rin)
+        {trip.vehicle_type === 'bus' ? t.bus : `${t.gazelle}/Mikroavtobus`} ({totalSeats} {cp("o'rin")})
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center" }}>
         {Array.from({ length: totalSeats }).map((_, i) => {
@@ -179,7 +180,7 @@ function SeatSelector({ trip, selectedSeats, onToggleSeat }) {
 }
 
 function TripCard({ trip, onViewMap, onSelect }) {
-  const { t } = useLanguage();
+  const { t, cp } = useClientText();
   const titleFrom = trip.from_district ? `${trip.from_region} • ${trip.from_district}` : trip.from_region;
   const titleTo = trip.to_district ? `${trip.to_region} • ${trip.to_district}` : trip.to_region;
 
@@ -211,7 +212,7 @@ function TripCard({ trip, onViewMap, onSelect }) {
 
 export default function ClientIntercityPage() {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, cp } = useClientText();
   
   // Search State
   const [from, setFrom] = useState({ region: null, district: "" });
@@ -305,10 +306,10 @@ export default function ClientIntercityPage() {
 
       setTrips(data || []);
       setDrawerOpen(true);
-      if ((data || []).length === 0) message.info("Mos reys topilmadi");
+      if ((data || []).length === 0) message.info(cp("Mos reys topilmadi"));
     } catch (e) {
       console.error(e);
-      message.error("Qidirishda xatolik");
+      message.error(cp("Qidirishda xatolik"));
     } finally {
       setLoading(false);
     }

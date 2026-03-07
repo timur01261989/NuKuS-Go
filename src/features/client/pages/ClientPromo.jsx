@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { validatePromo } from '@/services/promoApi';
 import { useLanguage } from '@shared/i18n/useLanguage';
+import { useClientText } from '../shared/i18n_clientLocalize';
 import { safeBack } from '@/shared/navigation/safeBack';
 
 export default function ClientPromo() {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, cp } = useClientText();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -22,7 +23,7 @@ export default function ClientPromo() {
       const j = await validatePromo(c, 100000);
       setResult(j);
     } catch (e) {
-      setErr(String(e?.message || e || t.error || "Xatolik"));
+      setErr(String(e?.message || e || t.error || cp("Xatolik")));
     } finally {
       setLoading(false);
     }
@@ -45,7 +46,7 @@ export default function ClientPromo() {
           <button type="button" className="bg-primaryHome hover:bg-primaryHome/90 text-backgroundDark font-bold px-4 rounded-xl active:scale-95" onClick={check} disabled={loading}>{loading ? "…" : t.checkPromo}</button>
         </div>
         {err ? <p className="mt-3 text-sm text-red-400">{err}</p> : null}
-        {result ? <div className="mt-4 rounded-2xl border border-primaryHome/30 p-4"><div className="font-bold text-primaryHome">OK</div><pre className="mt-2 text-xs text-slate-300 whitespace-pre-wrap break-words">{JSON.stringify(result, null, 2)}</pre></div> : null}
+        {result ? <div className="mt-4 rounded-2xl border border-primaryHome/30 p-4"><div className="font-bold text-primaryHome">{cp("Muvaffaqiyatli yakunlandi!")}</div><pre className="mt-2 text-xs text-slate-300 whitespace-pre-wrap break-words">{JSON.stringify(result, null, 2)}</pre></div> : null}
       </div>
     </div>
   );

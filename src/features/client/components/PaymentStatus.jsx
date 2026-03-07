@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { useClientText } from '../shared/i18n_clientLocalize';
 import Lottie from "lottie-react";
 import { Typography, Space } from 'antd';
 
@@ -12,6 +13,7 @@ const { Title, Text } = Typography;
 
 // ✅ Named export ham bo'ldi (ClientOrderCreate.jsx dagi { PaymentStatus } uchun)
 export function PaymentStatus({ status }) {
+  const { cp } = useClientText();
 
   // Statusga qarab qaysi animatsiyani ko'rsatishni aniqlash
   const currentAnimation = useMemo(() => {
@@ -44,12 +46,12 @@ export function PaymentStatus({ status }) {
 
       <Space direction="vertical" align="center" style={{ marginTop: 20 }}>
         <Title level={4} style={{ margin: 0, fontFamily: 'YangoHeadline' }}>
-          {status === 'searching' && "Haydovchi qidirilmoqda..."}
-          {status === 'processing' && "To'lov tekshirilmoqda..."}
-          {status === 'success' && "Muvaffaqiyatli yakunlandi!"}
+          {status === 'searching' && cp("Haydovchi qidirilmoqda...")}
+          {status === 'processing' && cp("To'lov tekshirilmoqda...")}
+          {status === 'success' && cp("Muvaffaqiyatli yakunlandi!")}
         </Title>
         <Text type="secondary">
-          {status === 'searching' ? "Eng yaqin mashinani aniqlayapmiz" : "Iltimos, kutib turing"}
+          {status === 'searching' ? cp("Eng yaqin mashinani aniqlayapmiz") : cp("Iltimos, kutib turing")}
         </Text>
       </Space>
 

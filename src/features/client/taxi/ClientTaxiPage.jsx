@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import { useClientText } from "../shared/i18n_clientLocalize";
 import { useNavigate } from "react-router-dom";
 import {
   Avatar,
@@ -306,7 +307,7 @@ export default function ClientTaxiPage() {
 
   const requestLocateNow = useCallback(() => {
     if (!navigator.geolocation) {
-      message.error("Geolokatsiya mavjud emas");
+      message.error(cp("Geolokatsiya mavjud emas"));
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -318,7 +319,7 @@ export default function ClientTaxiPage() {
         if (map) map.flyTo(ll, 16, { duration: 0.6 });
       },
       () => {
-        message.error("Joylashuvni aniqlab bo'lmadi");
+        message.error(cp("Joylashuvni aniqlab bo'lmadi"));
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
     );
@@ -395,7 +396,7 @@ export default function ClientTaxiPage() {
   const openPickupMapEdit = useCallback(() => {
     setStep("main");
     setSearchOpen(false);
-    message.info("Xaritani siljitib yo'lovchini olish nuqtasini o'zgartiring");
+    message.info(cp("Xaritani siljitib yo'lovchini olish nuqtasini o'zgartiring"));
   }, []);
 
   const openDestMapEdit = useCallback(() => {
@@ -417,10 +418,10 @@ export default function ClientTaxiPage() {
   const addStopFromCenter = useCallback(() => {
     if (!centerLatLng) return;
     const addr = step === "dest_map" ? (destAddrFromCenter || "") : (pickupAddrFromCenter || "");
-    const stop = { latlng: centerLatLng, address: addr || "Oraliq bekat" };
+    const stop = { latlng: centerLatLng, address: addr || cp("Oraliq bekat") };
     setWaypoints((w) => [...w, stop].slice(0, 3));
     setAddStopOpen(false);
-    message.success("Oraliq bekat qo'shildi");
+    message.success(cp("Oraliq bekat qo'shildi"));
   }, [centerLatLng, step, destAddrFromCenter, pickupAddrFromCenter]);
 
   const handlePickSaved = useCallback(
@@ -480,7 +481,7 @@ export default function ClientTaxiPage() {
       </div>
       <div className="yg-field-body">
         <div className="yg-field-label">Yo'lovchini olish nuqtasi</div>
-        <div className="yg-field-value">{pickup.address || "Manzilingiz aniqlanmoqda..."}</div>
+        <div className="yg-field-value">{pickup.address || cp("Manzilingiz aniqlanmoqda...")}</div>
       </div>
       <div style={{ display: "flex", gap: 8 }}>
         <Button size="small" className="yg-chip" onClick={openPickupMapEdit}>
@@ -500,10 +501,10 @@ export default function ClientTaxiPage() {
       </div>
       <div className="yg-field-body">
         <div className="yg-field-label">Yakuniy manzil</div>
-        <div className="yg-field-value">{dest.address || "Qaerga borasiz?"}</div>
+        <div className="yg-field-value">{dest.address || cp("Qaerga borasiz?")}</div>
       </div>
       <Button size="small" className="yg-chip" onClick={openDestinationSearch}>
-        {dest.address ? "O'zgartirish" : "Qidirish"}
+        {dest.address ? cp("O'zgartirish") : "Qidirish"}
       </Button>
     </div>
   );

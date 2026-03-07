@@ -1,3 +1,4 @@
+import { translateClientPhrase } from "../../shared/i18n_clientLocalize";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { message } from "antd";
 import api from "@/utils/apiHelper";
@@ -150,6 +151,9 @@ export function speak(text) {
 
 // Main taxi order hook
 export function useTaxiOrder() {
+  const currentLang = (() => { try { return localStorage.getItem("appLang") || "uz_lotin"; } catch { return "uz_lotin"; } })();
+  const cp = (x) => translateClientPhrase(currentLang, x);
+
   // Flow state
   const [step, setStep] = useState("main");
   const [darkMode, setDarkMode] = useState(false);
@@ -435,7 +439,7 @@ export function useTaxiOrder() {
         const results = await nominatimSearch(q);
         const first = Array.isArray(results) ? results[0] : null;
         if (!first) {
-          message.error("Manzil topilmadi");
+          message.error(cp("Manzil topilmadi"));
           return;
         }
         const ll = [Number(first.lat), Number(first.lon)];
@@ -446,7 +450,7 @@ export function useTaxiOrder() {
         if (pickup?.latlng) setStep("route");
         else setStep("main");
       } catch (e) {
-        message.error("Manzilni aniqlab bo'lmadi");
+        message.error(cp("Manzilni aniqlab bo'lmadi"));
       }
     },
     [pickup?.latlng]
@@ -455,7 +459,7 @@ export function useTaxiOrder() {
   // Order creation
   const handleOrderCreate = useCallback(async () => {
     if (!pickup.latlng) {
-      message.error("Yo'lovchini olish nuqtasi aniqlanmadi");
+      message.error(cp("Yo'lovchini olish nuqtasi aniqlanmadi"));
       return;
     }
 
@@ -467,7 +471,7 @@ export function useTaxiOrder() {
       }
     }
 
-    const hide = message.loading("Buyurtma yuborilmoqda...", 0);
+    const hide = message.loading(cp("Buyurtma yuborilmoqda..."), 0);
     try {
       const payloadBase = {
         status: "searching",
@@ -476,7 +480,7 @@ export function useTaxiOrder() {
         use_server_pricing: true,
         service_type: "taxi",
         tariff_id: tariff.id,
-        pickup_location: pickup.address || "Yo'lovchini olish nuqtasi",
+        pickup_location: pickup.address || cp("Yo'lovchini olish nuqtasi"),
         dropoff_location: dest.address || "",
         from_lat: pickup.latlng[0],
         from_lng: pickup.latlng[1],
@@ -511,17 +515,17 @@ export function useTaxiOrder() {
       }
 
       const id = res?.data?.id || res?.id || res?.orderId;
-      if (!id) throw lastErr || new Error("Serverdan ID kelmadi");
+      if (!id) throw lastErr || new Error(cp("Serverdan ID kelmadi"));
 
       setOrderId(String(id));
       localStorage.setItem("activeOrderId", String(id));
       setOrderStatus("searching");
       setStep("searching");
-      speak("Haydovchi qidirilmoqda");
-      message.success("Buyurtma yuborildi");
+      speak(cp("Haydovchi qidirilmoqda"));
+      message.success(cp("Buyurtma yuborildi"));
     } catch (e) {
       console.error("Order error:", e);
-      message.error("Zakaz berishda xatolik: " + (e?.message || "Server bilan aloqa yo'q"));
+      message.error("Zakaz berishda xatolik: " + (e?.message || cp("Server bilan aloqa yo'q")));
     } finally {
       hide();
     }
@@ -534,7 +538,7 @@ export function useTaxiOrder() {
       setOrderStatus(null);
       return;
     }
-    const hide = message.loading("Bekor qilinmoqda...", 0);
+    const hide = message.loading(cp("Bekor qilinmoqda..."), 0);
     try {
       await api.post("/api/order", { action: "cancel", order_id: orderId });
     } catch (e) {
@@ -548,7 +552,7 @@ export function useTaxiOrder() {
       setNearCars([]);
       setDispatchLine(null);
       setStep("main");
-      speak("Safar bekor qilindi");
+      speak(cp("Safar bekor qilindi"));
     }
   }, [orderId]);
 
@@ -608,10 +612,10 @@ export function useTaxiOrder() {
         const st = o?.status || o?.order_status;
         if (st && st !== orderStatus) {
           setOrderStatus(st);
-          if (st === "accepted") speak("Haydovchi topildi");
-          if (st === "arrived") speak("Haydovchi yetib keldi");
+          if (st === "accepted") speak(cp("Haydovchi topildi"));
+          if (st === "arrived") speak(cp("Haydovchi yetib keldi"));
           if (st === "completed" || st === "done") {
-            speak("Safar yakunlandi. Rahmat!");
+            speak(cp("Safar yakunlandi. Rahmat!"));
             const drvId = o?.driver?.id || o?.driver_id || o?.assigned_driver_id || null;
             const clientId = o?.client_user_id || o?.user_id || null;
             setCompletedOrderForRating({

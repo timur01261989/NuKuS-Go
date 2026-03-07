@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { useClientText } from "../../shared/i18n_clientLocalize";
 import { Button, Card, Upload, Typography } from "antd";
 import { CameraOutlined } from "@ant-design/icons";
 const { Text } = Typography;
@@ -18,7 +19,7 @@ export default function PhotoUploader({ photos = [], onChange }) {
   return (
     <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-        <div style={{ fontWeight: 1000 }}>Yuk rasmi (ixtiyoriy)</div>
+        <div style={{ fontWeight: 1000 }}>{cp({cp("Yuk rasmi (ixtiyoriy)")})}</div>
         <Upload {...uploadProps}>
           <Button icon={<CameraOutlined />} style={{ borderRadius: 14 }}>Rasm qo‘shish</Button>
         </Upload>

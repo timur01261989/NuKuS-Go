@@ -1,14 +1,16 @@
 import React from "react";
+import { useClientText } from "../../shared/i18n_clientLocalize";
 import { Card } from "antd";
 
 const WEIGHTS = [
-  { id: 1, label: "< 1 kg", sub: "Yengil" },
-  { id: 2, label: "5 kg", sub: "O‘rta" },
-  { id: 3, label: "10 kg", sub: "Og‘ir" },
-  { id: 4, label: "20 kg+", sub: "Juda og‘ir" },
+  { id: 1, label: < 1 kg, sub: "Yengil" },
+  { id: 2, label: 5 kg, sub: "O‘rta" },
+  { id: 3, label: 10 kg, sub: "Og‘ir" },
+  { id: 4, label: 20 kg+, sub: {cp("Juda og‘ir")} },
 ];
 
 export default function WeightSelector({ value, onChange }) {
+  const { cp } = useClientText();
   return (
     <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
       <div style={{ fontWeight: 1000, marginBottom: 10 }}>Og‘irlik</div>

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { useClientText } from "../../shared/i18n_clientLocalize";
 import { Button, Card, Form, Input, Modal, List, Typography } from "antd";
 import { ContactsOutlined } from "@ant-design/icons";
 import { useContacts } from "../../hooks/useContacts";
@@ -45,7 +46,7 @@ export default function ReceiverForm({ value, onChange }) {
         </Form.Item>
 
         <Text type="secondary" style={{ fontSize: 12 }}>
-          {supported ? "Kontaktlardan tanlash ishlashi mumkin." : "Kontaktlar API yo‘q — demo ro‘yxat chiqadi."}
+          {supported ? {cp("Kontaktlardan tanlash ishlashi mumkin.")} : {cp("Kontaktlar API yo‘q — demo ro‘yxat chiqadi.")}}
         </Text>
       </Form>
 

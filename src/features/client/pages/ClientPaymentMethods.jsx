@@ -1,11 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@shared/i18n/useLanguage';
+import { useClientText } from '../shared/i18n_clientLocalize';
 import { safeBack } from '@/shared/navigation/safeBack';
 
 export default function ClientPaymentMethods() {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, cp } = useClientText();
 
   return (
     <div className="min-h-screen bg-softBlue dark:bg-backgroundDark font-display text-slate-900 dark:text-slate-100 p-4">
@@ -22,7 +23,7 @@ export default function ClientPaymentMethods() {
         <div className="grid gap-3">
           <PaymentCard icon="account_balance_wallet" title={t.wallet} desc={t.walletBalance} />
           <PaymentCard icon="credit_card" title={t.cardSoon.split(" (")[0]} desc={t.cardSoon.match(/\(.+\)/)?.[0] || ""} disabled />
-          <PaymentCard icon="payments" title="Payme / Click" desc={t.paymeClickSoon.match(/\(.+\)/)?.[0] || t.paymeClickSoon} disabled />
+          <PaymentCard icon="payments" title={cp("Payme / Click")} desc={t.paymeClickSoon.match(/\(.+\)/)?.[0] || t.paymeClickSoon} disabled />
         </div>
         <button type="button" className="w-full bg-primaryHome hover:bg-primaryHome/90 text-backgroundDark font-bold py-3 rounded-xl active:scale-95" onClick={() => navigate('/client/wallet')}>
           {t.wallet}

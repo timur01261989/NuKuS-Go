@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useClientText } from "../shared/i18n_clientLocalize";
 import { Button, Card, Divider, List, message, Tag, Typography } from "antd";
 import { SendOutlined, ReloadOutlined, StopOutlined, CheckCircleOutlined } from "@ant-design/icons";
 
@@ -21,8 +22,8 @@ function statusTag(status) {
   const st = String(status || "");
   if (st === "posted") return <Tag color="blue">E’lon qilindi</Tag>;
   if (st === "offering") return <Tag color="gold">Takliflar kelyapti</Tag>;
-  if (st === "driver_selected") return <Tag color="green">Haydovchi tanlandi</Tag>;
-  if (st === "loading") return <Tag color="cyan">Yuklanmoqda</Tag>;
+  if (st === "driver_selected") return <Tag color="green">{cp("Haydovchi tanlandi ✅")}</Tag>;
+  if (st === "loading") return <Tag color="cyan">{cp("Yuk joylanmoqda...")}</Tag>;
   if (st === "in_transit") return <Tag color="purple">Yo‘lda</Tag>;
   if (st === "delivered") return <Tag color="geekblue">Yetkazildi</Tag>;
   if (st === "closed") return <Tag color="green">Yopildi</Tag>;
@@ -32,6 +33,7 @@ function statusTag(status) {
 
 function Inner() {
   const { user } = useAuth();
+  const { cp } = useClientText();
   const {
     truck,
     pickup,
@@ -131,7 +133,7 @@ function Inner() {
 
   const postCargo = useCallback(async () => {
     if (!canPost) return message.error("Avval kirish qiling va nuqtalarni belgilang");
-    const hide = message.loading("Yuk joylanmoqda...", 0);
+    const hide = message.loading(cp("Yuk joylanmoqda..."), 0);
     try {
       const payload = {
         ownerId: user.id,
@@ -147,7 +149,7 @@ function Inner() {
         loadersEnabled,
         loadersCount: loadersEnabled ? Number(loadersCount || 0) : 0,
         // truck tanlovi: hozircha “tavsiya” sifatida qoladi (backend matching capacity asosida)
-        title: cargoName || (truck?.title ? `Yuk: ${truck.title}` : "Yuk"),
+        title: cargoName || (truck?.title ? `${cp("Yuk")}: ${truck.title}` : cp("Yuk")),
       };
       const res = await createCargo(payload);
       const id = res?.data?.data?.id || res?.data?.id || res?.id;
@@ -156,7 +158,7 @@ function Inner() {
       try {
         localStorage.setItem("activeCargoId", String(id));
       } catch {}
-      message.success("Yuk e’loni yaratildi. Endi haydovchilar taklif yuboradi.");
+      message.success(cp("Yuk e’loni yaratildi. Endi haydovchilar taklif yuboradi."));
       // show immediate movement: how many drivers can see it
       try {
         const m = await matchVehicles({ cargoId: String(id), radiusKm: 30 });
@@ -200,7 +202,7 @@ function Inner() {
       const hide = message.loading("Taklif qabul qilinmoqda...", 0);
       try {
         await acceptOffer({ cargoId, offerId, ownerId: user?.id || null });
-        message.success("Haydovchi tanlandi ✅");
+        message.success(cp("Haydovchi tanlandi ✅"));
         await refresh({ silent: true });
       } catch (e) {
         message.error("Xatolik: " + (e?.message || ""));
@@ -222,8 +224,8 @@ function Inner() {
       <div style={{ padding: 14, maxWidth: 840, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
           <div>
-            <Title level={4} style={{ margin: 0 }}>Yuk tashish</Title>
-            <Text type="secondary" style={{ fontSize: 12 }}>Yuk e’loni va haydovchi takliflari.</Text>
+            <Title level={4} style={{ margin: 0 }}>{cp("Yuk tashish")}</Title>
+            <Text type="secondary" style={{ fontSize: 12 }}>{cp("Yuk e’loni va haydovchi takliflari.")}</Text>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             {statusTag(st)}
@@ -251,7 +253,7 @@ function Inner() {
           <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
               <div>
-                <div style={{ fontWeight: 1000 }}>Yuk: {cargo?.title || "-"}</div>
+                <div style={{ fontWeight: 1000 }}>{cp("Yuk")}: {cargo?.title || "-"}</div>
                 <div style={{ fontSize: 12, opacity: 0.75 }}>
                   {cargo?.weight_kg ? `${cargo.weight_kg} kg` : ""}{cargo?.volume_m3 ? ` • ${cargo.volume_m3} m³` : ""}
                   {budget ? ` • budget: ${formatUZS(budget)}` : ""}
@@ -269,10 +271,10 @@ function Inner() {
           </Card>
 
           <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
-            <div style={{ fontWeight: 1000, marginBottom: 10 }}>Haydovchi takliflari</div>
+            <div style={{ fontWeight: 1000, marginBottom: 10 }}>{cp("Haydovchi takliflari")}</div>
             {activeOffers.length === 0 ? (
               <div style={{ fontSize: 12, opacity: 0.75 }}>
-                Hozircha taklif yo‘q. Haydovchilar onlayn bo‘lsa taklif yuboradi.
+                {cp("Hozircha taklif yo‘q. Haydovchilar onlayn bo‘lsa taklif yuboradi.")}
               </div>
             ) : (
               <List
@@ -283,7 +285,7 @@ function Inner() {
                     <List.Item
                       actions={
                         isAccepted
-                          ? [<Tag key="acc" color="green" icon={<CheckCircleOutlined />}>Tanlangan</Tag>]
+                          ? [<Tag key="acc" color="green" icon={<CheckCircleOutlined />}>{cp("Tanlangan")}</Tag>]
                           : [
                               <Button key="pick" type="primary" onClick={() => doAcceptOffer(o.id)}>
                                 Tanlash
@@ -293,7 +295,7 @@ function Inner() {
                     >
                       <List.Item.Meta
                         title={<span style={{ fontWeight: 900 }}>{formatUZS(o.price)} {o.eta_minutes ? <Text type="secondary">• {o.eta_minutes} min</Text> : null}</span>}
-                        description={o.note ? <span style={{ fontSize: 12 }}>{o.note}</span> : <span style={{ fontSize: 12, opacity: 0.75 }}>Izoh yo‘q</span>}
+                        description={o.note ? <span style={{ fontSize: 12 }}>{o.note}</span> : <span style={{ fontSize: 12, opacity: 0.75 }}>{cp("Izoh yo‘q")}</span>}
                       />
                     </List.Item>
                   );
@@ -317,7 +319,7 @@ function Inner() {
                   <List.Item>
                     <div style={{ display: "flex", justifyContent: "space-between", width: "100%", gap: 10 }}>
                       <div>
-                        <div style={{ fontWeight: 900 }}>{v.title || "Yuk mashina"} {v.plate_number ? <Text type="secondary">• {v.plate_number}</Text> : null}</div>
+                        <div style={{ fontWeight: 900 }}>{v.title || cp("Yuk mashina")} {v.plate_number ? <Text type="secondary">• {v.plate_number}</Text> : null}</div>
                         <div style={{ fontSize: 12, opacity: 0.75 }}>
                           {v.body_type ? `Turi: ${v.body_type}` : ""}
                           {Number.isFinite(v.capacity_kg) ? ` • ${v.capacity_kg} kg` : ""}
@@ -362,9 +364,9 @@ function Inner() {
     <div style={{ padding: 14, maxWidth: 840, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
         <div>
-          <Title level={4} style={{ margin: 0 }}>Yuk tashish</Title>
+          <Title level={4} style={{ margin: 0 }}>{cp("Yuk tashish")}</Title>
           <Text type="secondary" style={{ fontSize: 12 }}>
-            Nuqtalarni belgilang, yuk detallarini to‘ldiring va e’lon qiling — haydovchilar taklif yuboradi.
+            {cp("Nuqtalarni belgilang, yuk detallarini to‘ldiring va e’lon qiling — haydovchilar taklif yuboradi.")}
           </Text>
         </div>
         <div style={{ textAlign: "right" }}>
@@ -380,7 +382,7 @@ function Inner() {
       <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
         
         <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
-          <div style={{ fontWeight: 1000, marginBottom: 10 }}>Manzillar</div>
+          <div style={{ fontWeight: 1000, marginBottom: 10 }}>{cp("Manzillar")}</div>
           <div style={{ display: "grid", gap: 10 }}>
             <Button
               size="large"
@@ -388,9 +390,9 @@ function Inner() {
               onClick={() => setSelecting("pickup")}
               style={{ borderRadius: 16, textAlign: "left", height: "auto", padding: "12px 14px" }}
             >
-              <div style={{ fontWeight: 900 }}>Yuborish manzili</div>
+              <div style={{ fontWeight: 900 }}>{cp("Yuborish manzili")}</div>
               <div style={{ fontSize: 12, opacity: 0.85 }}>
-                {pickup?.address ? pickup.address : "Xaritadan belgilang"}
+                {pickup?.address ? pickup.address : cp("Xaritadan belgilang")}
               </div>
             </Button>
 
@@ -400,15 +402,15 @@ function Inner() {
               onClick={() => setSelecting("dropoff")}
               style={{ borderRadius: 16, textAlign: "left", height: "auto", padding: "12px 14px" }}
             >
-              <div style={{ fontWeight: 900 }}>Tushirish manzili</div>
+              <div style={{ fontWeight: 900 }}>{cp("Tushirish manzili")}</div>
               <div style={{ fontSize: 12, opacity: 0.85 }}>
-                {dropoff?.address ? dropoff.address : "Xaritadan belgilang"}
+                {dropoff?.address ? dropoff.address : cp("Xaritadan belgilang")}
               </div>
             </Button>
           </div>
 
           <div style={{ fontSize: 12, opacity: 0.75, marginTop: 10 }}>
-            Tugmani bossangiz xarita kattalashadi — pinni joylab <b>Manzilni saqlash</b> ni bosing.
+            {cp("Tugmani bossangiz xarita kattalashadi — pinni joylab Manzilni saqlash ni bosing.")}
           </div>
         </Card>
 
@@ -421,7 +423,7 @@ function Inner() {
         </Card>
 
         <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
-          <div style={{ fontWeight: 1000, marginBottom: 10 }}>Yuk detali</div>
+          <div style={{ fontWeight: 1000, marginBottom: 10 }}>{cp("Yuk detali")}</div>
           <div style={{ display: "grid", gap: 12 }}>
             <CargoPhotoUpload />
             <Divider style={{ margin: "8px 0" }} />
@@ -440,7 +442,7 @@ function Inner() {
             onClick={postCargo}
             disabled={!canPost}
           >
-            Yukni e’lon qilish
+            {cp("Yukni e’lon qilish")}
           </Button>
         </div>
       </div>

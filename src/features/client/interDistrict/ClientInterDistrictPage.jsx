@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLanguage } from "@/shared/i18n/useLanguage";
+import { useClientText } from "../shared/i18n_clientLocalize";
 import { Button, Divider, Drawer, message, Typography, Card, Popconfirm } from "antd"; // Card va Popconfirm qo'shildi
 import DistrictHeader from "./components/Header/DistrictHeader";
 import DistrictList from "./components/Selection/DistrictList";
@@ -37,7 +38,7 @@ const pinIcon = (color = "#1677ff") =>
   });
 
 function MapPicker({ open, onClose, initialPoint, onPick }) {
-  const { t } = useLanguage();
+  const { t, cp } = useClientText();
   const [point, setPoint] = useState(initialPoint || null);
 
   useEffect(() => setPoint(initialPoint || null), [initialPoint?.lat, initialPoint?.lng, open]);
@@ -86,7 +87,7 @@ function MapClickSetter({ onPoint }) {
 // YANGI KOMPONENT: AKTIV SAFAR PANELI (Safar qabul qilingandan so'ng chiqadi)
 // =====================================================================
 function ActiveTripPanel() {
-  const { t } = useLanguage();
+  const { t, cp } = useClientText();
   const { tripStatus, setTripStatus, activeDriver } = useDistrict();
 
   const handleCancel = () => {
@@ -128,14 +129,14 @@ function ActiveTripPanel() {
           style={{ flex: 1, borderRadius: 12, height: 44, backgroundColor: "#52c41a", fontWeight: 600 }} 
           href={`tel:${activeDriver?.phone || "+998900000000"}`}
         >
-          {t.callDriver || "📞 Qo'ng'iroq"}
+          {t.callDriver || cp("📞 Qo'ng'iroq")}
         </Button>
         <Popconfirm 
-          title="Safarni bekor qilasizmi?" 
+          title={cp("Safarni bekor qilasizmi?")} 
           description="GPS orqali haydovchi bilan birga ketayotganingiz aniqlansa jarima yoziladi!"
           onConfirm={handleCancel} 
-          okText="Ha, bekor qilish" 
-          cancelText="Yo'q"
+          okText={cp("Ha, bekor qilish")} 
+          cancelText={cp("Yo'q")}
         >
           <Button danger style={{ flex: 1, borderRadius: 12, height: 44, fontWeight: 600 }}>
             {`❌ ${t.cancelAction}`}
@@ -282,7 +283,7 @@ function Inner({ onBack }) {
 
   const submitRequest = async (payload) => {
     if (!selectedTrip) return;
-    const hide = message.loading("So‘rov yuborilmoqda...", 0);
+    const hide = message.loading(cp("So‘rov yuborilmoqda..."), 0);
     try {
       await requestTrip({
         trip_id: selectedTrip.id,
