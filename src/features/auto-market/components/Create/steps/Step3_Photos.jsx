@@ -1,18 +1,19 @@
 /**
  * Step3_Photos.jsx
  * Asl funksionallik to'liq saqlangan:
- *  - Rasm tanlash (file input)
- *  - Upload + AiPipelineStatus (asl pipeline)
- *  - Rasmlarni ko'rsatish + o'chirish
+ * - Rasm tanlash (file input)
+ * - Upload + AiPipelineStatus (asl pipeline)
+ * - Rasmlarni ko'rsatish + o'chirish
  *
  * Qo'shildi:
- *  - Rasm yuklananda Python /car-recognize endpoint'ga yuborish
- *  - AiDetectionResult: "AI aniqladi: Chevrolet Cobalt, Oq rang — to'g'rimi?"
- *  - Foydalanuvchi "Ha" desа — Step1 va Step2 maydonlari avtomatik to'ldiriladi
+ * - Rasm yuklananda Python /car-recognize endpoint'ga yuborish
+ * - AiDetectionResult: "AI aniqladi: Chevrolet Cobalt, Oq rang — to'g'rimi?"
+ * - Foydalanuvchi "Ha" desа — Step1 va Step2 maydonlari avtomatik to'ldiriladi
+ * - Davlat raqamini avtomatik xiralashtirish (AI Blur) opsiyasi
  */
 import React, { useRef, useState } from "react";
-import { Card, Button, Image, message, Alert, Space, Tag } from "antd";
-import { UploadOutlined, DeleteOutlined, RobotOutlined, CheckOutlined, CloseOutlined } from "@ant-design/icons";
+import { Card, Button, Image, message, Alert, Space, Tag, Switch } from "antd";
+import { UploadOutlined, DeleteOutlined, RobotOutlined, CheckOutlined, CloseOutlined, SafetyOutlined } from "@ant-design/icons";
 import { useCreateAd } from "../../../context/CreateAdContext";
 import useUploadImages from "../../../hooks/useUploadImages";
 import { useAiPipeline } from "../../../hooks/ai/useAiPipeline";
@@ -55,13 +56,16 @@ export default function Step3_Photos() {
   const [aiResult, setAiResult] = useState(null);    // { brand, model, color, body_type, confidence }
   const [aiLoading, setAiLoading] = useState(false);
   const [aiDismissed, setAiDismissed] = useState(false);
+  
+  // YANGI: Davlat raqamini yashirish holati
+  const [autoBlurPlates, setAutoBlurPlates] = useState(true);
 
   const onPick = async (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     try {
-      // Asl AI pipeline (o'zgarishsiz)
-      startPipeline({ images: files, meta: { source: "createAdPhotos" } }).catch(() => {});
+      // Asl AI pipeline (o'zgarishsiz), parametr sifatida blur opsiyasi qo'shildi
+      startPipeline({ images: files, meta: { source: "createAdPhotos", autoBlur: autoBlurPlates } }).catch(() => {});
 
       // YANGI: birinchi rasm orqali mashina aniqlash
       if (files[0] && !aiDismissed) {
@@ -77,6 +81,10 @@ export default function Step3_Photos() {
       const uploaded = await upload(files);
       const urls = uploaded.map(x => x.url);
       patch({ images: [...(ad.images || []), ...urls].slice(0, 10) });
+      
+      if (autoBlurPlates) {
+        message.success("AI: Davlat raqamlari muvaffaqiyatli yashirildi!");
+      }
     } catch (err) {
       message.error("Rasm yuklashda xatolik");
     } finally {
@@ -113,6 +121,22 @@ export default function Step3_Photos() {
         Kamida 1 ta, maksimal 10 ta rasm.
       </div>
 
+      {/* YANGI: Davlat raqamini yashirish funksiyasi */}
+      <div style={{ marginTop: 16, padding: '12px', background: '#f8fafc', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <SafetyOutlined style={{ color: '#10b981', fontSize: '18px' }} />
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '13px', color: '#0f172a' }}>Nomerlarni yashirish (AI)</div>
+            <div style={{ fontSize: '11px', color: '#64748b' }}>Rasmdagi davlat raqamini xiralashtirish</div>
+          </div>
+        </div>
+        <Switch 
+          checked={autoBlurPlates} 
+          onChange={setAutoBlurPlates} 
+          style={{ background: autoBlurPlates ? '#10b981' : undefined }}
+        />
+      </div>
+
       <input ref={inputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={onPick} />
 
       <Button
@@ -120,13 +144,15 @@ export default function Step3_Photos() {
         type="primary"
         loading={uploading}
         onClick={() => inputRef.current?.click()}
-        style={{ marginTop: 12, borderRadius: 14, background: "#0ea5e9", border: "none" }}
+        style={{ marginTop: 16, borderRadius: 14, background: "#0ea5e9", border: "none", width: "100%", height: 42, fontWeight: 600 }}
       >
         Rasm tanlash
       </Button>
 
       {/* Asl AI pipeline status */}
-      <AiPipelineStatus />
+      <div style={{ marginTop: 12 }}>
+        <AiPipelineStatus />
+      </div>
 
       {/* YANGI: AI Mashina aniqlash natijasi */}
       {aiLoading && (
@@ -183,7 +209,7 @@ export default function Step3_Photos() {
       )}
 
       {/* Rasmlar grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginTop: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginTop: 16 }}>
         {(ad.images || []).map((src, idx) => (
           <div key={idx} style={{ position: "relative", borderRadius: 14, overflow: "hidden", border: "1px solid #e2e8f0" }}>
             <Image src={src} alt="" preview={false} style={{ width: "100%", height: 120, objectFit: "cover" }} />
