@@ -93,6 +93,16 @@ async function trySupabaseUpdate(id, patch) {
   }
 }
 
+async function trySupabaseDelete(id) {
+  try {
+    const { error } = await supabase.from("delivery_orders").delete().eq("id", id);
+    if (error) throw error;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function listDeliveryOrders() {
   const remote = await trySupabaseSelect();
   if (Array.isArray(remote)) return remote;
@@ -117,6 +127,15 @@ export async function updateDeliveryOrder(id, patch) {
   const updated = items.map((item) => (item.id === id ? { ...item, ...nextPatch } : item));
   lsWrite(updated);
   return updated.find((item) => item.id === id) || null;
+}
+
+export async function deleteDeliveryOrder(id) {
+  const deleted = await trySupabaseDelete(id);
+  if (deleted) return true;
+  const items = lsRead();
+  const next = items.filter((item) => item.id !== id);
+  lsWrite(next);
+  return true;
 }
 
 export async function appendDeliveryHistory(id, event) {
