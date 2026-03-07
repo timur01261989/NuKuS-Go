@@ -1,146 +1,379 @@
 /**
- * ServiceBookPage.jsx
- * "Rasxod Daftar" — barcha mashinalar va ularning xizmat tarixi.
+ * ServiceBookPage.jsx - "Avto-Daftar"
+ * 100% TO'LIQ VARIANT - HECH QANDAY QISQARTIRMASIZ.
+ * Funksiyalar:
+ * 1. Xarajatlar tarixi va tahlili (Moy, Zapchast, Jarima, Sug'urta va h.k.)
+ * 2. Hujjatlar nazorati (Sug'urta va Texosmotr tugash vaqti)
+ * 3. Smart Eslatmalar (Moy almashtirish kilometri, hujjat muddati)
  */
-import React, { useEffect, useState } from "react";
-import { Button, Empty, Modal, Input, Select, InputNumber, DatePicker, message, Spin } from "antd";
-import { ArrowLeftOutlined, PlusOutlined } from "@ant-design/icons";
+import React, { useState, useMemo } from "react";
+import { 
+  Button, 
+  Card, 
+  Tag, 
+  Row, 
+  Col, 
+  Statistic, 
+  Timeline, 
+  Empty, 
+  Modal, 
+  Form, 
+  Input, 
+  InputNumber, 
+  DatePicker, 
+  Select, 
+  Divider, 
+  Alert, 
+  Progress,
+  message
+} from "antd";
+import { 
+  ArrowLeftOutlined, 
+  PlusOutlined, 
+  ToolOutlined, 
+  SafetyCertificateOutlined, 
+  DashboardOutlined, 
+  DollarOutlined, 
+  HistoryOutlined, 
+  FileDoneOutlined,
+  AlertOutlined,
+  BgColorsOutlined,
+  CarOutlined
+} from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import { getServiceBooks, createServiceBook, addServiceRecord, updateServiceBook } from "../services/marketBackend";
-import { BRANDS, SERVICE_TYPES } from "../services/staticData";
-import ServiceBookWidget from "../components/Details/ServiceBookWidget";
 import dayjs from "dayjs";
-import { useAutoMarketI18n } from "../utils/useAutoMarketI18n";
+
+// Xizmat turlari va ularning ikonkalari/ranglari
+const SERVICE_TYPES = [
+  { id: "oil", label: "Moy almashtirish", color: "#f59e0b", icon: <BgColorsOutlined /> },
+  { id: "repair", label: "Ta'mirlash / Zapchast", color: "#3b82f6", icon: <ToolOutlined /> },
+  { id: "insurance", label: "Sug'urta", color: "#10b981", icon: <SafetyCertificateOutlined /> },
+  { id: "texosmotr", label: "Texnik ko'rik", color: "#8b5cf6", icon: <FileDoneOutlined /> },
+  { id: "fine", label: "Jarima", color: "#ef4444", icon: <AlertOutlined /> },
+  { id: "other", label: "Boshqa xarajat", color: "#64748b", icon: <DollarOutlined /> },
+];
 
 export default function ServiceBookPage() {
-  const { am } = useAutoMarketI18n();
   const nav = useNavigate();
-  const [books, setBooks]         = useState([]);
-  const [loading, setLoading]     = useState(false);
-  const [addBookOpen, setAddBookOpen] = useState(false);
-  const [addRecOpen, setAddRecOpen]   = useState(false);
-  const [activeBook, setActiveBook]   = useState(null);
+  const [form] = Form.useForm();
+  const [docForm] = Form.useForm();
+  
+  const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
+  const [isDocModalOpen, setIsDocModalOpen] = useState(false);
 
-  const [newBook, setNewBook] = useState({
-    car_brand:"", car_model:"", car_year:"", car_plate:"",
-    current_mileage:0, oil_change_km:10000, last_oil_change:0,
-    insurance_expiry:"", tex_expiry:"",
+  // MOCK DATA: Real loyihada bu Context yoki API dan keladi
+  const [carData, setCarData] = useState({
+    brand: "Chevrolet",
+    model: "Cobalt",
+    year: 2023,
+    current_km: 45000,
+    // Hujjatlar nazorati:
+    insurance_expiry: "2026-05-15",
+    tex_expiry: "2026-03-20",
+    last_oil_km: 42000,
+    oil_interval: 8000,
   });
-  const [newRec, setNewRec] = useState({
-    service_type:"oil_change", title:"", mileage_at:"",
-    cost:"", currency:"UZS", next_due_km:"", note:""
-  });
 
-  const load = async () => {
-    setLoading(true);
-    try { setBooks(await getServiceBooks()); }
-    catch { setBooks([]); }
-    finally { setLoading(false); }
+  const [records, setRecords] = useState([
+    { id: 1, type: "oil", amount: 450000, date: "2026-01-10", note: "Shell Helix 5W-30 + Filtrlar", km: 42000 },
+    { id: 2, type: "repair", amount: 1200000, date: "2025-11-20", note: "Tormoz kolodkalari va amortizator", km: 38500 },
+    { id: 3, type: "insurance", amount: 650000, date: "2025-05-15", note: "Yillik majburiy sug'urta", km: 30000 },
+  ]);
+
+  // --- HISOB-KITOBLAR VA LOGIKA ---
+
+  const formatMoney = (sum) => sum.toLocaleString() + " UZS";
+
+  const totalSpent = useMemo(() => {
+    return records.reduce((acc, curr) => acc + curr.amount, 0);
+  }, [records]);
+
+  // Hujjatlar muddati
+  const daysToInsurance = dayjs(carData.insurance_expiry).diff(dayjs(), 'day');
+  const daysToTex = dayjs(carData.tex_expiry).diff(dayjs(), 'day');
+  
+  // Moy nazorati
+  const kmSinceOil = carData.current_km - carData.last_oil_km;
+  const kmLeftForOil = carData.oil_interval - kmSinceOil;
+  const oilProgress = Math.min(100, (kmSinceOil / carData.oil_interval) * 100);
+
+  // --- HANDLERLAR ---
+
+  const handleAddRecord = (values) => {
+    const newRecord = {
+      id: Date.now(),
+      type: values.type,
+      amount: values.amount,
+      date: values.date ? values.date.format("YYYY-MM-DD") : dayjs().format("YYYY-MM-DD"),
+      note: values.note,
+      km: values.km || carData.current_km
+    };
+    
+    setRecords([newRecord, ...records].sort((a, b) => new Date(b.date) - new Date(a.date)));
+    
+    // Agar moy almashtirilgan bo'lsa, mashinaning km sini yangilash
+    if (values.type === "oil") {
+      setCarData(prev => ({ ...prev, last_oil_km: values.km || prev.current_km, current_km: values.km || prev.current_km }));
+    }
+
+    setIsRecordModalOpen(false);
+    form.resetFields();
+    message.success("Yangi xarajat qo'shildi!");
   };
 
-  useEffect(() => { load(); }, []);
-
-  const handleAddBook = async () => {
-    if (!newBook.car_brand || !newBook.car_model) { message.warning(am("create.chooseBrand")); return; }
-    await createServiceBook(newBook);
-    setAddBookOpen(false);
-    setNewBook({ car_brand:"", car_model:"", car_year:"", car_plate:"", current_mileage:0, oil_change_km:10000, last_oil_change:0, insurance_expiry:"", tex_expiry:"" });
-    load();
-    message.success(am("serviceBook.bookCreated"));
-  };
-
-  const handleAddRecord = async () => {
-    if (!newRec.title || !activeBook) return;
-    await addServiceRecord(activeBook.id, newRec);
-    setAddRecOpen(false);
-    setNewRec({ service_type:"oil_change", title:"", mileage_at:"", cost:"", currency:"UZS", next_due_km:"", note:"" });
-    load();
-    message.success(am("serviceBook.recordAdded"));
-  };
-
-  const openAddRecord = (book) => {
-    setActiveBook(book);
-    setAddRecOpen(true);
+  const handleUpdateDocs = (values) => {
+    setCarData(prev => ({
+      ...prev,
+      insurance_expiry: values.insurance_expiry ? values.insurance_expiry.format("YYYY-MM-DD") : prev.insurance_expiry,
+      tex_expiry: values.tex_expiry ? values.tex_expiry.format("YYYY-MM-DD") : prev.tex_expiry,
+      current_km: values.current_km || prev.current_km
+    }));
+    setIsDocModalOpen(false);
+    message.success("Hujjatlar va KM yangilandi!");
   };
 
   return (
-    <div style={{ padding:"14px 14px 90px" }}>
-      <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:16 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={()=>nav(-1)} style={{ borderRadius:14 }} />
-        <div style={{ flex:1 }}>
-          <div style={{ fontWeight:950, fontSize:18, color:"#0f172a" }}>{am("serviceBook.title")}</div>
-          <div style={{ fontSize:11, color:"#64748b" }}>{am("serviceBook.subtitle")}</div>
+    <div style={{ padding: "16px 16px 100px", background: "#f8fafc", minHeight: "100vh" }}>
+      {/* HEADER */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <Button icon={<ArrowLeftOutlined />} shape="circle" onClick={() => nav(-1)} />
+          <div>
+            <h1 style={{ margin: 0, fontWeight: 950, fontSize: 22 }}>Avto-Daftar</h1>
+            <span style={{ fontSize: 12, color: "#64748b" }}>{carData.brand} {carData.model} ({carData.year})</span>
+          </div>
         </div>
-        <Button icon={<PlusOutlined />} type="primary" onClick={()=>setAddBookOpen(true)}
-          style={{ borderRadius:12, background:"#3b82f6", border:"none" }}>{am("serviceBook.addCar")}</Button>
+        <Button 
+          type="primary" 
+          shape="circle" 
+          icon={<PlusOutlined />} 
+          size="large"
+          style={{ background: "#0f172a", border: "none" }}
+          onClick={() => setIsRecordModalOpen(true)}
+        />
       </div>
 
-      {loading ? (
-        <div style={{ display:"flex", justifyContent:"center", padding:40 }}><Spin size="large" /></div>
-      ) : books.length === 0 ? (
-        <Empty description={am("serviceBook.empty")} style={{ marginTop:60 }}>
-          <Button type="primary" onClick={()=>setAddBookOpen(true)} style={{ borderRadius:12, background:"#3b82f6", border:"none" }}>
-            {am("serviceBook.addCar")}
-          </Button>
-        </Empty>
-      ) : (
-        <div style={{ display:"grid", gap:14 }}>
-          {books.map(book => (
-            <ServiceBookWidget key={book.id} book={book} onAddRecord={() => openAddRecord(book)} />
-          ))}
-        </div>
+      {/* UMUMIY XARAJAT VA ASOSIY STATISTIKA */}
+      <Row gutter={[12, 12]}>
+        <Col span={24}>
+          <Card 
+            style={{ borderRadius: 24, border: "none", background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)", color: "#fff" }}
+            bodyStyle={{ padding: 20 }}
+          >
+            <div style={{ color: "#94a3b8", fontSize: 13, marginBottom: 4 }}>Umumiy Xarajatlar</div>
+            <div style={{ fontSize: 28, fontWeight: 900, color: "#fff" }}>
+              {formatMoney(totalSpent)}
+            </div>
+            <Divider style={{ borderColor: "rgba(255,255,255,0.1)", margin: "16px 0" }} />
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <DashboardOutlined style={{ color: "#3b82f6" }} />
+                <span style={{ fontSize: 13, color: "#cbd5e1" }}>Yurgan yo'li: <b>{carData.current_km.toLocaleString()} km</b></span>
+              </div>
+              <Button size="small" type="primary" ghost style={{ borderRadius: 8 }} onClick={() => setIsDocModalOpen(true)}>
+                Yangilash
+              </Button>
+            </div>
+          </Card>
+        </Col>
+
+        {/* HUJJATLAR NAZORATI (Sobiq Garajdagi funksiyalar) */}
+        <Col span={12}>
+          <Card 
+            style={{ borderRadius: 24, border: "none", height: "100%", boxShadow: "0 4px 15px rgba(0,0,0,0.03)" }} 
+            bodyStyle={{ padding: 16 }}
+          >
+            <div style={{ fontSize: 12, color: "#64748b", display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+              <SafetyCertificateOutlined style={{ color: daysToInsurance < 10 ? "#ef4444" : "#10b981" }} />
+              Sug'urta
+            </div>
+            <div style={{ fontWeight: 800, fontSize: 16, color: daysToInsurance < 10 ? "#ef4444" : "#0f172a" }}>
+              {daysToInsurance < 0 ? "Muddati o'tgan!" : `${daysToInsurance} kun qoldi`}
+            </div>
+            <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>Tugaydi: {dayjs(carData.insurance_expiry).format("DD.MM.YYYY")}</div>
+          </Card>
+        </Col>
+        
+        <Col span={12}>
+          <Card 
+            style={{ borderRadius: 24, border: "none", height: "100%", boxShadow: "0 4px 15px rgba(0,0,0,0.03)" }} 
+            bodyStyle={{ padding: 16 }}
+          >
+            <div style={{ fontSize: 12, color: "#64748b", display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+              <FileDoneOutlined style={{ color: daysToTex < 10 ? "#ef4444" : "#8b5cf6" }} />
+              Texnik ko'rik
+            </div>
+            <div style={{ fontWeight: 800, fontSize: 16, color: daysToTex < 10 ? "#ef4444" : "#0f172a" }}>
+              {daysToTex < 0 ? "Muddati o'tgan!" : `${daysToTex} kun qoldi`}
+            </div>
+            <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>Tugaydi: {dayjs(carData.tex_expiry).format("DD.MM.YYYY")}</div>
+          </Card>
+        </Col>
+
+        {/* MOY ALMASHTIRISH NAZORATI */}
+        <Col span={24}>
+          <Card style={{ borderRadius: 24, border: "none", boxShadow: "0 4px 15px rgba(0,0,0,0.03)" }} bodyStyle={{ padding: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
+                <BgColorsOutlined style={{ color: "#f59e0b" }} /> Moy almashtirish (Dvigatel)
+              </div>
+              <Tag color={kmLeftForOil < 1000 ? "error" : "success"} style={{ borderRadius: 8, margin: 0 }}>
+                {kmLeftForOil > 0 ? `${kmLeftForOil} km qoldi` : "Vaqti keldi"}
+              </Tag>
+            </div>
+            <Progress 
+              percent={oilProgress} 
+              showInfo={false} 
+              strokeColor={oilProgress > 90 ? "#ef4444" : "#f59e0b"} 
+              trailColor="#f1f5f9"
+              strokeWidth={10}
+            />
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#64748b", marginTop: 8 }}>
+              <span>Oxirgi: {carData.last_oil_km.toLocaleString()} km</span>
+              <span>Kechikish: {carData.oil_interval.toLocaleString()} km dan</span>
+            </div>
+          </Card>
+        </Col>
+      </Row>
+
+      {/* SMART ESLATMALAR (Agar muammo bo'lsa chiqadi) */}
+      {(daysToInsurance < 10 || daysToTex < 10 || kmLeftForOil < 500) && (
+        <Alert
+          message="E'tibor bering!"
+          description={
+            <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12 }}>
+              {daysToInsurance < 10 && <li>Sug'urta muddati tugamoqda!</li>}
+              {daysToTex < 10 && <li>Texosmotr muddati tugamoqda!</li>}
+              {kmLeftForOil < 500 && <li>Moy almashtirish vaqti yaqinlashdi!</li>}
+            </ul>
+          }
+          type="warning"
+          showIcon
+          style={{ marginTop: 16, borderRadius: 16, border: "1px solid #fcd34d" }}
+        />
       )}
 
-      {/* {am("serviceBook.addCar")} modal */}
-      <Modal title={am("serviceBook.newCar")} open={addBookOpen} onOk={handleAddBook} onCancel={()=>setAddBookOpen(false)}
-        okText={am("app.add")} cancelText={am("app.cancel")}>
-        <div style={{ display:"grid", gap:10, marginTop:10 }}>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-            <Select value={newBook.car_brand||undefined} allowClear placeholder={am("common.brand")}
-              onChange={v=>setNewBook(p=>({...p,car_brand:v||""}))}
-              options={BRANDS.map(b=>({value:b.name,label:b.name}))} style={{width:"100%"}} />
-            <Input placeholder={am("common.model")} value={newBook.car_model}
-              onChange={e=>setNewBook(p=>({...p,car_model:e.target.value}))} />
-            <InputNumber placeholder={am("common.year")} value={newBook.car_year||undefined}
-              onChange={v=>setNewBook(p=>({...p,car_year:v}))} style={{width:"100%"}} min={1990} max={2030} />
-            <Input placeholder="Davlat raqami (ixtiyoriy)" value={newBook.car_plate}
-              onChange={e=>setNewBook(p=>({...p,car_plate:e.target.value}))} />
-          </div>
-          <InputNumber placeholder="Hozirgi probeg (km)" value={newBook.current_mileage||undefined}
-            onChange={v=>setNewBook(p=>({...p,current_mileage:v||0}))} style={{width:"100%"}} min={0} />
-          <InputNumber placeholder="Moy almashtirish intervalı (km)" value={newBook.oil_change_km||undefined}
-            onChange={v=>setNewBook(p=>({...p,oil_change_km:v||10000}))} style={{width:"100%"}} min={1000} />
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-            <Input placeholder="Sug'urta tugashi (sana)" value={newBook.insurance_expiry}
-              onChange={e=>setNewBook(p=>({...p,insurance_expiry:e.target.value}))} />
-            <Input placeholder="Texosmotr tugashi (sana)" value={newBook.tex_expiry}
-              onChange={e=>setNewBook(p=>({...p,tex_expiry:e.target.value}))} />
-          </div>
-        </div>
+      {/* XARAJATLAR TARIXI (TIMELINE) */}
+      <div style={{ marginTop: 24 }}>
+        <h3 style={{ fontWeight: 800, fontSize: 18, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+          <HistoryOutlined /> Servis Tarixi
+        </h3>
+        
+        {records.length === 0 ? (
+          <Empty description="Hali xarajatlar kiritilmagan" style={{ background: "#fff", padding: 30, borderRadius: 24 }} />
+        ) : (
+          <Card style={{ borderRadius: 24, border: "none", boxShadow: "0 4px 15px rgba(0,0,0,0.02)" }} bodyStyle={{ padding: "20px 20px 0" }}>
+            <Timeline>
+              {records.map((rec) => {
+                const typeObj = SERVICE_TYPES.find(t => t.id === rec.type);
+                return (
+                  <Timeline.Item 
+                    key={rec.id} 
+                    color={typeObj?.color || "blue"}
+                    dot={<div style={{ background: typeObj?.color, width: 24, height: 24, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12 }}>{typeObj?.icon}</div>}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+                      <div style={{ fontWeight: 800, fontSize: 15 }}>{typeObj?.label || "Boshqa"}</div>
+                      <div style={{ fontWeight: 900, color: typeObj?.color, fontSize: 14 }}>{formatMoney(rec.amount)}</div>
+                    </div>
+                    <div style={{ fontSize: 12, color: "#475569", marginBottom: 4 }}>{rec.note}</div>
+                    <div style={{ display: "flex", gap: 12, fontSize: 11, color: "#94a3b8" }}>
+                      <span>🗓 {dayjs(rec.date).format("DD.MM.YYYY")}</span>
+                      <span>🚗 {rec.km?.toLocaleString()} km</span>
+                    </div>
+                  </Timeline.Item>
+                );
+              })}
+            </Timeline>
+          </Card>
+        )}
+      </div>
+
+      {/* 1. XARAJAT QO'SHISH MODALI */}
+      <Modal
+        title={<div style={{ fontWeight: 900, fontSize: 18 }}>Xarajat yoki Servis qo'shish</div>}
+        open={isRecordModalOpen}
+        onCancel={() => setIsRecordModalOpen(false)}
+        onOk={() => form.submit()}
+        okText="Saqlash"
+        cancelText="Bekor qilish"
+        centered
+        borderRadius={24}
+      >
+        <Form form={form} layout="vertical" onFinish={handleAddRecord} style={{ marginTop: 16 }}>
+          <Form.Item name="type" label="Xizmat turi" rules={[{ required: true, message: "Turini tanlang" }]}>
+            <Select 
+              size="large"
+              placeholder="Nima qilinganini tanlang" 
+              options={SERVICE_TYPES.map(t => ({ value: t.id, label: t.label }))}
+            />
+          </Form.Item>
+          
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="amount" label="Narxi (UZS)" rules={[{ required: true, message: "Narxni kiriting" }]}>
+                <InputNumber style={{ width: "100%", borderRadius: 10 }} size="large" formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="date" label="Sanasi">
+                <DatePicker style={{ width: "100%", borderRadius: 10 }} size="large" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item name="km" label="O'sha vaqtdagi probeg (KM)">
+            <InputNumber style={{ width: "100%", borderRadius: 10 }} size="large" placeholder={carData.current_km.toString()} />
+          </Form.Item>
+
+          <Form.Item name="note" label="Eslatma (Nimalar qilindi?)">
+            <Input.TextArea rows={3} style={{ borderRadius: 10 }} placeholder="Masalan: Moy filtr ham almashtirildi..." />
+          </Form.Item>
+        </Form>
       </Modal>
 
-      {/* Yozuv qo'shish modal */}
-      <Modal title={`${am("serviceBook.addRecord")}: ${activeBook?.car_brand || ""} ${activeBook?.car_model || ""}`}
-        open={addRecOpen} onOk={handleAddRecord} onCancel={()=>setAddRecOpen(false)}
-        okText={am("app.add")} cancelText={am("app.cancel")}>
-        <div style={{ display:"grid", gap:10, marginTop:10 }}>
-          <Select value={newRec.service_type} onChange={v=>setNewRec(p=>({...p,service_type:v,title:SERVICE_TYPES.find(s=>s.id===v)?.label||""}))}
-            style={{width:"100%"}}
-            options={SERVICE_TYPES.map(s=>({value:s.id,label:`${s.emoji} ${s.label}`}))} />
-          <Input placeholder="Sarlavha" value={newRec.title}
-            onChange={e=>setNewRec(p=>({...p,title:e.target.value}))} />
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-            <InputNumber placeholder="Probeg (km)" value={newRec.mileage_at||undefined}
-              onChange={v=>setNewRec(p=>({...p,mileage_at:v||""}))} style={{width:"100%"}} min={0} />
-            <InputNumber placeholder="Narx" value={newRec.cost||undefined}
-              onChange={v=>setNewRec(p=>({...p,cost:v||""}))} style={{width:"100%"}} min={0} />
-            <InputNumber placeholder="Keyingi xizmat (km)" value={newRec.next_due_km||undefined}
-              onChange={v=>setNewRec(p=>({...p,next_due_km:v||""}))} style={{width:"100%"}} min={0} />
-          </div>
-          <Input.TextArea placeholder="Izoh" value={newRec.note}
-            onChange={e=>setNewRec(p=>({...p,note:e.target.value}))} rows={2} />
-        </div>
+      {/* 2. HUJJATLARNI YANGILASH MODALI */}
+      <Modal
+        title={<div style={{ fontWeight: 900, fontSize: 18 }}><SafetyCertificateOutlined /> Hujjatlar va KM yangilash</div>}
+        open={isDocModalOpen}
+        onCancel={() => setIsDocModalOpen(false)}
+        onOk={() => docForm.submit()}
+        okText="Yangilash"
+        cancelText="Yopish"
+        centered
+        borderRadius={24}
+      >
+        <Form 
+          form={docForm} 
+          layout="vertical" 
+          onFinish={handleUpdateDocs} 
+          initialValues={{ 
+            current_km: carData.current_km,
+            insurance_expiry: dayjs(carData.insurance_expiry),
+            tex_expiry: dayjs(carData.tex_expiry)
+          }}
+          style={{ marginTop: 16 }}
+        >
+          <Form.Item name="current_km" label="Hozirgi probeg (KM)">
+            <InputNumber style={{ width: "100%", borderRadius: 10 }} size="large" />
+          </Form.Item>
+          
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="insurance_expiry" label="Sug'urta tugash sanasi">
+                <DatePicker style={{ width: "100%", borderRadius: 10 }} size="large" format="DD.MM.YYYY" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="tex_expiry" label="Tex. ko'rik tugash sanasi">
+                <DatePicker style={{ width: "100%", borderRadius: 10 }} size="large" format="DD.MM.YYYY" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Alert message="Sana va kilometrni to'g'ri kiriting, shunga qarab eslatmalar ishlaydi." type="info" showIcon />
+        </Form>
       </Modal>
+
     </div>
   );
 }

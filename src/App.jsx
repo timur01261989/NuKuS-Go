@@ -15,6 +15,7 @@ import React, { Suspense, lazy } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ConfigProvider, Spin } from "antd";
 import { LanguageProvider } from "@shared/i18n/LanguageContext";
+import LanguageDomSync from "@shared/i18n/LanguageDomSync";
 import { AppModeProvider } from "./providers/AppModeProvider"; // ✅ NEW IMPORT
 import RoleGate from "@shared/routes/RoleGate";
 import "./styles/hdr-taxi.css";
@@ -84,6 +85,7 @@ export default function App() {
     <AppModeProvider>
       <ConfigProvider>
         <LanguageProvider>
+          <LanguageDomSync />
           <BrowserRouter>
             <Suspense fallback={<PageLoader />}>
               <Routes>
