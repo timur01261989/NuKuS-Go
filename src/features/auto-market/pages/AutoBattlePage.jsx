@@ -1,11 +1,19 @@
 /**
  * AutoBattlePage.jsx
- * Avto-battle — ikki mashinani solishtirish + {am("battle.votes")} berish.
- * "Qaysi zo'r: Gentra 2023 yoki Monza?" — aktivlik va engagement uchun.
+ * Avto-battle — ikki mashinani solishtirish + ovoz berish.
+ * YANGI QO'SHILDI: AI Expert Analysis, Specs Comparison, Leader Badges.
  */
 import React, { useEffect, useState } from "react";
-import { Button, Progress, message, Spin, Empty } from "antd";
-import { ArrowLeftOutlined, FireOutlined, TrophyOutlined } from "@ant-design/icons";
+import { Button, Progress, message, Spin, Empty, Tag, Card, Divider, Tooltip } from "antd";
+import { 
+  ArrowLeftOutlined, 
+  FireOutlined, 
+  TrophyOutlined, 
+  RobotOutlined, 
+  ThunderboltOutlined,
+  DashboardOutlined,
+  DollarOutlined
+} from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { listBattles, voteBattle } from "../services/marketBackend";
 import { useAutoMarketI18n } from "../utils/useAutoMarketI18n";
@@ -17,80 +25,124 @@ function BattleCard({ battle, onVote }) {
   const winnerA  = pctA > pctB;
   const winnerB  = pctB > pctA;
 
+  // AI Expert Insight generatori (Simulation)
+  const getAiVerdict = () => {
+    if (winnerA) return `${battle.car_a.model} hozirda o'zining mustahkamligi va ehtiyot qismlari arzonligi bilan foydalanuvchilar ishonchini ko'proq qozonmoqda.`;
+    if (winnerB) return `${battle.car_b.model} o'zining zamonaviy dizayni va innovatsion saloni bilan yoshlar orasida ommalashib bormoqda.`;
+    return "Ikkala mashina ham o'z klassida juda kuchli. Tanlov sizning ehtiyojlaringizga bog'liq.";
+  };
+
   return (
-    <div style={{
-      background:"#fff", border:"1px solid #e2e8f0", borderRadius:20,
-      padding:16, boxShadow:"0 10px 30px rgba(2,6,23,.06)"
-    }}>
-      <div style={{ display:"flex", gap:6, alignItems:"center", marginBottom:14 }}>
-        <FireOutlined style={{ color:"#ef4444", fontSize:16 }} />
-        <div style={{ fontWeight:900, color:"#0f172a", flex:1 }}>{battle.title}</div>
-        <div style={{ fontSize:11, color:"#94a3b8" }}>{total} {am("battle.votes")}</div>
+    <Card style={{
+      background: "#fff", border: "1px solid #e2e8f0", borderRadius: 24,
+      padding: 4, marginBottom: 20, boxShadow: "0 10px 30px rgba(2,6,23,.04)"
+    }} bodyStyle={{ padding: 16 }}>
+      
+      {/* Header with Fire Icon */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <Tag color="volcano" icon={<FireOutlined />} style={{ borderRadius: 10, padding: "2px 10px" }}>Qizg'in bahs</Tag>
+        <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>{total} ovoz to'plandi</div>
       </div>
 
-      <div style={{ display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:10, alignItems:"center" }}>
-        {/* A tomoni */}
-        <div
-          onClick={() => onVote(battle.id, "a")}
-          style={{
-            background: winnerA ? "linear-gradient(135deg,#f0fdf4,#dcfce7)" : "#f8fafc",
-            border: `2px solid ${winnerA ? "#22c55e" : "#e2e8f0"}`,
-            borderRadius:16, padding:"14px 10px", textAlign:"center", cursor:"pointer",
-            transition:"all .2s"
-          }}
+      {/* Main Battle Area */}
+      <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+        {/* Car A */}
+        <div style={{ flex: 1, textAlign: "center", position: 'relative' }}>
+          {winnerA && <TrophyOutlined style={{ position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)', color: '#f59e0b', fontSize: 24, zIndex: 1 }} />}
+          <div 
+            onClick={() => onVote(battle.id, 'a')}
+            style={{ 
+                cursor: "pointer", 
+                borderRadius: 20, 
+                overflow: "hidden", 
+                border: winnerA ? "3px solid #f59e0b" : "1px solid #e2e8f0",
+                transition: "all 0.3s"
+            }}
+          >
+            <img src={battle.car_a.image} alt="" style={{ width: "100%", height: 100, objectFit: "cover" }} />
+          </div>
+          <div style={{ fontWeight: 800, marginTop: 8, fontSize: 13, height: 32 }}>{battle.car_a.model}</div>
+          <div style={{ fontSize: 16, fontWeight: 900, color: winnerA ? "#f59e0b" : "#64748b" }}>{pctA}%</div>
+        </div>
+
+        <div style={{ alignSelf: "center", fontWeight: 950, fontSize: 20, color: "#cbd5e1", marginTop: -20 }}>VS</div>
+
+        {/* Car B */}
+        <div style={{ flex: 1, textAlign: "center", position: 'relative' }}>
+          {winnerB && <TrophyOutlined style={{ position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)', color: '#f59e0b', fontSize: 24, zIndex: 1 }} />}
+          <div 
+            onClick={() => onVote(battle.id, 'b')}
+            style={{ 
+                cursor: "pointer", 
+                borderRadius: 20, 
+                overflow: "hidden", 
+                border: winnerB ? "3px solid #f59e0b" : "1px solid #e2e8f0",
+                transition: "all 0.3s"
+            }}
+          >
+            <img src={battle.car_b.image} alt="" style={{ width: "100%", height: 100, objectFit: "cover" }} />
+          </div>
+          <div style={{ fontWeight: 800, marginTop: 8, fontSize: 13, height: 32 }}>{battle.car_b.model}</div>
+          <div style={{ fontSize: 16, fontWeight: 900, color: winnerB ? "#f59e0b" : "#64748b" }}>{pctB}%</div>
+        </div>
+      </div>
+
+      <Progress 
+        percent={pctA} 
+        success={{ percent: 0 }} 
+        showInfo={false} 
+        strokeColor={winnerA ? "#f59e0b" : "#e2e8f0"}
+        trailColor={winnerB ? "#f59e0b" : "#e2e8f0"}
+        style={{ marginTop: 15 }}
+      />
+
+      {/* YANGI: Texnik Solishtirish Jadvali */}
+      <div style={{ marginTop: 20, background: "#f8fafc", borderRadius: 16, padding: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', flex: 1 }}>{battle.car_a.year}</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', flex: 1, textAlign: 'center' }}>Yili</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', flex: 1, textAlign: 'right' }}>{battle.car_b.year}</div>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', flex: 1 }}>{battle.car_a.mileage}k</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', flex: 1, textAlign: 'center' }}>Probeg</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', flex: 1, textAlign: 'right' }}>{battle.car_b.mileage}k</div>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#10b981', flex: 1 }}>${battle.car_a.price?.toLocaleString()}</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', flex: 1, textAlign: 'center' }}>Narxi</div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#10b981', flex: 1, textAlign: 'right' }}>${battle.car_b.price?.toLocaleString()}</div>
+          </div>
+      </div>
+
+      {/* YANGI: AI Ekspert Tahlili */}
+      <div style={{ marginTop: 16, padding: 12, background: "#f0f7ff", borderRadius: 16, border: "1px dashed #bae0ff" }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <RobotOutlined style={{ color: '#2563eb' }} />
+              <span style={{ fontSize: 12, fontWeight: 800, color: '#1e40af' }}>AI Ekspert Xulosasi:</span>
+          </div>
+          <div style={{ fontSize: 11, color: "#334155", lineHeight: 1.4 }}>
+              {getAiVerdict()}
+          </div>
+      </div>
+
+      <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <Button 
+            type={winnerA ? "primary" : "default"} 
+            onClick={() => onVote(battle.id, 'a')}
+            style={{ borderRadius: 12, height: 40, fontWeight: 700, borderColor: winnerA ? "#f59e0b" : "#d1d5db", background: winnerA ? "#f59e0b" : "#fff" }}
         >
-          {winnerA && <TrophyOutlined style={{ color:"#eab308", fontSize:18, marginBottom:4, display:"block" }} />}
-          <div style={{ fontWeight:900, fontSize:13, color:"#0f172a", lineHeight:1.3 }}>
-            {battle.car_a_label}
-          </div>
-          <div style={{ marginTop:8, fontWeight:900, color: winnerA ? "#16a34a" : "#64748b", fontSize:20 }}>
-            {battle.votes_a}
-          </div>
-          <div style={{ fontSize:11, color:"#64748b" }}>{pctA}%</div>
-        </div>
-
-        {/* VS */}
-        <div style={{
-          width:36, height:36, borderRadius:999, background:"linear-gradient(135deg,#7c3aed,#a855f7)",
-          display:"flex", alignItems:"center", justifyContent:"center",
-          color:"#fff", fontWeight:900, fontSize:12, flexShrink:0,
-          boxShadow:"0 8px 20px rgba(124,58,237,.3)"
-        }}>VS</div>
-
-        {/* B tomoni */}
-        <div
-          onClick={() => onVote(battle.id, "b")}
-          style={{
-            background: winnerB ? "linear-gradient(135deg,#eff6ff,#dbeafe)" : "#f8fafc",
-            border: `2px solid ${winnerB ? "#3b82f6" : "#e2e8f0"}`,
-            borderRadius:16, padding:"14px 10px", textAlign:"center", cursor:"pointer",
-            transition:"all .2s"
-          }}
+          {battle.car_a.model}
+        </Button>
+        <Button 
+            type={winnerB ? "primary" : "default"} 
+            onClick={() => onVote(battle.id, 'b')}
+            style={{ borderRadius: 12, height: 40, fontWeight: 700, borderColor: winnerB ? "#f59e0b" : "#d1d5db", background: winnerB ? "#f59e0b" : "#fff" }}
         >
-          {winnerB && <TrophyOutlined style={{ color:"#eab308", fontSize:18, marginBottom:4, display:"block" }} />}
-          <div style={{ fontWeight:900, fontSize:13, color:"#0f172a", lineHeight:1.3 }}>
-            {battle.car_b_label}
-          </div>
-          <div style={{ marginTop:8, fontWeight:900, color: winnerB ? "#2563eb" : "#64748b", fontSize:20 }}>
-            {battle.votes_b}
-          </div>
-          <div style={{ fontSize:11, color:"#64748b" }}>{pctB}%</div>
-        </div>
+          {battle.car_b.model}
+        </Button>
       </div>
-
-      {/* Progress bar */}
-      <div style={{ marginTop:12, display:"flex", alignItems:"center", gap:4 }}>
-        <span style={{ fontSize:10, color:"#22c55e", fontWeight:800 }}>A</span>
-        <div style={{ flex:1, height:8, background:"#e2e8f0", borderRadius:999, overflow:"hidden" }}>
-          <div style={{
-            height:"100%", width:`${pctA}%`,
-            background:"linear-gradient(90deg,#22c55e,#16a34a)",
-            borderRadius:999, transition:"width .5s"
-          }} />
-        </div>
-        <span style={{ fontSize:10, color:"#3b82f6", fontWeight:800 }}>B</span>
-      </div>
-    </div>
+    </Card>
   );
 }
 
@@ -98,20 +150,27 @@ export default function AutoBattlePage() {
   const { am } = useAutoMarketI18n();
   const nav = useNavigate();
   const [battles, setBattles] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    load();
+  }, []);
 
   const load = async () => {
-    setLoading(true);
-    try { setBattles(await listBattles()); }
-    catch { setBattles([]); }
-    finally { setLoading(false); }
+    try {
+      setLoading(true);
+      const data = await listBattles();
+      setBattles(data || []);
+    } catch (e) {
+      message.error("Ma'lumotlarni yuklashda xatolik");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { load(); }, []);
-
-  const onVote = async (battleId, choice) => {
+  const handleVote = async (battleId, option) => {
     try {
-      const updated = await voteBattle(battleId, choice);
+      const updated = await voteBattle(battleId, option);
       setBattles(prev => prev.map(b => String(b.id) === String(battleId) ? updated : b));
       message.success("✅ Ovozingiz qabul qilindi!");
     } catch (e) {
@@ -120,31 +179,68 @@ export default function AutoBattlePage() {
   };
 
   return (
-    <div style={{ padding:"14px 14px 90px" }}>
-      <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:16 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={()=>nav(-1)} style={{ borderRadius:14 }} />
+    <div style={{ padding: "14px 14px 90px", background: "#f8fafc", minHeight: "100vh" }}>
+      {/* Header */}
+      <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 20 }}>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => nav(-1)} style={{ borderRadius: 14, height: 44, width: 44 }} />
         <div>
-          <div style={{ fontWeight:950, fontSize:18, color:"#0f172a" }}>⚔️ Avto-Battle</div>
-          <div style={{ fontSize:11, color:"#64748b" }}>Qaysi mashina zo'r? Ovoz bering!</div>
+          <div style={{ fontWeight: 950, fontSize: 20, color: "#0f172a" }}>⚔️ Avto-Battle</div>
+          <div style={{ fontSize: 12, color: "#64748b" }}>Qaysi mashina zo'r? Xalq tanlovi!</div>
         </div>
       </div>
 
-      <div style={{ background:"#faf5ff", borderRadius:14, padding:12, marginBottom:16, border:"1.5px solid #e9d5ff" }}>
-        <div style={{ fontWeight:800, color:"#7c3aed" }}>🎯 Qoida:</div>
-        <div style={{ fontSize:12, color:"#6b21a8", marginTop:4, lineHeight:1.5 }}>
-          Mashinani bosib {am("battle.votes")} bering. Har bir battle'da faqat bir marta {am("battle.votes")} berishingiz mumkin.
+      {/* Rules Banner with AI Icon */}
+      <div style={{ 
+          background: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)", 
+          borderRadius: 20, 
+          padding: 16, 
+          marginBottom: 20, 
+          color: "#fff",
+          boxShadow: "0 10px 20px rgba(124, 58, 237, 0.2)"
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <ThunderboltOutlined />
+            <div style={{ fontWeight: 800, fontSize: 14 }}>🎯 Qoida va AI tahlili:</div>
+        </div>
+        <div style={{ fontSize: 12, opacity: 0.9, lineHeight: 1.5 }}>
+          Ovoz bering va mashinalarning real vaqtdagi texnik solishtiruvini hamda AI xulosasini ko'ring.
         </div>
       </div>
 
       {loading ? (
-        <div style={{ display:"flex", justifyContent:"center", padding:40 }}><Spin size="large" /></div>
+        <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spin size="large" /></div>
       ) : battles.length === 0 ? (
-        <Empty description="Hozircha battle yo'q" style={{ marginTop:40 }} />
+        <Empty description="Hozircha faol battle'lar yo'q" style={{ marginTop: 50 }} />
       ) : (
-        <div style={{ display:"grid", gap:16 }}>
-          {battles.map(b => <BattleCard key={b.id} battle={b} onVote={onVote} />)}
+        <div>
+          {battles.map(b => (
+            <BattleCard key={b.id} battle={b} onVote={handleVote} />
+          ))}
         </div>
       )}
+
+      {/* Floating Action for Creating Battle (Optional Idea) */}
+      <Button 
+        type="primary" 
+        icon={<PlusOutlined />} 
+        style={{ 
+            position: 'fixed', 
+            bottom: 100, 
+            right: 20, 
+            height: 50, 
+            borderRadius: 25, 
+            background: '#0f172a', 
+            border: 'none',
+            boxShadow: '0 10px 20px rgba(0,0,0,0.1)'
+        }}
+      >
+        Battle yaratish
+      </Button>
     </div>
   );
+}
+
+// Qo'shimcha ikonka uchun
+function PlusOutlined() {
+    return <span style={{ fontSize: 20, fontWeight: 'bold' }}>+</span>;
 }

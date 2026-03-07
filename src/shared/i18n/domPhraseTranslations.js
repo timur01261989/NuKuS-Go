@@ -1,3 +1,5 @@
+import { translations } from '@i18n/translations';
+
 const PHRASES = {
 
   "Haydovchi qidirilmoqda": {
@@ -836,25 +838,200 @@ const PHRASES = {
 };
 
 function normalizeSpaces(text) {
-  return String(text || '').replace(/\s+/g, ' ').trim();
+  return String(text || '')
+    .replace(/[‘’ʻʼ`´]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/[—–]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
+function normalizeLookup(text) {
+  return normalizeSpaces(text)
+    .toLowerCase()
+    .replace(/[.!?,;:()[\]{}]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function flattenEntries(obj, prefix = '', out = []) {
+  if (!obj || typeof obj !== 'object') return out;
+  for (const [key, value] of Object.entries(obj)) {
+    const nextKey = prefix ? `${prefix}.${key}` : key;
+    if (typeof value === 'string') out.push([nextKey, value]);
+    else if (value && typeof value === 'object') flattenEntries(value, nextKey, out);
+  }
+  return out;
+}
+
+const TOKEN_MAPS = {
+  ru: {
+    "sozlamalar": "настройки", "sozlama": "настройка", "til": "язык", "tanlang": "выберите", "tanlash": "выбрать",
+    "buyurtma": "заказ", "buyurtmalar": "заказы", "buyurtmalarim": "мои заказы", "safari": "поездка", "safar": "поездка", "safarlar": "поездки",
+    "tarixi": "история", "yordam": "помощь", "wallet": "кошелек", "hamyon": "кошелек", "balans": "баланс", "analitika": "аналитика",
+    "kunlik": "ежедневные", "missiyalar": "миссии", "qollab-quvvatlash": "поддержка", "support": "поддержка", "online": "онлайн", "offline": "офлайн",
+    "yoqish": "включить", "ochirish": "удалить", "ochirildi": "удалено", "saqlash": "сохранить", "saqlandi": "сохранено", "bekor": "отмена", "qilish": "сделать",
+    "davom": "продолжить", "orqaga": "назад", "ortga": "назад", "qaytish": "вернуться", "xaritadan": "с карты", "xarita": "карта",
+    "manzil": "адрес", "manzillar": "адреса", "izoh": "комментарий", "vaqt": "время", "sana": "дата", "ayollar": "женщины", "uchun": "для",
+    "qayerdan": "откуда", "qayerga": "куда", "qayerge": "куда", "qayerden": "откуда", "narx": "цена", "summa": "сумма", "summasi": "сумма", "so'm": "сум", "som": "сум",
+    "shahar": "город", "viloyatlar": "области", "viloyatlararo": "межобластной", "viloyatlar": "области", "tumanlar": "районы", "tumanlararo": "межрайонный",
+    "yuk": "груз", "tashish": "перевозка", "eltish": "доставка", "xizmati": "сервис", "haydovchi": "водитель", "yolovchi": "пассажир", "yo'lovchi": "пассажир",
+    "kelgan": "входящие", "rejim": "режим", "faol": "активный", "faollashdi": "активировано", "tanlandi": "выбрано", "qoshish": "добавить", "tolov": "оплата", "turi": "тип",
+    "promokod": "промокод", "mening": "мои", "mening": "мои", "profil": "профиль", "ma'lumotlari": "данные", "malumotlari": "данные", "chiqish": "выход",
+    "qabul": "принять", "qabul qilish": "принять", "kelmoqda": "едет", "topildi": "найден", "qidirilmoqda": "поиск", "kutish": "ожидание", "yakunlash": "завершить"
+  },
+  en: {
+    "sozlamalar": "settings", "sozlama": "setting", "til": "language", "tanlang": "select", "tanlash": "select",
+    "buyurtma": "order", "buyurtmalar": "orders", "buyurtmalarim": "my orders", "safar": "trip", "safari": "trip", "safarlar": "trips",
+    "tarixi": "history", "yordam": "help", "wallet": "wallet", "hamyon": "wallet", "balans": "balance", "analitika": "analytics",
+    "kunlik": "daily", "missiyalar": "missions", "qollab-quvvatlash": "support", "support": "support", "online": "online", "offline": "offline",
+    "yoqish": "enable", "ochirish": "delete", "ochirildi": "deleted", "saqlash": "save", "saqlandi": "saved", "bekor": "cancel",
+    "davom": "continue", "orqaga": "back", "ortga": "back", "qaytish": "return", "xaritadan": "from map", "xarita": "map",
+    "manzil": "address", "manzillar": "addresses", "izoh": "comment", "vaqt": "time", "sana": "date", "ayollar": "women", "uchun": "for",
+    "qayerdan": "from", "qayerga": "to", "qayerge": "to", "qayerden": "from", "narx": "price", "summa": "amount", "summasi": "amount", "so'm": "sum", "som": "sum",
+    "shahar": "city", "viloyatlar": "regions", "viloyatlararo": "inter-regional", "tumanlar": "districts", "tumanlararo": "inter-district",
+    "yuk": "cargo", "tashish": "transport", "eltish": "delivery", "xizmati": "service", "haydovchi": "driver", "yolovchi": "passenger", "yo'lovchi": "passenger",
+    "kelgan": "incoming", "rejim": "mode", "faol": "active", "faollashdi": "activated", "tanlandi": "selected", "qoshish": "add", "tolov": "payment", "turi": "type",
+    "promokod": "promo code", "mening": "my", "profil": "profile", "ma'lumotlari": "details", "malumotlari": "details", "chiqish": "logout",
+    "qabul": "accept", "qabul qilish": "accept", "kelmoqda": "arriving", "topildi": "found", "qidirilmoqda": "searching", "kutish": "waiting", "yakunlash": "finish"
+  },
+};
+
+const DIRECT_PHRASE_HINTS = {
+  "Mening manzillarim": { ru: "Мои адреса", en: "My addresses" },
+  "Sayohatlar tarixi": { ru: "История поездок", en: "Trip history" },
+  "To'lov turi": { ru: "Способ оплаты", en: "Payment type" },
+  "Promokodi": { ru: "Промокод", en: "Promo code" },
+  "Yordam": { ru: "Помощь", en: "Help" },
+  "Xaritadan belgilash": { ru: "Указать на карте", en: "Pick on map" },
+  "Ayollar uchun": { ru: "Для женщин", en: "For women" },
+  "Sana va vaqt": { ru: "Дата и время", en: "Date and time" },
+  "Izoh yozish": { ru: "Комментарий", en: "Write a comment" },
+  "Buyurtma berish": { ru: "Сделать заказ", en: "Place order" },
+  "E'lon yaratish": { ru: "Создать объявление", en: "Create ad" },
+  "Tugmani bosing": { ru: "Нажмите кнопку", en: "Press the button" },
+  "Kunlik missiyalar": { ru: "Ежедневные миссии", en: "Daily missions" },
+  "Haydovchi ma'lumotlari": { ru: "Данные водителя", en: "Driver details" },
+  "Buyurtmalar tarixi": { ru: "История заказов", en: "Order history" },
+  "Viloyatlar aro": { ru: "Межобластные", en: "Inter-regional" },
+  "Tumanlar aro": { ru: "Межрайонные", en: "Inter-district" },
+  "Yuk tashish": { ru: "Грузоперевозки", en: "Freight" },
+  "Eltish xizmati": { ru: "Доставка", en: "Delivery service" },
+  "Shahar ichida taksi": { ru: "Городское такси", en: "City taxi" },
+  "Avto Savdo": { ru: "Авто-рынок", en: "Auto market" },
+};
+
 const PHRASE_KEYS = Object.keys(PHRASES).sort((a, b) => b.length - a.length);
+const TRANSLATION_KEYS = new Map();
+
+for (const [lang, dict] of Object.entries(translations || {})) {
+  for (const [key, value] of flattenEntries(dict)) {
+    if (typeof value !== 'string') continue;
+    const normalized = normalizeLookup(value);
+    if (!normalized) continue;
+    if (!TRANSLATION_KEYS.has(normalized)) TRANSLATION_KEYS.set(normalized, key);
+  }
+}
+
+for (const [source, targets] of Object.entries(DIRECT_PHRASE_HINTS)) {
+  for (const [lang, value] of Object.entries(targets)) {
+    const key = `__hint__.${source}`;
+    if (!translations[lang]) continue;
+    translations[lang][key] = value;
+    translations.uz_lotin[key] = source;
+    TRANSLATION_KEYS.set(normalizeLookup(source), key);
+  }
+}
+
+function translateByTranslationKey(language, source) {
+  const normalized = normalizeLookup(source);
+  const key = TRANSLATION_KEYS.get(normalized);
+  if (!key) return '';
+  return translations?.[language]?.[key] || translations?.uz_lotin?.[key] || '';
+}
+
+function replaceWholePhrase(out, phrase, translated) {
+  if (!translated || !phrase || phrase === translated) return out;
+  if (out.includes(phrase)) return out.split(phrase).join(translated);
+  return out;
+}
+
+function translitUzToCyrl(text) {
+  return String(text || '')
+    .replace(/O‘|O'|Oʻ/g, 'Ў').replace(/o‘|o'|oʻ/g, 'ў')
+    .replace(/G‘|G'|Gʻ/g, 'Ғ').replace(/g‘|g'|gʻ/g, 'ғ')
+    .replace(/Sh/g, 'Ш').replace(/sh/g, 'ш')
+    .replace(/Ch/g, 'Ч').replace(/ch/g, 'ч')
+    .replace(/Yo/g, 'Ё').replace(/yo/g, 'ё')
+    .replace(/Yu/g, 'Ю').replace(/yu/g, 'ю')
+    .replace(/Ya/g, 'Я').replace(/ya/g, 'я')
+    .replace(/A/g, 'А').replace(/a/g, 'а').replace(/B/g, 'Б').replace(/b/g, 'б')
+    .replace(/D/g, 'Д').replace(/d/g, 'д').replace(/E/g, 'Е').replace(/e/g, 'е')
+    .replace(/F/g, 'Ф').replace(/f/g, 'ф').replace(/H/g, 'Ҳ').replace(/h/g, 'ҳ')
+    .replace(/I/g, 'И').replace(/i/g, 'и').replace(/J/g, 'Ж').replace(/j/g, 'ж')
+    .replace(/K/g, 'К').replace(/k/g, 'к').replace(/L/g, 'Л').replace(/l/g, 'л')
+    .replace(/M/g, 'М').replace(/m/g, 'м').replace(/N/g, 'Н').replace(/n/g, 'н')
+    .replace(/O/g, 'О').replace(/o/g, 'о').replace(/P/g, 'П').replace(/p/g, 'п')
+    .replace(/Q/g, 'Қ').replace(/q/g, 'қ').replace(/R/g, 'Р').replace(/r/g, 'р')
+    .replace(/S/g, 'С').replace(/s/g, 'с').replace(/T/g, 'Т').replace(/t/g, 'т')
+    .replace(/U/g, 'У').replace(/u/g, 'у').replace(/V/g, 'В').replace(/v/g, 'в')
+    .replace(/X/g, 'Х').replace(/x/g, 'х').replace(/Y/g, 'Й').replace(/y/g, 'й')
+    .replace(/Z/g, 'З').replace(/z/g, 'з');
+}
+
+function escapeRegex(text) {
+  return String(text || '').replace(/[.*+?^${}()|[\]\\]/g, '\$&');
+}
+
+function translateTokens(language, input) {
+  let out = String(input || '');
+  if (!out) return out;
+
+  const tokenMap = TOKEN_MAPS[language];
+  if (tokenMap) {
+    const multiWord = Object.keys(tokenMap).sort((a, b) => b.length - a.length);
+    for (const source of multiWord) {
+      const target = tokenMap[source];
+      const re = new RegExp(`(^|[^\p{L}])(${escapeRegex(source)})(?=$|[^\p{L}])`, 'giu');
+      out = out.replace(re, (m, lead) => `${lead || ''}${target}`);
+    }
+  }
+
+  if ((language === 'uz_kirill' || language === 'qq_kirill') && /[A-Za-zʻʼ‘’]/.test(out)) {
+    out = translitUzToCyrl(out);
+  }
+
+  return out;
+}
 
 export function translatePhrase(language, input) {
   const text = String(input ?? '');
   if (!text || !language || language === 'uz_lotin') return text;
 
-  const exact = PHRASES[normalizeSpaces(text)]?.[language];
+  const normalizedText = normalizeSpaces(text);
+
+  const exact = PHRASES[normalizedText]?.[language];
   if (exact) return exact;
 
+  const exactByKey = translateByTranslationKey(language, normalizedText);
+  if (exactByKey) return exactByKey;
+
   let out = text;
+
   for (const phrase of PHRASE_KEYS) {
     const translated = PHRASES[phrase]?.[language];
-    if (!translated) continue;
-    if (out.includes(phrase)) {
-      out = out.split(phrase).join(translated);
-    }
+    out = replaceWholePhrase(out, phrase, translated);
   }
+
+  const translationPairs = Array.from(TRANSLATION_KEYS.entries()).sort((a, b) => b[0].length - a[0].length);
+  for (const [sourceText, key] of translationPairs) {
+    if (!sourceText || sourceText.length < 3) continue;
+    const translated = translations?.[language]?.[key] || translations?.uz_lotin?.[key];
+    if (!translated || normalizeLookup(translated) === sourceText) continue;
+    const normalizedOut = normalizeLookup(out);
+    if (normalizedOut === sourceText) return translated;
+  }
+
+  out = translateTokens(language, out);
   return out;
 }

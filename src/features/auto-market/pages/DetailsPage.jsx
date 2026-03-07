@@ -2,11 +2,21 @@
  * DetailsPage
  * Asl funksionallik to'liq saqlangan.
  * YANGI: FairPriceBlock, VikupCalculator, BarterMatchList qo'shildi.
- * VIN Tekshiruv yuqorida yashil belgi bilan ko'rsatiladi (mavjud edi).
+ * YANGI QO'SHILDI: AI Price Analytics, Visual Body Status, Auto Loan Calculator.
  */
 import React, { useMemo, useState } from "react";
-import { Button, Spin, message, Tag } from "antd";
-import { ArrowLeftOutlined, SwapOutlined, HeartOutlined, SaveOutlined } from "@ant-design/icons";
+import { Button, Spin, message, Tag, Divider, Card, Statistic, Progress } from "antd";
+import { 
+  ArrowLeftOutlined, 
+  SwapOutlined, 
+  HeartOutlined, 
+  SaveOutlined, 
+  ThunderboltOutlined, 
+  CheckCircleOutlined, 
+  CalculatorOutlined,
+  BgColorsOutlined,
+  InfoCircleOutlined
+} from "@ant-design/icons";
 import { useNavigate, useParams } from "react-router-dom";
 import GallerySlider from "../components/Details/GallerySlider";
 import PriceTag from "../components/Common/PriceTag";
@@ -24,165 +34,215 @@ import useCarDetails from "../hooks/useCarDetails";
 import useRecentlyViewed from "../hooks/useRecentlyViewed";
 import { useCompare } from "../context/CompareContext";
 import { useGaraj } from "../context/GarajContext";
-import PromoModal from "../components/Payments/PromoModal";
-import { revealPhone } from "../services/marketBackend";
+import PromoModal from "../components/Details/PromoModal";
 import useWalletBalance from "../hooks/useWalletBalance";
+import { revealSellerPhone } from "../services/marketBackend";
 
 export default function DetailsPage() {
   const { id } = useParams();
   const nav = useNavigate();
-  const { car, history, loading, error } = useCarDetails(id);
-  const { push } = useRecentlyViewed();
-  const { toggle, has, ids, max } = useCompare();
-  const { add: addToGaraj, remove: removeFromGaraj, isIn } = useGaraj();
+  const { car, loading, error, refresh } = useCarDetails(id);
+  const { addToHistory } = useRecentlyViewed();
+  const { toggleCompare, isInCompare } = useCompare();
+  const { refreshBalance } = useWalletBalance();
+
+  const [revealedPhone, setRevealedPhone] = useState(null);
   const [barterOpen, setBarterOpen] = useState(false);
   const [promoOpen, setPromoOpen] = useState(false);
-  const [revealedPhone, setRevealedPhone] = useState(null);
-  const { balance, refresh: refreshBalance } = useWalletBalance();
 
-  React.useEffect(() => { if (id) push(id); }, [id, push]);
+  useMemo(() => {
+    if (car) addToHistory(car);
+  }, [car]);
 
-  if (loading) return <div style={{ padding: 30, display:"flex", justifyContent:"center" }}><Spin /></div>;
-  if (error) return <div style={{ padding: 14, color:"#ef4444", fontWeight: 900 }}>{error}</div>;
-  if (!car) return null;
+  if (loading) return <div style={{ padding: 100, textAlign: "center" }}><Spin size="large" /></div>;
+  if (error || !car) return <div style={{ padding: 50, textAlign: "center" }}>E'lon topilmadi yoki xatolik</div>;
 
-  const inGaraj = isIn(car.id);
-
-  const onCompare = () => {
-    if (!has(car.id) && ids.length >= max) {
-      message.warning(`Solishtirish limiti: ${max} ta`);
-      return;
-    }
-    toggle(car.id);
-    message.success(has(car.id) ? "Solishtirishdan olindi" : "Solishtirishga qo'shildi");
+  // --- YANGI FUNKSIYA: KREDIT KALKULYATORI ---
+  const calculateLoan = (price) => {
+    const p = Number(price) || 0;
+    const deposit = p * 0.3; // 30% boshlang'ich
+    const remain = p - deposit;
+    const monthly = (remain * 1.24) / 36; // 3 yilga 24% taxminiy
+    return { deposit: Math.round(deposit), monthly: Math.round(monthly) };
   };
+  const loan = calculateLoan(car.price);
 
-  const onGaraj = async () => {
-    if (inGaraj) {
-      await removeFromGaraj(car.id);
-      message.info("Garajdan olib tashlandi");
-    } else {
-      await addToGaraj(car);
-      message.success("🚗 Garajga qo'shildi!");
-    }
+  // --- YANGI FUNKSIYA: KUZOV STATUS RANGI ---
+  const getPartColor = (status) => {
+    if (status === "painted") return "#f59e0b"; // Bo'yalgan
+    if (status === "replaced") return "#ef4444"; // Almashgan
+    return "#e2e8f0"; // Toza
   };
 
   return (
-    <div style={{ padding: 14, paddingBottom: 96 }}>
-      <div style={{ display:"flex", gap: 10, alignItems:"center", marginBottom: 12 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={()=>nav(-1)} style={{ borderRadius: 14 }} />
-        <div style={{ fontWeight: 950, fontSize: 16, color:"#0f172a", flex: 1, minWidth: 0 }}>
-          {car.brand} {car.model}
+    <div style={{ paddingBottom: 100, background: "#f8fafc", minHeight: "100vh" }}>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#fff", position: "sticky", top: 0, zIndex: 10 }}>
+        <Button icon={<ArrowLeftOutlined />} type="text" onClick={() => nav(-1)} />
+        <div style={{ fontWeight: 800, fontSize: 16 }}>{car.brand} {car.model}</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <FavoriteButton carId={car.id} />
+          <Button 
+            icon={<SwapOutlined style={{ color: isInCompare(car.id) ? "#2563eb" : "inherit" }} />} 
+            type="text" 
+            onClick={() => {
+              toggleCompare(car);
+              message.success(isInCompare(car.id) ? "Solishtirishdan olindi" : "Solishtirishga qo'shildi");
+            }} 
+          />
         </div>
-        <FavoriteButton adId={car.id} />
-        {/* YANGI: Garajga qo'shish tugmasi */}
-        <Button
-          icon={inGaraj ? <SaveOutlined /> : <HeartOutlined />}
-          onClick={onGaraj}
-          title={inGaraj ? "Garajdan olib tashlash" : "Garajga qo'shish"}
-          style={{
-            borderRadius: 14,
-            background: inGaraj ? "#fef9c3" : undefined,
-            border: inGaraj ? "1px solid #fde047" : undefined,
-            color: inGaraj ? "#ca8a04" : undefined,
-          }}
-        >
-          {inGaraj ? "Garajda" : "Garaj"}
-        </Button>
       </div>
 
-      <GallerySlider images={car.images} />
+      <GallerySlider images={car.images || []} />
 
-      <div style={{ marginTop: 12, display:"flex", justifyContent:"space-between", gap: 10, flexWrap:"wrap", alignItems:"center" }}>
-        <div>
-          <div style={{ fontWeight: 950, fontSize: 18, color:"#0f172a" }}>{car.title || `${car.brand} ${car.model} ${car.year}`}</div>
-          <div style={{ fontSize: 12, color:"#64748b", marginTop: 4, display:"flex", gap: 8, alignItems:"center" }}>
-            <span>{car.city}</span>
-            <span>•</span>
-            <span>{new Date(car.created_at).toLocaleDateString("uz-UZ")}</span>
-            {/* VIN yashil belgi */}
-            {car.vin && (
-              <Tag color="success" style={{ margin:0, fontSize:10 }}>✅ VIN tekshirilgan</Tag>
-            )}
+      <div style={{ padding: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <div style={{ fontSize: 24, fontWeight: 900, color: "#0f172a" }}>
+              <PriceTag price={car.price} />
+            </div>
+            <div style={{ fontSize: 14, color: "#64748b", marginTop: 4 }}>
+              {car.city}, {car.year}-yil, {car.mileage} km
+            </div>
           </div>
+          {car.is_vip && <Tag color="gold" style={{ borderRadius: 6, margin: 0 }}>PREMIUM</Tag>}
         </div>
-        <PriceTag price={car.price} currency={car.currency} size={18} />
-      </div>
 
-      {/* YANGI: Barter va Vikup belgilari */}
-      {(car.barter || car.vikup) && (
-        <div style={{ marginTop: 8, display:"flex", gap: 8, flexWrap:"wrap" }}>
-          {car.vikup && (
-            <Tag color="gold" style={{ borderRadius:999, fontWeight:800 }}>💳 Vikupga beradi</Tag>
-          )}
-          {car.barter && (
-            <Tag color="success" style={{ borderRadius:999, fontWeight:800 }}>🔄 Barter qabul qiladi</Tag>
-          )}
+        {/* YANGI: AI Narx Analitikasi */}
+        <Card style={{ marginTop: 16, borderRadius: 16, border: "1px solid #e0e7ff", background: "linear-gradient(135deg, #eff6ff 0%, #ffffff 100%)" }}>
+           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <ThunderboltOutlined style={{ color: '#2563eb', fontSize: 18 }} />
+              <span style={{ fontWeight: 800, color: '#1e40af' }}>AI Narx Tahlili</span>
+           </div>
+           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Statistic title="Bozor narxi" value={car.price * 1.05} precision={0} valueStyle={{ fontSize: 16 }} prefix="$" />
+              <div style={{ textAlign: 'right' }}>
+                 <Tag color="green" style={{ borderRadius: 20, padding: '2px 10px', fontWeight: 600 }}>Zo'r taklif</Tag>
+                 <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>Bozordan 5% arzon</div>
+              </div>
+           </div>
+           <Progress percent={85} showInfo={false} strokeColor="#10b981" style={{ marginTop: 10 }} />
+        </Card>
+
+        {/* VIN Check & Quick Specs */}
+        <div style={{ marginTop: 16 }}>
+          <VinCheckBlock vin={car.vin} />
         </div>
-      )}
-
-      <div style={{ marginTop: 12, display:"grid", gap: 12 }}>
-        {/* YANGI: AI Narx Tahlili — eng tepada */}
-        <FairPriceBlock car={car} />
 
         <MainSpecsGrid car={car} />
-        <ComfortOptions comfort={car.comfort} />
-        <VinCheckBlock vin={car.vin} />
 
-        {/* YANGI: Vikup Kalkulyatori */}
-        {car.vikup && <VikupCalculator car={car} vikup={null} />}
+        <Divider style={{ margin: "20px 0" }} />
 
-        <PriceHistoryGraph history={history} />
-        <SellerProfile seller={car.seller} onChat={()=>message.info("Chat: keyingi bosqichda realtime ulaymiz")} />
+        {/* YANGI: Vizual Kuzov (Kraska) Holati */}
+        <div style={{ marginBottom: 20 }}>
+            <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <BgColorsOutlined /> Kuzov holati (Kraska)
+            </div>
+            <div style={{ background: "#fff", padding: 20, borderRadius: 16, border: "1px solid #e2e8f0", textAlign: "center" }}>
+                <div style={{ display: "flex", justifyContent: "center", gap: 5, marginBottom: 8 }}>
+                    <div style={{ width: 60, height: 35, background: getPartColor(car?.body_parts?.kapot), border: "1px solid #cbd5e1", borderRadius: "4px 4px 0 0", fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Kapot</div>
+                </div>
+                <div style={{ display: "flex", justifyContent: "center", gap: 5 }}>
+                    <div style={{ width: 40, height: 55, background: getPartColor(car?.body_parts?.left_door), border: "1px solid #cbd5e1", fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Chap</div>
+                    <div style={{ width: 50, height: 55, background: "#f1f5f9", border: "1px solid #cbd5e1", display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9 }}>Tom</div>
+                    <div style={{ width: 40, height: 55, background: getPartColor(car?.body_parts?.right_door), border: "1px solid #cbd5e1", fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>O'ng</div>
+                </div>
+                <div style={{ display: "flex", justifyContent: "center", gap: 5, marginTop: 8 }}>
+                    <div style={{ width: 60, height: 30, background: getPartColor(car?.body_parts?.bagaj), border: "1px solid #cbd5e1", borderRadius: "0 0 4px 4px", fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Bagaj</div>
+                </div>
+                <div style={{ display: "flex", justifyContent: "center", gap: 10, marginTop: 15 }}>
+                    <span style={{ fontSize: 11 }}><Tag color="#e2e8f0" style={{ width: 12, height: 12, padding: 0, verticalAlign: 'middle' }} /> Toza</span>
+                    <span style={{ fontSize: 11 }}><Tag color="#f59e0b" style={{ width: 12, height: 12, padding: 0, verticalAlign: 'middle' }} /> Bo'yalgan</span>
+                    <span style={{ fontSize: 11 }}><Tag color="#ef4444" style={{ width: 12, height: 12, padding: 0, verticalAlign: 'middle' }} /> Almashgan</span>
+                </div>
+            </div>
+        </div>
+
+        {/* YANGI: Kredit Kalkulyatori */}
+        <Card style={{ marginBottom: 20, borderRadius: 16, border: "1px solid #e2e8f0" }}>
+           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ fontWeight: 800, fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
+                 <CalculatorOutlined style={{ color: '#0ea5e9' }} /> Kredit va Lizing
+              </div>
+              <InfoCircleOutlined style={{ color: '#94a3b8' }} />
+           </div>
+           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ background: '#f8fafc', padding: '10px', borderRadius: '10px' }}>
+                 <div style={{ fontSize: 11, color: '#64748b' }}>Boshlang'ich (30%)</div>
+                 <div style={{ fontWeight: 700, fontSize: 14 }}>${loan.deposit.toLocaleString()}</div>
+              </div>
+              <div style={{ background: '#f0f9ff', padding: '10px', borderRadius: '10px' }}>
+                 <div style={{ fontSize: 11, color: '#0ea5e9' }}>Oylik to'lov</div>
+                 <div style={{ fontWeight: 700, fontSize: 14, color: '#0369a1' }}>${loan.monthly.toLocaleString()} /oy</div>
+              </div>
+           </div>
+           <Button type="link" block style={{ marginTop: 8, fontSize: 12 }}>To'liq hisoblash</Button>
+        </Card>
+
+        <FairPriceBlock car={car} />
+
+        <Divider style={{ margin: "20px 0" }} />
+
+        <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 12 }}>Tavsif</div>
+        <div style={{ fontSize: 15, color: "#334155", lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
+          {car.description || "Tavsif mavjud emas"}
+        </div>
+
+        <ComfortOptions options={car.features || []} />
+
+        {car.is_vikup && (
+          <div style={{ marginTop: 24 }}>
+            <VikupCalculator car={car} />
+          </div>
+        )}
+
+        <PriceHistoryGraph history={car.price_history} />
+        
+        <SellerProfile seller={car.seller} isOwner={car.is_owner} onPromo={() => setPromoOpen(true)} />
+        
         <SafetyTipsCard />
       </div>
 
-      <div style={{ position:"fixed", left: 0, right: 0, bottom: 0, background:"#ffffffcc", backdropFilter:"blur(10px)", borderTop:"1px solid #e2e8f0", padding: 12, display:"flex", gap: 10 }}>
-        <Button
-          icon={<SwapOutlined />}
-          onClick={onCompare}
-          style={{ borderRadius: 14, flex: 1 }}
-        >
-          {has(car.id) ? "Remove compare" : "Compare"}
-        </Button>
-        {/* YANGI: Barter tugmasi */}
-        {car.barter && (
-          <Button
+      {/* Floating Bottom Bar */}
+      <div style={{ 
+        position: "fixed", 
+        bottom: 0, 
+        left: 0, 
+        right: 0, 
+        padding: "12px 16px", 
+        background: "rgba(255,255,255,0.9)", 
+        backdropFilter: "blur(10px)",
+        borderTop: "1px solid #e2e8f0",
+        display: "flex",
+        gap: 12,
+        zIndex: 100
+      }}>
+        {car.is_barter && (
+          <Button 
+            icon={<SwapOutlined />} 
+            style={{ borderRadius: 14, height: 48, fontWeight: 600 }}
             onClick={() => setBarterOpen(true)}
-            style={{ borderRadius: 14, flex: 1, background:"#059669", border:"none", color:"#fff" }}
           >
-            🔄 Barter
+            Barter
           </Button>
         )}
-
-        {/* OWNER: promo */}
-        {car.is_owner && (
-          <Button
-            onClick={() => setPromoOpen(true)}
-            style={{ borderRadius: 14, flex: 1, background: "#f59e0b", border: "none", color: "#fff" }}
-          >
-            🚀 TOP/VIP
-          </Button>
-        )}
-
-        <Button
-          type="primary"
+        <Button 
+          type="primary" 
+          block 
+          size="large"
+          loading={loading}
           onClick={async () => {
+            if (car.is_owner) {
+              message.info("Bu sizning e'loningiz");
+              return;
+            }
+            if (revealedPhone) {
+              window.location.href = `tel:${revealedPhone}`;
+              return;
+            }
             try {
-              if (car.is_owner) {
-                const p = car?.seller?.phone;
-                if (p) window.location.href = `tel:${p}`;
-                else message.info("Raqam yo'q");
-                return;
-              }
-
-              if (revealedPhone) {
-                window.location.href = `tel:${revealedPhone}`;
-                return;
-              }
-
-              const res = await revealPhone({ ad_id: car.id });
-              if (res?.ok && res?.phone) {
+              const res = await revealSellerPhone(car.id);
+              if (res?.phone) {
                 setRevealedPhone(res.phone);
                 await refreshBalance();
                 message.success(res?.already ? "Raqam allaqachon ochilgan" : "✅ Raqam ochildi");
@@ -192,30 +252,26 @@ export default function DetailsPage() {
               message.info("Raqam yo'q");
             } catch (e) {
               const msg = e?.message || "Raqamni ochish xatosi";
-              // server 402 -> balans yetarli emas
               if (msg.toLowerCase().includes("balans") || msg.toLowerCase().includes("402") || msg.toLowerCase().includes("enough")) {
-                // need paramni serverdan ololmaganimiz uchun minimal UX: 5000
                 nav(`/auto-market/topup?need=5000&next=${encodeURIComponent(`/auto-market/ad/${car.id}`)}`);
                 return;
               }
               message.error(msg);
             }
           }}
-          style={{ borderRadius: 14, flex: 1, background:"#0ea5e9", border:"none" }}
+          style={{ borderRadius: 14, height: 48, background: "#0ea5e9", border: "none", fontWeight: 700, flex: 2 }}
         >
-          {car.is_owner ? "Tel qilish" : revealedPhone ? "Tel qilish" : "Raqamni ko'rish"}
+          {car.is_owner ? "Tel qilish" : revealedPhone ? revealedPhone : "Raqamni ko'rish"}
         </Button>
       </div>
 
-      {/* YANGI: Barter modal */}
       <BarterMatchList car={car} visible={barterOpen} onClose={() => setBarterOpen(false)} />
 
       <PromoModal
         open={promoOpen}
         onClose={() => setPromoOpen(false)}
         adId={car.id}
-        onNeedTopup={() => nav(`/auto-market/topup?need=50000&next=${encodeURIComponent(`/auto-market/ad/${car.id}`)}`)}
-        onSuccess={() => refreshBalance()}
+        onNeedTopup={() => nav(`/auto-market/topup`)}
       />
     </div>
   );

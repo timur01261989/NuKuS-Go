@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Divider, Select, Switch, Typography, message, Segmented } from 'antd';
 import { useLanguage } from '@shared/i18n/useLanguage';
+import { getLocalizedLanguages } from '@shared/i18n/languages';
 import PageBackButton from '@/shared/components/PageBackButton';
 import { useLocation } from 'react-router-dom';
 
@@ -17,7 +18,8 @@ function safeBoolFromLS(v, fallback = true) {
 }
 
 export default function Settings() {
-  const { langKey, setLanguage, t, availableLanguages } = useLanguage();
+  const { langKey, setLanguage, t } = useLanguage();
+  const localizedLanguages = useMemo(() => getLocalizedLanguages(langKey), [langKey]);
   const location = useLocation();
   const backFallback = useMemo(() => (location.pathname.startsWith('/driver') ? '/driver/dashboard' : '/client/home'), [location.pathname]);
   const [nightMode, setNightMode] = useState('auto');
@@ -63,7 +65,7 @@ export default function Settings() {
       <Card style={{ borderRadius: 16 }}>
         <Text strong>{t.language}</Text>
         <div style={{ marginTop: 8 }}>
-          <Select value={langKey} options={availableLanguages.map((lang) => ({ value: lang.key, label: lang.label }))} style={{ width: '100%' }} onChange={onLang} />
+          <Select key={langKey} value={langKey} options={localizedLanguages.map((lang) => ({ value: lang.key, label: lang.label }))} style={{ width: '100%' }} onChange={onLang} optionLabelProp="label" popupMatchSelectWidth={false} />
         </div>
 
         <Divider />

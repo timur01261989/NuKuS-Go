@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useEffect, useMemo, useState } from 'react';
 import { translations } from '@i18n/translations';
 import { createTranslator } from './createTranslator';
-import { AVAILABLE_LANGUAGES, DEFAULT_LANGUAGE, normalizeLanguageKey, getLanguageMeta } from './languages';
+import { AVAILABLE_LANGUAGES, DEFAULT_LANGUAGE, normalizeLanguageKey, getLanguageMeta, getLocalizedLanguages } from './languages';
 
 const STORAGE_KEY = 'appLang';
 
@@ -65,7 +65,7 @@ export function LanguageProvider({ children }) {
       setLangKey: setLanguage,
       t: proxy,
       tr,
-      availableLanguages: AVAILABLE_LANGUAGES,
+      availableLanguages: getLocalizedLanguages(language),
       currentLanguageMeta: getLanguageMeta(language),
     };
   }, [language, setLanguage]);

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { message } from 'antd';
 import { useLanguage } from '@shared/i18n/useLanguage';
+import { getLocalizedLanguages } from '@shared/i18n/languages';
 import { supabase } from '@/lib/supabase';
 import { useAppMode } from '@/providers/AppModeProvider';
 
@@ -13,7 +14,8 @@ export default function Auth() {
   const [remember, setRemember] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const { langKey, setLanguage, t, availableLanguages } = useLanguage();
+  const { langKey, setLanguage, t } = useLanguage();
+  const localizedLanguages = React.useMemo(() => getLocalizedLanguages(langKey), [langKey]);
   const { appMode } = useAppMode();
 
   useEffect(() => {
@@ -207,15 +209,17 @@ export default function Auth() {
 
           <div className="mt-6 inline-flex items-center space-x-2 bg-white/50 px-3 py-1 rounded-full border border-white/20">
             <select
+              key={langKey}
               value={langKey}
               onChange={(e) => {
-                setLanguage(e.target.value);
-                message.success(t.languageChanged);
+                const nextLang = e.target.value;
+                setLanguage(nextLang);
+                setTimeout(() => message.success(getLocalizedLanguages(nextLang).find((x) => x.key === nextLang)?.label || t.languageChanged), 0);
               }}
               className="bg-transparent text-xs font-bold text-gray-500 outline-none cursor-pointer"
               aria-label={t.language}
             >
-              {availableLanguages.map((l) => (
+              {localizedLanguages.map((l) => (
                 <option key={l.key} value={l.key}>
                   {l.label}
                 </option>

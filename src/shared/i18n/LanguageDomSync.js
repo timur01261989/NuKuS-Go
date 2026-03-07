@@ -32,7 +32,7 @@ function translateTextNode(node, language) {
 
 function translateAttributes(el, language) {
   if (!el || !el.getAttribute || SKIP_TAGS.has(el.tagName)) return;
-  const attrs = ['placeholder', 'title', 'aria-label'];
+  const attrs = ['placeholder', 'title', 'aria-label', 'value', 'alt', 'data-placeholder'];
   let store = attrOriginals.get(el);
   if (!store) {
     store = {};
@@ -43,9 +43,19 @@ function translateAttributes(el, language) {
     const value = el.getAttribute(attr);
     if (!value) continue;
     if (!(attr in store)) store[attr] = value;
+    if (attr === 'value') {
+      const type = (el.getAttribute('type') || '').toLowerCase();
+      const tag = (el.tagName || '').toUpperCase();
+      const isVisibleValue = tag === 'BUTTON' || type === 'button' || type === 'submit' || type === 'reset';
+      if (!isVisibleValue) continue;
+    }
     const translated = translatePhrase(language, store[attr]);
     if (translated && translated !== value) {
       el.setAttribute(attr, translated);
+      if (attr === 'value' && 'value' in el) { try { el.value = translated; } catch {} }
+      if (attr === 'placeholder' && 'placeholder' in el) { try { el.placeholder = translated; } catch {} }
+      if (attr === 'title' && 'title' in el) { try { el.title = translated; } catch {} }
+      if (attr === 'alt' && 'alt' in el) { try { el.alt = translated; } catch {} }
     }
   }
 }
@@ -86,6 +96,7 @@ export default function LanguageDomSync() {
         }
         if (mutation.type === 'attributes' && mutation.target?.nodeType === 1) {
           translateAttributes(mutation.target, language);
+          walk(mutation.target, language);
           continue;
         }
         mutation.addedNodes?.forEach((node) => walk(node, language));
@@ -97,7 +108,7 @@ export default function LanguageDomSync() {
       childList: true,
       characterData: true,
       attributes: true,
-      attributeFilter: ['placeholder', 'title', 'aria-label'],
+      attributeFilter: ['placeholder', 'title', 'aria-label', 'value', 'alt', 'data-placeholder'],
     });
 
     return () => observer.disconnect();
