@@ -48,7 +48,65 @@ function normalizeAdRow(row) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Cars / Ads
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// YANGI: PUL BILAN BOG'LIQ XIZMATLAR (PROMOTE, PHONE, WALLET)
+// ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * E'lonni ko'tarish (Promotion) - PromoModal ishlatadi
+ */
+export const promoteAd = async (adId, promoType) => {
+  try {
+    const { data } = await axiosClient.post('/market/promote', {
+      ad_id: adId,
+      promo_type: promoType
+    });
+    return data;
+  } catch (err) {
+    console.error("Promote Error:", err);
+    if (mock.promoteAd) return mock.promoteAd(adId, promoType);
+    throw new Error(err.response?.data?.message || "Balans yetarli emas yoki tizim xatosi");
+  }
+};
+const marketBackend = {
+  listCars,
+  getCarList,
+  getCarById,
+  getCarDetails,
+  createCarAd,
+  
+  // SHU YERGA QO'SHING:
+  promoteAd,
+  revealSellerPhone,
+  getWalletBalance,
+  
+  // ... qolgan eski funksiyalar (listBattles, analyzeFairPrice va h.k.)
+};
+/**
+ * Sotuvchi telefon raqamini ko'rish (Pullik xizmat)
+ */
+export const revealSellerPhone = async (adId) => {
+  try {
+    const { data } = await axiosClient.post('/market/reveal-phone', { ad_id: adId });
+    return data; 
+  } catch (err) {
+    console.error("Reveal Phone Error:", err);
+    throw new Error(err.response?.data?.message || "402");
+  }
+};
+
+/**
+ * Foydalanuvchi hamyon balansini olish
+ */
+export const getWalletBalance = async () => {
+  try {
+    const { data } = await axiosClient.get('/user/wallet');
+    return data; 
+  } catch (err) {
+    console.error("Wallet Balance Fetch Error:", err);
+    return { balance: 0 };
+  }
+};
 export async function listCars(filters = {}, { page = 1, pageSize = 12 } = {}) {
   if (!SB_READY) return mock.listCars(filters, { page, pageSize });
 
