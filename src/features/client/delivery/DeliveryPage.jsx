@@ -30,6 +30,7 @@ import { MapContainer, Marker, TileLayer, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 
 import { useAuth } from "@/shared/auth/AuthProvider";
+import { useLanguage } from "@/shared/i18n/useLanguage";
 import RegionDistrictSelect from "@/shared/components/RegionDistrictSelect";
 import { useContacts } from "./hooks/useContacts";
 import {
@@ -113,6 +114,7 @@ function MapPickerEvents({ onPick }) {
 }
 
 function PhoneField({ value, onChange, placeholder = "90 123 45 67", onSelectContact }) {
+  const { t } = useLanguage();
   return (
     <div style={{ display: "grid", gridTemplateColumns: "92px 1fr auto", gap: 8 }}>
       <Input value="+998" disabled style={{ textAlign: "center", fontWeight: 800 }} />
@@ -124,28 +126,27 @@ function PhoneField({ value, onChange, placeholder = "90 123 45 67", onSelectCon
         maxLength={12}
         prefix={<PhoneOutlined />}
       />
-      <Button icon={<UserOutlined />} onClick={onSelectContact}>
-        Kontakt
-      </Button>
+      <Button icon={<UserOutlined />} onClick={onSelectContact}>{t.contact}</Button>
     </div>
   );
 }
 
 function ContactPickerModal({ open, onClose, contacts, onPick, loading }) {
+  const { t } = useLanguage();
   return (
-    <Modal title="Kontakt tanlash" open={open} footer={null} onCancel={onClose}>
+    <Modal title={t.contactSelect} open={open} footer={null} onCancel={onClose}>
       <List
         loading={loading}
         dataSource={contacts}
-        locale={{ emptyText: "Kontakt topilmadi" }}
+        locale={{ emptyText: t.noContacts }}
         renderItem={(item) => (
           <List.Item
             style={{ cursor: "pointer", paddingInline: 8, borderRadius: 12 }}
             onClick={() => onPick?.(item)}
           >
             <List.Item.Meta
-              title={item.name || "Kontakt"}
-              description={item.phone || "Telefon yo‘q"}
+              title={item.name || t.contact}
+              description={item.phone || t.noPhone}
             />
           </List.Item>
         )}
@@ -162,6 +163,7 @@ function LocationPickerDrawer({
   onClose,
   onConfirm,
 }) {
+  const { t } = useLanguage();
   const [point, setPoint] = useState(value || null);
 
   useEffect(() => {
@@ -178,38 +180,36 @@ function LocationPickerDrawer({
         </MapContainer>
       </div>
       <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-        <Button block onClick={onClose}>
-          Bekor qilish
-        </Button>
-        <Button type="primary" block disabled={!point} onClick={() => onConfirm?.(point)}>
-          Manzilni saqlash
-        </Button>
+        <Button block onClick={onClose}>{t.cancelAction}</Button>
+        <Button type="primary" block disabled={!point} onClick={() => onConfirm?.(point)}>{t.saveAddress}</Button>
       </div>
     </Drawer>
   );
 }
 
 function ServiceInfoCard({ serviceMode, pickupMode, dropoffMode, matchedTripTitle }) {
-  const label = DELIVERY_SERVICE_MODES.find((item) => item.key === serviceMode)?.label || "Eltish";
+  const { t } = useLanguage();
+  const label = DELIVERY_SERVICE_MODES.find((item) => item.key === serviceMode)?.label || t.deliveryTitle;
   return (
     <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
       <Space direction="vertical" size={6} style={{ width: "100%" }}>
         <Space wrap>
           <Tag color="blue">{label}</Tag>
           <Tag color={pickupMode === "precise" ? "gold" : "default"}>
-            Olish: {pickupMode === "precise" ? "aniq manzil" : "standart nuqta"}
+            {`${t.pickup}: ${pickupMode === "precise" ? t.exactAddress : t.standardPoint}`}
           </Tag>
           <Tag color={dropoffMode === "precise" ? "purple" : "default"}>
-            Topshirish: {dropoffMode === "precise" ? "aniq manzil" : "standart nuqta"}
+            {`${t.dropoff}: ${dropoffMode === "precise" ? t.exactAddress : t.standardPoint}`}
           </Tag>
         </Space>
-        {matchedTripTitle ? <Text type="secondary">Mos reys: {matchedTripTitle}</Text> : null}
+        {matchedTripTitle ? <Text type="secondary">{`${t.matchedTrip}: ${matchedTripTitle}`}</Text> : null}
       </Space>
     </Card>
   );
 }
 
 function OrderCard({ order, onEdit, onDelete }) {
+  const { t } = useLanguage();
   const steps = getDeliveryStatusSteps(order.status);
   return (
     <Card
@@ -224,7 +224,7 @@ function OrderCard({ order, onEdit, onDelete }) {
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontWeight: 900, fontSize: 18 }}>{Number(order.price || 0).toLocaleString("uz-UZ")} so‘m</div>
-            <Text type="secondary">Naqd • komissiya {Number(order.commission_amount || 0).toLocaleString("uz-UZ")}</Text>
+            <Text type="secondary">{t.cash} • {t.commission} {Number(order.commission_amount || 0).toLocaleString("uz-UZ")}</Text>
           </div>
         </div>
 
@@ -236,8 +236,8 @@ function OrderCard({ order, onEdit, onDelete }) {
         />
 
         <div style={{ display: "grid", gap: 6 }}>
-          <div><b>Qaerdan:</b> {order.pickup_label}</div>
-          <div><b>Qaerga:</b> {order.dropoff_label}</div>
+          <div><b>{t.fromLabel}:</b> {order.pickup_label}</div>
+          <div><b>{t.toLabel}:</b> {order.dropoff_label}</div>
           <div><b>Qabul qiluvchi:</b> {order.receiver_name} — +998 {formatUzPhoneLabel(order.receiver_phone)}</div>
         </div>
 
@@ -445,7 +445,7 @@ export default function DeliveryPage({ onBack }) {
       } else {
         const order = await createDeliveryOrder(payloadFromState());
         setOrders((prev) => [order, ...prev]);
-        message.success("Eltish buyurtmasi yaratildi");
+        message.success(`${t.deliveryTitle} yaratildi`);
       }
       resetForm();
     } catch (error) {

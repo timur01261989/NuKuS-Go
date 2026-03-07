@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Divider, Select, Switch, Typography, message, Segmented } from 'antd';
 import { useLanguage } from '@shared/i18n/useLanguage';
-import { getLocalizedLanguages } from '@shared/i18n/languages';
+import { getLocalizedLanguages, getLocalizedLanguageLabel } from '@shared/i18n/languages';
 import PageBackButton from '@/shared/components/PageBackButton';
 import { useLocation } from 'react-router-dom';
 
@@ -65,7 +65,7 @@ export default function Settings() {
       <Card style={{ borderRadius: 16 }}>
         <Text strong>{t.language}</Text>
         <div style={{ marginTop: 8 }}>
-          <Select key={langKey} value={langKey} options={localizedLanguages.map((lang) => ({ value: lang.key, label: lang.label }))} style={{ width: '100%' }} onChange={onLang} optionLabelProp="label" popupMatchSelectWidth={false} />
+          <Select key={langKey} value={langKey} options={localizedLanguages.map((lang) => ({ value: lang.key, label: lang.label }))} style={{ width: '100%' }} onChange={onLang} optionLabelProp="label" popupMatchSelectWidth={false} labelRender={({ value }) => getLocalizedLanguageLabel(value, langKey)} />
         </div>
 
         <Divider />

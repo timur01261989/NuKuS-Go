@@ -3,6 +3,7 @@ import { Button, Card, Input, List, Space, Typography, Alert, Tag } from "antd";
 import { useLocation, useParams } from "react-router-dom";
 import { createOrFindSupportThread, getSupportThread, sendSupportMessage } from "../../services/supportApi";
 import { supabase } from "../../lib/supabase";
+import { useLanguage } from "@/shared/i18n/useLanguage";
 
 const { Title, Text } = Typography;
 
@@ -32,6 +33,7 @@ export default function SupportChatPage({ role, orderId: orderIdProp }) {
   const bottomRef = useRef(null);
 
   const senderRole = role || (location.pathname.startsWith("/driver") ? "driver" : "client");
+  const { t } = useLanguage();
 
   useEffect(() => {
     let cancelled = false;
@@ -120,16 +122,16 @@ export default function SupportChatPage({ role, orderId: orderIdProp }) {
       <Space direction="vertical" size={12} style={{ width: "100%" }}>
         <div>
           <Title level={3} style={{ marginBottom: 0 }}>
-            Support Chat
+            {t.supportChatTitle}
           </Title>
           <Space size={8}>
-            <Text type="secondary">Order:</Text>
+            <Text type="secondary">{t.orderLabel}:</Text>
             <Tag>{orderId || "—"}</Tag>
-            <Text type="secondary">Role:</Text>
+            <Text type="secondary">{t.roleLabel}:</Text>
             <Tag color="blue">{senderRole}</Tag>
             {threadId ? (
               <>
-                <Text type="secondary">Thread:</Text>
+                <Text type="secondary">{t.threadLabel}:</Text>
                 <Tag color="green">{threadId}</Tag>
               </>
             ) : null}
@@ -142,7 +144,7 @@ export default function SupportChatPage({ role, orderId: orderIdProp }) {
           <div style={{ maxHeight: 420, overflowY: "auto", padding: 12 }}>
             <List
               dataSource={thread?.messages || thread?.data?.messages || []}
-              locale={{ emptyText: "Hozircha xabar yo‘q" }}
+              locale={{ emptyText: t.noMessages }}
               renderItem={(it) => {
                 const mine = (it.sender_id || it.senderId) === me?.id;
                 const roleLabel = it.sender_role || it.senderRole || "user";
@@ -159,7 +161,7 @@ export default function SupportChatPage({ role, orderId: orderIdProp }) {
                       >
                         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                           <Text strong style={{ fontSize: 12 }}>
-                            {mine ? "You" : roleLabel}
+                            {mine ? t.you : roleLabel}
                           </Text>
                           <Text type="secondary" style={{ fontSize: 11 }}>
                             {it.created_at ? new Date(it.created_at).toLocaleString() : ""}
@@ -179,17 +181,17 @@ export default function SupportChatPage({ role, orderId: orderIdProp }) {
         <Card>
           <Space.Compact style={{ width: "100%" }}>
             <Input
-              placeholder="Xabar yozing…"
+              placeholder={t.writeMessage}
               value={msg}
               onChange={(e) => setMsg(e.target.value)}
               onPressEnter={onSend}
               disabled={loading}
             />
             <Button type="primary" onClick={onSend} loading={loading}>
-              Yuborish
+              {t.send}
             </Button>
             <Button onClick={() => refresh()} disabled={!threadId || loading}>
-              Yangilash
+              {t.refresh}
             </Button>
           </Space.Compact>
         </Card>

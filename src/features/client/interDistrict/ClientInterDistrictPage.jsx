@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useLanguage } from "@/shared/i18n/useLanguage";
 import { Button, Divider, Drawer, message, Typography, Card, Popconfirm } from "antd"; // Card va Popconfirm qo'shildi
 import DistrictHeader from "./components/Header/DistrictHeader";
 import DistrictList from "./components/Selection/DistrictList";
@@ -36,6 +37,7 @@ const pinIcon = (color = "#1677ff") =>
   });
 
 function MapPicker({ open, onClose, initialPoint, onPick }) {
+  const { t } = useLanguage();
   const [point, setPoint] = useState(initialPoint || null);
 
   useEffect(() => setPoint(initialPoint || null), [initialPoint?.lat, initialPoint?.lng, open]);
@@ -46,7 +48,7 @@ function MapPicker({ open, onClose, initialPoint, onPick }) {
   }, [point]);
 
   return (
-    <Drawer title="Xaritadan tanlash" placement="bottom" height={520} open={open} onClose={onClose}>
+    <Drawer title={t.mapSelect} placement="bottom" height={520} open={open} onClose={onClose}>
       <div style={{ height: 380, borderRadius: 18, overflow: "hidden", border: "1px solid rgba(0,0,0,.08)" }}>
         <MapContainer center={center} zoom={13} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
           <TileLayer
@@ -64,12 +66,8 @@ function MapPicker({ open, onClose, initialPoint, onPick }) {
           disabled={!point}
           onClick={() => onPick?.(point)}
           style={{ width: "100%", borderRadius: 16, height: 44 }}
-        >
-          Manzilni saqlash
-        </Button>
-        <Button onClick={onClose} style={{ width: "100%", marginTop: 10, borderRadius: 16, height: 44 }}>
-          Bekor qilish
-        </Button>
+        >{t.saveAddress}</Button>
+        <Button onClick={onClose} style={{ width: "100%", marginTop: 10, borderRadius: 16, height: 44 }}>{t.cancelAction}</Button>
       </div>
     </Drawer>
   );
@@ -88,11 +86,12 @@ function MapClickSetter({ onPoint }) {
 // YANGI KOMPONENT: AKTIV SAFAR PANELI (Safar qabul qilingandan so'ng chiqadi)
 // =====================================================================
 function ActiveTripPanel() {
+  const { t } = useLanguage();
   const { tripStatus, setTripStatus, activeDriver } = useDistrict();
 
   const handleCancel = () => {
     // API ga cancelTripWithFraudCheck so'rovi ketadi (hozircha UI imitatsiyasi)
-    message.loading({ content: "Bekor qilinmoqda... GPS ma'lumotlari tekshirilmoqda", key: "cancel" });
+    message.loading({ content: `${t.cancelAction}... GPS`, key: "cancel" });
     setTimeout(() => {
       message.error({ content: "Safar bekor qilindi. Agar firibgarlik aniqlansa reyting tushiriladi!", key: "cancel", duration: 4 });
       setTripStatus('IDLE'); // Qayta qidiruv sahifasiga o'tish
@@ -129,7 +128,7 @@ function ActiveTripPanel() {
           style={{ flex: 1, borderRadius: 12, height: 44, backgroundColor: "#52c41a", fontWeight: 600 }} 
           href={`tel:${activeDriver?.phone || "+998900000000"}`}
         >
-          📞 Qo'ng'iroq
+          {t.callDriver || "📞 Qo'ng'iroq"}
         </Button>
         <Popconfirm 
           title="Safarni bekor qilasizmi?" 
@@ -139,7 +138,7 @@ function ActiveTripPanel() {
           cancelText="Yo'q"
         >
           <Button danger style={{ flex: 1, borderRadius: 12, height: 44, fontWeight: 600 }}>
-            ❌ Bekor qilish
+            {`❌ ${t.cancelAction}`}
           </Button>
         </Popconfirm>
       </div>

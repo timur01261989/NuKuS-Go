@@ -22,7 +22,7 @@ export default function ClientPromo() {
       const j = await validatePromo(c, 100000);
       setResult(j);
     } catch (e) {
-      setErr(String(e?.message || e || 'Xatolik'));
+      setErr(String(e?.message || e || t.error || "Xatolik"));
     } finally {
       setLoading(false);
     }
@@ -41,8 +41,8 @@ export default function ClientPromo() {
       <div className="neumorphic-dark rounded-2xl p-5">
         <p className="text-sm text-slate-300">{t.promos}</p>
         <div className="mt-4 flex gap-2">
-          <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="PROMO123" className="flex-1 rounded-xl bg-backgroundDark/60 border border-slate-700 px-4 py-3 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primaryHome" />
-          <button type="button" className="bg-primaryHome hover:bg-primaryHome/90 text-backgroundDark font-bold px-4 rounded-xl active:scale-95" onClick={check} disabled={loading}>{loading ? '…' : 'Tekshir'}</button>
+          <input value={code} onChange={(e) => setCode(e.target.value)} placeholder={t.promoPlaceholder} className="flex-1 rounded-xl bg-backgroundDark/60 border border-slate-700 px-4 py-3 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primaryHome" />
+          <button type="button" className="bg-primaryHome hover:bg-primaryHome/90 text-backgroundDark font-bold px-4 rounded-xl active:scale-95" onClick={check} disabled={loading}>{loading ? "…" : t.checkPromo}</button>
         </div>
         {err ? <p className="mt-3 text-sm text-red-400">{err}</p> : null}
         {result ? <div className="mt-4 rounded-2xl border border-primaryHome/30 p-4"><div className="font-bold text-primaryHome">OK</div><pre className="mt-2 text-xs text-slate-300 whitespace-pre-wrap break-words">{JSON.stringify(result, null, 2)}</pre></div> : null}

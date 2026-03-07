@@ -27,6 +27,7 @@ import {
 import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import { useNavigate } from "react-router-dom"; 
+import { useLanguage } from "@/shared/i18n/useLanguage";
 
 import RegionDistrictSelect from "@/shared/components/RegionDistrictSelect";
 import { UZ_REGIONS } from "@/shared/constants/uzRegions";
@@ -116,6 +117,7 @@ function PickupPicker({ value, onChange, savedPoints }) {
 
 // --- O'rindiq Tanlash Komponenti ---
 function SeatSelector({ trip, selectedSeats, onToggleSeat }) {
+  const { t } = useLanguage();
   const isCar = trip.vehicle_type === 'car' || !trip.vehicle_type; // Default yengil
   const totalSeats = trip.seats || 4;
 
@@ -140,7 +142,7 @@ function SeatSelector({ trip, selectedSeats, onToggleSeat }) {
   if (isCar) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "center", background: "#f0f2f5", padding: 16, borderRadius: 12 }}>
-        <div style={{ fontWeight: 600, marginBottom: 4 }}>Yengil Mashina sxemasi</div>
+        <div style={{ fontWeight: 600, marginBottom: 4 }}>{t.lightCar} sxemasi</div>
         {/* Oldi qator */}
         <div style={{ display: "flex", gap: 20 }}>
           <div style={driverSeatStyle}>Rul</div>
@@ -160,7 +162,7 @@ function SeatSelector({ trip, selectedSeats, onToggleSeat }) {
   return (
     <div style={{ background: "#f0f2f5", padding: 16, borderRadius: 12 }}>
       <div style={{ fontWeight: 600, marginBottom: 8, textAlign: "center" }}>
-        {trip.vehicle_type === 'bus' ? 'Avtobus' : 'Gazel/Mikroavtobus'} ({totalSeats} o'rin)
+        {trip.vehicle_type === 'bus' ? t.bus : `${t.gazelle}/Mikroavtobus`} ({totalSeats} o'rin)
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center" }}>
         {Array.from({ length: totalSeats }).map((_, i) => {
@@ -177,6 +179,7 @@ function SeatSelector({ trip, selectedSeats, onToggleSeat }) {
 }
 
 function TripCard({ trip, onViewMap, onSelect }) {
+  const { t } = useLanguage();
   const titleFrom = trip.from_district ? `${trip.from_region} • ${trip.from_district}` : trip.from_region;
   const titleTo = trip.to_district ? `${trip.to_region} • ${trip.to_district}` : trip.to_region;
 
@@ -185,22 +188,22 @@ function TripCard({ trip, onViewMap, onSelect }) {
       <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 16 }}>{titleFrom} → {titleTo}</div>
       
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
-        <Tag color="blue">{trip.vehicle_type === 'bus' ? 'Avtobus' : trip.vehicle_type === 'gazel' ? 'Gazel' : 'Yengil'}</Tag>
+        <Tag color="blue">{trip.vehicle_type === 'bus' ? t.bus : trip.vehicle_type === 'gazel' ? t.gazelle : t.lightCar}</Tag>
         {trip.has_ac && <Tag color="cyan">AC</Tag>}
-        {trip.has_trunk && <Tag color="purple">Yukxona</Tag>}
-        {trip.women_only && <Tag color="magenta">Ayollar</Tag>}
+        {trip.has_trunk && <Tag color="purple">{t.trunk}</Tag>}
+        {trip.women_only && <Tag color="magenta">{t.womenOnlyTag}</Tag>}
       </div>
 
       <div style={{ fontSize: 13, opacity: 0.8, marginBottom: 10 }}>
         <div>📅 {trip.depart_date} {trip.depart_time ? `⏰ ${String(trip.depart_time).slice(0,5)}` : ""}</div>
         <div style={{ fontWeight: 600, marginTop: 4 }}>
-          💺 {trip.seats} ta joy • {trip.price ? `${trip.price.toLocaleString()} so'm` : "Kelishilgan"}
+          💺 {trip.seats} ta joy • {trip.price ? `${trip.price.toLocaleString()} so'm` : t.agreed}
         </div>
       </div>
 
       <div style={{ display: "flex", gap: 10 }}>
-        <Button onClick={() => onViewMap(trip)} icon={<EnvironmentOutlined />} block>Yo‘lni ko‘rish</Button>
-        <Button type="primary" onClick={() => onSelect(trip)} block>Tanlash</Button>
+        <Button onClick={() => onViewMap(trip)} icon={<EnvironmentOutlined />} block>{t.routeView}</Button>
+        <Button type="primary" onClick={() => onSelect(trip)} block>{t.choose}</Button>
       </div>
     </div>
   );
@@ -208,6 +211,7 @@ function TripCard({ trip, onViewMap, onSelect }) {
 
 export default function ClientIntercityPage() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   
   // Search State
   const [from, setFrom] = useState({ region: null, district: "" });

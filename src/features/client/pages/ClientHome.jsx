@@ -57,7 +57,7 @@ export default function ClientHome() {
 
         if (mounted) {
           setProfile({
-            fullName: fullName || "Foydalanuvchi",
+            fullName: fullName || t.userLabel,
             avatarUrl: avatarUrl || "",
           });
         }
@@ -226,7 +226,7 @@ export default function ClientHome() {
               (c, i) => (
                 <CarCard
                   key={c.id || i}
-                  title={c.title || c.model || `Mashina ${i + 1}`}
+                  title={c.title || c.model || `${t.autoMarketTitle} ${i + 1}`}
                   year={c.year}
                   priceUZS={c.price_uzs ?? c.price}
                   image={c.image}
@@ -290,7 +290,7 @@ function ServiceCard({ icon, label, onClick, onMouseEnter, onTouchStart }) {
 function CarCard({ title, year, priceUZS, image, onClick }) {
   const priceLabel =
     typeof priceUZS === "number" ? formatPriceUZS(priceUZS) : priceUZS ? String(priceUZS) : "";
-  const yearLabel = year ? String(year) + " yil" : "";
+  const yearLabel = year ? String(year) + ` ${"yil"}` : "";
   const img = image || "";
 
   return (

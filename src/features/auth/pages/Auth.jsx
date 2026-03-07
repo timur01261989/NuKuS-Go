@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { message } from 'antd';
 import { useLanguage } from '@shared/i18n/useLanguage';
-import { getLocalizedLanguages } from '@shared/i18n/languages';
+import { getLocalizedLanguages, getLocalizedLanguageLabel } from '@shared/i18n/languages';
 import { supabase } from '@/lib/supabase';
 import { useAppMode } from '@/providers/AppModeProvider';
 

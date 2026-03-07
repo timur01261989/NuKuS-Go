@@ -2,11 +2,13 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Card, Divider, Empty, List, Spin, Tag, Typography, message } from "antd";
 import { HeatMapOutlined, TrophyOutlined } from "@ant-design/icons";
 import { supabase } from "../../../lib/supabase";
+import { useLanguage } from "@/shared/i18n/useLanguage";
 import DailyMissions from "../city-taxi/components/widgets/DailyMissions";
 
 const { Title, Text } = Typography;
 
 export default function DriverInsights() {
+  const { t } = useLanguage();
   const [userId, setUserId] = useState(null);
   const [hotspots, setHotspots] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -37,7 +39,7 @@ export default function DriverInsights() {
       if (!r.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${r.status}`);
       setHotspots(Array.isArray(j.hotspots) ? j.hotspots : []);
     } catch (e) {
-      message.warning(e?.message || "Heatmap yuklanmadi (FEATURE_HEATMAP yoqilganini tekshiring)");
+      message.warning(e?.message || `${t.heatmapFailed} (FEATURE_HEATMAP)`);
       setHotspots([]);
     } finally {
       setLoading(false);
@@ -53,16 +55,16 @@ export default function DriverInsights() {
 
   return (
     <div style={{ padding: 16, maxWidth: 900, margin: "0 auto" }}>
-      <Title level={3} style={{ marginBottom: 6 }}>Haydovchi Insights</Title>
-      <Text type="secondary">Heatmap va kunlik missiyalar (bosqich-6)</Text>
+      <Title level={3} style={{ marginBottom: 6 }}>{t.insights}</Title>
+      <Text type="secondary">{`${t.heatmapHint} · ${t.dailyMissions}`}</Text>
 
       <Divider />
 
-      <Card title={<span><HeatMapOutlined /> Heatmap (talab yuqori joylar)</span>} style={{ borderRadius: 16 }}>
+      <Card title={<span><HeatMapOutlined /> {t.heatmapTitle} ({t.heatmapHint})</span>} style={{ borderRadius: 16 }}>
         {loading ? (
           <div style={{ textAlign: "center", padding: 24 }}><Spin /></div>
         ) : top.length === 0 ? (
-          <Empty description="Hotspot topilmadi. FEATURE_HEATMAP=true va cron ishlayotganini tekshiring." />
+          <Empty description={`${t.heatmapTitle} 0`} />
         ) : (
           <List
             dataSource={top}
@@ -86,17 +88,17 @@ export default function DriverInsights() {
           />
         )}
         <div style={{ marginTop: 12, fontSize: 12, color: "#667085" }}>
-          Eslatma: heatmap ma’lumotlari cron orqali yangilanadi.
+          {`${t.noteLabel}: ${t.heatmapNote}`}
         </div>
       </Card>
 
       <Divider />
 
-      <Card title={<span><TrophyOutlined /> Kunlik missiyalar</span>} style={{ borderRadius: 16 }}>
+      <Card title={<span><TrophyOutlined /> {t.dailyMissions}</span>} style={{ borderRadius: 16 }}>
         {userId ? (
           <DailyMissions userId={userId} visible={true} onClose={() => {}} />
         ) : (
-          <Empty description="User topilmadi (login qiling)" />
+          <Empty description={t.userNotFound} />
         )}
       </Card>
     </div>

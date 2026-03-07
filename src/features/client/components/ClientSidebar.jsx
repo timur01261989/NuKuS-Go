@@ -13,7 +13,7 @@ export default function ClientSidebar({ open, onClose, profile }) {
   const { t } = useLanguage();
   const [balanceUZS, setBalanceUZS] = useState(null);
 
-  const fullName = profile?.fullName || t.passenger;
+  const fullName = profile?.fullName || t.userLabel;
   const avatarUrl = profile?.avatarUrl || '';
 
   const initial = useMemo(() => {

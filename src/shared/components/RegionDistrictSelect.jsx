@@ -1,6 +1,8 @@
 import React, { useMemo } from "react";
 import { Select } from "antd";
 import { UZ_REGIONS } from "../constants/uzRegions";
+import { useLanguage } from "@/shared/i18n/useLanguage";
+import { localizeGeoLabel } from "@/shared/i18n/geo";
 
 /**
  * Region + District selector (District optional)
@@ -20,9 +22,10 @@ export default function RegionDistrictSelect({
   allowEmptyDistrict = true,
   className,
 }) {
+  const { language, t } = useLanguage();
   const regionOptions = useMemo(
-    () => UZ_REGIONS.map((r) => ({ label: r.name, value: r.name })),
-    []
+    () => UZ_REGIONS.map((r) => ({ label: localizeGeoLabel(r.name, language), value: r.name })),
+    [language]
   );
 
   const districts = useMemo(() => {
@@ -31,12 +34,12 @@ export default function RegionDistrictSelect({
   }, [region]);
 
   const districtOptions = useMemo(() => {
-    const opts = districts.map((d) => ({ label: d, value: d }));
+    const opts = districts.map((d) => ({ label: localizeGeoLabel(d, language), value: d }));
     if (allowEmptyDistrict) {
-      return [{ label: "— (tumansiz)", value: "" }, ...opts];
+      return [{ label: t.noDistrictOption || "— (Tumansiz)", value: "" }, ...opts];
     }
     return opts;
-  }, [districts, allowEmptyDistrict]);
+  }, [districts, allowEmptyDistrict, language, t.noDistrictOption]);
 
   return (
     <div className={className}>
@@ -44,7 +47,7 @@ export default function RegionDistrictSelect({
 
       <Select
         value={region || undefined}
-        placeholder="Viloyat / Qoraqalpogʻiston"
+        placeholder={t.regionPlaceholder || "Viloyat / Qoraqalpogʻiston"}
         options={regionOptions}
         onChange={(val) => onChange({ region: val, district: "" })}
         style={{ width: "100%", marginBottom: 10 }}
@@ -54,7 +57,7 @@ export default function RegionDistrictSelect({
 
       <Select
         value={district === "" ? "" : (district || undefined)}
-        placeholder={allowEmptyDistrict ? "Tuman (ixtiyoriy)" : "Tuman"}
+        placeholder={allowEmptyDistrict ? (t.districtOptionalPlaceholder || "Tuman (ixtiyoriy)") : (t.districtPlaceholder || "Tuman")}
         options={districtOptions}
         onChange={(val) => onChange({ region: region || "", district: val })}
         style={{ width: "100%" }}

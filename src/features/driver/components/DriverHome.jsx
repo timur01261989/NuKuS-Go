@@ -45,7 +45,7 @@ export default function DriverHome({ onLogout }) {
 
   // Driver header info (name/avatar/id)
   const [driverHeader, setDriverHeader] = useState({
-    name: "Haydovchi",
+    name: t.driverTitle,
     publicId: "----",
     avatarUrl: "",
   });

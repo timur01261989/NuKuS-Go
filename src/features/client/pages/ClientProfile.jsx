@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 
 export default function ClientProfile() {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
@@ -31,7 +32,7 @@ export default function ClientProfile() {
   };
 
   const name =
-    user?.user_metadata?.full_name || user?.user_metadata?.name || "Foydalanuvchi";
+    user?.user_metadata?.full_name || user?.user_metadata?.name || t.userLabel;
   const phone = user?.phone || "";
   const email = user?.email || "";
 

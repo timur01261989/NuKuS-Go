@@ -18,11 +18,11 @@ export default function ClientPaymentMethods() {
       </div>
 
       <div className="neumorphic-dark rounded-2xl p-5 space-y-4">
-        <p className="text-sm text-slate-300">{t.demoPlaceholder} Keyin karta/Payme/Click integratsiya qo‘shish oson bo‘lishi uchun alohida fayl qilib qo‘yildi.</p>
+        <p className="text-sm text-slate-300">{t.paymentHelp}</p>
         <div className="grid gap-3">
-          <PaymentCard icon="account_balance_wallet" title={t.wallet} desc="UniGo balans" />
-          <PaymentCard icon="credit_card" title="Karta" desc="(tez orada)" disabled />
-          <PaymentCard icon="payments" title="Payme / Click" desc="(tez orada)" disabled />
+          <PaymentCard icon="account_balance_wallet" title={t.wallet} desc={t.walletBalance} />
+          <PaymentCard icon="credit_card" title={t.cardSoon.split(" (")[0]} desc={t.cardSoon.match(/\(.+\)/)?.[0] || ""} disabled />
+          <PaymentCard icon="payments" title="Payme / Click" desc={t.paymeClickSoon.match(/\(.+\)/)?.[0] || t.paymeClickSoon} disabled />
         </div>
         <button type="button" className="w-full bg-primaryHome hover:bg-primaryHome/90 text-backgroundDark font-bold py-3 rounded-xl active:scale-95" onClick={() => navigate('/client/wallet')}>
           {t.wallet}
