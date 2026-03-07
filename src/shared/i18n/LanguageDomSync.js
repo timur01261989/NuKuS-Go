@@ -3,16 +3,53 @@ import { translatePhrase } from './domPhraseTranslations';
 import { useLanguage } from './useLanguage';
 
 const TEXT_NODE = 3;
-const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEXTAREA', 'CODE', 'PRE']);
+const SKIP_TAGS = new Set([
+  'SCRIPT',
+  'STYLE',
+  'NOSCRIPT',
+  'TEXTAREA',
+  'CODE',
+  'PRE',
+  'SVG',
+  'PATH',
+  'IMG',
+  'INPUT',
+  'OPTION',
+]);
+
+const ICON_SELECTOR = [
+  '.material-symbols-outlined',
+  '.material-icons',
+  '.material-icons-round',
+  '.material-icons-sharp',
+  '.material-icons-two-tone',
+  '.material-icons-outlined',
+  '.anticon',
+  '[data-no-auto-translate="true"]',
+  '[translate="no"]',
+  '[aria-hidden="true"]',
+  '[role="img"]',
+  '.notranslate',
+  'svg',
+].join(', ');
+
 const textOriginals = new WeakMap();
 const attrOriginals = new WeakMap();
+
+function shouldSkipElement(el) {
+  if (!el || el.nodeType !== 1) return true;
+  if (SKIP_TAGS.has(el.tagName)) return true;
+  if (el.closest?.(ICON_SELECTOR)) return true;
+  if (el.isContentEditable) return true;
+  const className = typeof el.className === 'string' ? el.className : '';
+  if (/leaflet-control|leaflet-marker|mapboxgl|gm-style/i.test(className)) return true;
+  return false;
+}
 
 function shouldSkipNode(node) {
   const parent = node?.parentElement;
   if (!parent) return true;
-  if (SKIP_TAGS.has(parent.tagName)) return true;
-  if (parent.closest?.('[data-no-auto-translate="true"]')) return true;
-  return false;
+  return shouldSkipElement(parent);
 }
 
 function translateTextNode(node, language) {
@@ -31,7 +68,7 @@ function translateTextNode(node, language) {
 }
 
 function translateAttributes(el, language) {
-  if (!el || !el.getAttribute || SKIP_TAGS.has(el.tagName)) return;
+  if (!el || !el.getAttribute || shouldSkipElement(el)) return;
   const attrs = ['placeholder', 'title', 'aria-label', 'value', 'alt', 'data-placeholder'];
   let store = attrOriginals.get(el);
   if (!store) {
@@ -67,6 +104,7 @@ function walk(root, language) {
     return;
   }
   if (root.nodeType !== 1) return;
+  if (shouldSkipElement(root)) return;
 
   translateAttributes(root, language);
 

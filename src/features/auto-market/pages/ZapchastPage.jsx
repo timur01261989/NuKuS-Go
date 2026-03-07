@@ -1,362 +1,161 @@
 /**
  * ZapchastPage.jsx
  * Ehtiyot qismlar bo'limi.
- * 100% TO'LIQ VARIANT - HECH QANDAY QISQARTIRMASIZ.
  * Smart filter: marka/model tanlansa, faqat o'sha mashinaga mos qismlar chiqadi.
- * YANGI: Kategoriya slayderi, Qidiruv tizimi va Premium e'lonlar dizayni.
  */
 import React, { useEffect, useState, useMemo } from "react";
-import { 
-  Button, 
-  Select, 
-  Input, 
-  Spin, 
-  Empty, 
-  Tag, 
-  Modal, 
-  message, 
-  Row, 
-  Col, 
-  Card, 
-  Badge,
-  Avatar
-} from "antd";
-import { 
-  ArrowLeftOutlined, 
-  PlusOutlined, 
-  PhoneOutlined, 
-  SearchOutlined, 
-  FilterOutlined, 
-  CarOutlined, 
-  CheckCircleOutlined,
-  EnvironmentOutlined,
-  ShoppingOutlined
-} from "@ant-design/icons";
+import { Button, Select, Input, Spin, Empty, Tag, Modal, message } from "antd";
+import { ArrowLeftOutlined, PlusOutlined, PhoneOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { listZapchast, createZapchastAd } from "../services/marketBackend";
 import { BRANDS, MODELS_BY_BRAND, ZAPCHAST_CATEGORIES, ZAPCHAST_CONDITIONS } from "../services/staticData";
 
-// --- Ehtiyot qismi kartasi komponenti ---
 function ZapchastCard({ item }) {
   const cat = ZAPCHAST_CATEGORIES.find(c => c.id === item.category);
-  const condition = ZAPCHAST_CONDITIONS.find(c => c.value === item.condition);
-
   return (
     <div style={{
-      background: "#fff", 
-      border: "1px solid #e2e8f0", 
-      borderRadius: 20,
-      padding: 14, 
-      boxShadow: "0 4px 16px rgba(2,6,23,.03)",
-      display: "flex", 
-      gap: 12,
-      marginBottom: 12,
-      position: "relative"
+      background:"#fff", border:"1px solid #e2e8f0", borderRadius:16,
+      padding:12, boxShadow:"0 4px 16px rgba(2,6,23,.05)",
+      display:"flex", gap:10
     }}>
-      {item.is_premium && (
-        <Badge.Ribbon text="Premium" color="gold" style={{ top: -10 }} />
-      )}
-      
       <div style={{
-        width: 64, 
-        height: 64, 
-        borderRadius: 16, 
-        background: item.is_premium ? "#fefce8" : "#f1f5f9",
-        display: "flex", 
-        alignItems: "center", 
-        justifyContent: "center",
-        fontSize: 28, 
-        flexShrink: 0,
-        border: item.is_premium ? "1px solid #fde047" : "1px solid transparent"
+        width:48, height:48, borderRadius:14, background:"#f1f5f9",
+        display:"flex", alignItems:"center", justifyContent:"center",
+        fontSize:22, flexShrink:0
       }}>
         {cat?.emoji || "📦"}
       </div>
-
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <h4 style={{ margin: 0, fontWeight: 800, fontSize: 16, color: "#1e293b" }}>{item.title}</h4>
-          <Tag color={condition?.color || "blue"} style={{ borderRadius: 6, margin: 0, fontSize: 10 }}>
-            {condition?.label || item.condition}
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ fontWeight:900, fontSize:13, color:"#0f172a" }}>{item.title}</div>
+        <div style={{ fontSize:11, color:"#64748b", marginTop:2 }}>
+          {item.compatible_brand} {item.compatible_model} {item.compatible_years}
+        </div>
+        <div style={{ display:"flex", gap:6, marginTop:6, flexWrap:"wrap", alignItems:"center" }}>
+          <Tag color={item.condition==="new"?"success":item.condition==="used"?"default":"error"}
+            style={{ borderRadius:999, margin:0, fontSize:10 }}>
+            {ZAPCHAST_CONDITIONS.find(c=>c.value===item.condition)?.label || item.condition}
           </Tag>
-        </div>
-        
-        <div style={{ fontSize: 12, color: "#64748b", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
-          <CarOutlined style={{ fontSize: 14 }} />
-          <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {item.compatible_brand} {item.compatible_model} uchun
+          <span style={{ fontWeight:900, color:"#0ea5e9", fontSize:13 }}>
+            {Number(item.price||0).toLocaleString("uz-UZ")} {item.currency}
           </span>
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
-          <div style={{ fontWeight: 900, fontSize: 17, color: "#059669" }}>
-            {item.price?.toLocaleString()} <span style={{ fontSize: 12 }}>{item.currency}</span>
-          </div>
-          <div style={{ fontSize: 11, color: "#94a3b8" }}>
-            <EnvironmentOutlined /> {item.city || "O'zbekiston"}
-          </div>
+          <span style={{ fontSize:11, color:"#94a3b8" }}>{item.city}</span>
         </div>
       </div>
-
-      <Button 
-        type="primary" 
-        shape="circle" 
-        icon={<PhoneOutlined />} 
-        style={{ 
-          alignSelf: "center", 
-          background: "#0ea5e9", 
-          border: "none",
-          boxShadow: "0 4px 10px rgba(14,165,233,0.3)"
-        }}
-        onClick={() => {
-          if (item.phone) window.location.href = `tel:${item.phone}`;
-          else message.info("Telefon raqami ko'rsatilmagan");
-        }}
+      <Button
+        size="small" type="primary" icon={<PhoneOutlined />}
+        href={`tel:${item.phone}`}
+        style={{ borderRadius:10, background:"#22c55e", border:"none", flexShrink:0 }}
       />
     </div>
   );
 }
 
-// --- Asosiy Sahifa ---
 export default function ZapchastPage() {
+  const { am } = useAutoMarketI18n();
   const nav = useNavigate();
-  const [list, setList] = useState([]);
-  const [loading, setLoading] = useState(false);
-  
-  // Filtrlar holati
-  const [filter, setFilter] = useState({ brand: "", model: "", category: "" });
-  const [searchQuery, setSearchQuery] = useState("");
-  
-  // Modal (E'lon berish) holati
-  const [isModal, setIsModal] = useState(false);
-  const [newItem, setNewItem] = useState({
-    title: "", category: "", compatible_brand: "", compatible_model: "",
-    price: "", currency: "UZS", condition: "new", city: "", phone: "", desc: ""
-  });
+  const [brand, setBrand]       = useState("");
+  const [model, setModel]       = useState("");
+  const [category, setCategory] = useState("");
+  const [q, setQ]               = useState("");
+  const [items, setItems]       = useState([]);
+  const [loading, setLoading]   = useState(false);
+  const [addOpen, setAddOpen]   = useState(false);
+  const [newItem, setNewItem]   = useState({ title:"", category:"other", compatible_brand:"", compatible_model:"", price:"", currency:"UZS", condition:"used", city:"Nukus", phone:"", is_razborka:false });
+
+  const modelOptions = useMemo(
+    () => (MODELS_BY_BRAND[brand]||[]).map(m=>({value:m,label:m})),
+    [brand]
+  );
 
   const load = async () => {
     setLoading(true);
-    try {
-      const data = await listZapchast();
-      setList(data || []);
-    } finally {
-      setLoading(false);
-    }
+    try { setItems(await listZapchast({ brand, model, category, q, is_razborka: false })); }
+    catch { setItems([]); }
+    finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [brand, model, category, q]);
 
-  // Filtrlangan ro'yxat
-  const filteredList = useMemo(() => {
-    return list.filter(item => {
-      const mBrand = !filter.brand || item.compatible_brand === filter.brand;
-      const mModel = !filter.model || item.compatible_model === filter.model;
-      const mCat = !filter.category || item.category === filter.category;
-      const mSearch = !searchQuery || item.title.toLowerCase().includes(searchQuery.toLowerCase());
-      return mBrand && mModel && mCat && mSearch;
-    });
-  }, [list, filter, searchQuery]);
-
-  const handleCreate = async () => {
-    if (!newItem.title || !newItem.category || !newItem.price) {
-      return message.warning("Asosiy maydonlarni to'ldiring");
-    }
-    try {
-      await createZapchastAd(newItem);
-      message.success("E'loningiz muvaffaqiyatli qo'shildi!");
-      setIsModal(false);
-      load();
-    } catch (e) {
-      message.error("Xatolik yuz berdi");
-    }
+  const handleAdd = async () => {
+    if (!newItem.title) { message.warning(am("parts.titleRequired")); return; }
+    await createZapchastAd(newItem);
+    setAddOpen(false);
+    setNewItem({ title:"", category:"other", compatible_brand:"", compatible_model:"", price:"", currency:"UZS", condition:"used", city:"Nukus", phone:"", is_razborka:false });
+    load();
+    message.success("E'lon qo'shildi!");
   };
 
   return (
-    <div style={{ padding: "16px 16px 100px", background: "#f8fafc", minHeight: "100vh" }}>
-      {/* Header */}
-      <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 20 }}>
-        <Button icon={<ArrowLeftOutlined />} shape="circle" onClick={() => nav(-1)} />
-        <div style={{ flex: 1 }}>
-          <h1 style={{ margin: 0, fontWeight: 950, fontSize: 22 }}>Ehtiyot qismlar</h1>
-          <div style={{ fontSize: 12, color: "#64748b" }}>Bozordagi barcha detallar bir joyda</div>
+    <div style={{ paddingBottom:90 }}>
+      <div style={{ position:"sticky", top:0, zIndex:50, background:"#ffffffcc", backdropFilter:"blur(10px)", borderBottom:"1px solid #e2e8f0" }}>
+        <div style={{ padding:"12px 14px", display:"flex", gap:10, alignItems:"center" }}>
+          <Button icon={<ArrowLeftOutlined />} onClick={()=>nav(-1)} style={{ borderRadius:14 }} />
+          <div style={{ flex:1 }}>
+            <div style={{ fontWeight:950, fontSize:16, color:"#0f172a" }}>{am("parts.title")}</div>
+            <div style={{ fontSize:11, color:"#64748b" }}>{am("parts.subtitle")}</div>
+          </div>
+          <Button icon={<PlusOutlined />} type="primary" onClick={()=>setAddOpen(true)}
+            style={{ borderRadius:12, background:"#22c55e", border:"none" }}>E'lon</Button>
         </div>
-        <Button 
-          type="primary" 
-          icon={<PlusOutlined />} 
-          style={{ borderRadius: 12, height: 40, background: "#10b981", border: "none" }}
-          onClick={() => setIsModal(true)}
-        >
-          Sotish
-        </Button>
+        {/* Smart filter */}
+        <div style={{ padding:"0 14px 10px", display:"flex", gap:8, flexWrap:"wrap" }}>
+          <Select value={brand||undefined} onChange={v=>{setBrand(v||"");setModel("");}} allowClear placeholder="Marka"
+            style={{width:110}} options={BRANDS.map(b=>({value:b.name,label:b.name}))} />
+          <Select value={model||undefined} onChange={v=>setModel(v||"")} allowClear disabled={!brand} placeholder="Model"
+            style={{width:110}} options={modelOptions} />
+          <Select value={category||undefined} onChange={v=>setCategory(v||"")} allowClear placeholder="Kategoriya"
+            style={{width:130}} options={ZAPCHAST_CATEGORIES.map(c=>({value:c.id,label:`${c.emoji} ${c.label}`}))} />
+        </div>
+        <div style={{ padding:"0 14px 12px" }}>
+          <Input value={q} onChange={e=>setQ(e.target.value)} placeholder="Qidirish..." style={{ borderRadius:14 }} />
+        </div>
       </div>
 
-      {/* Qidiruv va Brend Filter */}
-      <Card style={{ borderRadius: 24, border: "none", boxShadow: "0 4px 15px rgba(0,0,0,0.04)", marginBottom: 16 }}>
-        <Input 
-          prefix={<SearchOutlined style={{ color: "#94a3b8" }} />} 
-          placeholder="Zapchast nomini qidiring..." 
-          size="large"
-          variant="filled"
-          style={{ borderRadius: 14, marginBottom: 12 }}
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-        />
-        <Row gutter={8}>
-          <Col span={12}>
-            <Select 
-              placeholder="Marka tanlang" 
-              style={{ width: "100%" }} 
-              allowClear
-              value={filter.brand || undefined}
-              onChange={v => setFilter(p => ({ ...p, brand: v || "", model: "" }))}
-              options={BRANDS.map(b => ({ value: b.name, label: b.name }))}
-            />
-          </Col>
-          <Col span={12}>
-            <Select 
-              placeholder="Model tanlang" 
-              style={{ width: "100%" }} 
-              disabled={!filter.brand}
-              value={filter.model || undefined}
-              onChange={v => setFilter(p => ({ ...p, model: v || "" }))}
-              options={(MODELS_BY_BRAND[filter.brand] || []).map(m => ({ value: m, label: m }))}
-            />
-          </Col>
-        </Row>
-      </Card>
-
-      {/* Kategoriya slayderi */}
-      <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 16, scrollbarWidth: "none" }}>
-        <Tag 
-          color={!filter.category ? "blue" : "default"} 
-          style={{ padding: "6px 16px", borderRadius: 12, cursor: "pointer", fontSize: 13 }}
-          onClick={() => setFilter(p => ({ ...p, category: "" }))}
-        >
-          Hammasi
-        </Tag>
-        {ZAPCHAST_CATEGORIES.map(c => (
-          <Tag 
-            key={c.id}
-            color={filter.category === c.id ? "blue" : "default"}
-            style={{ padding: "6px 16px", borderRadius: 12, cursor: "pointer", fontSize: 13 }}
-            onClick={() => setFilter(p => ({ ...p, category: c.id }))}
-          >
-            {c.emoji} {c.label}
-          </Tag>
-        ))}
+      <div style={{ padding:"12px 14px" }}>
+        {loading ? (
+          <div style={{ display:"flex", justifyContent:"center", padding:40 }}><Spin size="large" /></div>
+        ) : items.length === 0 ? (
+          <Empty description="Zapchast topilmadi" style={{ marginTop:30 }}>
+            <Button onClick={()=>setAddOpen(true)} style={{ borderRadius:12 }}>E'lon qo'shish</Button>
+          </Empty>
+        ) : (
+          <div style={{ display:"grid", gap:10 }}>
+            {brand && model && (
+              <div style={{ background:"#f0fdf4", borderRadius:12, padding:"8px 12px", fontSize:12, color:"#059669", fontWeight:700 }}>
+                ✅ {brand} {model} uchun {items.length} ta zapchast topildi
+              </div>
+            )}
+            {items.map(item => <ZapchastCard key={item.id} item={item} />)}
+          </div>
+        )}
       </div>
 
-      {/* Ro'yxat */}
-      {loading ? (
-        <div style={{ textAlign: "center", padding: 50 }}><Spin size="large" /></div>
-      ) : filteredList.length === 0 ? (
-        <Empty description="Zapchastlar topilmadi" style={{ marginTop: 40 }} />
-      ) : (
-        <div style={{ marginTop: 8 }}>
-          {filteredList.map(item => <ZapchastCard key={item.id} item={item} />)}
-        </div>
-      )}
-
-      {/* E'lon berish modali */}
-      <Modal
-        title={<div style={{ fontWeight: 800 }}><ShoppingOutlined /> Detal sotish</div>}
-        open={isModal}
-        onCancel={() => setIsModal(false)}
-        onOk={handleCreate}
-        okText="E'lonni joylash"
-        cancelText="Bekor qilish"
-        centered
-        width={400}
-        borderRadius={24}
-      >
-        <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
-          <Input 
-            placeholder="Zapchast nomi (masalan: Akkumulyator 75A)" 
-            value={newItem.title} 
-            onChange={e => setNewItem(p => ({ ...p, title: e.target.value }))} 
-          />
-          <Select 
-            placeholder="Kategoriya" 
-            value={newItem.category || undefined}
-            onChange={v => setNewItem(p => ({ ...p, category: v }))}
-            options={ZAPCHAST_CATEGORIES.map(c => ({ value: c.id, label: `${c.emoji} ${c.label}` }))} 
-          />
-          <Row gutter={8}>
-            <Col span={12}>
-              <Select 
-                placeholder="Mos marka" 
-                value={newItem.compatible_brand || undefined}
-                onChange={v => setNewItem(p => ({ ...p, compatible_brand: v || "", compatible_model: "" }))}
-                options={BRANDS.map(b => ({ value: b.name, label: b.name }))} 
-                style={{ width: "100%" }}
-              />
-            </Col>
-            <Col span={12}>
-              <Input 
-                placeholder="Mos model" 
-                value={newItem.compatible_model} 
-                onChange={e => setNewItem(p => ({ ...p, compatible_model: e.target.value }))} 
-              />
-            </Col>
-          </Row>
-          <Row gutter={8}>
-            <Col span={16}>
-              <Input 
-                placeholder="Narx" 
-                type="number" 
-                value={newItem.price} 
-                onChange={e => setNewItem(p => ({ ...p, price: e.target.value }))} 
-              />
-            </Col>
-            <Col span={8}>
-              <Select 
-                value={newItem.currency} 
-                onChange={v => setNewItem(p => ({ ...p, currency: v }))}
-                options={[{ value: "UZS", label: "UZS" }, { value: "USD", label: "USD" }]} 
-                style={{ width: "100%" }}
-              />
-            </Col>
-          </Row>
-          <Select 
-            placeholder="Holati" 
-            value={newItem.condition} 
-            onChange={v => setNewItem(p => ({ ...p, condition: v }))}
-            options={ZAPCHAST_CONDITIONS.map(c => ({ value: c.value, label: c.label }))} 
-          />
-          <Input 
-            placeholder="Telefon raqam" 
-            value={newItem.phone} 
-            onChange={e => setNewItem(p => ({ ...p, phone: e.target.value }))} 
-          />
-          <Input.TextArea 
-            placeholder="Qo'shimcha ma'lumot (ixtiyoriy)" 
-            rows={3}
-            value={newItem.desc} 
-            onChange={e => setNewItem(p => ({ ...p, desc: e.target.value }))} 
-          />
+      {/* E'lon qo'shish modal */}
+      <Modal title="Zapchast e'lon qo'shish" open={addOpen} onOk={handleAdd} onCancel={()=>setAddOpen(false)}
+        okText="Qo'shish" cancelText="Bekor">
+        <div style={{ display:"grid", gap:10, marginTop:10 }}>
+          <Input placeholder="Sarlavha *" value={newItem.title} onChange={e=>setNewItem(p=>({...p,title:e.target.value}))} />
+          <Select value={newItem.category} onChange={v=>setNewItem(p=>({...p,category:v}))}
+            options={ZAPCHAST_CATEGORIES.map(c=>({value:c.id,label:`${c.emoji} ${c.label}`}))} style={{width:"100%"}} />
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+            <Select value={newItem.compatible_brand||undefined} allowClear placeholder="Marka"
+              onChange={v=>setNewItem(p=>({...p,compatible_brand:v||"",compatible_model:""}))}
+              options={BRANDS.map(b=>({value:b.name,label:b.name}))} style={{width:"100%"}} />
+            <Input placeholder="Model" value={newItem.compatible_model}
+              onChange={e=>setNewItem(p=>({...p,compatible_model:e.target.value}))} />
+            <Input placeholder="Narx" value={newItem.price}
+              onChange={e=>setNewItem(p=>({...p,price:e.target.value}))} />
+            <Select value={newItem.currency} onChange={v=>setNewItem(p=>({...p,currency:v}))}
+              options={[{value:"UZS",label:"UZS"},{value:"USD",label:"USD"}]} style={{width:"100%"}} />
+            <Select value={newItem.condition} onChange={v=>setNewItem(p=>({...p,condition:v}))}
+              options={ZAPCHAST_CONDITIONS.map(c=>({value:c.value,label:c.label}))} style={{width:"100%"}} />
+            <Input placeholder="Shahar" value={newItem.city}
+              onChange={e=>setNewItem(p=>({...p,city:e.target.value}))} />
+          </div>
+          <Input placeholder="Telefon *" value={newItem.phone}
+            onChange={e=>setNewItem(p=>({...p,phone:e.target.value}))} />
         </div>
       </Modal>
-
-      {/* Floating Info */}
-      <div style={{ 
-        position: "fixed", 
-        bottom: 20, 
-        left: 20, 
-        right: 20, 
-        background: "#0f172a", 
-        color: "#fff", 
-        padding: "12px 20px", 
-        borderRadius: 100, 
-        display: "flex", 
-        alignItems: "center", 
-        justifyContent: "space-between",
-        boxShadow: "0 10px 25px rgba(0,0,0,0.2)"
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-          <CheckCircleOutlined style={{ color: "#10b981" }} />
-          <span>Xavfsiz bitim kafolati</span>
-        </div>
-        <Button type="link" style={{ padding: 0, color: "#3b82f6", fontSize: 13 }}>Batafsil</Button>
-      </div>
     </div>
   );
 }

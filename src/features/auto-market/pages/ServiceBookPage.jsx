@@ -1,31 +1,10 @@
 /**
  * ServiceBookPage.jsx
  * "Rasxod Daftar" — barcha mashinalar va ularning xizmat tarixi.
- * Sodda, tushunarli va 100% TO'LIQ variant.
  */
 import React, { useEffect, useState } from "react";
-import { 
-  Button, 
-  Empty, 
-  Modal, 
-  Input, 
-  Select, 
-  InputNumber, 
-  DatePicker, 
-  message, 
-  Spin, 
-  Card,
-  Row,
-  Col,
-  Tag
-} from "antd";
-import { 
-  ArrowLeftOutlined, 
-  PlusOutlined, 
-  SafetyCertificateOutlined, 
-  FileDoneOutlined,
-  EditOutlined
-} from "@ant-design/icons";
+import { Button, Empty, Modal, Input, Select, InputNumber, DatePicker, message, Spin } from "antd";
+import { ArrowLeftOutlined, PlusOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { getServiceBooks, createServiceBook, addServiceRecord, updateServiceBook } from "../services/marketBackend";
 import { BRANDS, SERVICE_TYPES } from "../services/staticData";
@@ -36,193 +15,132 @@ import { useAutoMarketI18n } from "../utils/useAutoMarketI18n";
 export default function ServiceBookPage() {
   const { am } = useAutoMarketI18n();
   const nav = useNavigate();
-  
-  const [books, setBooks] = useState([]);
-  const [loading, setLoading] = useState(false);
-  
+  const [books, setBooks]         = useState([]);
+  const [loading, setLoading]     = useState(false);
   const [addBookOpen, setAddBookOpen] = useState(false);
-  const [addRecOpen, setAddRecOpen] = useState(false);
-  const [activeBook, setActiveBook] = useState(null);
+  const [addRecOpen, setAddRecOpen]   = useState(false);
+  const [activeBook, setActiveBook]   = useState(null);
 
-  // Yangi daftar (mashina) qo'shish formasi
   const [newBook, setNewBook] = useState({
-    car_brand: "", 
-    car_model: "", 
-    car_year: "", 
-    car_plate: "",
-    current_mileage: 0, 
-    oil_change_km: 10000, 
-    last_oil_change: 0,
-    insurance_expiry: "", 
-    tex_expiry: ""
+    car_brand:"", car_model:"", car_year:"", car_plate:"",
+    current_mileage:0, oil_change_km:10000, last_oil_change:0,
+    insurance_expiry:"", tex_expiry:"",
   });
-
-  // Yangi xarajat/servis qo'shish formasi
   const [newRec, setNewRec] = useState({
-    service_type: "",
-    title: "",
-    mileage_at: "",
-    cost: "",
-    next_due_km: ""
+    service_type:"oil_change", title:"", mileage_at:"",
+    cost:"", currency:"UZS", next_due_km:"", note:""
   });
 
-  // Daftarlarni yuklash
   const load = async () => {
     setLoading(true);
-    try {
-      const data = await getServiceBooks();
-      setBooks(data || []);
-    } catch (error) {
-      console.error("Xatolik:", error);
-    } finally {
-      setLoading(false);
-    }
+    try { setBooks(await getServiceBooks()); }
+    catch { setBooks([]); }
+    finally { setLoading(false); }
   };
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
-  // 1. Yangi daftar (mashina) saqlash
   const handleAddBook = async () => {
-    if (!newBook.car_brand || !newBook.car_model) {
-      return message.error("Marka va modelni kiriting");
-    }
-    
-    setLoading(true);
-    try {
-      await createServiceBook(newBook);
-      message.success("Yangi daftar ochildi");
-      setAddBookOpen(false);
-      setNewBook({
-        car_brand: "", car_model: "", car_year: "", car_plate: "",
-        current_mileage: 0, oil_change_km: 10000, last_oil_change: 0,
-        insurance_expiry: "", tex_expiry: ""
-      });
-      load();
-    } catch (e) {
-      message.error("Xatolik yuz berdi");
-    } finally {
-      setLoading(false);
-    }
+    if (!newBook.car_brand || !newBook.car_model) { message.warning(am("create.chooseBrand")); return; }
+    await createServiceBook(newBook);
+    setAddBookOpen(false);
+    setNewBook({ car_brand:"", car_model:"", car_year:"", car_plate:"", current_mileage:0, oil_change_km:10000, last_oil_change:0, insurance_expiry:"", tex_expiry:"" });
+    load();
+    message.success(am("serviceBook.bookCreated"));
   };
 
-  // 2. Yangi xarajat saqlash
   const handleAddRecord = async () => {
-    if (!activeBook || !newRec.service_type || !newRec.cost) {
-      return message.error("Xizmat turi va narxini kiriting");
-    }
+    if (!newRec.title || !activeBook) return;
+    await addServiceRecord(activeBook.id, newRec);
+    setAddRecOpen(false);
+    setNewRec({ service_type:"oil_change", title:"", mileage_at:"", cost:"", currency:"UZS", next_due_km:"", note:"" });
+    load();
+    message.success(am("serviceBook.recordAdded"));
+  };
 
-    setLoading(true);
-    try {
-      await addServiceRecord(activeBook.id, newRec);
-      message.success("Xarajat qo'shildi");
-      setAddRecOpen(false);
-      setNewRec({ service_type: "", title: "", mileage_at: "", cost: "", next_due_km: "" });
-      load();
-    } catch (e) {
-      message.error("Xatolik yuz berdi");
-    } finally {
-      setLoading(false);
-    }
+  const openAddRecord = (book) => {
+    setActiveBook(book);
+    setAddRecOpen(true);
   };
 
   return (
-    <div style={{ padding: 16, paddingBottom: 100, background: "#f8fafc", minHeight: "100vh" }}>
-      
-      {/* HEADER */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Button icon={<ArrowLeftOutlined />} shape="circle" onClick={() => nav(-1)} />
-          <h1 style={{ margin: 0, fontWeight: 900, fontSize: 20 }}>Rasxod Daftar</h1>
+    <div style={{ padding:"14px 14px 90px" }}>
+      <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:16 }}>
+        <Button icon={<ArrowLeftOutlined />} onClick={()=>nav(-1)} style={{ borderRadius:14 }} />
+        <div style={{ flex:1 }}>
+          <div style={{ fontWeight:950, fontSize:18, color:"#0f172a" }}>{am("serviceBook.title")}</div>
+          <div style={{ fontSize:11, color:"#64748b" }}>{am("serviceBook.subtitle")}</div>
         </div>
-        <Button 
-          type="primary" 
-          icon={<PlusOutlined />} 
-          style={{ borderRadius: 12, background: "#0f172a", border: "none" }}
-          onClick={() => setAddBookOpen(true)}
-        >
-          Mashina qo'shish
-        </Button>
+        <Button icon={<PlusOutlined />} type="primary" onClick={()=>setAddBookOpen(true)}
+          style={{ borderRadius:12, background:"#3b82f6", border:"none" }}>{am("serviceBook.addCar")}</Button>
       </div>
 
-      {loading && books.length === 0 ? (
-        <div style={{ textAlign: "center", marginTop: 50 }}><Spin size="large" /></div>
+      {loading ? (
+        <div style={{ display:"flex", justifyContent:"center", padding:40 }}><Spin size="large" /></div>
       ) : books.length === 0 ? (
-        <Empty description="Hali daftar ochilmagan" style={{ marginTop: 50 }} />
+        <Empty description={am("serviceBook.empty")} style={{ marginTop:60 }}>
+          <Button type="primary" onClick={()=>setAddBookOpen(true)} style={{ borderRadius:12, background:"#3b82f6", border:"none" }}>
+            {am("serviceBook.addCar")}
+          </Button>
+        </Empty>
       ) : (
-        <div style={{ display: "grid", gap: 16 }}>
+        <div style={{ display:"grid", gap:14 }}>
           {books.map(book => (
-            <Card 
-              key={book.id} 
-              style={{ borderRadius: 16, border: "1px solid #e2e8f0" }}
-              bodyStyle={{ padding: 16 }}
-            >
-              {/* ASOSIY MA'LUMOTLAR */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
-                <div>
-                  <h3 style={{ margin: 0, fontWeight: 800, fontSize: 18 }}>
-                    {book.car_brand} {book.car_model} {book.car_year && `(${book.car_year})`}
-                  </h3>
-                  <div style={{ color: "#64748b", fontSize: 13, marginTop: 4 }}>
-                    Davlat raqami: <b>{book.car_plate || "Kiritilmagan"}</b> • Probeg: <b>{book.current_mileage || 0} km</b>
-                  </div>
-                </div>
-                <Button 
-                  type="primary" 
-                  size="small"
-                  icon={<PlusOutlined />}
-                  style={{ borderRadius: 8 }}
-                  onClick={() => {
-                    setActiveBook(book);
-                    setAddRecOpen(true);
-                  }}
-                >
-                  Xarajat yozish
-                </Button>
-              </div>
-
-              {/* HUJJATLAR (Sug'urta va Texosmotr) */}
-              <Row gutter={12} style={{ marginBottom: 16 }}>
-                <Col span={12}>
-                  <div style={{ background: "#f1f5f9", padding: "8px 12px", borderRadius: 10 }}>
-                    <div style={{ fontSize: 11, color: "#64748b", display: "flex", alignItems: "center", gap: 4 }}>
-                      <SafetyCertificateOutlined /> Sug'urta
-                    </div>
-                    <div style={{ fontWeight: 700, fontSize: 13, marginTop: 2 }}>
-                      {book.insurance_expiry ? dayjs(book.insurance_expiry).format("DD.MM.YYYY") : "Kiritilmagan"}
-                    </div>
-                  </div>
-                </Col>
-                <Col span={12}>
-                  <div style={{ background: "#f1f5f9", padding: "8px 12px", borderRadius: 10 }}>
-                    <div style={{ fontSize: 11, color: "#64748b", display: "flex", alignItems: "center", gap: 4 }}>
-                      <FileDoneOutlined /> Tex. ko'rik
-                    </div>
-                    <div style={{ fontWeight: 700, fontSize: 13, marginTop: 2 }}>
-                      {book.tex_expiry ? dayjs(book.tex_expiry).format("DD.MM.YYYY") : "Kiritilmagan"}
-                    </div>
-                  </div>
-                </Col>
-              </Row>
-
-              {/* XARAJATLAR TARIXI WIDGETI */}
-              <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 16 }}>
-                <ServiceBookWidget book={book} />
-              </div>
-            </Card>
+            <ServiceBookWidget key={book.id} book={book} onAddRecord={() => openAddRecord(book)} />
           ))}
         </div>
       )}
 
-      {/* 1. YANGI DAFTAR OCHISH MODALI */}
-      <Modal 
-        title={<div style={{ fontWeight: 800, fontSize: 18 }}>Yangi Mashina qo'shish</div>}
-        open={addBookOpen} 
-        onOk={handleAddBook} 
-        onCancel={() => setAddBookOpen(false)}
-        okText={am("app.add") || "Qo'shish"} 
-        cancelText={am("app.cancel") || "Bekor qilish"}
-        centered
-      >
-        <div style={{ display
+      {/* {am("serviceBook.addCar")} modal */}
+      <Modal title={am("serviceBook.newCar")} open={addBookOpen} onOk={handleAddBook} onCancel={()=>setAddBookOpen(false)}
+        okText={am("app.add")} cancelText={am("app.cancel")}>
+        <div style={{ display:"grid", gap:10, marginTop:10 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+            <Select value={newBook.car_brand||undefined} allowClear placeholder={am("common.brand")}
+              onChange={v=>setNewBook(p=>({...p,car_brand:v||""}))}
+              options={BRANDS.map(b=>({value:b.name,label:b.name}))} style={{width:"100%"}} />
+            <Input placeholder={am("common.model")} value={newBook.car_model}
+              onChange={e=>setNewBook(p=>({...p,car_model:e.target.value}))} />
+            <InputNumber placeholder={am("common.year")} value={newBook.car_year||undefined}
+              onChange={v=>setNewBook(p=>({...p,car_year:v}))} style={{width:"100%"}} min={1990} max={2030} />
+            <Input placeholder="Davlat raqami (ixtiyoriy)" value={newBook.car_plate}
+              onChange={e=>setNewBook(p=>({...p,car_plate:e.target.value}))} />
+          </div>
+          <InputNumber placeholder="Hozirgi probeg (km)" value={newBook.current_mileage||undefined}
+            onChange={v=>setNewBook(p=>({...p,current_mileage:v||0}))} style={{width:"100%"}} min={0} />
+          <InputNumber placeholder="Moy almashtirish intervalı (km)" value={newBook.oil_change_km||undefined}
+            onChange={v=>setNewBook(p=>({...p,oil_change_km:v||10000}))} style={{width:"100%"}} min={1000} />
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+            <Input placeholder="Sug'urta tugashi (sana)" value={newBook.insurance_expiry}
+              onChange={e=>setNewBook(p=>({...p,insurance_expiry:e.target.value}))} />
+            <Input placeholder="Texosmotr tugashi (sana)" value={newBook.tex_expiry}
+              onChange={e=>setNewBook(p=>({...p,tex_expiry:e.target.value}))} />
+          </div>
+        </div>
+      </Modal>
+
+      {/* Yozuv qo'shish modal */}
+      <Modal title={`${am("serviceBook.addRecord")}: ${activeBook?.car_brand || ""} ${activeBook?.car_model || ""}`}
+        open={addRecOpen} onOk={handleAddRecord} onCancel={()=>setAddRecOpen(false)}
+        okText={am("app.add")} cancelText={am("app.cancel")}>
+        <div style={{ display:"grid", gap:10, marginTop:10 }}>
+          <Select value={newRec.service_type} onChange={v=>setNewRec(p=>({...p,service_type:v,title:SERVICE_TYPES.find(s=>s.id===v)?.label||""}))}
+            style={{width:"100%"}}
+            options={SERVICE_TYPES.map(s=>({value:s.id,label:`${s.emoji} ${s.label}`}))} />
+          <Input placeholder="Sarlavha" value={newRec.title}
+            onChange={e=>setNewRec(p=>({...p,title:e.target.value}))} />
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+            <InputNumber placeholder="Probeg (km)" value={newRec.mileage_at||undefined}
+              onChange={v=>setNewRec(p=>({...p,mileage_at:v||""}))} style={{width:"100%"}} min={0} />
+            <InputNumber placeholder="Narx" value={newRec.cost||undefined}
+              onChange={v=>setNewRec(p=>({...p,cost:v||""}))} style={{width:"100%"}} min={0} />
+            <InputNumber placeholder="Keyingi xizmat (km)" value={newRec.next_due_km||undefined}
+              onChange={v=>setNewRec(p=>({...p,next_due_km:v||""}))} style={{width:"100%"}} min={0} />
+          </div>
+          <Input.TextArea placeholder="Izoh" value={newRec.note}
+            onChange={e=>setNewRec(p=>({...p,note:e.target.value}))} rows={2} />
+        </div>
+      </Modal>
+    </div>
+  );
+}

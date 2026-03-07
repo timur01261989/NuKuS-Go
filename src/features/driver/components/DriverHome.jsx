@@ -361,7 +361,7 @@ useEffect(() => {
               />
             ) : (
               <div className="w-full h-full rounded-full bg-white flex items-center justify-center text-primarySidebar">
-                <span className="material-symbols-outlined">person</span>
+                <span className="material-symbols-outlined" data-no-auto-translate="true">person</span>
               </div>
             )}
           </div>
@@ -413,7 +413,7 @@ useEffect(() => {
           >
             <div className="flex items-center gap-5">
               <div className="w-16 h-16 rounded-2xl bg-orange-100 flex items-center justify-center text-primarySidebar">
-                <span className="material-symbols-outlined text-4xl">local_taxi</span>
+                <span className="material-symbols-outlined text-4xl" data-no-auto-translate="true">local_taxi</span>
               </div>
               <div>
                 <h3 className="text-2xl font-bold text-slate-900">{tr("taxi", "Shahar ichida taksi")}</h3>
@@ -422,7 +422,7 @@ useEffect(() => {
             </div>
 
             <div className="bg-primarySidebar text-white h-12 w-12 rounded-xl flex items-center justify-center shadow-lg">
-              <span className="material-symbols-outlined">arrow_forward</span>
+              <span className="material-symbols-outlined" data-no-auto-translate="true">arrow_forward</span>
             </div>
           </button>
         </section>
@@ -435,7 +435,7 @@ useEffect(() => {
             className="neumorphic-pop rounded-2xl p-6 flex flex-col items-center text-center gap-4 border border-white/50"
           >
             <div className="w-14 h-14 rounded-2xl bg-orange-100 flex items-center justify-center text-primarySidebar">
-              <span className="material-symbols-outlined text-4xl">map</span>
+              <span className="material-symbols-outlined text-4xl" data-no-auto-translate="true">map</span>
             </div>
             <p className="font-bold text-slate-800">{tr("interProvincial", "Viloyatlar aro")}</p>
           </button>
@@ -446,7 +446,7 @@ useEffect(() => {
             className="neumorphic-pop rounded-2xl p-6 flex flex-col items-center text-center gap-4 border border-white/50"
           >
             <div className="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center text-blue-600">
-              <span className="material-symbols-outlined text-4xl">distance</span>
+              <span className="material-symbols-outlined text-4xl" data-no-auto-translate="true">distance</span>
             </div>
             <p className="font-bold text-slate-800">{tr("interDistrict", "Tumanlar aro")}</p>
           </button>
@@ -457,7 +457,7 @@ useEffect(() => {
             className="neumorphic-pop rounded-2xl p-6 flex flex-col items-center text-center gap-4 border border-white/50"
           >
             <div className="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600">
-              <span className="material-symbols-outlined text-4xl">local_shipping</span>
+              <span className="material-symbols-outlined text-4xl" data-no-auto-translate="true">local_shipping</span>
             </div>
             <p className="font-bold text-slate-800">{tr("freight", "Yuk tashish")}</p>
           </button>
@@ -468,7 +468,7 @@ useEffect(() => {
             className="neumorphic-pop rounded-2xl p-6 flex flex-col items-center text-center gap-4 border border-white/50"
           >
             <div className="w-14 h-14 rounded-2xl bg-purple-100 flex items-center justify-center text-purple-600">
-              <span className="material-symbols-outlined text-4xl">inventory_2</span>
+              <span className="material-symbols-outlined text-4xl" data-no-auto-translate="true">inventory_2</span>
             </div>
             <p className="font-bold text-slate-800">{tr("delivery", "Eltish xizmati")}</p>
           </button>
@@ -485,7 +485,7 @@ useEffect(() => {
           }}
           className="flex flex-col items-center gap-1 text-primarySidebar"
         >
-          <span className="material-symbols-outlined">home</span>
+          <span className="material-symbols-outlined" data-no-auto-translate="true">home</span>
           <span className="text-[10px] font-bold">{tr("home", "Asosiy")}</span>
         </button>
 
@@ -494,7 +494,7 @@ useEffect(() => {
           onClick={() => navigate("/driver/orders")}
           className="flex flex-col items-center gap-1 text-slate-400"
         >
-          <span className="material-symbols-outlined">history</span>
+          <span className="material-symbols-outlined" data-no-auto-translate="true">history</span>
           <span className="text-[10px] font-medium">{tr("orderHistoryDriver", tr("orders", "Buyurtmalar tarixi"))}</span>
         </button>
 
@@ -503,7 +503,7 @@ useEffect(() => {
           onClick={() => navigate("/driver/settings")}
           className="flex flex-col items-center gap-1 text-slate-400"
         >
-          <span className="material-symbols-outlined">settings</span>
+          <span className="material-symbols-outlined" data-no-auto-translate="true">settings</span>
           <span className="text-[10px] font-medium">{tr("settingsTitle", "Sozlamalar")}</span>
         </button>
       </nav>

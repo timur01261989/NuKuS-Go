@@ -115,10 +115,10 @@ export default function ClientHome() {
 
         <div className="flex items-center gap-2">
           <button type="button" className="neumorphic-dark p-2 rounded-xl text-primaryHome" onClick={() => navigate('/settings')}>
-            <span className="material-symbols-outlined">settings</span>
+            <span className="material-symbols-outlined" data-no-auto-translate="true">settings</span>
           </button>
           <button type="button" className="neumorphic-dark p-2 rounded-xl text-primaryHome">
-            <span className="material-symbols-outlined">notifications</span>
+            <span className="material-symbols-outlined" data-no-auto-translate="true">notifications</span>
           </button>
         </div>
       </header>
@@ -203,7 +203,7 @@ export default function ClientHome() {
               <p className="text-sm text-slate-400">{t.autoMarketHint}</p>
             </div>
             <div className="text-primaryHome">
-              <span className="material-symbols-outlined text-4xl">directions_car</span>
+              <span className="material-symbols-outlined text-4xl" data-no-auto-translate="true">directions_car</span>
             </div>
           </button>
         </section>
@@ -280,7 +280,7 @@ function ServiceCard({ icon, label, onClick, onMouseEnter, onTouchStart }) {
       className="neumorphic-dark p-4 rounded-2xl flex flex-col items-center text-center gap-3 active:scale-95 transition-all"
     >
       <div className="bg-primaryHome/10 p-3 rounded-xl text-primaryHome">
-        <span className="material-symbols-outlined text-3xl">{icon}</span>
+        <span className="material-symbols-outlined text-3xl" data-no-auto-translate="true">{icon}</span>
       </div>
       <p className="text-sm font-semibold">{label}</p>
     </button>
@@ -327,7 +327,7 @@ function BottomNavItem({ icon, label, active, onClick }) {
         (active ? "text-primaryHome" : "text-slate-400")
       }
     >
-      <span className={"material-symbols-outlined " + (active ? "font-variation-fill" : "")}>
+      <span className={"material-symbols-outlined " + (active ? "font-variation-fill" : "")} data-no-auto-translate="true">
         {icon}
       </span>
       <span className="text-[10px] font-medium">{label}</span>

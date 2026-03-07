@@ -84,7 +84,7 @@ export default function ClientSidebar({ open, onClose, profile }) {
 
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
           <button type="button" className="w-full flex items-center gap-4 p-3 rounded-xl transition-colors bg-primarySidebar/10 text-primarySidebar border border-primarySidebar/20 text-left" onClick={() => go('/driver-mode', { replace: true, state: { from: location.pathname } })}>
-            <span className="material-symbols-outlined">local_taxi</span>
+            <span className="material-symbols-outlined" data-no-auto-translate="true">local_taxi</span>
             <span className="font-semibold">{t.workAsDriver}</span>
           </button>
 
@@ -117,7 +117,7 @@ export default function ClientSidebar({ open, onClose, profile }) {
 function SidebarItem({ icon, label, active, onClick }) {
   return (
     <button type="button" className={cx('w-full flex items-center gap-4 p-3 rounded-xl transition-colors text-left', active ? 'bg-primarySidebar/10 text-primarySidebar border border-primarySidebar/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300')} onClick={onClick}>
-      <span className={cx('material-symbols-outlined', active ? '' : 'text-slate-400')}>{icon}</span>
+      <span className={cx('material-symbols-outlined', active ? '' : 'text-slate-400')} data-no-auto-translate="true">{icon}</span>
       <span className={cx(active ? 'font-semibold' : 'font-medium')}>{label}</span>
     </button>
   );
