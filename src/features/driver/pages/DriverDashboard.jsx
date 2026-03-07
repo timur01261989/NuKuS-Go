@@ -3,20 +3,15 @@ import {
   Button,
   Card,
   Drawer,
-  Space,
   Typography,
   Divider,
-  Switch,
-  Tag,
+  Switch as AntSwitch,
   message,
-  Avatar,
-  Spin
+  Avatar
 } from "antd";
 import {
   MenuOutlined,
   CarOutlined,
-  EnvironmentOutlined,
-  RocketOutlined,
   SettingOutlined,
   HistoryOutlined,
   CustomerServiceOutlined,
@@ -26,8 +21,8 @@ import {
   StopOutlined
 } from "@ant-design/icons";
 import { useLocation, useNavigate } from "react-router-dom";
-import { supabase } from "../../../lib/supabase"; 
-import { useLanguage } from "../../../shared/i18n/useLanguage"; 
+import { supabase } from "../../../lib/supabase";
+import { useLanguage } from "../../../shared/i18n/useLanguage";
 import { startTracking } from "../components/services/locationService";
 import DriverHome from "../components/DriverHome";
 import { DriverOnlineProvider } from "../core/DriverOnlineContext";
@@ -60,16 +55,16 @@ export default function DriverDashboard() {
 
         const userId = authData?.user?.id;
         if (!userId) {
-      // NOTE: RoleGate handles auth redirects. Avoid redirect loops here.
-      // navigate("/login", { replace: true });
+          // NOTE: RoleGate handles auth redirects. Avoid redirect loops here.
+          // navigate("/login", { replace: true });
           return;
         }
 
         if (isMounted) setGateAllowed(true);
       } catch (e) {
         console.error("Driver dashboard gate error:", e);
-      // NOTE: RoleGate handles auth redirects. Avoid redirect loops here.
-      // navigate("/login", { replace: true });
+        // NOTE: RoleGate handles auth redirects. Avoid redirect loops here.
+        // navigate("/login", { replace: true });
       } finally {
         if (isMounted) setGateLoading(false);
       }
@@ -81,8 +76,6 @@ export default function DriverDashboard() {
       isMounted = false;
     };
   }, [navigate]);
-  const location = useLocation();
-  const { t } = useLanguage(); 
 
   /**
    * Driver bosh sahifada xizmatlar (Shahar ichida / Viloyatlar aro / Tumanlar aro / Eltish / Yuk tashish)
@@ -102,7 +95,7 @@ export default function DriverDashboard() {
     }
   };
 
-    if (gateLoading) {
+  if (gateLoading) {
     return (
       <div style={{ padding: 24, textAlign: "center" }}>
         Yuklanmoqda...
@@ -128,15 +121,20 @@ export default function DriverDashboard() {
  * Not used by default to avoid hook/TDZ issues and runtime crashes.
  */
 function LegacyDriverDashboard() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { t } = useLanguage();
 
+  // keep location referenced so linter/build optimizers don't rewrite unexpectedly
+  void location;
 
   // =========================
   // STATE
   // =========================
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profile, setProfile] = useState({ fullName: "", avatarUrl: "", phone: "" });
-  const [loading, setLoading] = useState(false); 
-  
+  const [loading, setLoading] = useState(false);
+
   const [isOnline, setIsOnline] = useState(() => {
     const v = localStorage.getItem("driverOnline");
     return v === "1";
@@ -150,10 +148,12 @@ function LegacyDriverDashboard() {
 
     const fetchProfile = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         if (!user) {
-      // NOTE: RoleGate handles auth redirects. Avoid redirect loops here.
-      // navigate("/login", { replace: true });
+          // NOTE: RoleGate handles auth redirects. Avoid redirect loops here.
+          // navigate("/login", { replace: true });
           return;
         }
 
@@ -203,16 +203,18 @@ function LegacyDriverDashboard() {
   const toggleOnline = async (checked) => {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error("Foydalanuvchi topilmadi");
 
       // DIQQAT: Faqat 'is_online' va 'last_seen_at' o'zgaradi.
       // 'status' ustuniga tegmaymiz (u 'active' bo'lib qolishi shart).
       const { error } = await supabase
         .from("drivers")
-        .update({ 
+        .update({
           is_online: checked,
-          last_seen_at: new Date().toISOString() 
+          last_seen_at: new Date().toISOString(),
         })
         .eq("user_id", user.id);
 
@@ -220,20 +222,19 @@ function LegacyDriverDashboard() {
 
       setIsOnline(checked);
       localStorage.setItem("driverOnline", checked ? "1" : "0");
-      
+
       if (checked) {
         message.success("Siz Online bo'ldingiz.");
-        startTracking(); 
+        startTracking();
       } else {
         message.warning("Siz Offline bo'ldingiz.");
       }
-
     } catch (err) {
       console.error("Xatolik:", err);
       message.error("Statusni o'zgartirishda xatolik!");
       setIsOnline(!checked); // Xato bo'lsa qaytarib qo'yamiz
     } finally {
-      setLoading(false); 
+      setLoading(false);
     }
   };
 
@@ -303,7 +304,7 @@ function LegacyDriverDashboard() {
             borderRadius: 16,
             border: "none",
             boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
-            background: isOnline ? "linear-gradient(135deg, #f6ffed 0%, #ffffff 100%)" : "#fff"
+            background: isOnline ? "linear-gradient(135deg, #f6ffed 0%, #ffffff 100%)" : "#fff",
           }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -317,7 +318,7 @@ function LegacyDriverDashboard() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  border: isOnline ? "1px solid #b7eb8f" : "1px solid #ffa39e"
+                  border: isOnline ? "1px solid #b7eb8f" : "1px solid #ffa39e",
                 }}
               >
                 {isOnline ? (
@@ -328,7 +329,7 @@ function LegacyDriverDashboard() {
               </div>
               <div>
                 <Text strong style={{ fontSize: 16, display: "block" }}>
-                  {isOnline ? (t?.online || "Siz Onlaynsiz") : (t?.offline || "Siz Offlaynsiz")}
+                  {isOnline ? t?.online || "Siz Onlaynsiz" : t?.offline || "Siz Offlaynsiz"}
                 </Text>
                 <Text type="secondary" style={{ fontSize: 12 }}>
                   {isOnline ? "Buyurtmalar qabul qilinmoqda" : "Hozir dam olish rejimi"}
@@ -336,13 +337,13 @@ function LegacyDriverDashboard() {
               </div>
             </div>
 
-            <Switch
+            <AntSwitch
               checkedChildren="ON"
               unCheckedChildren="OFF"
               checked={isOnline}
               loading={loading}
               onChange={toggleOnline}
-              style={{ transform: "scale(1.2)" }} 
+              style={{ transform: "scale(1.2)" }}
             />
           </div>
         </Card>
@@ -361,7 +362,7 @@ function LegacyDriverDashboard() {
             alignItems: "center",
             justifyContent: "flex-start",
             fontSize: 16,
-            fontWeight: 500
+            fontWeight: 500,
           }}
           onClick={() => go("/driver/orders")}
         >
@@ -379,7 +380,7 @@ function LegacyDriverDashboard() {
             alignItems: "center",
             justifyContent: "flex-start",
             fontSize: 16,
-            fontWeight: 500
+            fontWeight: 500,
           }}
           onClick={() => go("/settings")}
         >
@@ -397,7 +398,7 @@ function LegacyDriverDashboard() {
             alignItems: "center",
             justifyContent: "flex-start",
             fontSize: 16,
-            fontWeight: 500
+            fontWeight: 500,
           }}
           onClick={() => go("/support")}
         >
@@ -416,7 +417,7 @@ function LegacyDriverDashboard() {
             justifyContent: "flex-start",
             fontSize: 16,
             fontWeight: 500,
-            marginTop: 20
+            marginTop: 20,
           }}
           onClick={handleLogout}
         >
@@ -433,19 +434,21 @@ function LegacyDriverDashboard() {
         width={280}
       >
         <div style={{ textAlign: "center", marginBottom: 24 }}>
-           <Avatar size={64} icon={<UserOutlined />} src={profile.avatarUrl} style={{ marginBottom: 12 }} />
-           <Title level={4} style={{ margin: 0 }}>{profile.fullName}</Title>
-           <Text type="secondary">{profile.phone}</Text>
+          <Avatar size={64} icon={<UserOutlined />} src={profile.avatarUrl} style={{ marginBottom: 12 }} />
+          <Title level={4} style={{ margin: 0 }}>
+            {profile.fullName}
+          </Title>
+          <Text type="secondary">{profile.phone}</Text>
         </div>
         <Divider />
         <Button type="text" block style={{ textAlign: "left", height: 40 }} icon={<CarOutlined />} onClick={() => go("/driver/home")}>
-           Asosiy
+          Asosiy
         </Button>
         <Button type="text" block style={{ textAlign: "left", height: 40 }} icon={<HistoryOutlined />} onClick={() => go("/driver/orders")}>
-           Tarix
+          Tarix
         </Button>
         <Button type="text" block style={{ textAlign: "left", height: 40 }} icon={<SettingOutlined />} onClick={() => go("/settings")}>
-           Sozlamalar
+          Sozlamalar
         </Button>
       </Drawer>
     </div>
