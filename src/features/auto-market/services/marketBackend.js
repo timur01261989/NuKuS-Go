@@ -57,9 +57,9 @@ function normalizeAdRow(row) {
  */
 export const promoteAd = async (adId, promoType) => {
   try {
-    const { data } = await axiosClient.post('/market/promote', {
+    const { data } = await axiosClient.post("/market/promote", {
       ad_id: adId,
-      promo_type: promoType
+      promo_type: promoType,
     });
     return data;
   } catch (err) {
@@ -74,7 +74,7 @@ export const promoteAd = async (adId, promoType) => {
  */
 export const revealSellerPhone = async (adId) => {
   try {
-    const { data } = await axiosClient.post('/market/reveal-phone', { ad_id: adId });
+    const { data } = await axiosClient.post("/market/reveal-phone", { ad_id: adId });
     return data;
   } catch (err) {
     console.error("Reveal Phone Error:", err);
@@ -87,14 +87,58 @@ export const revealSellerPhone = async (adId) => {
  */
 export async function getWalletBalance() {
   try {
-    const { data } = await axiosClient.get('/wallet');
-    if (typeof data === 'number') return data;
+    const { data } = await axiosClient.get("/wallet");
+    if (typeof data === "number") return data;
     return data?.wallet?.balance_uzs ?? data?.balance ?? 0;
   } catch (err) {
     console.error("Wallet Balance Fetch Error:", err);
     return 0;
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// YANGI QO'SHILGAN FUNKSIYALAR
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * updateGarajItem - Garajdagi mashina ma'lumotlarini yangilash
+ * (Sug'urta muddati, yurgan yo'li va h.k.)
+ */
+export const updateGarajItem = async (adId, updates) => {
+  if (!SB_READY) {
+    const current = JSON.parse(localStorage.getItem("my_garaj") || "[]");
+    const newList = current.map((item) =>
+      String(item.ad_id) === String(adId) ? { ...item, ...updates } : item
+    );
+    localStorage.setItem("my_garaj", JSON.stringify(newList));
+    return newList;
+  }
+
+  const uid = await getAuthUserId();
+  if (!uid) throw new Error("Garajni yangilash uchun avval tizimga kiring");
+
+  try {
+    const { error } = await supabase
+      .from("auto_garaj")
+      .update(updates)
+      .eq("user_id", uid)
+      .eq("ad_id", adId);
+
+    if (error) throw error;
+    return getGaraj();
+  } catch (err) {
+    console.error("Garajni yangilashda xato:", err);
+    if (isMissingRelationError(err)) {
+      const current = JSON.parse(localStorage.getItem("my_garaj") || "[]");
+      const newList = current.map((item) =>
+        String(item.ad_id) === String(adId) ? { ...item, ...updates } : item
+      );
+      localStorage.setItem("my_garaj", JSON.stringify(newList));
+      return newList;
+    }
+    throw err;
+  }
+};
 
 export async function listCars(filters = {}, { page = 1, pageSize = 12 } = {}) {
   if (!SB_READY) return mock.listCars(filters, { page, pageSize });
@@ -106,7 +150,7 @@ export async function listCars(filters = {}, { page = 1, pageSize = 12 } = {}) {
     let q = supabase
       .from("auto_ads")
       .select("*, images:auto_ad_images(url, sort_order)", { count: "exact" })
-      .in("status", ["active", "pending"]) // pending: egasi ko'rishi mumkin
+      .in("status", ["active", "pending"])
       .order("is_top", { ascending: false })
       .order("created_at", { ascending: false })
       .range(from, to);
@@ -157,7 +201,6 @@ export async function getCarById(id) {
 
   try {
     const uid = await getAuthUserId();
-    // view increment (best-effort)
     await supabase.rpc("auto_market_inc_view", { p_ad_id: id }).catch(() => {});
 
     const { data, error } = await supabase
@@ -170,7 +213,6 @@ export async function getCarById(id) {
     if (!data) throw new Error("E'lon topilmadi");
 
     const row = normalizeAdRow(data);
-    // SECURITY/UX: other users do not see phone by default (reveal API orqali)
     const is_owner = uid && String(row.user_id) === String(uid);
     return {
       ...row,
@@ -213,8 +255,6 @@ export async function createCarAd(draft) {
 
   try {
     const now = new Date().toISOString();
-
-    // Anti-spam: bir kunda 10 tadan ko'p e'lon bermaslik
     const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
     const { count: dailyCount } = await supabase
@@ -225,7 +265,6 @@ export async function createCarAd(draft) {
 
     if ((dailyCount || 0) >= 10) throw new Error("Bir kunda 10 tadan ko'p e'lon joylab bo'lmaydi");
 
-    // Duplicate check: phone + (vin | title)
     const phone = draft?.seller?.phone || draft?.seller_phone || "";
     const vin = (draft?.vin || "").trim();
     const title = (draft?.title || "").trim();
@@ -262,7 +301,7 @@ export async function createCarAd(draft) {
       kredit: !!draft.kredit,
       exchange: !!draft.exchange,
       comfort: draft.comfort || null,
-      status: "pending", // moderatsiya
+      status: "pending",
       is_top: !!draft.is_top,
       views: 0,
       seller_name: draft?.seller?.name || draft?.seller_name || null,
@@ -290,7 +329,9 @@ export async function createCarAd(draft) {
     }
 
     if (payload.price) {
-      await supabase.from("auto_price_history").insert({ ad_id: inserted.id, at: now, price: payload.price, currency: payload.currency });
+      await supabase
+        .from("auto_price_history")
+        .insert({ ad_id: inserted.id, at: now, price: payload.price, currency: payload.currency });
     }
 
     return normalizeAdRow({ ...inserted, images: images.map((url, idx) => ({ url, sort_order: idx })) });
@@ -658,7 +699,6 @@ export const analyzeFairPrice = (...a) => mock.analyzeFairPrice?.(...a);
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function getCarList(params = {}) {
-  // params may come as { filters, page, pageSize }
   const filters = params.filters ?? params;
   const page = params.page ?? 1;
   const pageSize = params.pageSize ?? 12;
@@ -691,6 +731,7 @@ const marketBackend = {
   addToGaraj,
   removeFromGaraj,
   isInGaraj,
+  updateGarajItem,
   getServiceBooks,
   createServiceBook,
   addServiceRecord,
