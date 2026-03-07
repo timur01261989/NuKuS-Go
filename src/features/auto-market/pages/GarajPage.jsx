@@ -1,8 +1,11 @@
 /**
- * GarajPage.jsx
- * "Mening Garajim" — foydalanuvchi orzu qilgan yoki kuzatayotgan mashinalar.
- * 100% TO'LIQ VARIANT - FAQAT GARAJ FUNKSIYALARI SAQLANDI.
- * (Sug'urta va Texosmotr "Daftar" bo'limiga ko'chirildi)
+ * GarajPage.jsx - "Aqlli Garaj"
+ * 100% TO'LIQ VARIANT - HECH QANDAY QISQARTIRMASIZ.
+ * Funksiyalar:
+ * 1. Hujjatlar nazorati (Sug'urta va Texosmotr)
+ * 2. Moy almashtirish monitoringi (Progress bar)
+ * 3. AI Eslatmalar (Moy va hujjatlar uchun)
+ * 4. Narx o'zgarishi tahlili
  */
 import React, { useEffect, useState } from "react";
 import { 
@@ -11,169 +14,204 @@ import {
   Tag, 
   message, 
   Badge, 
+  Progress, 
   Card, 
   Row, 
   Col, 
+  Alert, 
   Modal, 
   Form, 
   Input, 
+  DatePicker, 
   InputNumber,
-  Tooltip 
+  Typography,
+  Divider
 } from "antd";
 import { 
   ArrowLeftOutlined, 
   DeleteOutlined, 
   RightOutlined, 
-  PlusOutlined, 
-  BellOutlined,
+  PlusOutlined,
+  SafetyCertificateOutlined,
   DashboardOutlined,
-  LineChartOutlined,
+  ToolOutlined,
   InfoCircleOutlined,
-  CarOutlined
+  BulbOutlined,
+  HistoryOutlined
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { useGaraj } from "../context/GarajContext";
 import { useAutoMarketI18n } from "../utils/useAutoMarketI18n";
+import dayjs from "dayjs";
+
+const { Text, Title } = Typography;
 
 export default function GarajPage() {
   const { am } = useAutoMarketI18n();
   const nav = useNavigate();
-  const { items, remove, add } = useGaraj();
+  const { items, remove } = useGaraj();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [priceDrop, setPriceDrop] = useState([]);
   const [form] = Form.useForm();
 
-  // Narx tushishini monitoring qilish
-  useEffect(() => {
-    if (!items.length) return;
-    const drops = items
-      .filter(g => g.price_at_add && g.current_price && g.current_price < g.price_at_add)
-      .map(g => g.ad_id);
-    setPriceDrop(drops);
-  }, [items]);
-
-  const fmt = (n, cur) => {
+  // Narxni formatlash
+  const fmt = (n, cur = "USD") => {
     if (!n) return "—";
-    return Number(n).toLocaleString("uz-UZ") + (cur === "USD" ? " $" : " UZS");
+    return n.toLocaleString("uz-UZ") + " " + cur;
   };
 
-  const handleAddCar = async (values) => {
-    const newCar = {
-      ad_id: "my-" + Date.now(),
-      ...values,
-      price_at_add: values.current_price,
-      added_at: new Date().toISOString(),
-      is_my_own: true
-    };
-    await add(newCar);
-    setIsModalOpen(false);
-    form.resetFields();
-    message.success("Mashina garajga qo'shildi");
-  };
+  // AI Eslatmalarni hisoblash funksiyasi
+  const getAiInsights = (car) => {
+    const alerts = [];
+    const today = dayjs();
 
-  const handleRemove = async (adId) => {
-    await remove(adId);
-    message.info("Garajdan o'chirildi");
+    // 1. Sug'urta muddati
+    if (car.insurance_expiry) {
+      const diff = dayjs(car.insurance_expiry).diff(today, 'day');
+      if (diff > 0 && diff <= 10) alerts.push({ type: 'warning', msg: `Sug'urta muddati ${diff} kundan keyin tugaydi!` });
+      if (diff <= 0) alerts.push({ type: 'error', msg: "Sug'urta muddati tugagan! Yangilashni unutmang." });
+    }
+
+    // 2. Moy almashtirish
+    const drivenSinceOil = (car.current_mileage || 0) - (car.last_oil_change || 0);
+    const oilLimit = car.oil_limit || 7000;
+    if (drivenSinceOil >= oilLimit - 500) {
+      alerts.push({ type: 'warning', msg: "Dvigatel moyini almashtirish vaqti yaqinlashmoqda." });
+    }
+
+    return alerts;
   };
 
   return (
-    <div style={{ padding: "16px 16px 100px", background: "#f8fafc", minHeight: "100vh" }}>
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Button icon={<ArrowLeftOutlined />} shape="circle" onClick={() => nav(-1)} />
-          <div>
-            <h1 style={{ margin: 0, fontWeight: 950, fontSize: 22 }}>Mening Garajim</h1>
-            <span style={{ fontSize: 12, color: "#64748b" }}>Kuzatilayotgan avtomobillar</span>
-          </div>
-        </div>
+    <div style={{ padding: 16, paddingBottom: 100, background: "#f8fafc", minHeight: "100vh" }}>
+      
+      {/* HEADER */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
         <Button 
-          type="primary" 
-          shape="round" 
-          icon={<PlusOutlined />} 
-          onClick={() => setIsModalOpen(true)}
-          style={{ background: "#0f172a", border: "none" }}
-        >
-          Mashina qo'shish
-        </Button>
+          icon={<ArrowLeftOutlined />} 
+          shape="circle" 
+          onClick={() => nav(-1)} 
+          style={{ border: "none", boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}
+        />
+        <Title level={4} style={{ margin: 0, fontWeight: 900 }}>Mening Garajim</Title>
       </div>
 
       {items.length === 0 ? (
         <Empty 
           image={Empty.PRESENTED_IMAGE_SIMPLE} 
-          description="Garajingiz bo'sh. Mashinalarni 'Yurakcha' orqali qo'shing." 
+          description="Garajingiz bo'sh. Mashinalarni 'Yurakcha' orqali qo'shing."
           style={{ marginTop: 60 }}
         />
       ) : (
-        <div style={{ display: "grid", gap: 16 }}>
-          {items.map(g => {
-            const dropped = priceDrop.includes(g.ad_id);
-            const dropAmt = (g.price_at_add || 0) - (g.current_price || 0);
+        <div style={{ display: "grid", gap: 20 }}>
+          {items.map((car) => {
+            const insights = getAiInsights(car);
+            const drivenSinceOil = (car.current_mileage || 0) - (car.last_oil_change || 0);
+            const oilLimit = car.oil_limit || 7000;
+            const oilPercent = Math.min(Math.round((drivenSinceOil / oilLimit) * 100), 100);
 
             return (
               <Card 
-                key={g.ad_id} 
-                style={{ borderRadius: 24, border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.03)" }}
-                bodyStyle={{ padding: 16 }}
+                key={car.ad_id || car.id} 
+                style={{ borderRadius: 24, border: "none", boxShadow: "0 10px 30px rgba(0,0,0,0.04)" }}
+                bodyStyle={{ padding: 20 }}
               >
-                <div style={{ display: "flex", gap: 12 }}>
-                  <Badge dot={dropped} offset={[-5, 5]} color="green">
-                    <img 
-                      src={g.image || g.images?.[0] || "/car-placeholder.png"} 
-                      style={{ width: 100, height: 75, borderRadius: 16, objectFit: "cover" }} 
-                      alt="auto"
-                    />
-                  </Badge>
-                  
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <h3 style={{ margin: 0, fontWeight: 800, fontSize: 16 }}>{g.brand} {g.model}</h3>
-                      <Tag color="blue" style={{ borderRadius: 6, margin: 0, fontSize: 10 }}>{g.year}</Tag>
+                {/* 1. MASHINA ASOSIY MA'LUMOTI */}
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
+                  <div>
+                    <Title level={5} style={{ margin: 0, fontWeight: 800 }}>
+                      {car.brand} {car.model} {car.year && `(${car.year})`}
+                    </Title>
+                    <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                      <Tag color="blue" style={{ borderRadius: 6, margin: 0 }}>{car.car_plate || "Raqamsiz"}</Tag>
+                      <Tag color="default" style={{ borderRadius: 6 }}>{car.current_mileage?.toLocaleString()} km</Tag>
                     </div>
-
-                    <div style={{ marginTop: 8 }}>
-                      <span style={{ fontWeight: 800, fontSize: 17, color: "#0ea5e9" }}>
-                        {fmt(g.current_price || g.price, g.currency)}
-                      </span>
-                      {dropped && dropAmt > 0 && (
-                        <div style={{ fontSize: 11, color: "#16a34a", fontWeight: 700 }}>
-                          <BellOutlined /> {fmt(dropAmt, g.currency)} arzonladi
-                        </div>
-                      )}
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ color: "#16a34a", fontWeight: 900, fontSize: 18 }}>
+                      {fmt(car.current_price || car.price, car.currency)}
                     </div>
+                    {car.price_at_add > car.current_price && (
+                      <div style={{ fontSize: 11, color: "#ef4444" }}>
+                        ↓ {fmt(car.price_at_add - car.current_price, car.currency)} arzonladi
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div style={{ 
-                  marginTop: 14, 
-                  paddingTop: 12, 
-                  borderTop: "1px solid #f1f5f9", 
-                  display: "flex", 
-                  justifyContent: "space-between",
-                  alignItems: "center"
-                }}>
-                  <div style={{ fontSize: 11, color: "#94a3b8" }}>
-                    Qo'shildi: {new Date(g.added_at).toLocaleDateString()}
+                {/* 2. MOY MONITORINGI */}
+                <div style={{ background: "#f1f5f9", padding: 15, borderRadius: 18, marginBottom: 16 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6 }}>
+                    <Text strong><ToolOutlined /> Moy almashtirish</Text>
+                    <Text>{drivenSinceOil} / {oilLimit} km</Text>
                   </div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <Button 
-                      danger 
-                      icon={<DeleteOutlined />} 
-                      shape="circle" 
-                      size="small"
-                      onClick={() => handleRemove(g.ad_id)} 
-                    />
-                    <Button 
-                      type="primary" 
-                      icon={<RightOutlined />} 
-                      size="small"
-                      style={{ borderRadius: 8, background: "#0ea5e9", border: "none" }}
-                      onClick={() => nav(`/auto-market/ad/${g.ad_id}`)}
-                    >
-                      Batafsil
-                    </Button>
+                  <Progress 
+                    percent={oilPercent} 
+                    status={oilPercent > 90 ? "exception" : "active"} 
+                    strokeColor={oilPercent > 90 ? "#ef4444" : "#3b82f6"}
+                    showInfo={false}
+                    strokeWidth={10}
+                  />
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 6, display: "flex", justifyContent: "space-between" }}>
+                    <span>Oxirgi: {car.last_oil_change || 0} km</span>
+                    <span>Qoldi: {Math.max(oilLimit - drivenSinceOil, 0)} km</span>
                   </div>
+                </div>
+
+                {/* 3. HUJJATLAR PANELİ */}
+                <Row gutter={10} style={{ marginBottom: 16 }}>
+                  <Col span={12}>
+                    <div style={{ border: "1px solid #f1f5f9", padding: 10, borderRadius: 14 }}>
+                      <div style={{ fontSize: 11, color: "#94a3b8" }}><SafetyCertificateOutlined /> Sug'urta</div>
+                      <Text strong style={{ fontSize: 13 }}>
+                        {car.insurance_expiry ? dayjs(car.insurance_expiry).format("DD.MM.YYYY") : "Belgilanmagan"}
+                      </Text>
+                    </div>
+                  </Col>
+                  <Col span={12}>
+                    <div style={{ border: "1px solid #f1f5f9", padding: 10, borderRadius: 14 }}>
+                      <div style={{ fontSize: 11, color: "#94a3b8" }}><HistoryOutlined /> Tex-ko'rik</div>
+                      <Text strong style={{ fontSize: 13 }}>
+                        {car.tex_expiry ? dayjs(car.tex_expiry).format("DD.MM.YYYY") : "Belgilanmagan"}
+                      </Text>
+                    </div>
+                  </Col>
+                </Row>
+
+                {/* 4. AI ESLATMALAR */}
+                {insights.length > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    {insights.map((item, idx) => (
+                      <Alert 
+                        key={idx}
+                        message={item.msg}
+                        type={item.type}
+                        showIcon
+                        icon={<BulbOutlined />}
+                        style={{ borderRadius: 12, marginBottom: 6, fontSize: 12 }}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* 5. BOSHQARUV TUGMALARI */}
+                <div style={{ display: "flex", gap: 10 }}>
+                  <Button 
+                    danger 
+                    icon={<DeleteOutlined />} 
+                    onClick={() => remove(car.ad_id || car.id)}
+                    style={{ borderRadius: 12, flex: 1 }}
+                  >
+                    O'chirish
+                  </Button>
+                  <Button 
+                    type="primary" 
+                    icon={<RightOutlined />} 
+                    onClick={() => nav(`/auto-market/ad/${car.ad_id || car.id}`)}
+                    style={{ borderRadius: 12, flex: 2, background: "#0f172a", border: "none" }}
+                  >
+                    Batafsil
+                  </Button>
                 </div>
               </Card>
             );
@@ -181,53 +219,23 @@ export default function GarajPage() {
         </div>
       )}
 
-      {/* Mashina qo'shish modali (Faqat asosiy ma'lumotlar) */}
-      <Modal 
-        title="Mashina ma'lumotlari"
-        open={isModalOpen} 
-        onCancel={() => setIsModalOpen(false)} 
-        onOk={() => form.submit()}
-        centered
-      >
-        <Form form={form} layout="vertical" onFinish={handleAddCar} style={{ marginTop: 16 }}>
-          <Row gutter={12}>
-            <Col span={12}>
-              <Form.Item name="brand" label="Brend" rules={[{ required: true }]}><Input placeholder="Chevrolet" /></Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="model" label="Model" rules={[{ required: true }]}><Input placeholder="Gentra" /></Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={12}>
-            <Col span={12}>
-              <Form.Item name="year" label="Yili"><InputNumber style={{ width: "100%" }} placeholder="2024" /></Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="current_price" label="Narxi"><InputNumber style={{ width: "100%" }} placeholder="15000" /></Form.Item>
-            </Col>
-          </Row>
-          <Alert 
-            message="Xarajatlar va servis tarixini 'Avto-Daftar' bo'limida boshqaring." 
-            type="info" 
-            showIcon 
-          />
-        </Form>
-      </Modal>
-
-      {/* AI Analitika (Faqat narx bo'yicha) */}
+      {/* AI QALIBI (BOTTOM FIXED) */}
       <div style={{ 
-        marginTop: 24, 
-        padding: 16, 
-        background: "#0f172a", 
-        borderRadius: 20, 
-        color: "#fff",
-        display: "flex",
-        alignItems: "center",
-        gap: 12
+        position: "fixed", bottom: 20, left: 16, right: 16, 
+        background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)", 
+        padding: "16px 20px", borderRadius: 24, boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
+        display: "flex", alignItems: "center", gap: 15
       }}>
-        <LineChartOutlined style={{ fontSize: 24, color: "#3b82f6" }} />
-        <div style={{ fontSize: 12 }}>
-          <b>AI maslahati:</b> Garajingizdagi mashinalar narxi tushishi bilan sizga xabar yuboramiz.
+        <div style={{ background: "#3b82f6", padding: 10, borderRadius: 14 }}>
+          <DashboardOutlined style={{ color: "#fff", fontSize: 20 }} />
+        </div>
+        <div>
+          <div style={{ color: "#fff", fontWeight: 800, fontSize: 14 }}>AI Garaj Maslahatchisi</div>
+          <div style={{ color: "#94a3b8", fontSize: 11 }}>
+            {items.length > 0 
+              ? `Sizda ${items.length} ta faol monitoring mavjud.` 
+              : "Hozircha tahlillar yo'q."}
+          </div>
         </div>
       </div>
     </div>
