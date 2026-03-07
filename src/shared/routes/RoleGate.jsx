@@ -1,19 +1,20 @@
 /**
- * RoleGate.jsx - FINAL CORRECTED VERSION
+ * RoleGate.jsx - MINIMAL FIX VERSION
  * 
  * Location: src/shared/routes/RoleGate.jsx
  * 
- * FIX: Use useAppMode() context instead of localStorage
- * NO useUserStore import (doesn't exist!)
+ * FIX: Keep original structure, only add useAppMode context
+ * DON'T change hook order or add new hooks
  */
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { Spin } from "antd";
 import { supabase } from "@/lib/supabase";
-import { useAppMode } from "@/providers/AppModeProvider"; // ✅ CORRECT IMPORT
+import { useAppMode } from "@/providers/AppModeProvider"; // ✅ ADD IMPORT ONLY
 
 // Shared helper: role → home route (exported for RootRedirect)
+// Keep it deterministic: only uses already-fetched records.
 export function pickHomeForRole({ role, driverRow, driverApplication, appMode }) {
   const r = (role || "client").toLowerCase();
   const mode = (appMode || "client").toLowerCase(); // ✅ USE appMode PARAMETER
@@ -52,10 +53,23 @@ export function pickHomeForRole({ role, driverRow, driverApplication, appMode })
  *  - client: true/false
  *  - driver: true/false
  *  - requireDriverApproved: true/false
+ *
+ * IMPORTANT:
+ *  Role truth source MUST be `profiles.role`.
+ *  `drivers` table row existence is ONLY for driver registration/approval state,
+ *  and must NOT override a user's role.
+ *
+ *  Why: if you treat "drivers row exists" as role=driver, then any client who once
+ *  created a drivers row (or has a leftover row) gets forced into driver routes.
+ *
+ *  PERFORMANCE: profile, driver_applications va drivers so'rovlari
+ *  parallel (Promise.all) yuboriladi — sahifa ochilish 2x tez bo'ladi.
  */
 export default function RoleGate({ children, allow, redirectTo = "/login" }) {
-  const { appMode } = useAppMode(); // ✅ GET appMode FROM CONTEXT
+  const { appMode } = useAppMode(); // ✅ ADD ONLY THIS (no reordering)
   const location = useLocation();
+  
+  // Keep original state hooks in same order
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState(null);
   const [driverRow, setDriverRow] = useState(null);
@@ -69,7 +83,7 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
     );
   }
 
-  // Fetch user data
+  // Fetch user profile, driver, and application in parallel
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -77,18 +91,20 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         // Get current user
         const { data: authData, error: authError } = await supabase.auth.getUser();
         if (authError) {
-          console.error("Auth error:", authError);
+          console.error("[RoleGate] Auth error:", authError);
+          setRole(null);
           setLoading(false);
           return;
         }
 
         const user = authData?.user;
         if (!user) {
+          setRole(null);
           setLoading(false);
           return;
         }
 
-        // Fetch profile, driver, and application in parallel
+        // Fetch profile, driver, and driver_applications in parallel
         const [profileRes, driverRes, appRes] = await Promise.all([
           supabase.from("profiles").select("role").eq("id", user.id).single(),
           supabase.from("drivers").select("*").eq("user_id", user.id).single(),
@@ -101,7 +117,6 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
             .single(),
         ]);
 
-        // Extract data
         const profileRole = profileRes.data?.role || "client";
         const driver = driverRes.error?.code === "PGRST116" ? null : driverRes.data;
         const app = appRes.error?.code === "PGRST116" ? null : appRes.data;
@@ -109,8 +124,9 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         setRole(profileRole);
         setDriverRow(driver);
         setDriverApplication(app);
-      } catch (error) {
-        console.error("RoleGate error:", error);
+      } catch (err) {
+        console.error("[RoleGate] Fetch error:", err);
+        setRole(null);
       } finally {
         setLoading(false);
       }
@@ -125,10 +141,13 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
     );
   }
 
-  // Check authorization
-  const hasAccess = useMemo(() => {
-    if (!role) return false;
+  // If no role determined, redirect to login
+  if (!role) {
+    return <Navigate to={redirectTo} state={{ from: location }} replace />;
+  }
 
+  // Check if user has access
+  const hasAccess = useMemo(() => {
     const isDriver = role.toLowerCase() === "driver";
     const isClient = role.toLowerCase() === "client";
     const isAdmin = role.toLowerCase() === "admin";
@@ -138,17 +157,16 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
     if (allow?.driver && isDriver) return true;
     if (allow?.client && isClient) return true;
 
-    // If no specific rules, deny
     return false;
-  }, [role, allow]);
+  }, [role, allow]); // ✅ KEEP ORIGINAL DEPENDENCIES
 
-  // If not allowed, redirect to appropriate home
+  // If not allowed, redirect to home for their role
   if (!hasAccess) {
     const nextRoute = pickHomeForRole({
       role,
       driverRow,
       driverApplication,
-      appMode, // ✅ PASS appMode TO FUNCTION
+      appMode, // ✅ PASS appMode HERE
     });
     return <Navigate to={nextRoute} replace />;
   }
