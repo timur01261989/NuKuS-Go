@@ -1,69 +1,51 @@
-/**
- * AppModeProvider.jsx - Global App Mode Management
- * 
- * Manages whether the user is in "client" or "driver" mode
- * This prevents drivers from being forced to client mode after login
- * 
- * INSTALLATION:
- * 1. Copy this file to: src/providers/AppModeProvider.jsx
- * 2. Update src/App.jsx (see App.jsx.FIXED below)
- */
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
-import { createContext, useContext, useState, useEffect } from "react";
-
-// Create the context
 const AppModeContext = createContext(null);
 
-/**
- * AppModeProvider Component
- * Wraps the entire app to provide global app_mode state
- */
 export function AppModeProvider({ children }) {
-  const [appMode, setAppMode] = useState(() => {
-    // Initialize from localStorage if available
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem("app_mode");
-      return saved || "client"; // Default to client mode
-    }
-    return "client";
-  });
-  
-  // Persist to localStorage whenever appMode changes
+  const [appMode, setAppModeState] = useState('client');
+  const [isLoading, setIsLoading] = useState(true);
+
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem("app_mode", appMode);
+    try {
+      const stored = localStorage.getItem('app_mode');
+      if (stored && ['client', 'driver'].includes(stored)) {
+        setAppModeState(stored);
+      } else {
+        setAppModeState('client');
+      }
+    } catch (e) {
+      console.warn('Failed to read app_mode:', e);
+      setAppModeState('client');
+    } finally {
+      setIsLoading(false);
     }
-  }, [appMode]);
-  
+  }, []);
+
+  const setAppMode = (newMode) => {
+    if (!['client', 'driver'].includes(newMode)) {
+      console.warn(`Invalid app mode: ${newMode}`);
+      return;
+    }
+    setAppModeState(newMode);
+    try {
+      localStorage.setItem('app_mode', newMode);
+    } catch (e) {
+      console.warn('Failed to save app_mode:', e);
+    }
+  };
+
   return (
-    <AppModeContext.Provider value={{ appMode, setAppMode }}>
+    <AppModeContext.Provider value={{ appMode, setAppMode, isLoading }}>
       {children}
     </AppModeContext.Provider>
   );
 }
 
-/**
- * Custom Hook - useAppMode
- * Use this in any component to access or modify app mode
- * 
- * USAGE EXAMPLES:
- * const { appMode, setAppMode } = useAppMode();
- * 
- * // Check current mode
- * if (appMode === "driver") { ... }
- * 
- * // Switch to driver mode
- * setAppMode("driver");
- */
 export function useAppMode() {
   const context = useContext(AppModeContext);
-  
   if (!context) {
-    throw new Error(
-      "useAppMode must be used within <AppModeProvider>. " +
-      "Make sure your App.jsx wraps content with <AppModeProvider>"
-    );
+    throw new Error('useAppMode must be used within AppModeProvider');
   }
-  
   return context;
 }

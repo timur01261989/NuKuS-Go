@@ -1,32 +1,53 @@
 /**
- * DriverModeRedirect.jsx - FINAL FIXED VERSION
- * Location: src/shared/routes/DriverModeRedirect.jsx
+ * DriverModeRedirect.jsx - FIXED VERSION
  * 
- * FIX: Import and use setAppMode hook correctly
+ * Changes:
+ * ✅ Use useAppMode() context instead of localStorage
+ * ✅ Removed hardcoded localStorage.setItem("app_mode", "driver")
+ * 
+ * INSTALLATION:
+ * Replace: src/shared/routes/DriverModeRedirect.jsx
  */
 
-import React, { useEffect } from "react";
+import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useAppMode } from "@/providers/AppModeProvider"; // ✅ CRITICAL IMPORT
 import { Spin } from "antd";
+import { useAppMode } from "@/providers/AppModeProvider"; // ✅ ADD THIS
 
+/**
+ * DriverModeRedirect
+ * /driver-mode route: user explicitly switches to driver mode
+ */
 export default function DriverModeRedirect() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { setAppMode } = useAppMode(); // ✅ GET setAppMode FROM CONTEXT
+  const { setAppMode } = useAppMode(); // ✅ GET FROM CONTEXT
 
-  useEffect(() => {
-    setAppMode("driver"); // ✅ USE setAppMode FROM CONTEXT
+  React.useEffect(() => {
+    // ✅ FIXED: Use context instead of localStorage
+    setAppMode("driver");
 
     const fromPath = location.state?.from;
+
+    // Go to protected driver dashboard:
+    // - if approved => dashboard
+    // - if not approved => RoleGate will redirect to /driver/pending
+    // - if not a driver => RoleGate will redirect to /driver/register
     navigate("/driver/dashboard", {
       replace: true,
       state: { from: fromPath },
     });
-  }, [navigate, setAppMode, location]); // ✅ setAppMode IN DEPENDENCIES
+  }, [navigate, location, setAppMode]); // ✅ ADD setAppMode TO DEPS
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
       <Spin size="large" tip="Yuklanmoqda..." />
     </div>
   );

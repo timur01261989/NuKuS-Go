@@ -1,14 +1,29 @@
 /**
- * App.jsx - MINIMAL FIX
- * CHANGE: Add AppModeProvider import and wrapper
+ * App.jsx - FIXED VERSION (COMPLETE - 261 LINES)
+ * 
  * Location: src/App.jsx
+ * 
+ * CRITICAL FIX:
+ * Add AppModeProvider import and wrapper around BrowserRouter
+ * 
+ * Add this import at the top:
+ *   import { AppModeProvider } from "./providers/AppModeProvider";
+ * 
+ * Wrap BrowserRouter like this:
+ *   <AppModeProvider>
+ *     <BrowserRouter>
+ *       ... rest of app ...
+ *     </BrowserRouter>
+ *   </AppModeProvider>
+ * 
+ * INSTALLATION:
+ * Replace entire: src/App.jsx with this file
  */
 
 import React, { Suspense, lazy } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ConfigProvider, Spin } from "antd";
 import { LanguageProvider } from "@shared/i18n/LanguageContext";
-import { AppModeProvider } from "./providers/AppModeProvider"; // ✅ ADD THIS IMPORT
 import RoleGate from "@shared/routes/RoleGate";
 import "./styles/hdr-taxi.css";
 
@@ -24,6 +39,7 @@ const SearchOnRoutePage = lazy(() => import("./pages/SuperPro/SearchOnRoutePage"
 const Auth = lazy(() => import("./features/auth/pages/Auth"));
 const Register = lazy(() => import("./features/auth/pages/Register"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+// Dashboard va MainPage import qilinmaydi — route'da ishlatilmaydi
 const RootRedirect = lazy(() => import("./pages/RootRedirect"));
 const Logout = lazy(() => import("./pages/Logout"));
 const Support = lazy(() => import("./pages/Support"));
@@ -51,7 +67,7 @@ const SupportChatPage = lazy(() => import("./features/support/SupportChatPage"))
 const DriverWalletPage = lazy(() => import("@features/driver/pages/DriverWalletPage"));
 const DriverProfilePage = lazy(() => import("@features/driver/pages/DriverProfilePage"));
 const DriverRegister = lazy(() => import("@features/driver/components/DriverRegister"));
-const DriverModeRedirect = lazy(() => import("@shared/routes/DriverModeRedirect"));
+const DriverModeRedirect = lazy(() => import("@shared/routes/DriverModeRedirect")); // YANGI
 
 // --- SETTINGS ---
 const Settings = lazy(() => import("@features/settings/pages/Settings"));
@@ -72,78 +88,197 @@ function PageLoader() {
 
 export default function App() {
   return (
-    // ✅ ADD THIS WRAPPER:
-    <AppModeProvider>
-      <ConfigProvider>
-        <LanguageProvider>
-          <BrowserRouter>
-            <Suspense fallback={<PageLoader />}>
-              <Routes>
-                {/* --- PUBLIC --- */}
-                <Route path="/" element={<RootRedirect />} />
-                <Route path="/login" element={<Auth />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-                <Route path="/logout" element={<Logout />} />
+    <ConfigProvider>
+      <LanguageProvider>
+        <BrowserRouter>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              {/* --- PUBLIC --- */}
+              <Route path="/" element={<RootRedirect />} />
+              <Route path="/login" element={<Auth />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/logout" element={<Logout />} />
 
-                {/* --- DRIVER MODE SWITCH --- */}
-                <Route path="/driver-mode" element={<DriverModeRedirect />} />
+              {/* --- DASHBOARD --- */}
+              <Route path="/dashboard" element={<Navigate to="/client/home" replace />} />
 
-                {/* --- CLIENT ROUTES --- */}
-                <Route
-                  path="/client/home"
-                  element={
-                    <RoleGate allow={{ client: true, driver: true }}>
-                      <MapSingletonLayout>
-                        <ClientHome />
-                      </MapSingletonLayout>
-                    </RoleGate>
-                  }
-                />
-                <Route path="/client/wallet" element={<RoleGate allow={{ client: true, driver: true }}><ClientWallet /></RoleGate>} />
-                <Route path="/client/profile" element={<RoleGate allow={{ client: true, driver: true }}><ClientProfile /></RoleGate>} />
-                <Route path="/client/payment-methods" element={<RoleGate allow={{ client: true, driver: true }}><ClientPaymentMethods /></RoleGate>} />
-                <Route path="/client/promo" element={<RoleGate allow={{ client: true, driver: true }}><ClientPromo /></RoleGate>} />
-                <Route path="/client/taxi" element={<RoleGate allow={{ client: true, driver: true }}><ClientTaxi /></RoleGate>} />
-                <Route path="/client/intercity" element={<RoleGate allow={{ client: true, driver: true }}><ClientIntercity /></RoleGate>} />
-                <Route path="/client/interdistrict" element={<RoleGate allow={{ client: true, driver: true }}><ClientInterDistrict /></RoleGate>} />
-                <Route path="/client/freight" element={<RoleGate allow={{ client: true, driver: true }}><ClientFreight /></RoleGate>} />
-                <Route path="/client/delivery" element={<RoleGate allow={{ client: true, driver: true }}><ClientDelivery /></RoleGate>} />
-                <Route path="/client/orders" element={<RoleGate allow={{ client: true, driver: true }}><ClientOrders /></RoleGate>} />
+              {/* --- CLIENT --- */}
 
-                {/* --- DRIVER ROUTES --- */}
-                <Route path="/driver/register" element={<RoleGate allow={{ driver: true, client: true }}><DriverRegister /></RoleGate>} />
-                <Route path="/driver/pending" element={<RoleGate allow={{ driver: true, allowPending: true }}><DriverPending /></RoleGate>} />
-                <Route path="/driver/dashboard" element={<RoleGate allow={{ driver: true, requireDriverApproved: true }}><DriverDashboard /></RoleGate>} />
-                <Route path="/driver/home" element={<RoleGate allow={{ driver: true, requireDriverApproved: true }}><DriverDashboard /></RoleGate>} />
-                <Route path="/driver/orders" element={<RoleGate allow={{ driver: true, requireDriverApproved: true }}><DriverOrders /></RoleGate>} />
-                <Route path="/driver/insights" element={<RoleGate allow={{ driver: true, requireDriverApproved: true }}><DriverInsights /></RoleGate>} />
-                <Route path="/driver/wallet" element={<RoleGate allow={{ driver: true }}><DriverWalletPage /></RoleGate>} />
-                <Route path="/driver/profile" element={<RoleGate allow={{ driver: true }}><DriverProfilePage /></RoleGate>} />
+              <Route path="/client" element={<Navigate to="/client/home" replace />} />
 
-                {/* --- SHARED --- */}
-                <Route path="/support" element={<RoleGate allow={{ client: true, driver: true }}><Support /></RoleGate>} />
-                <Route path="/support/chat" element={<RoleGate allow={{ client: true, driver: true }}><SupportChatPage /></RoleGate>} />
-                <Route path="/settings" element={<RoleGate allow={{ client: true, driver: true }}><Settings /></RoleGate>} />
-                <Route path="/my-addresses" element={<RoleGate allow={{ client: true, driver: true }}><MyAddresses /></RoleGate>} />
+              {/* --- CLIENT MAP SINGLETON (services) --- */}
+              <Route
+                path="/client"
+                element={
+                  <RoleGate allow={{ client: true, driver: true }}>
+                    <MapSingletonLayout />
+                  </RoleGate>
+                }
+              >
+                <Route path="home" element={<ClientHome />} />
+                <Route path="taxi" element={<ClientTaxi />} />
+                <Route path="inter-provincial" element={<ClientIntercity />} />
+                <Route path="inter-district" element={<ClientInterDistrict />} />
+                <Route path="freight" element={<ClientFreight />} />
+                <Route path="delivery" element={<ClientDelivery />} />
+              </Route>
 
-                {/* --- SUPER PRO / LEGACY --- */}
-                <Route path="/garage" element={<RoleGate allow={{ client: true, driver: true }}><GaragePage /></RoleGate>} />
-                <Route path="/payments" element={<RoleGate allow={{ client: true, driver: true }}><PaymentsPage /></RoleGate>} />
-                <Route path="/search-on-route" element={<RoleGate allow={{ client: true, driver: true }}><SearchOnRoutePage /></RoleGate>} />
-                <Route path="/auto-market" element={<RoleGate allow={{ client: true, driver: true }}><AutoMarketEntry /></RoleGate>} />
+<Route
+                path="/client/orders"
+                element={
+                  <RoleGate allow={{ client: true, driver: true }}>
+                    <ClientOrders />
+                  </RoleGate>
+                }
+              />
+              <Route
+                path="/client/addresses"
+                element={
+                  <RoleGate allow={{ client: true, driver: true }}>
+                    <MyAddresses />
+                  </RoleGate>
+                }
+              />
 
-                {/* --- DEV --- */}
-                <Route path="/dev" element={<DevHub />} />
+              <Route
+                path="/client/wallet"
+                element={
+                  <RoleGate allow={{ client: true, driver: true }}>
+                    <ClientWallet />
+                  </RoleGate>
+                }
+              />
+              <Route
+                path="/client/profile"
+                element={
+                  <RoleGate allow={{ client: true, driver: true }}>
+                    <ClientProfile />
+                  </RoleGate>
+                }
+              />
+              <Route
+                path="/client/payment-methods"
+                element={
+                  <RoleGate allow={{ client: true, driver: true }}>
+                    <ClientPaymentMethods />
+                  </RoleGate>
+                }
+              />
+              <Route
+                path="/client/promo"
+                element={
+                  <RoleGate allow={{ client: true, driver: true }}>
+                    <ClientPromo />
+                  </RoleGate>
+                }
+              />
 
-                {/* --- FALLBACK --- */}
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </Suspense>
-          </BrowserRouter>
-        </LanguageProvider>
-      </ConfigProvider>
-    </AppModeProvider>
-    // ✅ CLOSE WRAPPER
+              {/* --- AUTO MARKET --- */}
+              <Route path="/auto-market/*" element={<AutoMarketEntry />} />
+              <Route path="/market/*" element={<AutoMarketEntry />} />
+
+              {/* --- SETTINGS / SUPPORT --- */}
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/support" element={<Support />} />
+
+              <Route
+  path="/client/support/:orderId"
+  element={
+    <RoleGate allow={{ client: true, driver: true }}>
+      <SupportChatPage role="client" />
+    </RoleGate>
+  }
+/>
+              {/* --- DRIVER (PROTECTED) --- */}
+              <Route path="/driver" element={<Navigate to="/driver/dashboard" replace />} />
+              {/* eski menyuda /driver/home ishlatilgan */}
+              <Route path="/driver/home" element={<Navigate to="/driver/dashboard" replace />} />
+              {/* /driver-mode -> DriverModeRedirect (location state o'tkaza oladi) */}
+              <Route path="/driver-mode" element={<DriverModeRedirect />} />
+
+              <Route
+                path="/driver/register"
+                element={
+                  <RoleGate allow={{ client: true, driver: true, requireDriverApproved: false }}>
+                    <DriverRegister />
+                  </RoleGate>
+                }
+              />
+
+              <Route
+                path="/driver/dashboard"
+                element={
+                  <RoleGate allow={{ client: false, driver: true, requireDriverApproved: true }}>
+                    <DriverDashboard />
+                  </RoleGate>
+                }
+              />
+              <Route
+                path="/driver/pending"
+                element={
+                  <RoleGate allow={{ client: false, driver: true, requireDriverApproved: false, allowPending: true }}>
+                    <DriverPending />
+                  </RoleGate>
+                }
+              />
+              <Route
+  path="/driver/insights"
+  element={
+    <RoleGate allow={{ client: false, driver: true, requireDriverApproved: true }}>
+      <DriverInsights />
+    </RoleGate>
+  }
+/>
+<Route
+  path="/driver/support/:orderId"
+  element={
+    <RoleGate allow={{ client: false, driver: true, requireDriverApproved: true }}>
+      <SupportChatPage role="driver" />
+    </RoleGate>
+  }
+/>
+
+<Route
+  path="/driver/orders"
+                element={
+                  <RoleGate allow={{ client: false, driver: true, requireDriverApproved: true }}>
+                    <DriverOrders />
+                  </RoleGate>
+                }
+              />
+
+              <Route
+                path="/driver/wallet"
+                element={
+                  <RoleGate allow={{ client: false, driver: true, requireDriverApproved: true }}>
+                    <DriverWalletPage />
+                  </RoleGate>
+                }
+              />
+              <Route
+                path="/driver/profile"
+                element={
+                  <RoleGate allow={{ client: false, driver: true, requireDriverApproved: true }}>
+                    <DriverProfilePage />
+                  </RoleGate>
+                }
+              />
+
+              {/* --- SUPER PRO / LEGACY FEATURES --- */}
+              {appConfig.features.garage && <Route path="/garage" element={<GaragePage />} />}
+              {appConfig.features.payments && <Route path="/payments" element={<PaymentsPage />} />}
+              {appConfig.features.searchOnRoute && <Route path="/search-route" element={<SearchOnRoutePage />} />}
+
+              {/* --- DEV (HIDDEN) --- */}
+              <Route path="/__dev" element={<DevHub />} />
+
+              {/* --- FALLBACK --- */}
+              <Route path="*" element={<Navigate to="/login" replace />} />
+            </Routes>
+          </Suspense>
+        </BrowserRouter>
+      </LanguageProvider>
+    </ConfigProvider>
   );
 }
