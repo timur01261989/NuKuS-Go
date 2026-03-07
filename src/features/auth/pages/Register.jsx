@@ -2,10 +2,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { message } from "antd";
 import { supabase } from "@/lib/supabase";
+import { useLanguage } from "@/shared/i18n/useLanguage";
 
 export default function Register() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const { t, tr } = useLanguage();
 
   // step 1: user info, step 2: otp verify
   const [step, setStep] = useState(1);
@@ -62,10 +64,10 @@ export default function Register() {
     if (loading) return;
 
     const d = phone.replace(/\D/g, "");
-    if (!name.trim()) return message.error("Ismingizni kiriting.");
-    if (!surname.trim()) return message.error("Familiyangizni kiriting.");
-    if (d.length !== 9) return message.error("Telefon raqamni to'liq kiriting (9 ta raqam).");
-    if (!password || password.length < 6) return message.error("Parol kamida 6 ta belgidan iborat bo'lsin.");
+    if (!name.trim()) return message.error(tr("register.nameRequired", "Ismingizni kiriting."));
+    if (!surname.trim()) return message.error(tr("register.surnameRequired", "Familiyangizni kiriting."));
+    if (d.length !== 9) return message.error(tr("phoneRequired", "Telefon raqamni to'liq kiriting (9 ta raqam)."));
+    if (!password || password.length < 6) return message.error(tr("register.passwordMinLength", "Parol kamida 6 ta belgidan iborat bo'lsin."));
 
     setLoading(true);
     try {
@@ -73,7 +75,7 @@ export default function Register() {
       const { error } = await supabase.auth.signInWithOtp({ phone: fullPhone });
       if (error) throw error;
 
-      message.success("SMS kod yuborildi!");
+      message.success(tr("smsSent", "SMS kod yuborildi!"));
       setToast(true);
       setTimeout(() => setToast(false), 2500);
 
@@ -85,7 +87,7 @@ export default function Register() {
       });
       setStep(2);
     } catch (err) {
-      message.error("Xatolik: " + (err?.message || "Noma'lum xatolik"));
+      message.error(tr("register.errorPrefix", "Xatolik:") + " " + (err?.message || tr("register.unknownError", "Noma'lum xatolik")));
     } finally {
       setLoading(false);
     }
@@ -94,11 +96,11 @@ export default function Register() {
   const onVerifyOtp = async (otpCode) => {
     const code = String(otpCode || otp).replace(/\D/g, "").slice(0, 6);
     if (code.length !== 6) {
-      message.error("Kod 6 ta raqam bo'lishi kerak.");
+      message.error(tr("register.codeMustBe6", "Kod 6 ta raqam bo'lishi kerak."));
       return;
     }
     if (!formData?.fullPhone) {
-      message.error("Telefon raqam topilmadi. Qaytadan urinib ko'ring.");
+      message.error(tr("register.phoneNotFoundRetry", "Telefon raqam topilmadi. Qaytadan urinib ko'ring."));
       setStep(1);
       return;
     }
@@ -117,8 +119,8 @@ export default function Register() {
 
         await supabase.auth.updateUser({ password: formData.password });
 
-        const safeName = formData.name || "Noma'lum";
-        const safeSurname = formData.surname || "Foydalanuvchi";
+        const safeName = formData.name || (tr("register.unknownName", "Noma'lum"));
+        const safeSurname = formData.surname || (tr("register.userSurnameFallback", "Foydalanuvchi"));
 
         const { error: profileError } = await supabase.from("profiles").upsert([
           {
@@ -136,11 +138,11 @@ export default function Register() {
 
         if (profileError) throw profileError;
 
-        message.success("Muvaffaqiyatli ro'yxatdan o'tdingiz!");
+        message.success(tr("register.success", "Muvaffaqiyatli ro'yxatdan o'tdingiz!"));
         navigate("/", { replace: true });
       }
     } catch (err) {
-      message.error("Xatolik: " + (err?.message || "Noma'lum xatolik"));
+      message.error(tr("register.errorPrefix", "Xatolik:") + " " + (err?.message || tr("register.unknownError", "Noma'lum xatolik")));
     } finally {
       setLoading(false);
     }
@@ -172,7 +174,7 @@ export default function Register() {
           <div className="flex flex-col items-center mb-10">
             <div className="mb-6">{headerIcon}</div>
             <h1 className="text-5xl font-bold text-[#1e293b] tracking-tight">UniGo</h1>
-            <p className="text-[#ec5b13] font-medium mt-1 text-base">Yangi hisob yaratish</p>
+            <p className="text-[#ec5b13] font-medium mt-1 text-base">{tr("register.createAccountTitle", "Yangi hisob yaratish")}</p>
           </div>
 
           <div className="rounded-[32px] p-8 nm-flat">
@@ -181,52 +183,52 @@ export default function Register() {
                 type="button"
                 onClick={() => navigate("/login")}
                 className="w-12 h-12 rounded-2xl nm-button flex items-center justify-center active:scale-95 transition-transform"
-                aria-label="Back"
+                aria-label={tr("back", "Back")}
               >
                 <svg className="w-5 h-5 text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
-              <h2 className="text-xl font-bold text-slate-800 tracking-wide">Ro'yxatdan o'tish</h2>
+              <h2 className="text-xl font-bold text-slate-800 tracking-wide">{tr("register", "Ro'yxatdan o'tish")}</h2>
               <div className="w-12 h-12" />
             </div>
 
             <form className="space-y-5" onSubmit={onGetOtp}>
               <div>
-                <label className="text-xs font-semibold text-slate-500 ml-1">Ism</label>
+                <label className="text-xs font-semibold text-slate-500 ml-1">{tr("name", "Ism")}</label>
                 <div className="mt-2 nm-inset rounded-2xl px-4 py-3">
                   <input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="w-full bg-transparent outline-none text-slate-800 placeholder:text-slate-400"
-                    placeholder="Ismingiz"
+                    placeholder={tr("register.namePlaceholder", "Ismingiz")}
                     autoComplete="given-name"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-500 ml-1">Familiya</label>
+                <label className="text-xs font-semibold text-slate-500 ml-1">{tr("surname", "Familiya")}</label>
                 <div className="mt-2 nm-inset rounded-2xl px-4 py-3">
                   <input
                     value={surname}
                     onChange={(e) => setSurname(e.target.value)}
                     className="w-full bg-transparent outline-none text-slate-800 placeholder:text-slate-400"
-                    placeholder="Familiyangiz"
+                    placeholder={tr("register.surnamePlaceholder", "Familiyangiz")}
                     autoComplete="family-name"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-500 ml-1">Telefon raqam</label>
+                <label className="text-xs font-semibold text-slate-500 ml-1">{tr("phoneLabel", "Telefon raqam")}</label>
                 <div className="mt-2 nm-inset rounded-2xl px-4 py-3 flex items-center">
                   <span className="text-slate-600 font-semibold mr-2">+998</span>
                   <input
                     value={phone}
                     onChange={(e) => setPhone(normalizePhoneInput(e.target.value))}
                     className="w-full bg-transparent outline-none text-slate-800 placeholder:text-slate-400"
-                    placeholder="90 123 45 67"
+                    placeholder={tr("phonePlaceholder", "90 123 45 67")}
                     inputMode="numeric"
                     autoComplete="tel"
                   />
@@ -234,13 +236,13 @@ export default function Register() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-500 ml-1">Parol</label>
+                <label className="text-xs font-semibold text-slate-500 ml-1">{tr("password", "Parol")}</label>
                 <div className="mt-2 nm-inset rounded-2xl px-4 py-3">
                   <input
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full bg-transparent outline-none text-slate-800 placeholder:text-slate-400"
-                    placeholder="Kamida 6 ta belgi"
+                    placeholder={tr("register.passwordHint", "Kamida 6 ta belgi")}
                     type="password"
                     autoComplete="new-password"
                   />
@@ -252,18 +254,18 @@ export default function Register() {
                 disabled={loading}
                 className="w-full rounded-2xl py-4 font-extrabold tracking-wider text-slate-800 nm-button active:scale-[0.98] transition-transform disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {loading ? "Yuborilmoqda..." : "SMS KOD OLISH"}
+                {loading ? (tr("sending", "Yuborilmoqda...")) : (tr("register.getSmsCode", "SMS KOD OLISH"))}
               </button>
             </form>
 
             <p className="text-center text-slate-500 text-sm mt-8">
-              Allaqachon hisobingiz bormi?
+              {tr("register.alreadyHave", "Allaqachon hisobingiz bormi?")}
               <button
                 type="button"
                 onClick={() => navigate("/login")}
                 className="text-[#ec5b13] font-bold hover:underline ml-1"
               >
-                Kirish
+                {tr("loginLink", tr("login", "Kirish"))}
               </button>
             </p>
           </div>
@@ -305,7 +307,7 @@ export default function Register() {
                 clipRule="evenodd"
               />
             </svg>
-            <span className="text-sm font-medium text-gray-700">SMS kod yuborildi!</span>
+            <span className="text-sm font-medium text-gray-700">{tr("smsSent", "SMS kod yuborildi!")}</span>
           </div>
         </div>
       )}
@@ -321,7 +323,7 @@ export default function Register() {
                 setStep(1);
               }}
               className="text-gray-400 hover:text-white transition-colors p-2 -ml-2 rounded-full hover:bg-white/10"
-              aria-label="Back"
+              aria-label={tr("back", "Back")}
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
@@ -329,20 +331,20 @@ export default function Register() {
             </button>
 
             <h1 className="text-white text-lg font-bold tracking-wider uppercase ml-2 flex-grow text-center pr-8">
-              Ro'yxatdan O'tish
+              {tr("register", "Ro'yxatdan o'tish")}
             </h1>
           </div>
 
           <div className="relative z-10 space-y-6">
             <div className="bg-[#FFFBEB] text-yellow-900 rounded-xl p-4 border border-yellow-200/50">
-              <p className="text-sm font-semibold">Kod yuborildi:</p>
+              <p className="text-sm font-semibold">{tr("register.codeSentTo", "Kod yuborildi:")}</p>
               <p className="text-lg font-black tracking-wide">{formData?.fullPhone}</p>
-              <p className="text-xs mt-1 opacity-70">Iltimos, SMS orqali kelgan 6 xonali kodni kiriting.</p>
+              <p className="text-xs mt-1 opacity-70">{tr("register.enterSms6", "Iltimos, SMS orqali kelgan 6 xonali kodni kiriting.")}</p>
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">
-                SMS KOD
+                {tr("smsCode", "SMS KOD")}
               </label>
               <input
                 value={otp}
@@ -361,11 +363,11 @@ export default function Register() {
               onClick={() => onVerifyOtp()}
               className="w-full bg-white text-black font-black py-4 rounded-2xl shadow-lg transition-transform active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {loading ? "Tekshirilmoqda..." : "TASDIQLASH"}
+              {loading ? (tr("register.verifying", "Tekshirilmoqda...")) : (tr("register.confirmAction", "TASDIQLASH"))}
             </button>
 
             <div className="text-center text-gray-500 text-sm">
-              Kod kelmadimi?{" "}
+              {tr("register.didntReceiveCode", "Kod kelmadimi?")}{" "}
               <button
                 type="button"
                 onClick={() => {
@@ -378,16 +380,16 @@ export default function Register() {
                     .signInWithOtp({ phone: formData.fullPhone })
                     .then(({ error }) => {
                       if (error) throw error;
-                      message.success("SMS kod qayta yuborildi!");
+                      message.success(tr("register.smsResent", "SMS kod qayta yuborildi!"));
                       setToast(true);
                       setTimeout(() => setToast(false), 2500);
                     })
-                    .catch((err) => message.error("Xatolik: " + (err?.message || "Noma'lum xatolik")))
+                    .catch((err) => message.error(`${tr("register.errorPrefix", "Xatolik:")} ${err?.message || tr("register.unknownError", "Noma'lum xatolik")}`))
                     .finally(() => setLoading(false));
                 }}
                 className="text-white font-semibold hover:underline"
               >
-                Qayta yuborish
+                {tr("register.resend", "Qayta yuborish")}
               </button>
             </div>
           </div>
