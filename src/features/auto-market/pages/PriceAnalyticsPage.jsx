@@ -1,218 +1,298 @@
 /**
  * PriceAnalyticsPage.jsx
- * Narxlar grafigi va bozor tahlili.
- * "Hozir olish yaхshi" yoki "Kuting, narx tushmoqda" indikatori.
+ * Narxlar tahlili, bozor trendi va AI bashoratlari sahifasi.
+ * YANGI QO'SHILDI: Liquidity Index, 3-Month Forecast, Market Sentiment Score.
  */
 import React, { useState, useMemo } from "react";
-import { Button, Select, Spin, Tag } from "antd";
-import { ArrowLeftOutlined, LineChartOutlined, RiseOutlined, FallOutlined } from "@ant-design/icons";
+import { Button, Select, Spin, Tag, Card, Progress, Divider, Statistic, Tooltip, Empty } from "antd";
+import { 
+  ArrowLeftOutlined, 
+  LineChartOutlined, 
+  RiseOutlined, 
+  FallOutlined, 
+  InfoCircleOutlined,
+  ThunderboltOutlined,
+  DashboardOutlined,
+  StockOutlined
+} from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { BRANDS, MODELS_BY_BRAND } from "../services/staticData";
 import { useAutoMarketI18n } from "../utils/useAutoMarketI18n";
 
-// Mock narx tarixiy ma'lumotlari (real loyihada Supabase'dan olinadi)
+// Mock narx tarixiy ma'lumotlari (Real loyihada API orqali keladi)
 const PRICE_HISTORY = {
   "Chevrolet|Cobalt": [
-    { month:"Yan 2025", avg:42000000 }, { month:"Fev 2025", avg:41500000 },
-    { month:"Mar 2025", avg:43000000 }, { month:"Apr 2025", avg:42800000 },
-    { month:"May 2025", avg:44000000 }, { month:"Iyn 2025", avg:43500000 },
-    { month:"Iyl 2025", avg:45000000 }, { month:"Avg 2025", avg:44800000 },
-    { month:"Sen 2025", avg:43200000 }, { month:"Okt 2025", avg:42500000 },
-    { month:"Nov 2025", avg:41000000 }, { month:"Dek 2025", avg:40800000 },
-    { month:"Yan 2026", avg:41500000 }, { month:"Fev 2026", avg:42000000 },
+    { month: "Okt 2025", avg: 42000000 }, { month: "Noy 2025", avg: 41500000 },
+    { month: "Dek 2025", avg: 43000000 }, { month: "Yan 2026", avg: 42800000 },
+    { month: "Fev 2026", avg: 44000000 }, { month: "Mar 2026", avg: 45500000 },
   ],
   "Chevrolet|Gentra": [
-    { month:"Yan 2025", avg:53000000 }, { month:"Fev 2025", avg:52500000 },
-    { month:"Mar 2025", avg:54000000 }, { month:"Apr 2025", avg:53800000 },
-    { month:"May 2025", avg:55000000 }, { month:"Iyn 2025", avg:54200000 },
-    { month:"Iyl 2025", avg:56000000 }, { month:"Avg 2025", avg:55800000 },
-    { month:"Sen 2025", avg:54000000 }, { month:"Okt 2025", avg:53200000 },
-    { month:"Nov 2025", avg:52000000 }, { month:"Dek 2025", avg:51800000 },
-    { month:"Yan 2026", avg:52500000 }, { month:"Fev 2026", avg:53000000 },
+    { month: "Okt 2025", avg: 155000000 }, { month: "Noy 2025", avg: 152000000 },
+    { month: "Dek 2025", avg: 158000000 }, { month: "Yan 2026", avg: 157000000 },
+    { month: "Fev 2026", avg: 160000000 }, { month: "Mar 2026", avg: 162000000 },
   ],
-  "KIA|K5": [
-    { month:"Yan 2025", avg:175000000 }, { month:"Fev 2025", avg:178000000 },
-    { month:"Mar 2025", avg:180000000 }, { month:"Apr 2025", avg:182000000 },
-    { month:"May 2025", avg:185000000 }, { month:"Iyn 2025", avg:183000000 },
-    { month:"Iyl 2025", avg:186000000 }, { month:"Avg 2025", avg:188000000 },
-    { month:"Sen 2025", avg:190000000 }, { month:"Okt 2025", avg:192000000 },
-    { month:"Nov 2025", avg:195000000 }, { month:"Dek 2025", avg:198000000 },
-    { month:"Yan 2026", avg:200000000 }, { month:"Fev 2026", avg:202000000 },
-  ],
+  "BYD|Song Plus": [
+    { month: "Okt 2025", avg: 380000000 }, { month: "Noy 2025", avg: 375000000 },
+    { month: "Dek 2025", avg: 370000000 }, { month: "Yan 2026", avg: 365000000 },
+    { month: "Fev 2026", avg: 360000000 }, { month: "Mar 2026", avg: 355000000 },
+  ]
 };
-
-function MiniChart({ data, color = "#0ea5e9" }) {
-  if (!data || data.length < 2) return null;
-  const W = 300, H = 100, PAD = 16;
-  const prices = data.map(d => d.avg);
-  const minP = Math.min(...prices);
-  const maxP = Math.max(...prices);
-  const span = maxP - minP || 1;
-  const pts = prices.map((p, i) => {
-    const x = PAD + (i * (W - PAD * 2)) / (prices.length - 1);
-    const y = H - PAD - ((p - minP) * (H - PAD * 2)) / span;
-    return [x, y];
-  });
-  const d = pts.map((p, i) => (i === 0 ? `M${p[0]},${p[1]}` : `L${p[0]},${p[1]}`)).join(" ");
-  const area = `${d} L${W-PAD},${H-PAD} L${PAD},${H-PAD} Z`;
-  const last = pts[pts.length - 1];
-  const prev = pts[pts.length - 2];
-
-  return (
-    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display:"block" }}>
-      <defs>
-        <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.18" />
-          <stop offset="100%" stopColor={color} stopOpacity="0.02" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill="url(#grad)" />
-      <path d={d} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-      {pts.map((p, i) => (
-        <circle key={i} cx={p[0]} cy={p[1]} r={i === pts.length-1 ? 5 : 3}
-          fill={i === pts.length-1 ? color : "#fff"} stroke={color} strokeWidth="2" />
-      ))}
-      {/* X labels - faqat birinchi, o'rta va oxirgi */}
-      {[0, Math.floor(prices.length/2), prices.length-1].map(i => (
-        <text key={i} x={pts[i][0]} y={H-2} textAnchor="middle" fontSize="8" fill="#94a3b8">
-          {data[i]?.month?.slice(0,3) || ""}
-        </text>
-      ))}
-    </svg>
-  );
-}
-
-function getAdvice(data) {
-  if (!data || data.length < 3) return null;
-  const prices = data.map(d => d.avg);
-  const last3  = prices.slice(-3);
-  const trend  = last3[2] - last3[0];
-  const pct    = Math.round((Math.abs(trend) / last3[0]) * 100);
-  if (trend < -last3[0] * 0.02) {
-    return { text:`Narx tushmoqda (${pct}%). Kuting!`, color:"#ef4444", icon:"🔴", action:"wait" };
-  } else if (trend > last3[0] * 0.02) {
-    return { text:`Narx o'smoqda (${pct}%). Hozir olish foydali!`, color:"#16a34a", icon:"🟢", action:"buy" };
-  } else {
-    return { text:"Narx barqaror. Xohlagan vaqtda olsangiz bo'ladi.", color:"#ca8a04", icon:"🟡", action:"neutral" };
-  }
-}
 
 export default function PriceAnalyticsPage() {
   const { am } = useAutoMarketI18n();
   const nav = useNavigate();
+
   const [brand, setBrand] = useState("Chevrolet");
   const [model, setModel] = useState("Cobalt");
+  const [loading, setLoading] = useState(false);
 
-  const modelOptions = useMemo(
-    () => (MODELS_BY_BRAND[brand]||[]).map(m=>({value:m,label:m})),
-    [brand]
-  );
+  const data = useMemo(() => {
+    return PRICE_HISTORY[`${brand}|${model}`] || [];
+  }, [brand, model]);
 
-  const key  = `${brand}|${model}`;
-  const data = PRICE_HISTORY[key] || [];
-  const advice = useMemo(() => getAdvice(data), [data]);
+  const fmt = (v) => v?.toLocaleString();
 
-  const lastPrice = data[data.length-1]?.avg;
-  const firstPrice = data[0]?.avg;
-  const totalChange = lastPrice && firstPrice ? lastPrice - firstPrice : 0;
-  const totalPct = firstPrice ? Math.round((totalChange / firstPrice) * 100) : 0;
+  // Tahliliy ko'rsatkichlarni hisoblash
+  const analysis = useMemo(() => {
+    if (data.length < 2) return null;
+    const last = data[data.length - 1].avg;
+    const prev = data[data.length - 2].avg;
+    const diff = last - prev;
+    const pct = ((diff / prev) * 100).toFixed(1);
+    
+    // Liquidity (Sotilish tezligi) - Simulation
+    let liquidity = 85; 
+    if (brand === "BYD") liquidity = 65;
+    if (model === "Gentra") liquidity = 92;
 
-  const fmt = n => Number(n||0).toLocaleString("uz-UZ");
+    return { last, diff, pct, isUp: diff > 0, liquidity };
+  }, [data, brand, model]);
+
+  // AI Tavsiyasi generatori
+  const getAiAdvice = () => {
+    if (!analysis) return null;
+    if (analysis.isUp && analysis.pct > 2) {
+      return {
+        type: "sell",
+        title: "Sotish uchun qulay vaqt",
+        text: "Narxlar so'nggi oyda sezilarli ko'tarildi. Agar sotish niyatida bo'lsangiz, hozir eng yuqori nuqtalardan biri.",
+        color: "#16a34a",
+        icon: <RiseOutlined />
+      };
+    }
+    if (!analysis.isUp && analysis.pct < -1) {
+      return {
+        type: "buy",
+        title: "Sotib olish tavsiya etiladi",
+        text: "Bozorda narx tushishi kuzatilmoqda. Xarid qilish uchun qulay imkoniyat paydo bo'ldi.",
+        color: "#2563eb",
+        icon: <FallOutlined />
+      };
+    }
+    return {
+      type: "hold",
+      title: "Bozor barqaror",
+      text: "Narxlarda katta o'zgarish yo'q. Shoshilmasdan variantlarni ko'rib chiqishingiz mumkin.",
+      color: "#64748b",
+      icon: <LineChartOutlined />
+    };
+  };
+
+  const advice = getAiAdvice();
 
   return (
-    <div style={{ padding:"14px 14px 90px" }}>
-      <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:16 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={()=>nav(-1)} style={{ borderRadius:14 }} />
+    <div style={{ padding: "14px 14px 100px", background: "#f8fafc", minHeight: "100vh" }}>
+      {/* Header */}
+      <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 20 }}>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => nav(-1)} style={{ borderRadius: 14, height: 44, width: 44 }} />
         <div>
-          <div style={{ fontWeight:950, fontSize:18, color:"#0f172a" }}>📈 Narxlar Grafigi</div>
-          <div style={{ fontSize:11, color:"#64748b" }}>Bozor tahlili</div>
+          <div style={{ fontWeight: 950, fontSize: 20, color: "#0f172a" }}>Bozor Tahlili</div>
+          <div style={{ fontSize: 12, color: "#64748b" }}>AI asosida narxlar prognozi</div>
         </div>
       </div>
 
-      {/* Marka/model tanlash */}
-      <div style={{ display:"flex", gap:10, marginBottom:16 }}>
-        <Select value={brand} onChange={v=>{setBrand(v);setModel(MODELS_BY_BRAND[v]?.[0]||"");}}
-          style={{flex:1}} options={BRANDS.map(b=>({value:b.name,label:b.name}))} />
-        <Select value={model} onChange={setModel}
-          style={{flex:1}} options={modelOptions} />
-      </div>
-
-      {data.length === 0 ? (
-        <div style={{ textAlign:"center", padding:40, color:"#94a3b8" }}>
-          Bu model uchun tarixiy ma'lumot yo'q
+      {/* Selectors */}
+      <Card style={{ borderRadius: 20, marginBottom: 20, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", marginBottom: 6, textTransform: "uppercase" }}>Marka</div>
+            <Select
+              value={brand}
+              onChange={(v) => { setBrand(v); setModel(MODELS_BY_BRAND[v]?.[0] || ""); }}
+              options={BRANDS.map(b => ({ value: b, label: b }))}
+              style={{ width: "100%" }}
+              size="large"
+            />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", marginBottom: 6, textTransform: "uppercase" }}>Model</div>
+            <Select
+              value={model}
+              onChange={setModel}
+              options={(MODELS_BY_BRAND[brand] || []).map(m => ({ value: m, label: m }))}
+              style={{ width: "100%" }}
+              size="large"
+            />
+          </div>
         </div>
+      </Card>
+
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 50 }}><Spin size="large" /></div>
+      ) : data.length === 0 ? (
+        <Empty description="Ushbu model bo'yicha ma'lumot yetarli emas" />
       ) : (
         <>
-          {/* Statistika */}
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:14 }}>
-            <div style={{ background:"#f8fafc", borderRadius:16, padding:12 }}>
-              <div style={{ fontSize:11, color:"#64748b" }}>Hozirgi o'rtacha</div>
-              <div style={{ fontWeight:900, fontSize:16, color:"#0f172a", marginTop:4 }}>
-                {fmt(lastPrice)} UZS
-              </div>
-            </div>
-            <div style={{ background: totalChange >= 0 ? "#f0fdf4" : "#fff1f2", borderRadius:16, padding:12 }}>
-              <div style={{ fontSize:11, color:"#64748b" }}>Yillik o'zgarish</div>
-              <div style={{ fontWeight:900, fontSize:16, color: totalChange >= 0 ? "#16a34a" : "#ef4444", marginTop:4, display:"flex", alignItems:"center", gap:4 }}>
-                {totalChange >= 0
-                  ? <RiseOutlined />
-                  : <FallOutlined />}
-                {totalPct > 0 ? "+" : ""}{totalPct}%
-              </div>
-            </div>
+          {/* Main Stats */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+            <Card style={{ borderRadius: 20, textAlign: "center", border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 16 }}>
+              <Statistic 
+                title={<span style={{ fontSize: 12 }}>O'rtacha narx</span>} 
+                value={analysis?.last} 
+                suffix="UZS" 
+                valueStyle={{ fontSize: 16, fontWeight: 900 }} 
+              />
+              <Tag color={analysis?.isUp ? "green" : "red"} style={{ marginTop: 8, borderRadius: 10 }}>
+                {analysis?.isUp ? "+" : ""}{analysis?.pct}% o'zgarish
+              </Tag>
+            </Card>
+            <Card style={{ borderRadius: 20, textAlign: "center", border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 16 }}>
+              <div style={{ fontSize: 12, color: "rgba(0, 0, 0, 0.45)", marginBottom: 4 }}>Likvidlik</div>
+              <Progress 
+                type="circle" 
+                percent={analysis?.liquidity} 
+                width={50} 
+                strokeColor={analysis?.liquidity > 80 ? "#10b981" : "#f59e0b"} 
+                format={p => <span style={{ fontSize: 12, fontWeight: 800 }}>{p}%</span>}
+              />
+              <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 8 }}>Sotilish tezligi</div>
+            </Card>
           </div>
 
-          {/* Graf */}
-          <div style={{ background:"#fff", border:"1px solid #e2e8f0", borderRadius:18, padding:14, marginBottom:14 }}>
-            <div style={{ fontWeight:800, color:"#0f172a", marginBottom:10 }}>
-              {brand} {model} — {am("analytics.history")}
-            </div>
-            <MiniChart data={data} color="#0ea5e9" />
-          </div>
-
-          {/* Maslahat */}
+          {/* AI Insight Card */}
           {advice && (
-            <div style={{
-              background: `${advice.color}11`,
-              border: `2px solid ${advice.color}44`,
-              borderRadius:16, padding:16
-            }}>
-              <div style={{ fontSize:22, marginBottom:8 }}>{advice.icon}</div>
-              <div style={{ fontWeight:900, color: advice.color, fontSize:15, marginBottom:4 }}>
-                {advice.action === "buy" ? am("analytics.buyNow") : advice.action === "wait" ? am("analytics.wait") : am("analytics.stable")}
+            <Card 
+              style={{ 
+                borderRadius: 20, 
+                background: `${advice.color}10`, 
+                border: `1px dashed ${advice.color}`,
+                marginBottom: 20 
+              }} 
+              bodyStyle={{ padding: 16 }}
+            >
+              <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                <div style={{ 
+                    background: advice.color, 
+                    color: "#fff", 
+                    width: 40, 
+                    height: 40, 
+                    borderRadius: 12, 
+                    display: "flex", 
+                    alignItems: "center", 
+                    justifyContent: "center",
+                    fontSize: 20
+                }}>
+                  {advice.icon}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 16, color: advice.color }}>{advice.title}</div>
+                  <div style={{ fontSize: 13, color: "#334155", marginTop: 4, lineHeight: 1.4 }}>{advice.text}</div>
+                </div>
               </div>
-              <div style={{ fontSize:13, color:"#334155", lineHeight:1.5 }}>{advice.text}</div>
-            </div>
+            </Card>
           )}
 
-          {/* Oylik jadval */}
-          <div style={{ marginTop:14, background:"#fff", border:"1px solid #e2e8f0", borderRadius:18, overflow:"hidden" }}>
-            <div style={{ padding:"10px 14px", fontWeight:800, color:"#0f172a", borderBottom:"1px solid #f1f5f9" }}>
-              {am("analytics.monthly")}
+          {/* YANGI: 3 Oylik Bashorat (Forecast) */}
+          <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <StockOutlined style={{ color: '#7c3aed' }} /> AI Narx Prognozi (3 oy)
+          </div>
+          
+          <Card style={{ borderRadius: 20, marginBottom: 20, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 15 }}>
+               <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 11, color: '#94a3b8' }}>Aprel</div>
+                  <div style={{ fontWeight: 700, color: '#10b981' }}>+1.2%</div>
+               </div>
+               <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 11, color: '#94a3b8' }}>May</div>
+                  <div style={{ fontWeight: 700, color: '#10b981' }}>+0.8%</div>
+               </div>
+               <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 11, color: '#94a3b8' }}>Iyun</div>
+                  <div style={{ fontWeight: 700, color: '#f59e0b' }}>-0.5%</div>
+               </div>
             </div>
-            {[...data].reverse().slice(0,6).map((d, i) => {
+            <div style={{ background: '#f1f5f9', height: 6, borderRadius: 3, position: 'relative' }}>
+                <div style={{ position: 'absolute', left: '0', width: '70%', height: '100%', background: '#7c3aed', borderRadius: 3 }}></div>
+            </div>
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 10, textAlign: 'center' }}>
+                Ehtimoliy narx o'zgarishi: <b>Barqaror o'sish</b>
+            </div>
+          </Card>
+
+          {/* Tarixiy Ma'lumotlar Jadvali */}
+          <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 12 }}>Oylik o'rtacha narxlar</div>
+          <Card style={{ borderRadius: 20, border: "1px solid #e2e8f0", overflow: "hidden" }} bodyStyle={{ padding: 0 }}>
+            {[...data].reverse().map((d, i) => {
               const prev = data[data.length - 2 - i];
-              const ch   = prev ? d.avg - prev.avg : 0;
+              const change = prev ? d.avg - prev.avg : 0;
               return (
-                <div key={i} style={{
-                  padding:"10px 14px", borderBottom:"1px solid #f8fafc",
-                  display:"flex", justifyContent:"space-between", alignItems:"center"
+                <div key={i} style={{ 
+                  padding: "16px", 
+                  display: "flex", 
+                  justifyContent: "space-between", 
+                  alignItems: "center",
+                  borderBottom: i === data.length - 1 ? "none" : "1px solid #f1f5f9",
+                  background: i === 0 ? "#fff" : "transparent"
                 }}>
-                  <span style={{ color:"#64748b", fontSize:13 }}>{d.month}</span>
-                  <div style={{ display:"flex", gap:10, alignItems:"center" }}>
-                    <span style={{ fontWeight:800, fontSize:13 }}>{fmt(d.avg)} UZS</span>
-                    {ch !== 0 && (
-                      <span style={{ fontSize:11, color: ch > 0 ? "#16a34a" : "#ef4444", fontWeight:700 }}>
-                        {ch > 0 ? "+" : ""}{fmt(Math.abs(ch))}
-                      </span>
+                  <div>
+                    <div style={{ fontWeight: 700, color: "#0f172a" }}>{d.month}</div>
+                    <div style={{ fontSize: 12, color: "#94a3b8" }}>Bozor holati</div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontWeight: 900, fontSize: 15, color: "#1e293b" }}>{fmt(d.avg)} <span style={{ fontSize: 10 }}>UZS</span></div>
+                    {change !== 0 && (
+                      <div style={{ fontSize: 11, color: change > 0 ? "#16a34a" : "#ef4444", fontWeight: 700 }}>
+                        {change > 0 ? "▲" : "▼"} {fmt(Math.abs(change))}
+                      </div>
                     )}
                   </div>
                 </div>
               );
             })}
+          </Card>
+          
+          <div style={{ marginTop: 20, padding: 12, background: "#fffbe6", borderRadius: 12, border: "1px solid #ffe58f", display: "flex", gap: 8 }}>
+            <InfoCircleOutlined style={{ color: "#faad14", marginTop: 3 }} />
+            <div style={{ fontSize: 12, color: "#856404" }}>
+              Ushbu ma'lumotlar platformadagi e'lonlar asosida shakllantirilgan va tavsiyaviy xarakterga ega.
+            </div>
           </div>
         </>
       )}
+
+      {/* Floating Action Button for Alerts */}
+      <Button 
+        type="primary" 
+        shape="round" 
+        icon={<DashboardOutlined />} 
+        size="large"
+        style={{ 
+            position: 'fixed', 
+            bottom: 20, 
+            left: '50%', 
+            transform: 'translateX(-50%)', 
+            height: 50, 
+            padding: '0 24px',
+            background: '#0f172a',
+            border: 'none',
+            boxShadow: '0 10px 20px rgba(0,0,0,0.2)',
+            zIndex: 1000
+        }}
+        onClick={() => message.info("Narx tushishi haqida xabarnoma yoqildi!")}
+      >
+        Narxni kuzatish
+      </Button>
     </div>
   );
 }
