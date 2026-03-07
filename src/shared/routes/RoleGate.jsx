@@ -1,35 +1,36 @@
 /**
  * RoleGate.jsx - TO'LIQ VA TO'G'IRLANGAN VERSIYA
- * * Location: src/shared/routes/RoleGate.jsx
- * * FIX: useAppMode kontekstidan appMode qiymatini olish va 
- * yo'naltirish (redirect) mantiqini to'liq ishlashini ta'minlash.
+ * -------------------------------------------------------
+ * Location: src/shared/routes/RoleGate.jsx
+ * FIX: useAppMode kontekstidan foydalanish va import xatolarini tuzatish.
+ * Hech qanday qisqartirishlarsiz.
  */
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { Spin } from "antd";
 import { supabase } from "@/lib/supabase";
-import { useAppMode } from "@/providers/AppModeProvider"; // ✅ KONTEKST IMPORTI
+import { useAppMode } from "@/providers/AppModeProvider"; // ✅ To'g'ri import
 
 /**
- * pickHomeForRole - Rol va rejimga qarab mos sahifani aniqlash
- * Bu funksiya komponentdan tashqarida ham ishlatilishi mumkinligi uchun eksport qilingan.
+ * pickHomeForRole - Rol va rejimga qarab yo'naltirish manzillarini aniqlaydi.
+ * @param {Object} params - role, driverRow, driverApplication, appMode
  */
 export function pickHomeForRole({ role, driverRow, driverApplication, appMode }) {
   const r = (role || "client").toLowerCase();
   const mode = (appMode || "client").toLowerCase(); 
 
-  // 1. Agar admin bo'lsa, har doim admin panelga
+  // 1. Admin har doim admin panelga
   if (r === "admin") return "/admin";
 
-  // 2. Agar ilova rejimi "driver" bo'lmasa, har doim mijoz asosiy sahifasiga
+  // 2. Agar ilova rejimi "driver" (haydovchi) bo'lmasa, mijoz asosiy sahifasiga
   if (mode !== "driver") return "/client/home";
 
-  // 3. Agar haydovchi rejimida bo'lsa
+  // 3. Haydovchi roli va rejimi uchun tekshiruvlar
   if (r === "driver") {
     const appStatus = (driverApplication?.status || "").toLowerCase();
 
-    // Haydovchi tasdiqlanganini tekshirish (turli xil baza variantlari uchun)
+    // Haydovchi tasdiqlanganini turli ustunlar orqali tekshirish
     const driverApproved =
       !!driverRow &&
       (String(driverRow.status || "").toLowerCase() === "approved" ||
@@ -39,30 +40,25 @@ export function pickHomeForRole({ role, driverRow, driverApplication, appMode })
 
     if (driverApproved) return "/driver/dashboard";
     
-    // Agar ariza tasdiqlangan bo'lsa-yu, hali haydovchi jadvalida faol bo'lmasa
+    // Arizalar holatiga qarab yo'naltirish
     if (appStatus === "approved") return "/driver/dashboard";
-    
-    // Agar ariza kutilayotgan bo'lsa
     if (appStatus === "pending") return "/driver/pending";
-    
-    // Agar ariza rad etilgan bo'lsa
     if (appStatus === "rejected") return "/driver/pending";
 
-    // Aks holda ro'yxatdan o'tishga
+    // Agar hech qanday ma'lumot bo'lmasa, ro'yxatdan o'tishga
     return "/driver/register";
   }
 
-  // Boshqa barcha holatlarda mijoz sahifasiga
+  // Standart holatda mijoz sahifasi
   return "/client/home";
 }
 
 /**
- * RoleGate - Asosiy komponent
- * Berilgan 'allow' qoidalariga ko'ra kirishni cheklaydi yoki yo'naltiradi.
+ * RoleGate - Sahifalarga kirish huquqini boshqaruvchi asosiy komponent.
  */
 export default function RoleGate({ children, allow, redirectTo = "/login" }) {
   const location = useLocation();
-  const { appMode } = useAppMode(); // ✅ KONTEKSTDAN JORIY REJIMNI OLISH
+  const { appMode } = useAppMode(); // ✅ Kontekstdan joriy rejimni olish
   
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState(null);
@@ -72,13 +68,13 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
   useEffect(() => {
     let isMounted = true;
 
-    (async () => {
+    // Foydalanuvchi ma'lumotlarini yuklash funksiyasi
+    const initGate = async () => {
       try {
         setLoading(true);
         
-        // 1. Auth foydalanuvchini olish
-        const { data: authData } = await supabase.auth.getUser();
-        const user = authData?.user;
+        // 1. Joriy foydalanuvchini olish
+        const { data: { user } } = await supabase.auth.getUser();
 
         if (!user) {
           if (isMounted) {
@@ -88,7 +84,7 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
           return;
         }
 
-        // 2. Profil, Haydovchi va Ariza ma'lumotlarini parallel yuklash
+        // 2. Parallel ravishda profil, haydovchi ma'lumotlari va arizasini yuklash
         const [profileRes, driverRes, appRes] = await Promise.all([
           supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(),
           supabase.from("drivers").select("*").eq("user_id", user.id).maybeSingle(),
@@ -97,28 +93,30 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
 
         if (!isMounted) return;
 
-        // Xatoliklarni tekshirish (PGRST116 - ma'lumot topilmagan holat, bu xato emas)
-        const profileRole = profileRes.data?.role || "client";
-        const driver = driverRes.error?.code === "PGRST116" ? null : driverRes.data;
-        const app = appRes.error?.code === "PGRST116" ? null : appRes.data;
+        // Ma'lumotlarni o'zgaruvchilarga saqlash (topilmasa null)
+        const userRole = profileRes.data?.role || "client";
+        const dRow = driverRes.data || null;
+        const dApp = appRes.data || null;
 
-        setRole(profileRole);
-        setDriverRow(driver);
-        setDriverApplication(app);
+        setRole(userRole);
+        setDriverRow(dRow);
+        setDriverApplication(dApp);
       } catch (err) {
-        console.error("[RoleGate] Fetch error:", err);
+        console.error("[RoleGate Error]:", err);
         if (isMounted) setRole(null);
       } finally {
         if (isMounted) setLoading(false);
       }
-    })();
+    };
+
+    initGate();
 
     return () => {
       isMounted = false;
     };
   }, []);
 
-  // Yuklanish jarayoni
+  // Ma'lumotlar yuklanayotgan vaqtda spinner ko'rsatish
   if (loading) {
     return (
       <div style={{ 
@@ -126,47 +124,48 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         display: "flex", 
         alignItems: "center", 
         justifyContent: "center",
-        background: "#f0f2f5"
+        flexDirection: "column",
+        gap: "10px"
       }}>
-        <Spin size="large" tip="Sahifa yuklanmoqda..." />
+        <Spin size="large" />
+        <span style={{ color: "#999" }}>Ruxsatlar tekshirilmoqda...</span>
       </div>
     );
   }
 
-  // Agar foydalanuvchi tizimga kirmagan bo'lsa (yoki roli yo'q bo'lsa), login sahifasiga
+  // Foydalanuvchi tizimga kirmagan bo'lsa login sahifasiga yuborish
   if (!role) {
     return <Navigate to={redirectTo} state={{ from: location }} replace />;
   }
 
-  // Foydalanuvchi kirish huquqiga egaligini tekshirish
+  // Kirish huquqini tekshirish (useMemo optimizatsiya uchun)
   const hasAccess = useMemo(() => {
-    const userRole = role.toLowerCase();
+    const currentRole = role.toLowerCase();
 
-    // Ruxsat berilgan rollarni tekshirish
-    if (allow?.admin && userRole === "admin") return true;
-    if (allow?.driver && userRole === "driver") return true;
-    if (allow?.client && userRole === "client") return true;
+    if (allow?.admin && currentRole === "admin") return true;
+    if (allow?.driver && currentRole === "driver") return true;
+    if (allow?.client && currentRole === "client") return true;
 
     return false;
   }, [role, allow]);
 
-  // Agar kirishga ruxsat bo'lmasa, foydalanuvchini o'z rolidan kelib chiqib mos sahifaga yuborish
+  // Agar kirish taqiqlangan bo'lsa, mos keladigan sahifani aniqlash
   if (!hasAccess) {
-    const nextRoute = pickHomeForRole({
+    const destination = pickHomeForRole({
       role,
       driverRow,
       driverApplication,
-      appMode // ✅ useAppMode dan kelgan qiymat uzatiladi
+      appMode
     });
 
-    // Hozirgi joylashuv va yo'naltirilayotgan joy bir xil bo'lsa, cheksiz sikl oldini olish
-    if (location.pathname === nextRoute) {
-      return children; 
+    // Cheksiz yo'naltirish (infinite loop) bo'lmasligi uchun tekshiruv
+    if (location.pathname === destination) {
+      return children;
     }
 
-    return <Navigate to={nextRoute} replace />;
+    return <Navigate to={destination} replace />;
   }
 
-  // Agar hamma tekshiruvlardan o'tsa, sahifani ko'rsatish
+  // Hamma narsa joyida bo'lsa, sahifani ko'rsatish
   return children;
 }
