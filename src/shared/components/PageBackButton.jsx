@@ -11,7 +11,7 @@ export default function PageBackButton({ fallback = '/', className = '', iconCla
       className={className || 'h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center active:scale-95'}
       onClick={() => safeBack(navigate, fallback)}
     >
-      <span className={iconClassName || 'material-symbols-rounded'}>arrow_back</span>
+      <span className={iconClassName || 'material-symbols-rounded'} translate="no" aria-hidden="true" data-no-auto-translate="true">arrow_back</span>
     </button>
   );
 }
