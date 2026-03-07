@@ -3,15 +3,17 @@ import React from "react";
 import { Switch, message } from "antd";
 import { useDriverOnline } from "../core/useDriverOnline";
 import { canActivateService } from "../core/serviceGuards";
+import { useDriverText } from "../shared/i18n_driverLocalize";
 
 export default function DriverOnlineToggle({ serviceType, onBeforeOnline, onAfterOnlineChange, checkedChildren = "ON", unCheckedChildren = "OFF" }) {
+  const { cp } = useDriverText();
   const { isOnline, activeService, setOnline, setOffline } = useDriverOnline();
   const active = isOnline && activeService === serviceType;
 
   const onChange = async (next) => {
     if (next) {
       if (!canActivateService(activeService, serviceType)) {
-        message.warning("Avval boshqa xizmatni offline qiling");
+        message.warning(cp("Avval boshqa xizmatni offline qiling"));
         return;
       }
       const allowed = await (onBeforeOnline?.() ?? true);

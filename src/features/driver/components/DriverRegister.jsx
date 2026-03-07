@@ -32,6 +32,7 @@ import {
 import { UploadOutlined } from '@ant-design/icons';
 import { supabase } from '../../../lib/supabase';
 import { useAppMode } from '@/providers/AppModeProvider';
+import { useDriverText } from "../shared/i18n_driverLocalize";
 
 const PHONE_PREFIX = '+998';
 
@@ -83,6 +84,7 @@ async function uploadToStorage(userId, file, bucket = 'driver-docs') {
 }
 
 export default function DriverRegister() {
+  const { cp } = useDriverText();
   const [form] = Form.useForm();
   const navigate = useNavigate();
 
@@ -107,9 +109,9 @@ export default function DriverRegister() {
   const [carPhotoFile4, setCarPhotoFile4] = useState(null);
 
   const steps = [
-    { title: 'Shaxsiy ma\'lumotlar' },
-    { title: 'Mashina' },
-    { title: 'Guvohnoma' },
+    { title: cp("Shaxsiy ma'lumotlar") },
+    { title: cp('Mashina') },
+    { title: cp('Guvohnoma') },
   ];
 
   const stepFields = useMemo(
@@ -132,7 +134,7 @@ export default function DriverRegister() {
     try {
       await form.validateFields(stepFields[step]);
       if (!requiredFilesOk()) {
-        message.error('Majburiy rasmlarni yuklang');
+        message.error(cp('Majburiy rasmlarni yuklang'));
         return;
       }
       setStep((s) => Math.min(2, s + 1));
@@ -149,16 +151,16 @@ export default function DriverRegister() {
       const { data: authData, error: authError } = await supabase.auth.getUser();
       if (authError) throw authError;
       const user = authData?.user;
-      if (!user?.id) throw new Error('User not authenticated');
+      if (!user?.id) throw new Error(cp('User not authenticated'));
 
       if (!selfieFile || !passportFrontFile || !passportBackFile) {
-        throw new Error('Selfi va pasport rasmlari majburiy');
+        throw new Error(cp('Selfi va pasport rasmlari majburiy'));
       }
       if (!techPassFrontFile || !techPassBackFile) {
-        throw new Error('Texpasport (oldi/orqasi) majburiy');
+        throw new Error(cp('Texpasport (oldi/orqasi) majburiy'));
       }
       if (!licenseFrontFile || !licenseBackFile) {
-        throw new Error('Guvohnoma (oldi/orqasi) majburiy');
+        throw new Error(cp('Guvohnoma (oldi/orqasi) majburiy'));
       }
 
       // Upload all files

@@ -44,6 +44,7 @@ const { Title, Text } = Typography;
  * Sahifaning asosiy mantiqiy qismi
  */
 function Inner() {
+  const { cp } = useDriverText();
   const { mode, MODES, upsertPremiumClient, lastError, locateOnce } = useDistrict();
   const { isOnline, activeService, setOnline, setOffline } = useDriverOnline();
   const serviceType = 'interDist';
@@ -63,7 +64,7 @@ function Inner() {
     enabled: serviceActive && mode === MODES.PREMIUM,
     onClientRequest: (req) => {
       upsertPremiumClient(req);
-      message.info("Yangi buyurtma keldi!");
+      message.info(cp("Yangi buyurtma keldi!"));
     },
   });
 
@@ -72,7 +73,7 @@ function Inner() {
     setActiveTrip(data);
     setTripCreateOpen(false);
     setOnline(serviceType);
-    message.success("Reys muvaffaqiyatli e'lon qilindi!");
+    message.success(cp("Reys muvaffaqiyatli e'lon qilindi!"));
   };
 
   return (
@@ -103,19 +104,19 @@ function Inner() {
           }}>
             <CarOutlined style={{ color: '#fff', fontSize: 20 }} />
           </div>
-          <Title level={4} style={{ margin: 0 }}>Haydovchi Paneli</Title>
+          <Title level={4} style={{ margin: 0 }}>{cp("Haydovchi Paneli")}</Title>
         </Space>
 
         <Space size="middle">
 
-<Tooltip title={serviceActive ? "Hozir onlaynsiz" : "Oflayn holatdasiz"}>
+<Tooltip title={serviceActive ? cp("Hozir onlaynsiz") : cp("Oflayn holatdasiz")}>
   <DriverOnlineToggle
     serviceType={serviceType}
     checkedChildren="ON"
     unCheckedChildren="OFF"
     onBeforeOnline={() => {
       if (!canActivateService(activeService, serviceType)) {
-        message.warning("Avval boshqa xizmatni offline qiling");
+        message.warning(cp("Avval boshqa xizmatni offline qiling"));
         return false;
       }
       if (!activeTrip) {

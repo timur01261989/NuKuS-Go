@@ -5,10 +5,12 @@ import {
   ArrowDownOutlined, BankOutlined, HistoryOutlined 
 } from '@ant-design/icons';
 import { supabase } from "@/lib/supabase";
+import { useDriverText } from "../shared/i18n_driverLocalize";
 
 const { Title, Text } = Typography;
 
 export default function DriverWallet({ onBack }) {
+  const { cp } = useDriverText();
   const [balance, setBalance] = useState(0);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -41,13 +43,13 @@ export default function DriverWallet({ onBack }) {
 
   const handleWithdraw = () => {
     if (balance < 10000) {
-      message.warning("Minimal yechish miqdori 10 000 so'm");
+      message.warning(cp("Minimal yechish miqdori 10 000 so'm"));
       return;
     }
     Modal.confirm({
-      title: 'Pul yechish',
-      content: `${balance.toLocaleString()} so'm kartangizga o'tkazilsinmi?`,
-      onOk: () => message.success("So'rov qabul qilindi, 24 soat ichida tushadi.")
+      title: cp('Pul yechish'),
+      content: `${balance.toLocaleString()} so'm ${cp("kartangizga o'tkazilsinmi?")}`,
+      onOk: () => message.success(cp("So'rov qabul qilindi, 24 soat ichida tushadi."))
     });
   };
 
@@ -56,7 +58,7 @@ export default function DriverWallet({ onBack }) {
       {/* HEADER */}
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={onBack} type="text" size="large" />
-        <Title level={4} style={{ margin: '0 0 0 10px', fontFamily: 'YangoHeadline' }}>Hamyon</Title>
+        <Title level={4} style={{ margin: '0 0 0 10px', fontFamily: 'YangoHeadline' }}>{cp('Hamyon')}</Title>
       </div>
 
       {/* BALANS KARTASI */}
@@ -69,7 +71,7 @@ export default function DriverWallet({ onBack }) {
         marginBottom: 25
       }}>
         <Statistic 
-          title={<Text style={{ color: 'rgba(255,255,255,0.6)' }}>Asosiy balans</Text>}
+          title={<Text style={{ color: 'rgba(255,255,255,0.6)' }}>{cp('Asosiy balans')}</Text>}
           value={balance} 
           precision={0}
           suffix="so'm"
@@ -95,11 +97,11 @@ export default function DriverWallet({ onBack }) {
       </Card>
 
       {/* TRANZAKSIYALAR TARIXI */}
-      <Title level={5}><HistoryOutlined /> Oxirgi harakatlar</Title>
+      <Title level={5}><HistoryOutlined /> {cp('Oxirgi harakatlar')}</Title>
       <List
         loading={loading}
         dataSource={transactions}
-        locale={{ emptyText: <Empty description="Tranzaksiyalar yo'q" /> }}
+        locale={{ emptyText: <Empty description={cp("Tranzaksiyalar yo'q")} /> }}
         renderItem={item => (
           <Card style={{ borderRadius: 16, marginBottom: 10, border: 'none' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

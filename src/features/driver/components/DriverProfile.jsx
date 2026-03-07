@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useDriverText } from "../shared/i18n_driverLocalize";
 import { Card, Avatar, Typography, Row, Col, Statistic, Button, List, Rate, Tag } from 'antd';
 import {
   UserOutlined, CarOutlined, StarFilled,
@@ -18,6 +19,7 @@ import Leaderboard from './Leaderboard';
 const { Title, Text } = Typography;
 
 export default function DriverProfile({ onBack, onLogout }) {
+  const { cp } = useDriverText();
   const [driverData, setDriverData] = useState(null);
   const [stats, setStats] = useState({ total_trips: 0, rating: 5.0 });
   const [walletOpen, setWalletOpen] = useState(false);
@@ -74,7 +76,7 @@ export default function DriverProfile({ onBack, onLogout }) {
       {/* HEADER */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={onBack} shape="circle" style={{ border: 'none' }} />
-        <Title level={4} style={{ margin: 0, fontFamily: 'YangoHeadline' }}>Profil</Title>
+        <Title level={4} style={{ margin: 0, fontFamily: 'YangoHeadline' }}>{cp('Profil')}</Title>
         <Button icon={<SettingOutlined />} shape="circle" />
       </div>
 
@@ -89,21 +91,21 @@ export default function DriverProfile({ onBack, onLogout }) {
             style={{ position: 'absolute', bottom: 5, right: 5, background: '#FFD700', border: 'none' }}
           />
         </div>
-        <Title level={3} style={{ marginTop: 15, marginBottom: 5 }}>{driverData?.first_name || 'Haydovchi'}</Title>
+        <Title level={3} style={{ marginTop: 15, marginBottom: 5 }}>{driverData?.first_name || cp('Haydovchi')}</Title>
         <Rate disabled value={stats.rating} allowHalf style={{ color: '#FFD700', fontSize: 14 }} />
-        <Text type="secondary" style={{ display: 'block' }}>({driverData?.rating_count || 0} ta baho)</Text>
+        <Text type="secondary" style={{ display: 'block' }}>({driverData?.rating_count || 0} {cp('ta baho')})</Text>
       </Card>
 
       {/* STATISTIKA */}
       <Row gutter={15} style={{ marginBottom: 20 }}>
         <Col span={12}>
           <Card style={{ borderRadius: 20, textAlign: 'center', border: 'none' }}>
-            <Statistic title="Jami safarlar" value={stats.total_trips} prefix={<HistoryOutlined />} />
+            <Statistic title={cp("Jami safarlar")} value={stats.total_trips} prefix={<HistoryOutlined />} />
           </Card>
         </Col>
         <Col span={12}>
           <Card style={{ borderRadius: 20, textAlign: 'center', border: 'none' }}>
-            <Statistic title="Reyting" value={stats.rating} precision={1} prefix={<StarFilled style={{ color: '#FFD700' }} />} />
+            <Statistic title={cp("Reyting")} value={stats.rating} precision={1} prefix={<StarFilled style={{ color: '#FFD700' }} />} />
           </Card>
         </Col>
       </Row>
@@ -114,17 +116,17 @@ export default function DriverProfile({ onBack, onLogout }) {
       <div style={{ marginBottom: 20 }} />
 
       {/* AVTOMOBIL MA'LUMOTLARI */}
-      <Card title={<><CarOutlined /> Mashina ma'lumotlari</>} style={{ borderRadius: 20, marginBottom: 20, border: 'none' }}>
+      <Card title={<><CarOutlined /> {cp("Mashina ma'lumotlari")}</>} style={{ borderRadius: 20, marginBottom: 20, border: 'none' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-          <Text type="secondary">Model:</Text>
+          <Text type="secondary">{cp("Model:")}</Text>
           <Text strong>{driverData?.car_model || '---'}</Text>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-          <Text type="secondary">Rangi:</Text>
+          <Text type="secondary">{cp("Rangi:")}</Text>
           <Text strong>{driverData?.car_color || '---'}</Text>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <Text type="secondary">Davlat raqami:</Text>
+          <Text type="secondary">{cp("Davlat raqami:")}</Text>
           <Tag color="black" style={{ fontSize: 14, fontWeight: 'bold' }}>{driverData?.plate_number || '---'}</Tag>
         </div>
       </Card>
@@ -140,23 +142,23 @@ export default function DriverProfile({ onBack, onLogout }) {
           >
             <List.Item.Meta
               avatar={<TrophyFilled style={{ color: '#FFD700', fontSize: 22 }} />}
-              title={<b>Top haydovchilar</b>}
-              description="Nukus Go reytingida o'z o'rningizni ko'ring"
+              title={<b>{cp("Top haydovchilar")}</b>}
+              description={cp("Nukus Go reytingida o'z o'rningizni ko'ring")}
             />
           </List.Item>
 
           <List.Item onClick={() => setWalletOpen(true)} style={{ cursor: 'pointer' }}>
             <List.Item.Meta
               avatar={<WalletOutlined style={{ color: '#FFD700', fontSize: 20 }} />}
-              title={<b>Hamyon va balans</b>}
-              description="Daromadlarni ko'rish va pul yechish"
+              title={<b>{cp("Hamyon va balans")}</b>}
+              description={cp("Daromadlarni ko'rish va pul yechish")}
             />
           </List.Item>
 
           <List.Item style={{ cursor: 'pointer' }} onClick={onLogout}>
             <List.Item.Meta
               avatar={<LogoutOutlined style={{ color: 'red' }} />}
-              title={<Text type="danger">Tizimdan chiqish</Text>}
+              title={<Text type="danger">{cp("Tizimdan chiqish")}</Text>}
             />
           </List.Item>
 

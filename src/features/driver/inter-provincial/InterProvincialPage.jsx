@@ -123,6 +123,7 @@ function TripRow({ trip, onEdit, onDelete, onShowMap }) {
 }
 
 export default function InterProvincialPage() {
+  const { cp } = useDriverText();
   const { user } = useAuth();
 
   // Basic Info

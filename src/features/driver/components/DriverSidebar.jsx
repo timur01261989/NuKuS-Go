@@ -6,6 +6,7 @@ import { useLanguage } from "@/shared/i18n/useLanguage";
 export default function DriverSidebar({ open, onClose, onLogout }) {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const passengerTitle = t.passengerPage || t.passenger || "Foydalanuvchi";
 
   const go = (path) => {
     onClose?.();
@@ -42,7 +43,7 @@ export default function DriverSidebar({ open, onClose, onLogout }) {
 
           <div className="px-4 pb-4 flex-1 overflow-auto">
             <div className="space-y-3">
-              <MenuItem icon="person" title={t.passengerPage || t.passenger} onClick={() => go("/client/home")} />
+              <MenuItem icon="person" title={passengerTitle} onClick={() => go("/client/home")} />
               <MenuItem icon="history" title={t.orderHistoryDriver || t.orders} onClick={() => go("/driver/orders")} />
               <MenuItem icon="account_balance_wallet" title={t.wallet} onClick={() => go("/driver/wallet")} />
               <MenuItem icon="settings" title={t.settingsTitle || t.settings} onClick={() => go("/driver/settings")} />

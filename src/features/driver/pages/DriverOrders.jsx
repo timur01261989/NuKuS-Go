@@ -9,6 +9,7 @@ import 'leaflet/dist/leaflet.css';
 
 import { supabase } from "@/lib/supabase"; 
 import { getOrderOtherPhone } from "@/services/orderPhonesApi";
+import { useDriverText } from "../shared/i18n_driverLocalize";
 
 // --- MAP ICON FIX ---
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -69,6 +70,7 @@ function RecenterMap({ lat, lng }) {
 }
 
 export default function DriverOrderFeed() {
+  const { cp } = useDriverText();
   const [orders, setOrders] = useState([]);
   const [activeOrder, setActiveOrder] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -85,7 +87,7 @@ export default function DriverOrderFeed() {
         // 1. Yangi buyurtma tushsa (pending YOKI searching)
         if (payload.eventType === 'INSERT' && ['pending', 'searching'].includes(payload.new.status)) {
             setOrders(prev => [payload.new, ...prev]);
-            message.info("Yangi buyurtma tushdi!");
+            message.info(cp("Yangi buyurtma tushdi!"));
         }
         // 2. Buyurtma o'zgarsa (birov olsa yoki bekor bo'lsa)
         if (payload.eventType === 'UPDATE' && !['pending', 'searching'].includes(payload.new.status)) {
@@ -134,7 +136,7 @@ export default function DriverOrderFeed() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-          message.error("Iltimos, tizimga qayta kiring");
+          message.error(cp("Iltimos, tizimga qayta kiring"));
           return;
       }
 
@@ -147,18 +149,18 @@ export default function DriverOrderFeed() {
       const { data: check } = await supabase.from('orders').select('driver_id').eq('id', order.id).single();
       
       if (!check || check.driver_id !== user.id) {
-          message.warning("Ulgurmadingiz, buyurtmani boshqa haydovchi oldi.");
+          message.warning(cp("Ulgurmadingiz, buyurtmani boshqa haydovchi oldi."));
           fetchOrders();
           return;
       }
 
-      message.success("Buyurtma qabul qilindi!");
+      message.success(cp("Buyurtma qabul qilindi!"));
       setActiveOrder({ ...order, status: 'accepted', driver_id: user.id });
       setOrders(prev => prev.filter(o => o.id !== order.id)); // Ro'yxatdan o'chirish
 
     } catch (error) {
       console.error(error);
-      message.error("Xatolik: " + error.message);
+      message.error(cp("Xatolik: ") + error.message);
     }
   };
 
@@ -172,10 +174,10 @@ export default function DriverOrderFeed() {
 
       if (!error) {
           setActiveOrder({ ...activeOrder, status: newStatus });
-          if (newStatus === 'arrived') message.success("Mijozga xabar yuborildi: Yetib keldingiz!");
-          if (newStatus === 'in_progress') message.success("Safar boshlandi!");
+          if (newStatus === 'arrived') message.success(cp("Mijozga xabar yuborildi: Yetib keldingiz!"));
+          if (newStatus === 'in_progress') message.success(cp("Safar boshlandi!"));
           if (newStatus === 'completed') {
-              message.success("Safar yakunlandi!");
+              message.success(cp("Safar yakunlandi!"));
               setActiveOrder(null);
               fetchOrders();
           }
@@ -187,18 +189,18 @@ export default function DriverOrderFeed() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) {
-        message.error("Iltimos, tizimga qayta kiring");
+        message.error(cp("Iltimos, tizimga qayta kiring"));
         return;
       }
       const resp = await getOrderOtherPhone({ order_id: order?.id, requester_id: user.id });
       const phone = resp?.passenger_phone;
       if (!phone) {
-        message.error("Yo'lovchi raqami topilmadi");
+        message.error(cp("Yo'lovchi raqami topilmadi"));
         return;
       }
       window.location.href = `tel:${phone}`;
     } catch (e) {
-      message.error("Qo'ng'iroq uchun raqam olinmadi: " + (e?.message || 'xatolik'));
+      message.error(cp("Qo'ng'iroq uchun raqam olinmadi: ") + (e?.message || 'xatolik'));
     }
   };
 

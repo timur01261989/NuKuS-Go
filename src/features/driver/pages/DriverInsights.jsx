@@ -3,12 +3,14 @@ import { Card, Divider, Empty, List, Spin, Tag, Typography, message } from "antd
 import { HeatMapOutlined, TrophyOutlined } from "@ant-design/icons";
 import { supabase } from "../../../lib/supabase";
 import { useLanguage } from "@/shared/i18n/useLanguage";
+import { useDriverText } from "../shared/i18n_driverLocalize";
 import DailyMissions from "../city-taxi/components/widgets/DailyMissions";
 
 const { Title, Text } = Typography;
 
 export default function DriverInsights() {
   const { t } = useLanguage();
+  const { cp } = useDriverText();
   const [userId, setUserId] = useState(null);
   const [hotspots, setHotspots] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -74,7 +76,7 @@ export default function DriverInsights() {
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
                     <div>
                       <div style={{ fontWeight: 800 }}>
-                        {h.service_type || "unknown"} <Tag color="blue">{Number(h.demand_count || 0)}</Tag>
+                        {h.service_type || cp("unknown")} <Tag color="blue">{Number(h.demand_count || 0)}</Tag>
                       </div>
                       <div style={{ fontSize: 12, color: "#667085" }}>
                         {String(h.geokey || "")} • {Number(h.center_lat || 0).toFixed(4)}, {Number(h.center_lng || 0).toFixed(4)}

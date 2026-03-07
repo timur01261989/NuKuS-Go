@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useLanguage } from '@shared/i18n/useLanguage';
 import { safeBack } from '@/shared/navigation/safeBack';
+import { useDriverText } from "../shared/i18n_driverLocalize";
 
 const { Title, Text } = Typography;
 
@@ -12,11 +13,12 @@ export default function DriverServiceSelect({ onSelectService }) {
   const navigate = useNavigate();
   const [isOnline, setIsOnline] = useState(false);
   const { t, currentLanguageMeta } = useLanguage();
+  const { cp } = useDriverText();
 
   const toggleOnline = async (checked) => {
     setIsOnline(checked);
-    if (checked) message.success(t.driverOnline);
-    else message.warning(t.driverOffline);
+    if (checked) message.success(t.driverOnline || cp("Siz Online rejimdasiz"));
+    else message.warning(t.driverOffline || cp("Siz Offline rejimdasiz"));
 
     try {
       const { data: auth } = await supabase.auth.getUser();
