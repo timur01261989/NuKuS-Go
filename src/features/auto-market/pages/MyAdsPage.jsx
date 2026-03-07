@@ -1,58 +1,296 @@
-import React, { useEffect, useState } from "react";
-import { Button, Spin, Tag } from "antd";
-import { ArrowLeftOutlined, PlusOutlined } from "@ant-design/icons";
+/**
+ * MyAdsPage.jsx
+ * Foydalanuvchining shaxsiy e'lonlari boshqaruvi.
+ * 100% TO'LIQ VARIANT - HECH QANDAY QISQARTIRMASIZ.
+ * YANGI: Promotion (TOP, VIP), Ko'rishlar statistikasi, Holatni boshqarish.
+ */
+import React, { useEffect, useState, useCallback } from "react";
+import { 
+  Button, 
+  Spin, 
+  Tag, 
+  message, 
+  Card, 
+  Statistic, 
+  Row, 
+  Col, 
+  Divider, 
+  Tooltip, 
+  Modal, 
+  List, 
+  Badge 
+} from "antd";
+import { 
+  ArrowLeftOutlined, 
+  PlusOutlined, 
+  EyeOutlined, 
+  PhoneOutlined, 
+  ThunderboltOutlined, 
+  CheckCircleOutlined, 
+  DeleteOutlined, 
+  EditOutlined, 
+  LineChartOutlined,
+  StarOutlined,
+  ClockCircleOutlined
+} from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import { myAds, markAdStatus } from "../services/marketBackend";
+import { myAds, markAdStatus, promoteAd } from "../services/marketBackend";
 import CarCardHorizontal from "../components/Feed/CarCardHorizontal";
 import { useAutoMarketI18n } from "../utils/useAutoMarketI18n";
 
 export default function MyAdsPage() {
   const { am } = useAutoMarketI18n();
   const nav = useNavigate();
+  
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [promoModal, setPromoModal] = useState({ open: false, adId: null });
 
-  const load = async () => {
+  // Ma'lumotlarni yuklash
+  const load = useCallback(async () => {
     setLoading(true);
-    try { setItems(await myAds()); } finally { setLoading(false); }
+    try {
+      const data = await myAds();
+      setItems(data || []);
+    } catch (err) {
+      message.error("Ma'lumotlarni yuklashda xatolik");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // E'lon holatini o'zgartirish
+  const handleStatusChange = async (adId, newStatus) => {
+    try {
+      await markAdStatus(adId, newStatus);
+      message.success(`E'lon holati "${newStatus}" ga o'zgartirildi`);
+      load();
+    } catch (e) {
+      message.error("Xatolik yuz berdi");
+    }
   };
 
-  useEffect(() => { load(); }, []);
+  // E'lonni ko'tarish (Promotion)
+  const handlePromote = async (type) => {
+    try {
+      await promoteAd(promoModal.adId, type);
+      message.success("E'lon muvaffaqiyatli ko'tarildi!");
+      setPromoModal({ open: false, adId: null });
+      load();
+    } catch (e) {
+      message.error("Balans yetarli emas yoki xatolik");
+    }
+  };
 
   return (
-    <div style={{ padding: 14, paddingBottom: 80 }}>
-      <div style={{ display:"flex", gap: 10, alignItems:"center", marginBottom: 12 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={()=>nav(-1)} style={{ borderRadius: 14 }} />
-        <div style={{ fontWeight: 950, fontSize: 18, color:"#0f172a", flex:1 }}>{am("myAds.title")}</div>
-        <Button icon={<PlusOutlined />} type="primary" style={{ borderRadius: 12, background:"#22c55e", border:"none" }} onClick={()=>nav("/auto-market/create")}>
+    <div style={{ padding: "14px 14px 100px", background: "#f8fafc", minHeight: "100vh" }}>
+      {/* Header Qismi */}
+      <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 20 }}>
+        <Button 
+          icon={<ArrowLeftOutlined />} 
+          onClick={() => nav(-1)} 
+          style={{ borderRadius: 14, border: "none", boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }} 
+        />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 950, fontSize: 20, color: "#0f172a" }}>{am("myAds.title")}</div>
+          <div style={{ fontSize: 12, color: "#64748b" }}>E'lonlaringizni boshqarish va tahlil qilish</div>
+        </div>
+        <Button 
+          icon={<PlusOutlined />} 
+          type="primary" 
+          style={{ borderRadius: 12, background: "#22c55e", border: "none", fontWeight: 700 }} 
+          onClick={() => nav("/auto-market/create")}
+        >
           Yangi
         </Button>
       </div>
 
-      {loading ? <div style={{ display:"flex", justifyContent:"center", padding: 30 }}><Spin /></div> : null}
+      {loading && items.length === 0 ? (
+        <div style={{ display: "flex", justifyContent: "center", padding: 50 }}><Spin size="large" /></div>
+      ) : items.length === 0 ? (
+        <Card style={{ borderRadius: 20, textAlign: "center", padding: "40px 0" }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>🚗</div>
+          <h3>Hozircha e'lonlaringiz yo'q</h3>
+          <Button type="primary" onClick={() => nav("/auto-market/create")}>Birinchi e'lonni joylang</Button>
+        </Card>
+      ) : null}
 
-      <div style={{ display:"grid", gap: 10 }}>
-        {items.map(ad => (
-          <div key={ad.id} style={{ display:"grid", gap: 8 }}>
-            <CarCardHorizontal ad={ad} onClick={()=>nav(`/auto-market/ad/${ad.id}`)} />
-            <div style={{ display:"flex", gap: 8, flexWrap:"wrap" }}>
-              <Tag color={ad.status === "active" ? "green" : ad.status === "sold" ? "volcano" : "default"} style={{ borderRadius: 999 }}>
-                {ad.status}
-              </Tag>
-              <Button size="small" style={{ borderRadius: 999 }} onClick={async ()=>{ await markAdStatus(ad.id, "sold"); load(); }}>
-                Sotildi
-              </Button>
-              <Button size="small" style={{ borderRadius: 999 }} onClick={async ()=>{ await markAdStatus(ad.id, "archived"); load(); }}>
-                Arxiv
-              </Button>
-            </div>
-          </div>
+      {/* E'lonlar Ro'yxati */}
+      <div style={{ display: "grid", gap: 16 }}>
+        {items.map((ad) => (
+          <Badge.Ribbon 
+            key={ad.id} 
+            text={ad.is_vip ? "VIP" : ad.is_top ? "TOP" : null} 
+            color={ad.is_vip ? "gold" : "#0ea5e9"}
+            style={{ display: ad.is_vip || ad.is_top ? "block" : "none" }}
+          >
+            <Card 
+              bodyStyle={{ padding: 12 }} 
+              style={{ borderRadius: 20, border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.03)" }}
+            >
+              <CarCardHorizontal ad={ad} onClick={() => nav(`/auto-market/ad/${ad.id}`)} />
+              
+              <Divider style={{ margin: "12px 0" }} />
+
+              {/* Statistika Bloklari */}
+              <Row gutter={10} style={{ marginBottom: 12 }}>
+                <Col span={8}>
+                  <div style={{ textAlign: "center", background: "#f1f5f9", padding: "8px", borderRadius: 12 }}>
+                    <div style={{ fontSize: 10, color: "#64748b" }}><EyeOutlined /> Ko'rildi</div>
+                    <div style={{ fontWeight: 800 }}>{ad.views_count || 0}</div>
+                  </div>
+                </Col>
+                <Col span={8}>
+                  <div style={{ textAlign: "center", background: "#f1f5f9", padding: "8px", borderRadius: 12 }}>
+                    <div style={{ fontSize: 10, color: "#64748b" }}><PhoneOutlined /> Tel</div>
+                    <div style={{ fontWeight: 800 }}>{ad.calls_count || 0}</div>
+                  </div>
+                </Col>
+                <Col span={8}>
+                  <div style={{ textAlign: "center", background: "#f1f5f9", padding: "8px", borderRadius: 12 }}>
+                    <div style={{ fontSize: 10, color: "#64748b" }}><ClockCircleOutlined /> Kun</div>
+                    <div style={{ fontWeight: 800 }}>{ad.days_active || 1}</div>
+                  </div>
+                </Col>
+              </Row>
+
+              {/* Boshqaruv Tugmalari */}
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <Tag color={ad.status === "active" ? "green" : ad.status === "sold" ? "volcano" : "default"} style={{ borderRadius: 8, margin: 0, padding: "2px 10px" }}>
+                    {ad.status.toUpperCase()}
+                  </Tag>
+                  {ad.status !== "sold" && (
+                    <Button 
+                      size="small" 
+                      type="primary" 
+                      ghost 
+                      icon={<ThunderboltOutlined />} 
+                      style={{ borderRadius: 8, fontSize: 11 }}
+                      onClick={() => setPromoModal({ open: true, adId: ad.id })}
+                    >
+                      Tezlatish
+                    </Button>
+                  )}
+                </div>
+
+                <div style={{ display: "flex", gap: 8 }}>
+                  <Tooltip title="Tahrirlash">
+                    <Button shape="circle" icon={<EditOutlined />} onClick={() => nav(`/auto-market/edit/${ad.id}`)} />
+                  </Tooltip>
+                  
+                  {ad.status === "active" && (
+                    <Button 
+                      size="small" 
+                      style={{ borderRadius: 8, background: "#16a34a", color: "#fff", border: "none" }}
+                      onClick={() => handleStatusChange(ad.id, "sold")}
+                    >
+                      Sotildi
+                    </Button>
+                  )}
+                  
+                  <Button 
+                    size="small" 
+                    danger 
+                    icon={<DeleteOutlined />} 
+                    style={{ borderRadius: 8 }}
+                    onClick={() => handleStatusChange(ad.id, "archived")}
+                  >
+                    Arxiv
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </Badge.Ribbon>
         ))}
       </div>
 
-      {!loading && !items.length ? (
-        <div style={{ marginTop: 20, color:"#64748b", fontWeight: 800 }}>{am("app.emptyMyAds")}</div>
-      ) : null}
+      {/* Promotion Modali */}
+      <Modal
+        title="E'lonni sotuvini tezlashtirish"
+        open={promoModal.open}
+        onCancel={() => setPromoModal({ open: false, adId: null })}
+        footer={null}
+        centered
+        borderRadius={20}
+      >
+        <List
+          itemLayout="horizontal"
+          dataSource={[
+            { 
+              type: "top", 
+              title: "TOP e'lon", 
+              desc: "E'lon ro'yxatning eng yuqorisida 3 kun turadi", 
+              price: "5,000", 
+              icon: <ArrowLeftOutlined style={{ transform: "rotate(90deg)", color: "#0ea5e9" }} /> 
+            },
+            { 
+              type: "vip", 
+              title: "VIP status", 
+              desc: "Oltin rangli hoshiya va maksimal ko'rilish", 
+              price: "15,000", 
+              icon: <StarOutlined style={{ color: "#eab308" }} /> 
+            },
+            { 
+              type: "turbo", 
+              title: "Turbo sotuv", 
+              desc: "TOP + VIP + Telegram kanalga chiqish", 
+              price: "25,000", 
+              icon: <ThunderboltOutlined style={{ color: "#ef4444" }} /> 
+            }
+          ]}
+          renderItem={item => (
+            <List.Item 
+              style={{ cursor: "pointer", padding: "16px", borderRadius: 12, border: "1px solid #f1f5f9", marginBottom: 10 }}
+              onClick={() => handlePromote(item.type)}
+            >
+              <List.Item.Meta
+                avatar={<div style={{ fontSize: 24 }}>{item.icon}</div>}
+                title={<span style={{ fontWeight: 800 }}>{item.title}</span>}
+                description={item.desc}
+              />
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontWeight: 900, color: "#16a34a" }}>{item.price} UZS</div>
+                <Button size="small" type="link">Tanlash</Button>
+              </div>
+            </List.Item>
+          )}
+        />
+      </Modal>
+
+      {/* Pastki Tahlil Bloki */}
+      <div style={{ 
+        marginTop: 30, 
+        padding: 20, 
+        background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)", 
+        borderRadius: 24,
+        color: "#fff"
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+          <LineChartOutlined style={{ fontSize: 20, color: "#3b82f6" }} />
+          <span style={{ fontWeight: 800 }}>Umumiy Hisob-kitob</span>
+        </div>
+        <Row gutter={16}>
+          <Col span={12}>
+            <Statistic 
+              title={<span style={{ color: "#94a3b8", fontSize: 12 }}>Faol e'lonlar</span>} 
+              value={items.filter(x => x.status === "active").length} 
+              valueStyle={{ color: "#fff", fontWeight: 900 }} 
+            />
+          </Col>
+          <Col span={12}>
+            <Statistic 
+              title={<span style={{ color: "#94a3b8", fontSize: 12 }}>Sotilganlar</span>} 
+              value={items.filter(x => x.status === "sold").length} 
+              valueStyle={{ color: "#22c55e", fontWeight: 900 }} 
+            />
+          </Col>
+        </Row>
+      </div>
     </div>
   );
 }
