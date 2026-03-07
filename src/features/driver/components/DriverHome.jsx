@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Drawer, message } from "antd";
+import { Drawer, message, Switch } from "antd";
 
 import { appConfig } from "../../../shared/config/appConfig";
 
