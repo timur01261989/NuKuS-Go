@@ -10,8 +10,10 @@ import { getServiceBooks, createServiceBook, addServiceRecord, updateServiceBook
 import { BRANDS, SERVICE_TYPES } from "../services/staticData";
 import ServiceBookWidget from "../components/Details/ServiceBookWidget";
 import dayjs from "dayjs";
+import { useAutoMarketI18n } from "../utils/useAutoMarketI18n";
 
 export default function ServiceBookPage() {
+  const { am } = useAutoMarketI18n();
   const nav = useNavigate();
   const [books, setBooks]         = useState([]);
   const [loading, setLoading]     = useState(false);
@@ -39,12 +41,12 @@ export default function ServiceBookPage() {
   useEffect(() => { load(); }, []);
 
   const handleAddBook = async () => {
-    if (!newBook.car_brand || !newBook.car_model) { message.warning("Marka va model kiriting"); return; }
+    if (!newBook.car_brand || !newBook.car_model) { message.warning(am("create.chooseBrand")); return; }
     await createServiceBook(newBook);
     setAddBookOpen(false);
     setNewBook({ car_brand:"", car_model:"", car_year:"", car_plate:"", current_mileage:0, oil_change_km:10000, last_oil_change:0, insurance_expiry:"", tex_expiry:"" });
     load();
-    message.success("Daftar yaratildi!");
+    message.success(am("serviceBook.bookCreated"));
   };
 
   const handleAddRecord = async () => {
@@ -53,7 +55,7 @@ export default function ServiceBookPage() {
     setAddRecOpen(false);
     setNewRec({ service_type:"oil_change", title:"", mileage_at:"", cost:"", currency:"UZS", next_due_km:"", note:"" });
     load();
-    message.success("Yozuv qo'shildi!");
+    message.success(am("serviceBook.recordAdded"));
   };
 
   const openAddRecord = (book) => {
@@ -66,19 +68,19 @@ export default function ServiceBookPage() {
       <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:16 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={()=>nav(-1)} style={{ borderRadius:14 }} />
         <div style={{ flex:1 }}>
-          <div style={{ fontWeight:950, fontSize:18, color:"#0f172a" }}>📖 Rasxod Daftar</div>
-          <div style={{ fontSize:11, color:"#64748b" }}>Mashina xizmat tarixi</div>
+          <div style={{ fontWeight:950, fontSize:18, color:"#0f172a" }}>{am("serviceBook.title")}</div>
+          <div style={{ fontSize:11, color:"#64748b" }}>{am("serviceBook.subtitle")}</div>
         </div>
         <Button icon={<PlusOutlined />} type="primary" onClick={()=>setAddBookOpen(true)}
-          style={{ borderRadius:12, background:"#3b82f6", border:"none" }}>Mashina</Button>
+          style={{ borderRadius:12, background:"#3b82f6", border:"none" }}>{am("serviceBook.addCar")}</Button>
       </div>
 
       {loading ? (
         <div style={{ display:"flex", justifyContent:"center", padding:40 }}><Spin size="large" /></div>
       ) : books.length === 0 ? (
-        <Empty description="Hali mashina qo'shilmagan" style={{ marginTop:60 }}>
+        <Empty description={am("serviceBook.empty")} style={{ marginTop:60 }}>
           <Button type="primary" onClick={()=>setAddBookOpen(true)} style={{ borderRadius:12, background:"#3b82f6", border:"none" }}>
-            Mashina qo'shish
+            {am("serviceBook.addCar")}
           </Button>
         </Empty>
       ) : (
@@ -89,17 +91,17 @@ export default function ServiceBookPage() {
         </div>
       )}
 
-      {/* Mashina qo'shish modal */}
-      <Modal title="Yangi mashina qo'shish" open={addBookOpen} onOk={handleAddBook} onCancel={()=>setAddBookOpen(false)}
-        okText="Qo'shish" cancelText="Bekor">
+      {/* {am("serviceBook.addCar")} modal */}
+      <Modal title={am("serviceBook.newCar")} open={addBookOpen} onOk={handleAddBook} onCancel={()=>setAddBookOpen(false)}
+        okText={am("app.add")} cancelText={am("app.cancel")}>
         <div style={{ display:"grid", gap:10, marginTop:10 }}>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-            <Select value={newBook.car_brand||undefined} allowClear placeholder="Marka"
+            <Select value={newBook.car_brand||undefined} allowClear placeholder={am("common.brand")}
               onChange={v=>setNewBook(p=>({...p,car_brand:v||""}))}
               options={BRANDS.map(b=>({value:b.name,label:b.name}))} style={{width:"100%"}} />
-            <Input placeholder="Model" value={newBook.car_model}
+            <Input placeholder={am("common.model")} value={newBook.car_model}
               onChange={e=>setNewBook(p=>({...p,car_model:e.target.value}))} />
-            <InputNumber placeholder="Yil" value={newBook.car_year||undefined}
+            <InputNumber placeholder={am("common.year")} value={newBook.car_year||undefined}
               onChange={v=>setNewBook(p=>({...p,car_year:v}))} style={{width:"100%"}} min={1990} max={2030} />
             <Input placeholder="Davlat raqami (ixtiyoriy)" value={newBook.car_plate}
               onChange={e=>setNewBook(p=>({...p,car_plate:e.target.value}))} />
@@ -118,9 +120,9 @@ export default function ServiceBookPage() {
       </Modal>
 
       {/* Yozuv qo'shish modal */}
-      <Modal title={`Yozuv: ${activeBook?.car_brand} ${activeBook?.car_model}`}
+      <Modal title={`${am("serviceBook.addRecord")}: ${activeBook?.car_brand || ""} ${activeBook?.car_model || ""}`}
         open={addRecOpen} onOk={handleAddRecord} onCancel={()=>setAddRecOpen(false)}
-        okText="Qo'shish" cancelText="Bekor">
+        okText={am("app.add")} cancelText={am("app.cancel")}>
         <div style={{ display:"grid", gap:10, marginTop:10 }}>
           <Select value={newRec.service_type} onChange={v=>setNewRec(p=>({...p,service_type:v,title:SERVICE_TYPES.find(s=>s.id===v)?.label||""}))}
             style={{width:"100%"}}

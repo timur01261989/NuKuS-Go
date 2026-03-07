@@ -2,14 +2,16 @@ import React from "react";
 import { Modal } from "antd";
 import GallerySlider from "../Details/GallerySlider";
 import PriceTag from "../Common/PriceTag";
+import { useAutoMarketI18n } from "../../utils/useAutoMarketI18n";
 
 export default function PreviewModal({ open, onClose, ad }) {
+  const { am } = useAutoMarketI18n();
   return (
     <Modal open={open} onCancel={onClose} footer={null} width={860} centered>
       <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 14 }}>
         <GallerySlider images={ad?.images || []} />
         <div>
-          <div style={{ fontWeight: 900, fontSize: 18, color: "#0f172a" }}>{ad?.title || "Sarlavha"}</div>
+          <div style={{ fontWeight: 900, fontSize: 18, color: "#0f172a" }}>{ad?.title || am("create.titlePlaceholder")}</div>
           <div style={{ marginTop: 8 }}>
             <PriceTag price={ad?.price} currency={ad?.currency} size={18} />
           </div>
@@ -17,7 +19,7 @@ export default function PreviewModal({ open, onClose, ad }) {
             {ad?.brand} {ad?.model} • {ad?.year} • {ad?.mileage} km
           </div>
           <div style={{ marginTop: 12, whiteSpace: "pre-wrap", color: "#0f172a" }}>
-            {ad?.description || "Tavsif..."}
+            {ad?.description || am("create.descPlaceholder")}
           </div>
         </div>
       </div>

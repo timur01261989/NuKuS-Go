@@ -25,7 +25,7 @@ export default function FavoriteButton({ adId, size = "middle", onChanged }) {
       size={size}
       shape="circle"
       onClick={onClick}
-      aria-label="Sevimli"
+      aria-label="Favorite"
       style={{
         border: "none",
         background: "rgba(255,255,255,.92)",

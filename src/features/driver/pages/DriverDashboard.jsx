@@ -382,7 +382,7 @@ function LegacyDriverDashboard() {
             fontSize: 16,
             fontWeight: 500,
           }}
-          onClick={() => go("/settings")}
+          onClick={() => go("/driver/settings")}
         >
           {t?.settings || "Sozlamalar"}
         </Button>
@@ -447,7 +447,7 @@ function LegacyDriverDashboard() {
         <Button type="text" block style={{ textAlign: "left", height: 40 }} icon={<HistoryOutlined />} onClick={() => go("/driver/orders")}>
           Tarix
         </Button>
-        <Button type="text" block style={{ textAlign: "left", height: 40 }} icon={<SettingOutlined />} onClick={() => go("/settings")}>
+        <Button type="text" block style={{ textAlign: "left", height: 40 }} icon={<SettingOutlined />} onClick={() => go("/driver/settings")}>
           Sozlamalar
         </Button>
       </Drawer>

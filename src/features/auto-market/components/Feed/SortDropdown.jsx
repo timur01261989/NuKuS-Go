@@ -1,8 +1,10 @@
 import React from "react";
 import { Select } from "antd";
 import { useMarket } from "../../context/MarketContext";
+import { useAutoMarketI18n } from "../../utils/useAutoMarketI18n";
 
 export default function SortDropdown() {
+  const { am } = useAutoMarketI18n();
   const { filters, patchFilters } = useMarket();
   return (
     <Select
@@ -10,10 +12,10 @@ export default function SortDropdown() {
       onChange={(v) => patchFilters({ sort: v })}
       style={{ width: 160 }}
       options={[
-        { value: "recent", label: "Yangi" },
-        { value: "cheap", label: "Arzon" },
-        { value: "expensive", label: "Qimmat" },
-        { value: "year_new", label: "Yili yangi" },
+        { value: "recent", label: am("sort.recent") },
+        { value: "cheap", label: am("sort.cheap") },
+        { value: "expensive", label: am("sort.expensive") },
+        { value: "year_new", label: am("sort.yearNew") },
       ]}
     />
   );

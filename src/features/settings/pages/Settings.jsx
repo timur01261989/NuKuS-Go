@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Divider, Select, Switch, Typography, message, Segmented } from 'antd';
 import { useLanguage } from '@shared/i18n/useLanguage';
 import PageBackButton from '@/shared/components/PageBackButton';
+import { useLocation } from 'react-router-dom';
 
 const { Title, Text } = Typography;
 
@@ -17,6 +18,8 @@ function safeBoolFromLS(v, fallback = true) {
 
 export default function Settings() {
   const { langKey, setLanguage, t, availableLanguages } = useLanguage();
+  const location = useLocation();
+  const backFallback = useMemo(() => (location.pathname.startsWith('/driver') ? '/driver/dashboard' : '/client/home'), [location.pathname]);
   const [nightMode, setNightMode] = useState('auto');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
@@ -51,7 +54,7 @@ export default function Settings() {
   return (
     <div style={{ padding: 14, maxWidth: 680, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-        <PageBackButton fallback="/client/home" />
+        <PageBackButton fallback={backFallback} />
         <Title level={3} style={{ margin: 0 }}>
           {t.settingsTitle}
         </Title>

@@ -20,6 +20,7 @@ import { canActivateService } from "../core/serviceGuards";
 import { useSpeedometer } from "../speed/useSpeedometer";
 import { useRadar } from "../radar/useRadar";
 import RadarMiniOverlay from "./RadarMiniOverlay";
+import { useLanguage } from "@/shared/i18n/useLanguage";
 
 function safeShortId(id) {
   const s = String(id || "");
@@ -29,6 +30,7 @@ function safeShortId(id) {
 
 export default function DriverHome({ onLogout }) {
   const navigate = useNavigate();
+  const { t, tr } = useLanguage();
   const { isOnline, activeService, setOnline, setOffline } = useDriverOnline();
 
   // =========================
@@ -110,7 +112,7 @@ const toggleOnline = async (next) => {
   try {
     const targetService = selectedService || activeService || (typeof window !== "undefined" ? localStorage.getItem("driverActiveService") : null) || "taxi";
     if (next && !canActivateService(activeService, targetService)) {
-      message.warning("Avval boshqa xizmatni offline qiling");
+      message.warning(tr("goOffline", "Avval boshqa xizmatni offline qiling"));
       return;
     }
 
@@ -140,10 +142,10 @@ const toggleOnline = async (next) => {
       await setOffline();
     }
 
-    message.success(next ? "Siz Online rejimdasiz" : "Siz Offline rejimdasiz");
+    message.success(next ? tr("driverOnline", "Siz Online rejimdasiz") : tr("driverOffline", "Siz Offline rejimdasiz"));
   } catch (err) {
     console.error("Status update error:", err);
-    message.error("Statusni o'zgartirishda xatolik!");
+    message.error(tr("errorChangingStatus", "Statusni o'zgartirishda xatolik!"));
   } finally {
     setLoading(false);
   }
@@ -177,7 +179,7 @@ useEffect(() => {
         if (!alive) return;
 
         setDriverHeader({
-          name: d?.first_name || "Haydovchi",
+          name: d?.first_name || tr("driverTitle", "Haydovchi"),
           publicId: d?.id ? String(d.id) : safeShortId(user.id),
           avatarUrl: d?.avatar_url || "",
         });
@@ -331,12 +333,12 @@ useEffect(() => {
             type="button"
             onClick={() => setSidebarOpen(true)}
             className="p-2 rounded-xl neumorphic-pop text-slate-700"
-            aria-label="Menyu"
+            aria-label={t.menu || "Menyu"}
           >
             <span className="material-symbols-outlined block">menu</span>
           </button>
 
-          <h1 className="text-2xl font-bold tracking-tight text-primarySidebar">Nukus Go</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-primarySidebar">{tr("appName", "UniGo")}</h1>
         </div>
 
         <button
@@ -346,7 +348,7 @@ useEffect(() => {
           aria-label="Profil"
         >
           <div className="text-right">
-            <p className="text-sm font-bold leading-tight">{driverHeader?.name || "Haydovchi"}</p>
+            <p className="text-sm font-bold leading-tight">{driverHeader?.name || tr("driverTitle", "Haydovchi")}</p>
             <p className="text-xs text-slate-500">ID: {driverHeader?.publicId || "----"}</p>
           </div>
 
@@ -372,9 +374,9 @@ useEffect(() => {
           <div className="flex items-center gap-3">
             <div className={`w-3 h-3 rounded-full ${isOnline ? "bg-green-500" : "bg-slate-400"}`} />
             <div>
-              <p className="font-bold text-slate-800">Haydovchi holati</p>
+              <p className="font-bold text-slate-800">{tr("driverStatus", "Haydovchi holati")}</p>
               <p className="text-sm text-slate-500">
-                Siz hozir {isOnline ? `onlayn${activeService ? ` (${activeService})` : ""}` : "oflayn"} rejimdasiz
+                {tr("currentStatus", "Siz hozir")} {isOnline ? `${tr("online", "onlayn")}${activeService ? ` (${activeService})` : ""}` : tr("offline", "oflayn")}
               </p>
             </div>
           </div>
@@ -414,8 +416,8 @@ useEffect(() => {
                 <span className="material-symbols-outlined text-4xl">local_taxi</span>
               </div>
               <div>
-                <h3 className="text-2xl font-bold text-slate-900">Shahar ichida taksi</h3>
-                <p className="text-slate-500 text-sm">Eng tezkor va qulay narxlar</p>
+                <h3 className="text-2xl font-bold text-slate-900">{tr("taxi", "Shahar ichida taksi")}</h3>
+                <p className="text-slate-500 text-sm">{tr("cityTaxiHint", "Eng tezkor va qulay narxlar")}</p>
               </div>
             </div>
 
@@ -435,7 +437,7 @@ useEffect(() => {
             <div className="w-14 h-14 rounded-2xl bg-orange-100 flex items-center justify-center text-primarySidebar">
               <span className="material-symbols-outlined text-4xl">map</span>
             </div>
-            <p className="font-bold text-slate-800">Viloyatlar aro</p>
+            <p className="font-bold text-slate-800">{tr("interProvincial", "Viloyatlar aro")}</p>
           </button>
 
           <button
@@ -446,7 +448,7 @@ useEffect(() => {
             <div className="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center text-blue-600">
               <span className="material-symbols-outlined text-4xl">distance</span>
             </div>
-            <p className="font-bold text-slate-800">Tumanlar aro</p>
+            <p className="font-bold text-slate-800">{tr("interDistrict", "Tumanlar aro")}</p>
           </button>
 
           <button
@@ -457,7 +459,7 @@ useEffect(() => {
             <div className="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600">
               <span className="material-symbols-outlined text-4xl">local_shipping</span>
             </div>
-            <p className="font-bold text-slate-800">Yuk tashish</p>
+            <p className="font-bold text-slate-800">{tr("freight", "Yuk tashish")}</p>
           </button>
 
           <button
@@ -468,7 +470,7 @@ useEffect(() => {
             <div className="w-14 h-14 rounded-2xl bg-purple-100 flex items-center justify-center text-purple-600">
               <span className="material-symbols-outlined text-4xl">inventory_2</span>
             </div>
-            <p className="font-bold text-slate-800">Eltish xizmati</p>
+            <p className="font-bold text-slate-800">{tr("delivery", "Eltish xizmati")}</p>
           </button>
         </section>
       </main>
@@ -484,7 +486,7 @@ useEffect(() => {
           className="flex flex-col items-center gap-1 text-primarySidebar"
         >
           <span className="material-symbols-outlined">home</span>
-          <span className="text-[10px] font-bold">Asosiy</span>
+          <span className="text-[10px] font-bold">{tr("home", "Asosiy")}</span>
         </button>
 
         <button
@@ -493,16 +495,16 @@ useEffect(() => {
           className="flex flex-col items-center gap-1 text-slate-400"
         >
           <span className="material-symbols-outlined">history</span>
-          <span className="text-[10px] font-medium">Buyurtmalar tarixi</span>
+          <span className="text-[10px] font-medium">{tr("orderHistoryDriver", tr("orders", "Buyurtmalar tarixi"))}</span>
         </button>
 
         <button
           type="button"
-          onClick={() => navigate("/driver/wallet")}
+          onClick={() => navigate("/driver/settings")}
           className="flex flex-col items-center gap-1 text-slate-400"
         >
-          <span className="material-symbols-outlined">account_balance_wallet</span>
-          <span className="text-[10px] font-medium">Hamyon</span>
+          <span className="material-symbols-outlined">settings</span>
+          <span className="text-[10px] font-medium">{tr("settingsTitle", "Sozlamalar")}</span>
         </button>
       </nav>
 
@@ -536,7 +538,7 @@ useEffect(() => {
           >
             <div style={{ fontWeight: 900 }}>Profil</div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ fontSize: 12, opacity: 0.9 }}>{isOnline ? "Online" : "Offline"}</div>
+              <div style={{ fontSize: 12, opacity: 0.9 }}>{isOnline ? tr("online", "Online") : tr("offline", "Offline")}</div>
               <Switch size="small" checked={isOnline} onChange={toggleOnline} loading={loading} />
             </div>
           </div>

@@ -51,6 +51,7 @@ function ZapchastCard({ item }) {
 }
 
 export default function ZapchastPage() {
+  const { am } = useAutoMarketI18n();
   const nav = useNavigate();
   const [brand, setBrand]       = useState("");
   const [model, setModel]       = useState("");
@@ -76,7 +77,7 @@ export default function ZapchastPage() {
   useEffect(() => { load(); }, [brand, model, category, q]);
 
   const handleAdd = async () => {
-    if (!newItem.title) { message.warning("Sarlavha kiriting"); return; }
+    if (!newItem.title) { message.warning(am("parts.titleRequired")); return; }
     await createZapchastAd(newItem);
     setAddOpen(false);
     setNewItem({ title:"", category:"other", compatible_brand:"", compatible_model:"", price:"", currency:"UZS", condition:"used", city:"Nukus", phone:"", is_razborka:false });
@@ -90,8 +91,8 @@ export default function ZapchastPage() {
         <div style={{ padding:"12px 14px", display:"flex", gap:10, alignItems:"center" }}>
           <Button icon={<ArrowLeftOutlined />} onClick={()=>nav(-1)} style={{ borderRadius:14 }} />
           <div style={{ flex:1 }}>
-            <div style={{ fontWeight:950, fontSize:16, color:"#0f172a" }}>🔩 Zapchast</div>
-            <div style={{ fontSize:11, color:"#64748b" }}>Ehtiyot qismlar bozori</div>
+            <div style={{ fontWeight:950, fontSize:16, color:"#0f172a" }}>{am("parts.title")}</div>
+            <div style={{ fontSize:11, color:"#64748b" }}>{am("parts.subtitle")}</div>
           </div>
           <Button icon={<PlusOutlined />} type="primary" onClick={()=>setAddOpen(true)}
             style={{ borderRadius:12, background:"#22c55e", border:"none" }}>E'lon</Button>

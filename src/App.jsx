@@ -259,6 +259,15 @@ export default function App() {
                   }
                 />
 
+                <Route
+                  path="/driver/settings"
+                  element={
+                    <RoleGate allow={{ client: false, driver: true, requireDriverApproved: true }}>
+                      <Settings />
+                    </RoleGate>
+                  }
+                />
+
                 {/* --- SUPER PRO / LEGACY FEATURES --- */}
                 {appConfig.features.garage && <Route path="/garage" element={<GaragePage />} />}
                 {appConfig.features.payments && <Route path="/payments" element={<PaymentsPage />} />}

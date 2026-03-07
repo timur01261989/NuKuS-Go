@@ -1,6 +1,6 @@
 /**
  * AutoBattlePage.jsx
- * Avto-battle — ikki mashinani solishtirish + ovoz berish.
+ * Avto-battle — ikki mashinani solishtirish + {am("battle.votes")} berish.
  * "Qaysi zo'r: Gentra 2023 yoki Monza?" — aktivlik va engagement uchun.
  */
 import React, { useEffect, useState } from "react";
@@ -8,6 +8,7 @@ import { Button, Progress, message, Spin, Empty } from "antd";
 import { ArrowLeftOutlined, FireOutlined, TrophyOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { listBattles, voteBattle } from "../services/marketBackend";
+import { useAutoMarketI18n } from "../utils/useAutoMarketI18n";
 
 function BattleCard({ battle, onVote }) {
   const total    = battle.votes_a + battle.votes_b;
@@ -24,7 +25,7 @@ function BattleCard({ battle, onVote }) {
       <div style={{ display:"flex", gap:6, alignItems:"center", marginBottom:14 }}>
         <FireOutlined style={{ color:"#ef4444", fontSize:16 }} />
         <div style={{ fontWeight:900, color:"#0f172a", flex:1 }}>{battle.title}</div>
-        <div style={{ fontSize:11, color:"#94a3b8" }}>{total} ovoz</div>
+        <div style={{ fontSize:11, color:"#94a3b8" }}>{total} {am("battle.votes")}</div>
       </div>
 
       <div style={{ display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:10, alignItems:"center" }}>
@@ -94,6 +95,7 @@ function BattleCard({ battle, onVote }) {
 }
 
 export default function AutoBattlePage() {
+  const { am } = useAutoMarketI18n();
   const nav = useNavigate();
   const [battles, setBattles] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -130,7 +132,7 @@ export default function AutoBattlePage() {
       <div style={{ background:"#faf5ff", borderRadius:14, padding:12, marginBottom:16, border:"1.5px solid #e9d5ff" }}>
         <div style={{ fontWeight:800, color:"#7c3aed" }}>🎯 Qoida:</div>
         <div style={{ fontSize:12, color:"#6b21a8", marginTop:4, lineHeight:1.5 }}>
-          Mashinani bosib ovoz bering. Har bir battle'da faqat bir marta ovoz berishingiz mumkin.
+          Mashinani bosib {am("battle.votes")} bering. Har bir battle'da faqat bir marta {am("battle.votes")} berishingiz mumkin.
         </div>
       </div>
 

@@ -1,7 +1,7 @@
 /**
  * SponsoredCarCard.jsx
- * Reklama kartochkasi — lentada har 5 ta kartadan keyin chiqadi.
- * "Native" integratsiya: oddiy kartochkaga o'xshaydi, lekin "Reklama" belgisi bor.
+ * {am("sponsor.ad")} kartochkasi — lentada har 5 ta kartadan keyin chiqadi.
+ * "Native" integratsiya: oddiy kartochkaga o'xshaydi, lekin "{am("sponsor.ad")}" belgisi bor.
  *
  * Props:
  *  - sponsor: { brand, title, subtitle, cta, color, bg, logo_text, onClick }
@@ -49,6 +49,7 @@ export const DEFAULT_SPONSORS = [
 ];
 
 export default function SponsoredCarCard({ sponsor }) {
+  const { am } = useAutoMarketI18n();
   if (!sponsor) return null;
 
   const handleClick = () => {
@@ -69,13 +70,13 @@ export default function SponsoredCarCard({ sponsor }) {
         position: "relative",
       }}
     >
-      {/* Reklama belgisi */}
+      {/* {am("sponsor.ad")} belgisi */}
       <div style={{ position:"absolute", top:10, right:10, zIndex:2 }}>
         <Tag style={{
           fontSize:10, borderRadius:999, background:"rgba(255,255,255,0.85)",
           border:"1px solid #e2e8f0", color:"#94a3b8", fontWeight:700, padding:"2px 8px"
         }}>
-          Reklama
+          {am("sponsor.ad")}
         </Tag>
       </div>
 

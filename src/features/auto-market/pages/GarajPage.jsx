@@ -8,8 +8,10 @@ import { Button, Empty, Tag, message, Badge } from "antd";
 import { ArrowLeftOutlined, DeleteOutlined, RightOutlined, BellOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { useGaraj } from "../context/GarajContext";
+import { useAutoMarketI18n } from "../utils/useAutoMarketI18n";
 
 export default function GarajPage() {
+  const { am } = useAutoMarketI18n();
   const nav = useNavigate();
   const { items, remove } = useGaraj();
   const [priceDrop, setPriceDrop] = useState([]);

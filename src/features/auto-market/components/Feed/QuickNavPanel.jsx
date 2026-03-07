@@ -5,23 +5,25 @@
  */
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { useAutoMarketI18n } from "../../utils/useAutoMarketI18n";
 
 const SECTIONS = [
-  { path:"/auto-market/vikup",        emoji:"💳", label:"Vikup",      bg:"linear-gradient(135deg,#fef9c3,#fefce8)", border:"#fde68a" },
-  { path:"/auto-market/barter",       emoji:"🔄", label:"Barter",     bg:"linear-gradient(135deg,#dcfce7,#f0fdf4)", border:"#86efac" },
-  { path:"/auto-market/zapchast",     emoji:"🔩", label:"Zapchast",   bg:"linear-gradient(135deg,#dbeafe,#eff6ff)", border:"#93c5fd" },
-  { path:"/auto-market/razborka",     emoji:"🔧", label:"Razborka",   bg:"linear-gradient(135deg,#fee2e2,#fff1f2)", border:"#fca5a5" },
-  { path:"/auto-market/garaj",        emoji:"🚗", label:"Garajim",    bg:"linear-gradient(135deg,#fae8ff,#fdf4ff)", border:"#d8b4fe" },
-  { path:"/auto-market/battle",       emoji:"⚔️",  label:"Battle",     bg:"linear-gradient(135deg,#ede9fe,#f5f3ff)", border:"#c4b5fd" },
-  { path:"/auto-market/analytics",    emoji:"📈", label:"Tahlil",     bg:"linear-gradient(135deg,#cffafe,#ecfeff)", border:"#67e8f9" },
-  { path:"/auto-market/service-book", emoji:"📖", label:"Daftar",     bg:"linear-gradient(135deg,#e0f2fe,#f0f9ff)", border:"#7dd3fc" },
+  { path:"/auto-market/vikup",        emoji:"💳", label:"vikup",      bg:"linear-gradient(135deg,#fef9c3,#fefce8)", border:"#fde68a" },
+  { path:"/auto-market/barter",       emoji:"🔄", label:"barter",     bg:"linear-gradient(135deg,#dcfce7,#f0fdf4)", border:"#86efac" },
+  { path:"/auto-market/zapchast",     emoji:"🔩", label:"parts",   bg:"linear-gradient(135deg,#dbeafe,#eff6ff)", border:"#93c5fd" },
+  { path:"/auto-market/razborka",     emoji:"🔧", label:"dismantling",   bg:"linear-gradient(135deg,#fee2e2,#fff1f2)", border:"#fca5a5" },
+  { path:"/auto-market/garaj",        emoji:"🚗", label:"garage",    bg:"linear-gradient(135deg,#fae8ff,#fdf4ff)", border:"#d8b4fe" },
+  { path:"/auto-market/battle",       emoji:"⚔️",  label:"battle",     bg:"linear-gradient(135deg,#ede9fe,#f5f3ff)", border:"#c4b5fd" },
+  { path:"/auto-market/analytics",    emoji:"📈", label:"analytics",     bg:"linear-gradient(135deg,#cffafe,#ecfeff)", border:"#67e8f9" },
+  { path:"/auto-market/service-book", emoji:"📖", label:"serviceBook",     bg:"linear-gradient(135deg,#e0f2fe,#f0f9ff)", border:"#7dd3fc" },
 ];
 
 export default function QuickNavPanel() {
+  const { am } = useAutoMarketI18n();
   const nav = useNavigate();
   return (
     <div style={{ padding:"10px 14px 0" }}>
-      <div style={{ fontSize:13, fontWeight:900, color:"#0f172a", marginBottom:8 }}>Bo'limlar</div>
+      <div style={{ fontSize:13, fontWeight:900, color:"#0f172a", marginBottom:8 }}>{am("quickNav.title")}</div>
       <div style={{ display:"flex", gap:8, overflowX:"auto", paddingBottom:6 }}>
         {SECTIONS.map(s => (
           <div
@@ -39,7 +41,7 @@ export default function QuickNavPanel() {
           >
             <div style={{ fontSize:22, lineHeight:1 }}>{s.emoji}</div>
             <div style={{ fontSize:10, fontWeight:800, color:"#0f172a", marginTop:4, whiteSpace:"nowrap" }}>
-              {s.label}
+              {am(`nav.${s.label}`, s.label)}
             </div>
           </div>
         ))}

@@ -5,8 +5,10 @@ import { useNavigate } from "react-router-dom";
 import { useCompare } from "../context/CompareContext";
 import { getCarById } from "../services/marketBackend";
 import { formatPrice } from "../services/priceUtils";
+import { useAutoMarketI18n } from "../utils/useAutoMarketI18n";
 
 export default function ComparePage() {
+  const { am } = useAutoMarketI18n();
   const nav = useNavigate();
   const { ids, remove, clear } = useCompare();
   const [cars, setCars] = useState([]);
@@ -27,29 +29,29 @@ export default function ComparePage() {
   }, [ids]);
 
   const rows = [
-    { key: "brand", name: "Marka", v: (c) => c.brand },
-    { key: "model", name: "Model", v: (c) => c.model },
-    { key: "year", name: "Yil", v: (c) => c.year },
-    { key: "mileage", name: "Probeg", v: (c) => (c.mileage ?? "-") + " km" },
-    { key: "engine", name: "Motor", v: (c) => c.engine },
-    { key: "fuel", name: "Yoqilg'i", v: (c) => c.fuel_type },
-    { key: "trans", name: "Uzatma", v: (c) => c.transmission },
-    { key: "price", name: "Narx", v: (c) => formatPrice(c.price, c.currency) },
-    { key: "city", name: "Shahar", v: (c) => c.city },
+    { key: "brand", name: am("compare.brand"), v: (c) => c.brand },
+    { key: "model", name: am("compare.model"), v: (c) => c.model },
+    { key: "year", name: am("compare.year"), v: (c) => c.year },
+    { key: "mileage", name: am("compare.mileage"), v: (c) => (c.mileage ?? "-") + " km" },
+    { key: "engine", name: am("compare.engine"), v: (c) => c.engine },
+    { key: "fuel", name: am("compare.fuel"), v: (c) => c.fuel_type },
+    { key: "trans", name: am("compare.trans"), v: (c) => c.transmission },
+    { key: "price", name: am("compare.price"), v: (c) => formatPrice(c.price, c.currency) },
+    { key: "city", name: am("compare.city"), v: (c) => c.city },
   ];
 
   return (
     <div style={{ padding: 14, paddingBottom: 60 }}>
       <div style={{ display:"flex", gap: 10, alignItems:"center", marginBottom: 12 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={()=>nav(-1)} style={{ borderRadius: 14 }} />
-        <div style={{ fontWeight: 950, fontSize: 18, color:"#0f172a", flex:1 }}>Solishtirish</div>
+        <div style={{ fontWeight: 950, fontSize: 18, color:"#0f172a", flex:1 }}>{am("compare.title")}</div>
         <Button icon={<DeleteOutlined />} onClick={clear} danger style={{ borderRadius: 12 }}>Tozalash</Button>
       </div>
 
       {loading ? <div style={{ display:"flex", justifyContent:"center", padding: 30 }}><Spin /></div> : null}
 
       {!loading && !ids.length ? (
-        <div style={{ color:"#64748b", fontWeight: 800 }}>Solishtirish bo'sh.</div>
+        <div style={{ color:"#64748b", fontWeight: 800 }}>{am("app.emptyCompare")}</div>
       ) : null}
 
       {!loading && ids.length ? (
@@ -57,7 +59,7 @@ export default function ComparePage() {
           <table style={{ width:"100%", borderCollapse:"separate", borderSpacing:"0 10px" }}>
             <thead>
               <tr>
-                <th style={{ textAlign:"left", color:"#64748b", fontSize: 12, padding: 8 }}>Parametr</th>
+                <th style={{ textAlign:"left", color:"#64748b", fontSize: 12, padding: 8 }}>{am("compare.param")}</th>
                 {cars.map(c => (
                   <th key={c.id} style={{ textAlign:"left", padding: 8 }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap: 10 }}>

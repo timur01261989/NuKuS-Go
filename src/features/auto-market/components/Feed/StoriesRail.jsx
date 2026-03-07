@@ -4,8 +4,10 @@ import { Carousel } from "antd";
 import { listCars } from "../../services/marketBackend";
 import PriceTag from "../Common/PriceTag";
 import StatusBadge from "../Common/StatusBadge";
+import { useAutoMarketI18n } from "../../utils/useAutoMarketI18n";
 
 export default function StoriesRail() {
+  const { am } = useAutoMarketI18n();
   const nav = useNavigate();
   const [items, setItems] = React.useState([]);
 
@@ -21,8 +23,8 @@ export default function StoriesRail() {
   return (
     <div style={{ padding: "12px 14px 0" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
-        <div style={{ fontSize: 14, fontWeight: 900, color: "#0f172a" }}>Tezkor e'lonlar</div>
-        <div style={{ fontSize: 12, color: "#64748b" }}>TOP</div>
+        <div style={{ fontSize: 14, fontWeight: 900, color: "#0f172a" }}>{am("stories.title")}</div>
+        <div style={{ fontSize: 12, color: "#64748b" }}>{am("stories.top")}</div>
       </div>
 
       <Carousel dots={false} slidesToShow={1} draggable>

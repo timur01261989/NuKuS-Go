@@ -1,9 +1,11 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../../lib/supabase";
+import { useLanguage } from "@/shared/i18n/useLanguage";
 
 export default function DriverSidebar({ open, onClose, onLogout }) {
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   const go = (path) => {
     onClose?.();
@@ -13,9 +15,7 @@ export default function DriverSidebar({ open, onClose, onLogout }) {
   const logout = async () => {
     try {
       await supabase.auth.signOut();
-    } catch {
-      // ignore
-    }
+    } catch {}
     onClose?.();
     onLogout?.();
     navigate("/login");
@@ -25,64 +25,41 @@ export default function DriverSidebar({ open, onClose, onLogout }) {
 
   return (
     <>
-      {/* Overlay */}
-      <div
-        className="fixed inset-0 z-[60] bg-black/30 backdrop-blur-sm"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-
-      {/* Drawer */}
+      <div className="fixed inset-0 z-[60] bg-black/30 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <aside className="fixed inset-y-0 left-0 z-[70] w-[86%] max-w-[360px] bg-backgroundLightDriver text-slate-900 shadow-2xl">
         <div className="h-full flex flex-col">
-          {/* Header */}
           <div className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-2xl font-extrabold text-primarySidebar leading-none">Nukus Go</div>
-                <div className="text-sm text-slate-500 mt-1">Haydovchi menyusi</div>
+                <div className="text-2xl font-extrabold text-primarySidebar leading-none">{t.appName}</div>
+                <div className="text-sm text-slate-500 mt-1">{t.appSubtitle || t.driverRegTitle}</div>
               </div>
-
-              <button
-                type="button"
-                onClick={onClose}
-                className="p-2 rounded-xl neumorphic-pop text-slate-700"
-                aria-label="Yopish"
-              >
+              <button type="button" onClick={onClose} className="p-2 rounded-xl neumorphic-pop text-slate-700" aria-label={t.cancel || 'Close'}>
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
           </div>
 
-          {/* Menu */}
           <div className="px-4 pb-4 flex-1 overflow-auto">
             <div className="space-y-3">
-              <MenuItem icon="person" title="Yolovchi sahifasi" onClick={() => go("/client/home")} />
-              <MenuItem icon="history" title="Buyurtmalar tarixi" onClick={() => go("/driver/orders")} />
-              <MenuItem icon="account_balance_wallet" title="Hisobni to'ldirish" onClick={() => go("/driver/wallet")} />
-              <MenuItem icon="settings" title="Sozlamalar" onClick={() => go("/driver/settings")} />
-              <MenuItem icon="confirmation_number" title="Promokodlar" onClick={() => go("/driver/promo")} />
-              <MenuItem icon="help" title="Qo'llanma" onClick={() => go("/driver/guide")} />
-              <MenuItem icon="insights" title="Insights" onClick={() => go("/driver/insights")} />
+              <MenuItem icon="person" title={t.passenger || "Yo'lovchi sahifasi"} onClick={() => go("/client/home")} />
+              <MenuItem icon="history" title={t.orderHistoryDriver || t.orders} onClick={() => go("/driver/orders")} />
+              <MenuItem icon="account_balance_wallet" title={t.wallet} onClick={() => go("/driver/wallet")} />
+              <MenuItem icon="settings" title={t.settingsTitle || t.settings} onClick={() => go("/driver/settings")} />
+              <MenuItem icon="insights" title={t.insights || "Insights"} onClick={() => go("/driver/insights")} />
             </div>
           </div>
 
-          {/* Footer */}
           <div className="p-4 border-t border-slate-200/70 bg-white/40 backdrop-blur">
-            <button
-              type="button"
-              onClick={logout}
-              className="w-full neumorphic-pop rounded-2xl px-4 py-3 flex items-center justify-between"
-            >
+            <button type="button" onClick={logout} className="w-full neumorphic-pop rounded-2xl px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-3 text-red-600">
                 <span className="material-symbols-outlined">logout</span>
-                <span className="font-bold">Chiqish</span>
+                <span className="font-bold">{t.logout}</span>
               </div>
               <span className="material-symbols-outlined text-red-600">arrow_forward</span>
             </button>
-
             <div className="mt-4 text-center">
-              <div className="text-sm font-extrabold text-slate-800">Nukus Go</div>
+              <div className="text-sm font-extrabold text-slate-800">{t.appName}</div>
               <div className="text-xs text-slate-500">UniGo</div>
             </div>
           </div>
@@ -94,11 +71,7 @@ export default function DriverSidebar({ open, onClose, onLogout }) {
 
 function MenuItem({ icon, title, onClick }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="w-full neumorphic-pop rounded-2xl px-4 py-3 flex items-center justify-between"
-    >
+    <button type="button" onClick={onClick} className="w-full neumorphic-pop rounded-2xl px-4 py-3 flex items-center justify-between">
       <div className="flex items-center gap-3">
         <span className="material-symbols-outlined text-primarySidebar">{icon}</span>
         <span className="font-bold text-slate-800">{title}</span>

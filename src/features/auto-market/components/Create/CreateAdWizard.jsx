@@ -9,10 +9,13 @@ import Step4_Desc from "./steps/Step4_Desc";
 import Step5_Contact from "./steps/Step5_Contact";
 import PreviewModal from "./PreviewModal";
 import { createCarAd } from "../../services/marketBackend";
+import { useAutoMarketI18n } from "../../utils/useAutoMarketI18n";
 
-const titles = ["Marka/Model", "Parametrlar", "Rasmlar", "Narx & Tavsif", "Kontakt"];
+
 
 export default function CreateAdWizard() {
+  const { am } = useAutoMarketI18n();
+  const titles = am("create.steps");
   const nav = useNavigate();
   const { step, setStep, ad, reset } = useCreateAd();
   const [preview, setPreview] = useState(false);
@@ -33,25 +36,25 @@ export default function CreateAdWizard() {
 
   const validateStep = () => {
     if (step === 0) {
-      if (!ad.brand) return message.error("Marka tanlang");
-      if (!ad.model) return message.error("Model tanlang");
+      if (!ad.brand) return message.error(am("create.chooseBrand"));
+      if (!ad.model) return message.error(am("create.chooseModel"));
     }
     if (step === 1) {
-      if (!ad.year) return message.error("Yil kiriting");
-      if (!ad.mileage && ad.mileage !== 0) return message.error("Probeg kiriting");
-      if (!ad.fuel_type) return message.error("Yoqilg'i turini tanlang");
-      if (!ad.transmission) return message.error("Uzatma turini tanlang");
+      if (!ad.year) return message.error(am("create.enterYear"));
+      if (!ad.mileage && ad.mileage !== 0) return message.error(am("create.enterMileage"));
+      if (!ad.fuel_type) return message.error(am("create.chooseFuel"));
+      if (!ad.transmission) return message.error(am("create.chooseTransmission"));
     }
     if (step === 2) {
-      if (!ad.images?.length) return message.error("Kamida 1 ta rasm yuklang");
+      if (!ad.images?.length) return message.error(am("create.uploadImage"));
     }
     if (step === 3) {
-      if (!ad.price) return message.error("Narx kiriting");
-      if (!ad.title?.trim()) return message.error("Sarlavha kiriting");
+      if (!ad.price) return message.error(am("create.enterPrice"));
+      if (!ad.title?.trim()) return message.error(am("create.enterTitle"));
     }
     if (step === 4) {
-      if (!ad.seller?.phone?.trim()) return message.error("Telefon raqam kiriting");
-      if (!ad.city) return message.error("Shahar tanlang");
+      if (!ad.seller?.phone?.trim()) return message.error(am("create.enterPhone"));
+      if (!ad.city) return message.error(am("create.chooseCity"));
     }
     return true;
   };
@@ -67,14 +70,14 @@ export default function CreateAdWizard() {
 
   const onSubmit = async () => {
     if (!validateStep()) return;
-    const hide = message.loading("E'lon joylanmoqda...", 0);
+    const hide = message.loading(am("app.posting"), 0);
     try {
       const created = await createCarAd(ad);
-      message.success("E'lon joylandi");
+      message.success(am("app.adPosted"));
       reset();
       nav(`/auto-market/ad/${created.id}`);
     } catch (e) {
-      message.error(e?.message || "Xatolik");
+      message.error(e?.message || am("app.error"));
     } finally {
       hide();
     }
@@ -82,7 +85,7 @@ export default function CreateAdWizard() {
 
   return (
     <div style={{ padding: 14 }}>
-      <div style={{ fontWeight: 900, fontSize: 18, color: "#0f172a" }}>E'lon berish</div>
+      <div style={{ fontWeight: 900, fontSize: 18, color: "#0f172a" }}>{am("create.title")}</div>
       <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
         {titles[step]} • {step + 1}/{titles.length}
       </div>

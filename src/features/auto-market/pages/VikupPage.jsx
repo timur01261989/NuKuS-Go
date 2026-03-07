@@ -12,8 +12,10 @@ import { BRANDS } from "../services/staticData";
 import PriceTag from "../components/Common/PriceTag";
 import VikupCalculator from "../components/Details/VikupCalculator";
 import StatusBadge from "../components/Common/StatusBadge";
+import { useAutoMarketI18n } from "../utils/useAutoMarketI18n";
 
 export default function VikupPage() {
+  const { am } = useAutoMarketI18n();
   const nav = useNavigate();
   const [items, setItems]     = useState([]);
   const [loading, setLoading] = useState(false);
@@ -39,22 +41,22 @@ export default function VikupPage() {
         <div style={{ padding:"12px 14px", display:"flex", gap:10, alignItems:"center" }}>
           <Button icon={<ArrowLeftOutlined />} onClick={()=>nav(-1)} style={{ borderRadius:14 }} />
           <div>
-            <div style={{ fontWeight:950, fontSize:16, color:"#0f172a" }}>💳 Vikup</div>
-            <div style={{ fontSize:11, color:"#d97706" }}>Bo'lib to'lash bilan mashina</div>
+            <div style={{ fontWeight:950, fontSize:16, color:"#0f172a" }}>{am("vikup.title")}</div>
+            <div style={{ fontSize:11, color:"#d97706" }}>{am("vikup.subtitle")}</div>
           </div>
         </div>
         <div style={{ padding:"0 14px 12px", display:"flex", gap:10 }}>
           <Input
             value={q}
             onChange={e => setQ(e.target.value)}
-            placeholder="Qidirish..."
+            placeholder={am("common.search")}
             style={{ borderRadius:14 }}
           />
           <Select
             value={brand || undefined}
             onChange={v => setBrand(v || "")}
             allowClear
-            placeholder="Marka"
+            placeholder={am("common.brand")}
             style={{ width:130 }}
             options={BRANDS.map(b => ({ value:b.name, label:b.name }))}
           />
@@ -63,7 +65,7 @@ export default function VikupPage() {
 
       {/* Kalkulyator tushuntirish */}
       <div style={{ margin:"12px 14px", padding:12, background:"#fffbeb", borderRadius:16, border:"1.5px solid #fde68a" }}>
-        <div style={{ fontWeight:800, color:"#d97706", marginBottom:4 }}>💡 Vikup nima?</div>
+        <div style={{ fontWeight:800, color:"#d97706", marginBottom:4 }}>{am("vikup.title")}</div>
         <div style={{ fontSize:12, color:"#92400e", lineHeight:1.5 }}>
           Boshlang'ich to'lovni (masalan $2,000) to'lang va qolganini oyiga $300 dan to'lang.
           Barcha hujjatlar rasmiylashtirilib beriladi.
@@ -74,7 +76,7 @@ export default function VikupPage() {
         {loading ? (
           <div style={{ display:"flex", justifyContent:"center", padding:40 }}><Spin size="large" /></div>
         ) : items.length === 0 ? (
-          <Empty description="Vikupga beriladigan mashinalar topilmadi" style={{ marginTop:40 }} />
+          <Empty description={am("vikup.empty")} style={{ marginTop:40 }} />
         ) : (
           <div style={{ display:"grid", gap:12 }}>
             {items.map(ad => (

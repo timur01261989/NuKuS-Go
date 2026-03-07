@@ -4,8 +4,10 @@ import { ArrowLeftOutlined, PlusOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { myAds, markAdStatus } from "../services/marketBackend";
 import CarCardHorizontal from "../components/Feed/CarCardHorizontal";
+import { useAutoMarketI18n } from "../utils/useAutoMarketI18n";
 
 export default function MyAdsPage() {
+  const { am } = useAutoMarketI18n();
   const nav = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -21,7 +23,7 @@ export default function MyAdsPage() {
     <div style={{ padding: 14, paddingBottom: 80 }}>
       <div style={{ display:"flex", gap: 10, alignItems:"center", marginBottom: 12 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={()=>nav(-1)} style={{ borderRadius: 14 }} />
-        <div style={{ fontWeight: 950, fontSize: 18, color:"#0f172a", flex:1 }}>Mening e'lonlarim</div>
+        <div style={{ fontWeight: 950, fontSize: 18, color:"#0f172a", flex:1 }}>{am("myAds.title")}</div>
         <Button icon={<PlusOutlined />} type="primary" style={{ borderRadius: 12, background:"#22c55e", border:"none" }} onClick={()=>nav("/auto-market/create")}>
           Yangi
         </Button>
@@ -49,7 +51,7 @@ export default function MyAdsPage() {
       </div>
 
       {!loading && !items.length ? (
-        <div style={{ marginTop: 20, color:"#64748b", fontWeight: 800 }}>Siz hali e'lon bermagansiz.</div>
+        <div style={{ marginTop: 20, color:"#64748b", fontWeight: 800 }}>{am("app.emptyMyAds")}</div>
       ) : null}
     </div>
   );

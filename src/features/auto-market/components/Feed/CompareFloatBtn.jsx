@@ -2,9 +2,11 @@ import React from "react";
 import { Button, Badge } from "antd";
 import { useNavigate } from "react-router-dom";
 import { useCompare } from "../../context/CompareContext";
+import { useAutoMarketI18n } from "../../utils/useAutoMarketI18n";
 import { SwapOutlined } from "@ant-design/icons";
 
 export default function CompareFloatBtn() {
+  const { am } = useAutoMarketI18n();
   const { ids } = useCompare();
   const nav = useNavigate();
   if (!ids.length) return null;
@@ -25,7 +27,7 @@ export default function CompareFloatBtn() {
             border: "none"
           }}
         >
-          Solishtirish
+          {am("compare.title")}
         </Button>
       </Badge>
     </div>

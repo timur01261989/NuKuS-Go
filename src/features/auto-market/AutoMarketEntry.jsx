@@ -5,6 +5,7 @@
  *   /vikup, /barter, /garaj, /zapchast, /razborka, /battle, /analytics, /service-book
  */
 import React from "react";
+import { useLanguage } from "@/shared/i18n/useLanguage";
 import { Routes, Route, Navigate } from "react-router-dom";
 import AppProviders from "./context/AppProviders";
 
@@ -28,8 +29,9 @@ import ServiceBookPage    from "./pages/ServiceBookPage";
 import TopUpPage          from "./pages/TopUpPage";
 
 export default function AutoMarketEntry() {
+  const { language } = useLanguage();
   return (
-    <AppProviders>
+    <AppProviders key={language}>
       <Routes>
         {/* Asl route'lar — o'zgarishsiz */}
         <Route path="/"          element={<FeedPage />} />

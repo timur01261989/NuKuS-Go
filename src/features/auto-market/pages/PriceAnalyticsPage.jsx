@@ -8,6 +8,7 @@ import { Button, Select, Spin, Tag } from "antd";
 import { ArrowLeftOutlined, LineChartOutlined, RiseOutlined, FallOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { BRANDS, MODELS_BY_BRAND } from "../services/staticData";
+import { useAutoMarketI18n } from "../utils/useAutoMarketI18n";
 
 // Mock narx tarixiy ma'lumotlari (real loyihada Supabase'dan olinadi)
 const PRICE_HISTORY = {
@@ -97,6 +98,7 @@ function getAdvice(data) {
 }
 
 export default function PriceAnalyticsPage() {
+  const { am } = useAutoMarketI18n();
   const nav = useNavigate();
   const [brand, setBrand] = useState("Chevrolet");
   const [model, setModel] = useState("Cobalt");
@@ -163,7 +165,7 @@ export default function PriceAnalyticsPage() {
           {/* Graf */}
           <div style={{ background:"#fff", border:"1px solid #e2e8f0", borderRadius:18, padding:14, marginBottom:14 }}>
             <div style={{ fontWeight:800, color:"#0f172a", marginBottom:10 }}>
-              {brand} {model} — Narx tarixi
+              {brand} {model} — {am("analytics.history")}
             </div>
             <MiniChart data={data} color="#0ea5e9" />
           </div>
@@ -177,9 +179,7 @@ export default function PriceAnalyticsPage() {
             }}>
               <div style={{ fontSize:22, marginBottom:8 }}>{advice.icon}</div>
               <div style={{ fontWeight:900, color: advice.color, fontSize:15, marginBottom:4 }}>
-                {advice.action === "buy" ? "Hozir sotib olish vaqti!" :
-                 advice.action === "wait" ? "Kuting, narx tushadi" :
-                 "Barqaror narx"}
+                {advice.action === "buy" ? am("analytics.buyNow") : advice.action === "wait" ? am("analytics.wait") : am("analytics.stable")}
               </div>
               <div style={{ fontSize:13, color:"#334155", lineHeight:1.5 }}>{advice.text}</div>
             </div>
@@ -188,7 +188,7 @@ export default function PriceAnalyticsPage() {
           {/* Oylik jadval */}
           <div style={{ marginTop:14, background:"#fff", border:"1px solid #e2e8f0", borderRadius:18, overflow:"hidden" }}>
             <div style={{ padding:"10px 14px", fontWeight:800, color:"#0f172a", borderBottom:"1px solid #f1f5f9" }}>
-              Oylik narxlar
+              {am("analytics.monthly")}
             </div>
             {[...data].reverse().slice(0,6).map((d, i) => {
               const prev = data[data.length - 2 - i];

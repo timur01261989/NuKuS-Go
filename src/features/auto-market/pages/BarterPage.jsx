@@ -10,8 +10,10 @@ import { useNavigate } from "react-router-dom";
 import { listBarterAdsByOfferModel, createBarterOffer } from "../services/marketBackend";
 import { BRANDS, MODELS_BY_BRAND } from "../services/staticData";
 import PriceTag from "../components/Common/PriceTag";
+import { useAutoMarketI18n } from "../utils/useAutoMarketI18n";
 
 export default function BarterPage() {
+  const { am } = useAutoMarketI18n();
   const nav = useNavigate();
   const [offerBrand, setOfferBrand] = useState("");
   const [offerModel, setOfferModel] = useState("");
@@ -38,7 +40,7 @@ export default function BarterPage() {
 
   const sendOffer = async (ad) => {
     if (!offerBrand && !offerModel) {
-      message.warning("Avval o'z mashinangizni tanlang");
+      message.warning(am("barter.chooseYourCar"));
       return;
     }
     await createBarterOffer({
@@ -48,7 +50,7 @@ export default function BarterPage() {
       extra_payment: 0,
     });
     setSent(prev => new Set([...prev, ad.id]));
-    message.success("✅ Barter taklifi yuborildi!");
+    message.success(am("barter.offerSent"));
   };
 
   return (
@@ -58,15 +60,15 @@ export default function BarterPage() {
         <div style={{ padding:"12px 14px", display:"flex", gap:10, alignItems:"center" }}>
           <Button icon={<ArrowLeftOutlined />} onClick={()=>nav(-1)} style={{ borderRadius:14 }} />
           <div>
-            <div style={{ fontWeight:950, fontSize:16, color:"#0f172a" }}>🔄 Barter</div>
-            <div style={{ fontSize:11, color:"#059669" }}>Mashina almashtirish</div>
+            <div style={{ fontWeight:950, fontSize:16, color:"#0f172a" }}>{am("barter.title")}</div>
+            <div style={{ fontSize:11, color:"#059669" }}>{am("barter.subtitle")}</div>
           </div>
         </div>
       </div>
 
       {/* O'z mashinangizni tanlash */}
       <div style={{ margin:"12px 14px", padding:14, background:"#f0fdf4", borderRadius:16, border:"1.5px solid #86efac" }}>
-        <div style={{ fontWeight:800, color:"#059669", marginBottom:10 }}>🚗 Sizning mashinangiz:</div>
+        <div style={{ fontWeight:800, color:"#059669", marginBottom:10 }}>{am("barter.yourCar")}</div>
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
           <Select
             value={offerBrand || undefined}
@@ -95,17 +97,17 @@ export default function BarterPage() {
         <Input
           value={q}
           onChange={e => setQ(e.target.value)}
-          placeholder="Qidirish: Gentra, Cobalt..."
+          placeholder={am("barter.searchPlaceholder")}
           style={{ borderRadius:14, marginBottom:12 }}
         />
         <div style={{ fontWeight:800, color:"#64748b", fontSize:13, marginBottom:10 }}>
-          Barter qabul qiladigan e'lonlar:
+          {am("barter.title")}:
         </div>
 
         {loading ? (
           <div style={{ display:"flex", justifyContent:"center", padding:40 }}><Spin size="large" /></div>
         ) : items.length === 0 ? (
-          <Empty description="Barter qabul qiladigan e'lonlar topilmadi" style={{ marginTop:30 }} />
+          <Empty description={am("barter.empty")} style={{ marginTop:30 }} />
         ) : (
           <div style={{ display:"grid", gap:12 }}>
             {items.map(ad => (

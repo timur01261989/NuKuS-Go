@@ -5,8 +5,10 @@ import { useNavigate } from "react-router-dom";
 import { listFavoriteCars } from "../services/marketBackend";
 import CarCardHorizontal from "../components/Feed/CarCardHorizontal";
 import { useMarket } from "../context/MarketContext";
+import { useAutoMarketI18n } from "../utils/useAutoMarketI18n";
 
 export default function FavoritesPage() {
+  const { am } = useAutoMarketI18n();
   const nav = useNavigate();
   const { filters } = useMarket();
   const [items, setItems] = useState([]);
@@ -28,7 +30,7 @@ export default function FavoritesPage() {
     <div style={{ padding: 14, paddingBottom: 80 }}>
       <div style={{ display:"flex", gap: 10, alignItems:"center", marginBottom: 12 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={()=>nav(-1)} style={{ borderRadius: 14 }} />
-        <div style={{ fontWeight: 950, fontSize: 18, color:"#0f172a" }}>Sevimlilar</div>
+        <div style={{ fontWeight: 950, fontSize: 18, color:"#0f172a" }}>{am("favorites.title")}</div>
       </div>
 
       {loading ? <div style={{ display:"flex", justifyContent:"center", padding: 30 }}><Spin /></div> : null}
@@ -40,7 +42,7 @@ export default function FavoritesPage() {
       </div>
 
       {!loading && !items.length ? (
-        <div style={{ marginTop: 20, color:"#64748b", fontWeight: 800 }}>Hozircha sevimlilar yo'q.</div>
+        <div style={{ marginTop: 20, color:"#64748b", fontWeight: 800 }}>{am("app.emptyFavorites")}</div>
       ) : null}
     </div>
   );

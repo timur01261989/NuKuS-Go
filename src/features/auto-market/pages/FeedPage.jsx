@@ -17,10 +17,12 @@ import SortDropdown from "../components/Feed/SortDropdown";
 import FullFilterDrawer from "../components/Filters/FullFilterDrawer";
 import useCarList from "../hooks/useCarList";
 import { useMarket } from "../context/MarketContext";
+import { useAutoMarketI18n } from "../utils/useAutoMarketI18n";
 
 const SPONSOR_EVERY = 5; // har nechta kartadan keyin sponsor
 
 export default function FeedPage() {
+  const { am } = useAutoMarketI18n();
   const nav = useNavigate();
   const [drawer, setDrawer] = useState(false);
   const { filters, patchFilters } = useMarket();
@@ -58,10 +60,10 @@ export default function FeedPage() {
     <div style={{ paddingBottom: 90 }}>
       <div style={{ position:"sticky", top:0, zIndex: 50, background:"#ffffffcc", backdropFilter:"blur(10px)", borderBottom:"1px solid #e2e8f0" }}>
         <div style={{ padding: "12px 14px", display:"flex", gap: 10, alignItems:"center" }}>
-          <div style={{ fontWeight: 950, fontSize: 18, color:"#0f172a" }}>Auto Market</div>
+          <div style={{ fontWeight: 950, fontSize: 18, color:"#0f172a" }}>{am("app.title")}</div>
           <div style={{ marginLeft:"auto", display:"flex", gap: 8 }}>
             <Button icon={<PlusOutlined />} type="primary" style={{ borderRadius: 12, background:"#22c55e", border:"none" }} onClick={()=>nav("/auto-market/create")}>
-              E'lon berish
+              {am("app.createAd")}
             </Button>
           </div>
         </div>
@@ -70,7 +72,7 @@ export default function FeedPage() {
           <Input
             value={filters.q}
             onChange={(e)=>patchFilters({ q: e.target.value })}
-            placeholder="Qidirish: Cobalt, Gentra..."
+            placeholder={am("feed.searchPlaceholder")}
             style={{ borderRadius: 14 }}
           />
           <Button icon={<FilterOutlined />} onClick={()=>setDrawer(true)} style={{ borderRadius: 14 }} />
@@ -94,9 +96,9 @@ export default function FeedPage() {
         )}
 
         <div style={{ display:"flex", gap: 10, justifyContent:"center", marginTop: 18 }}>
-          <Button disabled={page<=1} onClick={()=>go(page-1)} style={{ borderRadius: 12 }}>Oldingi</Button>
+          <Button disabled={page<=1} onClick={()=>go(page-1)} style={{ borderRadius: 12 }}>{am("app.previous")}</Button>
           <div style={{ alignSelf:"center", fontWeight: 800, color:"#64748b" }}>{page}/{pageCount}</div>
-          <Button disabled={page>=pageCount} onClick={()=>go(page+1)} style={{ borderRadius: 12 }}>Keyingi</Button>
+          <Button disabled={page>=pageCount} onClick={()=>go(page+1)} style={{ borderRadius: 12 }}>{am("app.next")}</Button>
         </div>
       </div>
 

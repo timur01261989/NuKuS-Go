@@ -4,8 +4,10 @@ import { ArrowLeftOutlined } from "@ant-design/icons";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { createPayment } from "../services/marketBackend";
 import useWalletBalance from "../hooks/useWalletBalance";
+import { useAutoMarketI18n } from "../utils/useAutoMarketI18n";
 
 export default function TopUpPage() {
+  const { am } = useAutoMarketI18n();
   const nav = useNavigate();
   const [sp] = useSearchParams();
   const { balance, loading: balLoading, refresh } = useWalletBalance();
@@ -20,14 +22,14 @@ export default function TopUpPage() {
   const onPay = async () => {
     try {
       if (!amount || amount <= 0) {
-        message.error("Summani kiriting");
+        message.error(am("app.enterAmount"));
         return;
       }
       setLoading(true);
       const res = await createPayment({ provider, amount_uzs: amount, return_url: window.location.origin + "/auto-market/topup" });
 
       if (res?.status === "paid" && res?.ok) {
-        message.success("✅ Balans to'ldirildi");
+        message.success(am("app.topUpSuccess"));
         await refresh();
         if (next) nav(next);
         else nav(-1);
@@ -43,7 +45,7 @@ export default function TopUpPage() {
 
       message.warning(res?.note || "Payment yaratildi, lekin payment_url yo'q. ENV keylarni tekshiring.");
     } catch (e) {
-      message.error(e?.message || "TopUp xatosi");
+      message.error(e?.message || am("app.topUpError"));
     } finally {
       setLoading(false);
     }
@@ -53,12 +55,12 @@ export default function TopUpPage() {
     <div style={{ padding: 14, paddingBottom: 96 }}>
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={() => nav(-1)} style={{ borderRadius: 14 }} />
-        <div style={{ fontWeight: 950, fontSize: 16, color: "#0f172a" }}>Balans to'ldirish</div>
+        <div style={{ fontWeight: 950, fontSize: 16, color: "#0f172a" }}>{am("app.topUp")}</div>
       </div>
 
       <div style={{ border: "1px solid #e2e8f0", borderRadius: 16, padding: 14, background: "#fff" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-          <div style={{ fontWeight: 900 }}>Hozirgi balans</div>
+          <div style={{ fontWeight: 900 }}>{am("app.currentBalance")}</div>
           <div style={{ fontWeight: 950 }}>
             {balLoading ? <Spin size="small" /> : `${Number(balance || 0).toLocaleString("uz-UZ")} UZS`}
           </div>
@@ -66,13 +68,13 @@ export default function TopUpPage() {
 
         {need > 0 && (
           <div style={{ fontSize: 12, color: "#ef4444", fontWeight: 800, marginBottom: 10 }}>
-            ⚠️ Kerakli summa: {need.toLocaleString("uz-UZ")} UZS
+            ⚠️ {am("app.topUpNeed")}: {need.toLocaleString("uz-UZ")} UZS
           </div>
         )}
 
         <div style={{ display: "grid", gap: 10 }}>
           <div>
-            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>Provider</div>
+            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>{am("app.topUpProvider")}</div>
             <Select
               value={provider}
               onChange={setProvider}
@@ -86,7 +88,7 @@ export default function TopUpPage() {
           </div>
 
           <div>
-            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>Summa (UZS)</div>
+            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>{am("app.topUpAmount")} (UZS)</div>
             <InputNumber
               value={amount}
               onChange={(v) => setAmount(Number(v || 0))}

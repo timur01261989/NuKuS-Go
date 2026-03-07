@@ -10,8 +10,10 @@ import { ArrowLeftOutlined, PlusOutlined, PhoneOutlined, ToolOutlined } from "@a
 import { useNavigate } from "react-router-dom";
 import { listZapchast, createZapchastAd } from "../services/marketBackend";
 import { BRANDS, MODELS_BY_BRAND, ZAPCHAST_CATEGORIES } from "../services/staticData";
+import { useAutoMarketI18n } from "../utils/useAutoMarketI18n";
 
 export default function RazborkaPage() {
+  const { am } = useAutoMarketI18n();
   const nav = useNavigate();
   const [brand, setBrand]     = useState("");
   const [model, setModel]     = useState("");
@@ -40,11 +42,11 @@ export default function RazborkaPage() {
   useEffect(() => { load(); }, [brand, model, q]);
 
   const handleAdd = async () => {
-    if (!newItem.title) { message.warning("Sarlavha kiriting"); return; }
+    if (!newItem.title) { message.warning(am("parts.titleRequired")); return; }
     await createZapchastAd({ ...newItem, is_razborka:true });
     setAddOpen(false);
     load();
-    message.success("Razborka e'loni qo'shildi!");
+    message.success(am("dismantling.added"));
   };
 
   return (
@@ -53,8 +55,8 @@ export default function RazborkaPage() {
         <div style={{ padding:"12px 14px", display:"flex", gap:10, alignItems:"center" }}>
           <Button icon={<ArrowLeftOutlined />} onClick={()=>nav(-1)} style={{ borderRadius:14 }} />
           <div style={{ flex:1 }}>
-            <div style={{ fontWeight:950, fontSize:16, color:"#0f172a" }}>🔧 Razborka</div>
-            <div style={{ fontSize:11, color:"#64748b" }}>Bo'laklangan mashinalar</div>
+            <div style={{ fontWeight:950, fontSize:16, color:"#0f172a" }}>{am("dismantling.title")}</div>
+            <div style={{ fontSize:11, color:"#64748b" }}>{am("dismantling.subtitle")}</div>
           </div>
           <Button icon={<PlusOutlined />} type="primary" onClick={()=>setAddOpen(true)}
             style={{ borderRadius:12, background:"#dc2626", border:"none" }}>E'lon</Button>
@@ -70,7 +72,7 @@ export default function RazborkaPage() {
 
       {/* Tushuntirish */}
       <div style={{ margin:"12px 14px", padding:12, background:"#fff7ed", borderRadius:14, border:"1.5px solid #fed7aa" }}>
-        <div style={{ fontWeight:800, color:"#ea580c", marginBottom:4 }}>🔧 Razborka nima?</div>
+        <div style={{ fontWeight:800, color:"#ea580c", marginBottom:4 }}>🔧 {am("dismantling.whatIs")}</div>
         <div style={{ fontSize:12, color:"#7c2d12", lineHeight:1.5 }}>
           Eski yoki shikastlangan mashinalarni bo'laklarga ajratib sotadiganlar.
           Arzon narxda original zapchast topasiz.
@@ -81,8 +83,8 @@ export default function RazborkaPage() {
         {loading ? (
           <div style={{ display:"flex", justifyContent:"center", padding:40 }}><Spin size="large" /></div>
         ) : items.length === 0 ? (
-          <Empty description="Razborka e'lonlari topilmadi" style={{ marginTop:30 }}>
-            <Button onClick={()=>setAddOpen(true)} style={{ borderRadius:12 }}>E'lon qo'shish</Button>
+          <Empty description={am("dismantling.empty")} style={{ marginTop:30 }}>
+            <Button onClick={()=>setAddOpen(true)} style={{ borderRadius:12 }}>{am("app.add")}</Button>
           </Empty>
         ) : (
           <div style={{ display:"grid", gap:10 }}>
@@ -128,8 +130,8 @@ export default function RazborkaPage() {
         )}
       </div>
 
-      <Modal title="Razborka e'lon qo'shish" open={addOpen} onOk={handleAdd} onCancel={()=>setAddOpen(false)}
-        okText="Qo'shish" cancelText="Bekor">
+      <Modal title={am("dismantling.addTitle")} open={addOpen} onOk={handleAdd} onCancel={()=>setAddOpen(false)}
+        okText={am("app.add")} cancelText={am("app.cancel")}>
         <div style={{ display:"grid", gap:10, marginTop:10 }}>
           <Input placeholder="Sarlavha (masalan: Cobalt 2017 to'liq razborka)" value={newItem.title}
             onChange={e=>setNewItem(p=>({...p,title:e.target.value}))} />

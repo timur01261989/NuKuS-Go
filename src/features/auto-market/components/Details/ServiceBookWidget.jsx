@@ -8,6 +8,7 @@ import React, { useMemo } from "react";
 import { Card, Tag, Progress, Button, Tooltip } from "antd";
 import { ToolOutlined, AlertOutlined, CheckCircleOutlined } from "@ant-design/icons";
 import { SERVICE_TYPES } from "../../services/staticData";
+import { useAutoMarketI18n } from "../../utils/useAutoMarketI18n";
 
 function daysUntil(dateStr) {
   if (!dateStr) return null;
@@ -21,6 +22,7 @@ function kmUntil(nextKm, currentKm) {
 }
 
 export default function ServiceBookWidget({ book, onAddRecord }) {
+  const { am } = useAutoMarketI18n();
   if (!book) return null;
 
   const oilKmLeft = useMemo(() => {
@@ -69,7 +71,7 @@ export default function ServiceBookWidget({ book, onAddRecord }) {
         </div>
         {onAddRecord && (
           <Button size="small" onClick={onAddRecord} style={{ marginLeft:"auto", borderRadius: 10 }}>
-            + Yozuv
+            + {am("serviceBook.addRecord")}
           </Button>
         )}
       </div>
@@ -77,13 +79,13 @@ export default function ServiceBookWidget({ book, onAddRecord }) {
       {/* Moy almashtirish */}
       <div style={{ marginBottom: 12 }}>
         <div style={{ display:"flex", justifyContent:"space-between", marginBottom: 4, fontSize: 12 }}>
-          <span style={{ fontWeight:700 }}>🛢️ Moy almashtirish</span>
+          <span style={{ fontWeight:700 }}>{am("serviceBook.oilChange")}</span>
           <span style={{ fontWeight:800, color: oilColor }}>
             {oilKmLeft !== null
               ? oilKmLeft > 0
                 ? `${Number(oilKmLeft).toLocaleString("uz-UZ")} km qoldi`
                 : "❗ Vaqti o'tdi!"
-              : "Kiritilmagan"}
+              : am("serviceBook.notEntered")}
           </span>
         </div>
         <Progress percent={oilPct} strokeColor={oilColor} showInfo={false} size="small" />
@@ -92,7 +94,7 @@ export default function ServiceBookWidget({ book, onAddRecord }) {
       {/* Sug'urta */}
       {book.insurance_expiry && (
         <div style={{ display:"flex", justifyContent:"space-between", marginBottom: 8, fontSize: 12 }}>
-          <span style={{ fontWeight:700 }}>📋 Sug'urta</span>
+          <span style={{ fontWeight:700 }}>{am("serviceBook.insurance")}</span>
           <Tag color={getExpireColor(insuranceDays) === "#22c55e" ? "success" : getExpireColor(insuranceDays) === "#f59e0b" ? "warning" : "error"}>
             {insuranceDays !== null
               ? insuranceDays > 0
@@ -106,7 +108,7 @@ export default function ServiceBookWidget({ book, onAddRecord }) {
       {/* Texosmotr */}
       {book.tex_expiry && (
         <div style={{ display:"flex", justifyContent:"space-between", marginBottom: 8, fontSize: 12 }}>
-          <span style={{ fontWeight:700 }}>✅ Texosmotr</span>
+          <span style={{ fontWeight:700 }}>{am("serviceBook.inspection")}</span>
           <Tag color={getExpireColor(texDays) === "#22c55e" ? "success" : getExpireColor(texDays) === "#f59e0b" ? "warning" : "error"}>
             {texDays !== null
               ? texDays > 0
@@ -120,7 +122,7 @@ export default function ServiceBookWidget({ book, onAddRecord }) {
       {/* Oxirgi yozuvlar */}
       {(book.records || []).length > 0 && (
         <div style={{ marginTop: 10, borderTop:"1px solid #f1f5f9", paddingTop: 10 }}>
-          <div style={{ fontSize: 11, color:"#64748b", fontWeight:700, marginBottom: 6 }}>OXIRGI YOZUVLAR</div>
+          <div style={{ fontSize: 11, color:"#64748b", fontWeight:700, marginBottom: 6 }}>{am("serviceBook.recent")}</div>
           {[...(book.records || [])].reverse().slice(0, 3).map(r => (
             <div key={r.id} style={{ display:"flex", justifyContent:"space-between", fontSize: 12, marginBottom: 4 }}>
               <span>{SERVICE_TYPES.find(s=>s.id===r.service_type)?.emoji || "📝"} {r.title}</span>
