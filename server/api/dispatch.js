@@ -5,7 +5,7 @@ import { haversineKm } from '../_shared/geo.js';
 
 function normalizeDriverId(body) {
   // Frontend historically sends driver_id; DB uses driver_id.
-  return String(body.driver_id || body.driver_id || '').trim();
+  return String(body.driver_id || body.driverId || '').trim();
 }
 
 
@@ -85,7 +85,7 @@ export async function driver_ping_handler(req, res) {
     const { data: offer, error: oe } = await sb
       .from('order_offers')
       .select('order_id,status,expires_at,sent_at')
-      .or(`driver_id.eq.${driver_id},driver_id.eq.${driver_id}`)
+      .eq('driver_id', driver_id)
       .eq('status', 'sent')
       .gt('expires_at', now)
       .order('sent_at', { ascending: false })

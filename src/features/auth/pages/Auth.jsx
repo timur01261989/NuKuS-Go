@@ -18,6 +18,7 @@ import { useNavigate } from "react-router-dom";
 import { message } from "antd";
 import { useLanguage } from "@shared/i18n/useLanguage";
 import { supabase } from "@/lib/supabase";
+import { useAppMode } from "@/providers/AppModeProvider";
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -28,6 +29,7 @@ export default function Auth() {
   const [showPassword, setShowPassword] = useState(false);
 
   const { langKey, setLangKey, t } = useLanguage();
+  const { appMode } = useAppMode();
 
   const languages = useMemo(
     () => [
@@ -117,15 +119,13 @@ export default function Auth() {
 
       message.success(t?.greeting || "Xush kelibsiz!");
 
-      // old behavior: default app_mode="client"
       try {
-        localStorage.setItem("app_mode", "client");
         // optional remember flag (non-breaking): store last phone
         if (remember) localStorage.setItem("last_phone", digits);
         else localStorage.removeItem("last_phone");
       } catch (err) {}
 
-      navigate("/", { replace: true });
+      navigate("/", { replace: true, state: { appMode } });
     } catch (err) {
       message.error("Telefon raqam yoki parol noto'g'ri!");
     } finally {

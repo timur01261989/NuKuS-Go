@@ -22,6 +22,7 @@ import { useNavigate } from "react-router-dom";
 import { Spin } from "antd";
 
 import { supabase } from "@/lib/supabase";
+import { useAppMode } from "@/providers/AppModeProvider";
 import { useSessionProfile } from "../shared/auth/useSessionProfile";
 // NOTE: keep helper close to routing guards.
 // RootRedirect and RoleGate must agree on the same role → home mapping.
@@ -35,6 +36,7 @@ import { pickHomeForRole } from "../shared/routes/RoleGate";
 export default function RootRedirect() {
   const navigate = useNavigate();
   const didRun = useRef(false);
+  const { appMode, isLoading: appModeLoading } = useAppMode();
 
   const { session, profile, driver, driverApp, loading, refetch } = useSessionProfile({
     includeDriver: true,
@@ -42,7 +44,7 @@ export default function RootRedirect() {
   });
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || appModeLoading) return;
 
     // Prevent double navigation in React strict mode.
     if (didRun.current) return;
@@ -54,7 +56,7 @@ export default function RootRedirect() {
         return;
       }
 
-      const mode = (localStorage.getItem("app_mode") || "client").toLowerCase();
+      const mode = String(appMode || "client").toLowerCase();
 
       // Default: client home
       if (mode !== "driver") {
@@ -105,13 +107,14 @@ export default function RootRedirect() {
         role,
         driverRow: driver,
         driverApplication: driverApp,
+        appMode,
       });
 
       navigate(home, { replace: true });
     };
 
     go();
-  }, [loading, session, profile, driver, driverApp, navigate, refetch]);
+  }, [loading, appModeLoading, appMode, session, profile, driver, driverApp, navigate, refetch]);
 
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "70vh" }}>

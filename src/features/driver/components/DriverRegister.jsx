@@ -31,6 +31,7 @@ import {
 } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
 import { supabase } from '../../../lib/supabase';
+import { useAppMode } from '@/providers/AppModeProvider';
 
 const PHONE_PREFIX = '+998';
 
@@ -554,7 +555,7 @@ export default function DriverRegister() {
                 onClick={() => {
                   if (step === 0) {
                     // If on first step, go back to client/home
-                    try { localStorage.setItem("app_mode", "client"); } catch(e) {}
+                    setAppMode("client");
                     navigate("/client/home", { replace: true });
                   } else {
                     // Otherwise go to previous step

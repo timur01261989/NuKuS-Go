@@ -21,12 +21,13 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { Spin } from "antd";
 import { supabase } from "@/lib/supabase";
+import { useAppMode } from "@/providers/AppModeProvider";
 
 // Shared helper: role → home route (exported for RootRedirect)
 // Keep it deterministic: only uses already-fetched records.
-export function pickHomeForRole({ role, driverRow, driverApplication }) {
+export function pickHomeForRole({ role, driverRow, driverApplication, appMode = "client" }) {
   const r = (role || "client").toLowerCase();
-  const mode = (localStorage.getItem("app_mode") || "client").toLowerCase();
+  const mode = String(appMode || "client").toLowerCase();
 
   if (r === "admin") return "/admin";
 
@@ -84,6 +85,7 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
   }
 
   const location = useLocation();
+  const { appMode, isLoading: appModeLoading } = useAppMode();
 
   const [loading, setLoading] = useState(true);
   const [ok, setOk] = useState(false);
@@ -139,6 +141,7 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
 
     const run = async () => {
       try {
+        if (appModeLoading) return;
         setLoading(true);
         setReason(null);
 
@@ -351,7 +354,7 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
     return () => {
       mounted = false;
     };
-  }, [allowKey, location.pathname]);
+  }, [allowKey, location.pathname, appMode, appModeLoading]);
 
   if (loading) {
     return (
