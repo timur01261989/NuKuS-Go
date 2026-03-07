@@ -7,7 +7,7 @@ import {
   Divider,
   Switch as AntSwitch,
   message,
-  Avatar
+  Avatar,
 } from "antd";
 import {
   MenuOutlined,
@@ -18,7 +18,7 @@ import {
   LogoutOutlined,
   UserOutlined,
   CheckCircleOutlined,
-  StopOutlined
+  StopOutlined,
 } from "@ant-design/icons";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../../../lib/supabase";
@@ -77,6 +77,9 @@ export default function DriverDashboard() {
     };
   }, [navigate]);
 
+  useLocation();
+  useLanguage();
+
   /**
    * Driver bosh sahifada xizmatlar (Shahar ichida / Viloyatlar aro / Tumanlar aro / Eltish / Yuk tashish)
    * ko‘rinishi kerak. Hozirgi oqimda Drawer-menu asosidagi dashboard o‘rniga
@@ -122,11 +125,7 @@ export default function DriverDashboard() {
  */
 function LegacyDriverDashboard() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { t } = useLanguage();
-
-  // keep location referenced so linter/build optimizers don't rewrite unexpectedly
-  void location;
 
   // =========================
   // STATE
@@ -426,18 +425,10 @@ function LegacyDriverDashboard() {
       </div>
 
       {/* DRAWER */}
-      <Drawer
-        title="Menu"
-        placement="left"
-        onClose={() => setDrawerOpen(false)}
-        open={drawerOpen}
-        width={280}
-      >
+      <Drawer title="Menu" placement="left" onClose={() => setDrawerOpen(false)} open={drawerOpen} width={280}>
         <div style={{ textAlign: "center", marginBottom: 24 }}>
           <Avatar size={64} icon={<UserOutlined />} src={profile.avatarUrl} style={{ marginBottom: 12 }} />
-          <Title level={4} style={{ margin: 0 }}>
-            {profile.fullName}
-          </Title>
+          <Title level={4} style={{ margin: 0 }}>{profile.fullName}</Title>
           <Text type="secondary">{profile.phone}</Text>
         </div>
         <Divider />
