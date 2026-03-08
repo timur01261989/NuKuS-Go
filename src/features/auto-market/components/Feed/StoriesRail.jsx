@@ -28,7 +28,7 @@ export default function StoriesRail() {
       </div>
 
       <Carousel dots={false} slidesToShow={1} draggable>
-        {items.map((ad) => (
+        {items.filter(Boolean).map((ad) => (
           <div key={ad.id}>
             <div
               onClick={() => nav(`/auto-market/ad/${ad.id}`)}

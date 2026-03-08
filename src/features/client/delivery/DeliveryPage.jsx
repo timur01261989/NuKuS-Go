@@ -224,7 +224,7 @@ function OrderCard({ order, onEdit, onDelete }) {
             <Text type="secondary">#{String(order.id).slice(-6)} • {new Date(order.created_at).toLocaleString()}</Text>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontWeight: 900, fontSize: 18 }}>{Number(order.price || 0).toLocaleString("uz-UZ")} so‘m</div>
+            <div style={{ fontWeight: 900, fontSize: 18 }}>{Number(order.price || 0).toLocaleString("uz-UZ")} {cp("so'm")}</div>
             <Text type="secondary">{t.cash} • {t.commission} {Number(order.commission_amount || 0).toLocaleString("uz-UZ")}</Text>
           </div>
         </div>
@@ -433,7 +433,7 @@ export default function DeliveryPage({ onBack }) {
 
   const handleSubmit = async () => {
     if (parcelMeta.maxKg > 0 && Number(weightKg || 0) > parcelMeta.maxKg) {
-      message.error(`Bu turdagi buyum ${parcelMeta.maxKg} kg dan oshmasligi kerak`);
+      message.error(cp("Bu turdagi buyum og‘irligi ruxsat etilgan me’yordan oshmasligi kerak"));
       return;
     }
 
@@ -446,7 +446,7 @@ export default function DeliveryPage({ onBack }) {
       } else {
         const order = await createDeliveryOrder(payloadFromState());
         setOrders((prev) => [order, ...prev]);
-        message.success(`${t.deliveryTitle} yaratildi`);
+        message.success(cp("Eltish xizmati yaratildi"));
       }
       resetForm();
     } catch (error) {
@@ -485,11 +485,11 @@ export default function DeliveryPage({ onBack }) {
 
   const handleDelete = (order) => {
     Modal.confirm({
-      title: "Buyurtmani o‘chirasizmi?",
-      content: "Bu amalni bekor qilib bo‘lmaydi.",
-      okText: "O‘chirish",
+      title: cp("Buyurtmani o‘chirasizmi?"),
+      content: cp("Bu amalni bekor qilib bo‘lmaydi."),
+      okText: cp("O‘chirish"),
       okButtonProps: { danger: true },
-      cancelText: "Bekor qilish",
+      cancelText: cp("Bekor qilish"),
       onOk: async () => {
         await deleteDeliveryOrder(order.id);
         setOrders((prev) => prev.filter((item) => item.id !== order.id));
@@ -506,10 +506,10 @@ export default function DeliveryPage({ onBack }) {
   return (
     <div style={{ maxWidth: 920, margin: "0 auto", padding: 16, paddingBottom: 100, minHeight: "100vh", background: pageBg }}>
       <Space align="center" style={{ width: "100%", justifyContent: "space-between" }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={onBack}>Orqaga</Button>
+        <Button icon={<ArrowLeftOutlined />} onClick={onBack}>{cp("Orqaga")}</Button>
         <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 12, opacity: 0.75 }}>Hisoblangan narx</div>
-          <div style={{ fontWeight: 900, fontSize: 22 }}>{price.toLocaleString("uz-UZ")} so‘m</div>
+          <div style={{ fontSize: 12, opacity: 0.75 }}>{cp("Hisoblangan narx")}</div>
+          <div style={{ fontWeight: 900, fontSize: 22 }}>{price.toLocaleString("uz-UZ")} {cp("so'm")}</div>
         </div>
       </Space>
 
@@ -520,7 +520,7 @@ export default function DeliveryPage({ onBack }) {
         <Space direction="vertical" size={14} style={{ width: "100%" }}>
           <div>
             <Title level={4} style={{ margin: 0 }}>{editingId ? cp("Buyurtmani tahrirlash") : cp("Eltish xizmati")}</Title>
-            <Text type="secondary">Shahar, tumanlar aro va viloyatlar aro eltish bir joyda boshqariladi.</Text>
+            <Text type="secondary">{cp("Shahar, tumanlar aro va viloyatlar aro eltish bir joyda boshqariladi.")}</Text>
           </div>
 
           <Segmented
@@ -532,11 +532,11 @@ export default function DeliveryPage({ onBack }) {
 
           <Card size="small" style={{ borderRadius: 18, background: "#f8fbff", border: "1px solid rgba(87,119,255,0.1)" }}>
             <Space direction="vertical" size={12} style={{ width: "100%" }}>
-              <div style={{ fontWeight: 700 }}>Qaerdan olish</div>
+              <div style={{ fontWeight: 700 }}>{cp("Qaerdan olish")}</div>
               <RegionDistrictSelect region={pickup.region} district={pickup.district} onChange={(next) => setPickup((prev) => ({ ...prev, ...next }))} allowEmptyDistrict={serviceMode === "city"} />
               <Radio.Group value={pickupMode} onChange={(e) => setPickupMode(e.target.value)}>
                 <Space direction="vertical">
-                  <Radio value="standard" disabled={serviceMode === "city"}>Standart nuqta</Radio>
+                  <Radio value="standard" disabled={serviceMode === "city"}>{cp("Standart nuqta")}</Radio>
                   <Radio value="precise">{cp("Xaritadan aniq manzil")}</Radio>
                 </Space>
               </Radio.Group>
@@ -555,7 +555,7 @@ export default function DeliveryPage({ onBack }) {
               <RegionDistrictSelect region={dropoff.region} district={dropoff.district} onChange={(next) => setDropoff((prev) => ({ ...prev, ...next }))} allowEmptyDistrict={serviceMode === "city"} />
               <Radio.Group value={dropoffMode} onChange={(e) => setDropoffMode(e.target.value)}>
                 <Space direction="vertical">
-                  <Radio value="standard" disabled={serviceMode === "city"}>Standart nuqta</Radio>
+                  <Radio value="standard" disabled={serviceMode === "city"}>{cp("Standart nuqta")}</Radio>
                   <Radio value="precise">{cp("Aniq manzil")}</Radio>
                 </Space>
               </Radio.Group>
@@ -570,7 +570,7 @@ export default function DeliveryPage({ onBack }) {
 
           <Card size="small" style={{ borderRadius: 18, background: "#f8fbff", border: "1px solid rgba(87,119,255,0.1)" }}>
             <Form layout="vertical">
-              <Form.Item label="Buyum turi" style={{ marginBottom: 12 }}>
+              <Form.Item label={cp("Buyum turi")} style={{ marginBottom: 12 }}>
                 <Segmented
                   block
                   value={parcelType}
@@ -579,21 +579,21 @@ export default function DeliveryPage({ onBack }) {
                 />
               </Form.Item>
               {needsWeight ? (
-                <Form.Item label={`Og‘irlik (maks: ${parcelMeta.maxKg} kg)`} style={{ marginBottom: 12 }}>
+                <Form.Item label={`${cp("Og‘irlik")} (maks: ${parcelMeta.maxKg} kg)`} style={{ marginBottom: 12 }}>
                   <InputNumber min={1} max={parcelMeta.maxKg} value={weightKg} onChange={setWeightKg} style={{ width: "100%" }} />
                 </Form.Item>
               ) : null}
-              <Form.Item label="Jo‘natuvchi telefon" style={{ marginBottom: 12 }}>
+              <Form.Item label={cp("Jo‘natuvchi telefon")} style={{ marginBottom: 12 }}>
                 <PhoneField value={senderPhone} onChange={setSenderPhone} onSelectContact={() => openContacts("sender")} />
               </Form.Item>
-              <Form.Item label="Qabul qiluvchi ismi" style={{ marginBottom: 12 }}>
-                <Input value={receiverName} onChange={(e) => setReceiverName(e.target.value)} placeholder="Ism" />
+              <Form.Item label={cp("Qabul qiluvchi ismi")} style={{ marginBottom: 12 }}>
+                <Input value={receiverName} onChange={(e) => setReceiverName(e.target.value)} placeholder={cp("Ism")} />
               </Form.Item>
-              <Form.Item label="Qabul qiluvchi telefon" style={{ marginBottom: 12 }}>
+              <Form.Item label={cp("Qabul qiluvchi telefon")} style={{ marginBottom: 12 }}>
                 <PhoneField value={receiverPhone} onChange={setReceiverPhone} onSelectContact={() => openContacts("receiver")} />
               </Form.Item>
               <Form.Item label={cp("Izoh")} style={{ marginBottom: 0 }}>
-                <Input.TextArea rows={3} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Masalan: Toshkentda avtovokzalda kutib oladi" />
+                <Input.TextArea rows={3} value={comment} onChange={(e) => setComment(e.target.value)} placeholder={cp("Masalan: Toshkentda avtovokzalda kutib oladi")} />
               </Form.Item>
             </Form>
           </Card>
@@ -607,7 +607,7 @@ export default function DeliveryPage({ onBack }) {
                     {matchedTrip.from_region} {matchedTrip.from_district ? `• ${matchedTrip.from_district}` : ""} → {matchedTrip.to_region} {matchedTrip.to_district ? `• ${matchedTrip.to_district}` : ""}
                   </Text>
                 ) : (
-                  <Text type="secondary">Hozircha mos reys topilmadi. Buyurtma baribir saqlanadi, haydovchi keyin qabul qilishi mumkin.</Text>
+                  <Text type="secondary">{cp("Hozircha mos reys topilmadi. Buyurtma baribir saqlanadi, haydovchi keyin qabul qilishi mumkin.")}</Text>
                 )}
               </Space>
             </Card>
@@ -615,9 +615,9 @@ export default function DeliveryPage({ onBack }) {
 
           <Card size="small" style={{ borderRadius: 18, background: "#fffdf0", border: "1px solid rgba(255,196,52,0.25)" }}>
             <Space direction="vertical" size={6} style={{ width: "100%" }}>
-              <div style={{ fontWeight: 700 }}>Narx qanday hisoblandi</div>
-              <Text>Asosiy tarif + olish rejimi + topshirish rejimi + buyum turi.</Text>
-              <Text>Komissiya faqat ko‘rsatilgan narxdan olinadi. To‘lov usuli: naqd.</Text>
+              <div style={{ fontWeight: 700 }}>{cp("Narx qanday hisoblandi")}</div>
+              <Text>{cp("Asosiy tarif + olish rejimi + topshirish rejimi + buyum turi.")}</Text>
+              <Text>{cp("Komissiya faqat ko‘rsatilgan narxdan olinadi. To‘lov usuli: naqd.")}</Text>
             </Space>
           </Card>
 
@@ -631,7 +631,7 @@ export default function DeliveryPage({ onBack }) {
               onClick={handleSubmit}
               style={{ borderRadius: 18, height: 52, fontWeight: 800, flex: 1, minWidth: 220 }}
             >
-              {editingId ? "O‘zgarishlarni saqlash" : "Buyurtma berish"}
+              {editingId ? cp("O‘zgarishlarni saqlash") : cp("Buyurtma berish")}
             </Button>
             {editingId ? (
               <Button size="large" style={{ borderRadius: 18, height: 52, fontWeight: 700 }} onClick={resetForm}>
@@ -643,9 +643,9 @@ export default function DeliveryPage({ onBack }) {
       </Card>
 
       <div style={{ marginTop: 18 }}>
-        <Title level={5} style={{ marginBottom: 8 }}>Mening eltish buyurtmalarim</Title>
+        <Title level={5} style={{ marginBottom: 8 }}>{cp("Mening eltish buyurtmalarim")}</Title>
         {orders.length === 0 ? (
-          <Card style={{ borderRadius: 18 }}><Empty description="Hozircha eltish buyurtmasi yo‘q" /></Card>
+          <Card style={{ borderRadius: 18 }}><Empty description={cp("Hozircha eltish buyurtmasi yo‘q")} /></Card>
         ) : (
           <List
             dataSource={orders}

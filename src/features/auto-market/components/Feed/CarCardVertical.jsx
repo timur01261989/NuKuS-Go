@@ -9,7 +9,8 @@ import StatusBadge from "../Common/StatusBadge";
  * YANGI: vikup va barter badge'lari qo'shildi
  */
 export default function CarCardVertical({ ad, onClick }) {
-  const badge = ad.is_top ? "TOP" : null;
+  if (!ad) return null;
+  const badge = ad?.is_top ? "TOP" : null;
   return (
     <div
       onClick={onClick}

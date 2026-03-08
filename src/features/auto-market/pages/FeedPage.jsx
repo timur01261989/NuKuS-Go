@@ -45,10 +45,10 @@ export default function FeedPage() {
     items.forEach((item, idx) => {
       // Asl e'lon kartochkasi (QuickView funksiyasi qo'shildi)
       result.push(
-        <div key={item.id} style={{ position: 'relative' }}>
+        <div key={item?.id ?? `item-`} style={{ position: 'relative' }}>
           <CarCardVertical 
-            car={item} 
-            onClick={() => nav(`/auto-market/ad/${item.id}`)} 
+            ad={item} 
+            onClick={() => item?.id && nav(`/auto-market/ad/`)} 
           />
           <Button 
             icon={<EyeOutlined />} 
