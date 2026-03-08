@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Drawer, Button, Space, Typography, Input, Switch, Radio, Divider } from "antd";
 import { useDistrict } from "../../context/DistrictContext"; // 1. Context import qilindi
-import { useClientText, formatClientMoney } from "../../shared/i18n_clientLocalize";
+import { useClientText, formatClientMoney } from "../../../shared/i18n_clientLocalize";
 
 /**
  * RequestTripDrawer.jsx

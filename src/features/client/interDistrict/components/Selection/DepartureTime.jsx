@@ -3,7 +3,7 @@ import { Card, DatePicker, TimePicker, Typography, Space, Button } from "antd"; 
 import { ClockCircleOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { useDistrict } from "../../context/DistrictContext";
-import { useClientText } from "../../shared/i18n_clientLocalize";
+import { useClientText } from "../../../shared/i18n_clientLocalize";
 
 /**
  * DepartureTime.jsx (Client)

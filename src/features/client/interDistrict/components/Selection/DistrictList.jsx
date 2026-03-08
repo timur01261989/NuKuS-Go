@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { useClientText } from "../../shared/i18n_clientLocalize";
+import { useClientText } from "../../../shared/i18n_clientLocalize";
 import { Card, Col, Row, Select, Space, Switch, Typography, Button } from "antd";
 import { EnvironmentOutlined } from "@ant-design/icons";
 import { REGIONS, getDistrictsByRegion } from "../../services/districtData";

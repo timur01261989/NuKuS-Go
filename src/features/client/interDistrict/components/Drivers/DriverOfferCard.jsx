@@ -1,7 +1,7 @@
 import React from "react";
 import { Card, Button, Typography, Tag } from "antd";
 import { CarOutlined } from "@ant-design/icons";
-import { useClientText, formatClientMoney } from "../../shared/i18n_clientLocalize";
+import { useClientText, formatClientMoney } from "../../../shared/i18n_clientLocalize";
 
 /**
  * DriverOfferCard.jsx
