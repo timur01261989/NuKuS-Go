@@ -21,14 +21,14 @@ export default function DriverWallet({ onBack }) {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       // 1. Joriy balansni olish
-      const { data: driver } = await supabase.from('drivers').select('balance').eq('user_id', user.id).single();
-      if (driver) setBalance(driver.balance ?? 0);
+      const { data: wallet } = await supabase.from('wallets').select('balance_uzs').eq('user_id', user.id).maybeSingle();
+      if (wallet) setBalance(wallet.balance_uzs ?? 0);
 
       // 2. Tranzaksiyalarni olish
       const { data: txs } = await supabase
         .from('wallet_transactions')
         .select('*')
-        .eq('driver_id', user.id)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(10);
       if (txs) setTransactions(txs);
@@ -108,18 +108,18 @@ export default function DriverWallet({ onBack }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
                 <div style={{ 
                   width: 40, height: 40, borderRadius: '50%', 
-                  background: item.type === 'income' ? '#e6f7ed' : '#fff1f0',
+                  background: (item.type || (item.direction === 'credit' ? 'income' : 'expense')) === 'income' ? '#e6f7ed' : '#fff1f0',
                   display: 'flex', alignItems: 'center', justifyContent: 'center'
                 }}>
-                  {item.type === 'income' ? <ArrowDownOutlined style={{color: '#52c41a'}} /> : <ArrowUpOutlined style={{color: '#ff4d4f'}} />}
+                  {(item.type || (item.direction === 'credit' ? 'income' : 'expense')) === 'income' ? <ArrowDownOutlined style={{color: '#52c41a'}} /> : <ArrowUpOutlined style={{color: '#ff4d4f'}} />}
                 </div>
                 <div>
                   <Text strong style={{ display: 'block' }}>{item.description}</Text>
                   <Text type="secondary" style={{ fontSize: 12 }}>{new Date(item.created_at).toLocaleDateString()}</Text>
                 </div>
               </div>
-              <Text strong style={{ color: item.type === 'income' ? '#52c41a' : '#ff4d4f' }}>
-                {item.type === 'income' ? '+' : '-'}{(item.amount ?? 0).toLocaleString()}
+              <Text strong style={{ color: (item.type || (item.direction === 'credit' ? 'income' : 'expense')) === 'income' ? '#52c41a' : '#ff4d4f' }}>
+                {(item.type || (item.direction === 'credit' ? 'income' : 'expense')) === 'income' ? '+' : '-'}{(item.amount ?? item.amount_uzs ?? 0).toLocaleString()}
               </Text>
             </div>
           </Card>

@@ -123,15 +123,17 @@ const toggleOnline = async (next) => {
     userIdRef.current = user.id;
 
     const driverPayload = {
+      driver_id: user.id,
       is_online: next,
+      state: next ? 'online' : 'offline',
       last_seen_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
       active_service_type: next ? targetService : null,
     };
 
     const { error } = await supabase
-      .from("drivers")
-      .update(driverPayload)
-      .eq("user_id", user.id);
+      .from("driver_presence")
+      .upsert([driverPayload], { onConflict: 'driver_id' });
 
     if (error) throw error;
 

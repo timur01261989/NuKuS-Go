@@ -1,44 +1,24 @@
-# UniGo
+# UniGo Super App Reworked
 
-Bu paket yangi **yagona ID** arxitekturaga moslashtirildi.
+Bu paket yangi yagona-ID arxitektura asosida tayyorlandi.
 
-## Asosiy qoida
-- `auth.users.id` hamma joy uchun bitta ID
-- `profiles.id`
-- `driver_applications.user_id`
-- `drivers.user_id`
-- `driver_presence.driver_id`
-- `wallets.user_id`
-- `orders.client_id` / `orders.driver_id`
-- `auto_market_ads.owner_user_id`
-- `auto_market_payments.user_id`
+Asosiy qoida:
+- `auth.users.id` = barcha modul uchun yagona user ID
+- client / driver / wallet / orders / auto market hammasi shu ID bilan ishlaydi
 
-## SQL ishga tushirish tartibi
-Faqat shu fayllar ishlatiladi:
+## SQL tartibi
 1. `sql/00_reset_unigo_superapp.sql`
 2. `sql/01_unigo_superapp_schema.sql`
 3. `sql/02_unigo_superapp_rls.sql`
+4. `sql/03_unigo_compat_feature_tables.sql`
 
-## Driver oqimi
-1. User ro'yxatdan o'tadi
-2. Driver ariza yuboradi (`driver_applications`)
-3. Admin web panel orqali approve/reject qiladi
-4. Approve bo'lgach `drivers` capability profili yaratiladi
-5. Presence va online holat faqat `driver_presence` orqali yuradi
+## O'zgargan asosiy oqim
+- Driver bo'lish uchun ariza `driver_applications` ga yoziladi
+- Tasdiqlangan haydovchi `drivers` da saqlanadi
+- Online/offline truth source `driver_presence`
+- Orderlar umumiy `orders` jadvalida
+- Wallet umumiy `wallets` + `wallet_transactions`
+- Avto savdo `auto_market_ads` + `auto_market_payments`
 
-## Transport turlari
-- `light_car`
-- `bus_gazel`
-- `truck`
-
-`light_car` barcha asosiy xizmatlarni ko'rishi mumkin, ammo freight dispatch faqat haydovchi limiti ichidagi kg uchun chiqadi.
-
-## Muhim o'zgarishlar
-- eski aralash SQL fayllar olib tashlandi
-- driver registration `drivers` ga pending row yaratmaydi
-- driver pending sahifasi `driver_applications` holatiga qaraydi
-- online/offline truth source `driver_presence`
-- auto market owner/payment ham bitta user ID bilan ishlaydi
-
-## Eslatma
-Admin panel bu loyihaga aralashtirilmagan. U alohida web loyiha bo'ladi.
+## Muhim
+Admin panel bu paket ichida emas. U alohida web loyiha sifatida ishlanadi.

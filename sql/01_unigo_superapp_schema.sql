@@ -26,7 +26,10 @@ create table if not exists public.profiles (
   avatar_url text,
   language_code text not null default 'uz_latn',
   role text not null default 'client' check (role in ('client','driver','both','admin')),
-  current_role text generated always as (role) stored,
+  current_role text not null default 'client' check (current_role in ('client','driver','both','admin')),
+  first_name text,
+  last_name text,
+  father_name text,
   is_admin boolean not null default false,
   is_blocked boolean not null default false,
   is_deleted boolean not null default false,
@@ -80,6 +83,10 @@ create table if not exists public.driver_applications (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null unique references public.profiles(id) on delete cascade,
   status text not null default 'pending' check (status in ('pending','approved','rejected','revoked')),
+  first_name text,
+  last_name text,
+  father_name text,
+  phone text,
   transport_type text not null check (transport_type in ('light_car','bus_gazel','truck')),
   vehicle_brand text,
   vehicle_model text,
@@ -256,7 +263,8 @@ begin
   on conflict (driver_id) do nothing;
 
   update public.profiles
-     set current_role = case when current_role = 'client' then 'both' else current_role end,
+     set role = case when role = 'client' then 'both' else role end,
+         current_role = case when current_role = 'client' then 'both' else current_role end,
          updated_at = now()
    where id = app_row.user_id;
 end;
@@ -275,8 +283,12 @@ create table if not exists public.driver_presence (
   lat double precision,
   lng double precision,
   heading double precision,
+  bearing double precision,
   speed double precision,
   accuracy double precision,
+  device_id text,
+  platform text,
+  app_version text,
   last_seen_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -313,14 +325,18 @@ for each row execute function public.touch_updated_at();
 create table if not exists public.wallet_transactions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.wallets(user_id) on delete cascade,
-  direction text not null check (direction in ('credit','debit')),
-  kind text not null check (kind in ('topup','withdraw','order_payment','order_payout','commission','refund','ad_fee','manual_adjustment')),
+  driver_id uuid generated always as (user_id) stored,
+  direction text not null default 'credit' check (direction in ('credit','debit')),
+  kind text not null check (kind in ('topup','withdraw','order_payment','order_payout','commission','refund','ad_fee','manual_adjustment','spend','bonus')),
   service_type text,
   amount_uzs bigint not null check (amount_uzs > 0),
+  amount bigint generated always as (amount_uzs) stored,
+  type text generated always as (case when direction = 'credit' then 'income' else 'expense' end) stored,
   order_id uuid,
   ad_id uuid,
   description text,
   metadata jsonb not null default '{}'::jsonb,
+  meta jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
 
@@ -355,7 +371,7 @@ create table if not exists public.orders (
   passenger_id uuid generated always as (client_id) stored,
   driver_id uuid references public.profiles(id) on delete set null,
   service_type text not null check (service_type in ('taxi','delivery','inter_district','inter_city','freight')),
-  status text not null default 'searching' check (status in ('draft','searching','offered','accepted','arrived','in_progress','completed','cancelled_by_client','cancelled_by_driver','expired')),
+  status text not null default 'searching' check (status in ('draft','pending','searching','offered','accepted','arrived','in_progress','in_trip','completed','cancelled_by_client','cancelled_by_driver','cancelled','expired')),
   pickup jsonb,
   dropoff jsonb,
   from_location jsonb generated always as (pickup) stored,
@@ -371,6 +387,7 @@ create table if not exists public.orders (
   price bigint generated always as (price_uzs) stored,
   commission_uzs bigint not null default 0,
   driver_payout_uzs bigint not null default 0,
+  rating numeric(3,2),
   offered_at timestamptz,
   accepted_at timestamptz,
   arrived_at timestamptz,
@@ -397,6 +414,9 @@ create table if not exists public.order_offers (
   id uuid primary key default gen_random_uuid(),
   order_id uuid not null references public.orders(id) on delete cascade,
   driver_id uuid not null references public.drivers(user_id) on delete cascade,
+  service_type text,
+  dist_km numeric(10,3),
+  score numeric(10,3),
   status text not null default 'sent' check (status in ('sent','accepted','rejected','expired')),
   sent_at timestamptz not null default now(),
   expires_at timestamptz,
@@ -411,10 +431,13 @@ create table if not exists public.order_events (
   id bigserial primary key,
   order_id uuid not null references public.orders(id) on delete cascade,
   actor_user_id uuid references public.profiles(id) on delete set null,
+  actor_id uuid generated always as (actor_user_id) stored,
   actor_role text,
   event_code text not null,
+  event text generated always as (event_code) stored,
   from_status text,
   to_status text,
+  reason text,
   payload jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
@@ -818,3 +841,44 @@ select id, ad_id, user_id, promo_type, amount_uzs, status, starts_at, ends_at, c
 
 create or replace view public.auto_contact_reveals as
 select id, ad_id, user_id, price_uzs, created_at from public.auto_market_contact_reveals;
+
+
+-- =========================
+-- SUPPORT / PUSH / NOTIFICATIONS (minimal compatibility)
+-- =========================
+create table if not exists public.notifications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.profiles(id) on delete cascade,
+  title text,
+  body text,
+  type text,
+  data jsonb not null default '{}'::jsonb,
+  is_read boolean not null default false,
+  created_at timestamptz not null default now(),
+  read_at timestamptz
+);
+create index if not exists idx_notifications_user on public.notifications(user_id, created_at desc);
+
+create table if not exists public.push_tokens (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.profiles(id) on delete cascade,
+  token text not null,
+  platform text,
+  device_id text,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(user_id, token)
+);
+
+create table if not exists public.push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.profiles(id) on delete cascade,
+  endpoint text not null,
+  p256dh text,
+  auth text,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(user_id, endpoint)
+);
