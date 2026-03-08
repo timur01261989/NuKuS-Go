@@ -1,5 +1,5 @@
 import React from "react";
-import { useClientText } from "../../shared/i18n_clientLocalize";
+import { useClientText } from "../../../shared/i18n_clientLocalize";
 import { Button, Card, Typography } from "antd";
 import { LoadingOutlined, StopOutlined } from "@ant-design/icons";
 import { useFreight } from "../../context/FreightContext";

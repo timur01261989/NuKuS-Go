@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { Card, Tag, Typography } from "antd";
 import { useFreight } from "../../context/FreightContext";
 import { formatUZS } from "../../services/truckData";
-import { useClientText } from "../../shared/i18n_clientLocalize";
+import { useClientText } from "../../../shared/i18n_clientLocalize";
 const { Text } = Typography;
 
 export default function PriceEstimator() {

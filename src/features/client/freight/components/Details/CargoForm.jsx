@@ -1,7 +1,7 @@
 import React from "react";
 import { Input, InputNumber, Typography } from "antd";
 import { useFreight } from "../../context/FreightContext";
-import { useClientText } from "../../shared/i18n_clientLocalize";
+import { useClientText } from "../../../shared/i18n_clientLocalize";
 const { Text } = Typography;
 
 export default function CargoForm() {

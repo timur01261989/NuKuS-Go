@@ -1,6 +1,6 @@
 import React from "react";
 import { Card, Tag, Typography } from "antd";
-import { useClientText } from "../../shared/i18n_clientLocalize";
+import { useClientText } from "../../../shared/i18n_clientLocalize";
 const { Text } = Typography;
 
 export default function TruckCard({ truck, selected, onClick }) {
