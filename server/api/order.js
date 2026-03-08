@@ -71,7 +71,7 @@ function normalizeOrderPayload(body = {}) {
   const cargo_weight_kg = body.cargo_weight_kg ?? body.weight_kg ?? null;
   const cargo_volume_m3 = body.cargo_volume_m3 ?? body.volume_m3 ?? null;
   return {
-    client_id: body.client_id ?? body.user_id ?? body.passengerId ?? body.passenger_id ?? null,
+    client_id: body.client_id ?? body.user_id ?? null,
     service_type,
     pickup,
     dropoff,

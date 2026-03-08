@@ -1,24 +1,33 @@
-# UniGo Super App Reworked
+# UniGo Super App
 
-Bu paket yangi yagona-ID arxitektura asosida tayyorlandi.
+Bu paket yangi yagona schema asosida tozalangan variant.
 
-Asosiy qoida:
-- `auth.users.id` = barcha modul uchun yagona user ID
-- client / driver / wallet / orders / auto market hammasi shu ID bilan ishlaydi
+## Asosiy qoida
+- Bitta user ID: `auth.users.id`
+- Shu ID quyidagi hamma joyda ishlatiladi:
+  - `profiles.id`
+  - `driver_applications.user_id`
+  - `drivers.user_id`
+  - `driver_presence.driver_id`
+  - `wallets.user_id`
+  - `orders.client_id`
+  - `orders.driver_id`
+  - `auto_market_ads.owner_user_id`
+  - `auto_market_payments.user_id`
 
-## SQL tartibi
+## SQL ishga tushirish tartibi
 1. `sql/00_reset_unigo_superapp.sql`
 2. `sql/01_unigo_superapp_schema.sql`
 3. `sql/02_unigo_superapp_rls.sql`
 4. `sql/03_unigo_compat_feature_tables.sql`
 
-## O'zgargan asosiy oqim
-- Driver bo'lish uchun ariza `driver_applications` ga yoziladi
-- Tasdiqlangan haydovchi `drivers` da saqlanadi
-- Online/offline truth source `driver_presence`
-- Orderlar umumiy `orders` jadvalida
-- Wallet umumiy `wallets` + `wallet_transactions`
-- Avto savdo `auto_market_ads` + `auto_market_payments`
+## Muhim o'zgarishlar
+- `profiles.user_id` fallback olib tashlangan, endi faqat `profiles.id`
+- `orders.passenger_id` o'rniga `orders.client_id`
+- driver online/offline markazi `driver_presence`
+- `drivers` jadvali statik capability uchun qoldirilgan
+- ortiqcha audit va checklist hujjatlari olib tashlangan
+- eski root SQL fayllari olib tashlangan
 
-## Muhim
-Admin panel bu paket ichida emas. U alohida web loyiha sifatida ishlanadi.
+## Eslatma
+Bu paket katta rework qilingan variant. Build va runtime testni lokal yoki Vercel muhitingizda tekshirish kerak.

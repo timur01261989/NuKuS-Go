@@ -44,13 +44,7 @@ async function readBody(req) {
 
 function isAdminCheck(sb, userId) {
   return (async () => {
-    let res = await sb.from("profiles").select("is_admin,role").eq("id", userId).maybeSingle();
-
-    // Fallback: some schemas use profiles.user_id instead of profiles.id
-    if (res.error && (res.error.code === "42703" || /column\s+\"id\"\s+does\s+not\s+exist/i.test(res.error.message || ""))) {
-      res = await sb.from("profiles").select("is_admin,role").eq("user_id", userId).maybeSingle();
-    }
-
+    const res = await sb.from("profiles").select("is_admin,role").eq("id", userId).maybeSingle();
     const roleVal = res.data?.role;
     const adminVal = res.data?.is_admin;
     return roleVal === "admin" || adminVal === true;

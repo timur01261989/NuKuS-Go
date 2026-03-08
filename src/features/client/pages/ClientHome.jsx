@@ -31,22 +31,12 @@ export default function ClientHome() {
 
         let fullName = user.user_metadata?.full_name || user.user_metadata?.name || "";
         let avatarUrl = user.user_metadata?.avatar_url || "";
-
         try {
-          let pRes = await supabase
+          const pRes = await supabase
             .from("profiles")
             .select("full_name,avatar_url")
             .eq("id", user.id)
             .maybeSingle();
-
-          // Fallback: some schemas use profiles.user_id instead of profiles.id
-          if (pRes.error && /column\s+\"id\"\s+does\s+not\s+exist/i.test(pRes.error.message || "")) {
-            pRes = await supabase
-              .from("profiles")
-              .select("full_name,avatar_url")
-              .eq("user_id", user.id)
-              .maybeSingle();
-          }
 
           const p = pRes.data;
           if (p?.full_name) fullName = p.full_name;

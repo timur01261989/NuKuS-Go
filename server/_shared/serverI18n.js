@@ -18,7 +18,7 @@ const DICT = {
     "Forbidden": "Тақиқланган",
     "Requester is not a participant of this order": "Сўровчи ушбу буюртма иштирокчиси эмас",
     "Other party not assigned yet": "Иккинчи томон ҳали бириктирилмаган",
-    "passenger_id missing": "passenger_id йўқ",
+    "client_id missing": "client_id йўқ",
     "driver_id missing": "driver_id йўқ",
     "Phone not found": "Телефон рақами топилмади",
     "No phone field found for the other party": "Иккинчи томон учун телефон майдони топилмади",
