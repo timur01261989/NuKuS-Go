@@ -37,7 +37,7 @@ export default function DriverHome({ onLogout }) {
   // STATE
   // =========================
   const [selectedService, setSelectedService] = useState(
-    (typeof window !== "undefined" ? localStorage.getItem("driverActiveService") : null) || null
+    (typeof window !== "undefined" ? localStorage.getItem("driver_active_service") : null) || null
   );
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -67,7 +67,7 @@ export default function DriverHome({ onLogout }) {
       setSelectedService((prev) => {
         if (prev) {
           try {
-            localStorage.removeItem("driverActiveService");
+            localStorage.removeItem("driver_active_service");
           } catch {
             // ignore
           }
@@ -96,12 +96,12 @@ export default function DriverHome({ onLogout }) {
 
   const selectService = (key) => {
     setSelectedService(key);
-    if (typeof window !== "undefined") localStorage.setItem("driverActiveService", key);
+    if (typeof window !== "undefined") localStorage.setItem("driver_active_service", key);
   };
 
   const backToMenu = () => {
     setSelectedService(null);
-    if (typeof window !== "undefined") localStorage.removeItem("driverActiveService");
+    if (typeof window !== "undefined") localStorage.removeItem("driver_active_service");
   };
 
   const userIdRef = useRef(null);
@@ -110,7 +110,7 @@ export default function DriverHome({ onLogout }) {
 const toggleOnline = async (next) => {
   setLoading(true);
   try {
-    const targetService = selectedService || activeService || (typeof window !== "undefined" ? localStorage.getItem("driverActiveService") : null) || "taxi";
+    const targetService = selectedService || activeService || (typeof window !== "undefined" ? localStorage.getItem("driver_active_service") : null) || "taxi";
     if (next && !canActivateService(activeService, targetService)) {
       message.warning(tr("goOffline", "Avval boshqa xizmatni offline qiling"));
       return;
@@ -155,7 +155,7 @@ const toggleOnline = async (next) => {
 
 useEffect(() => {
   if (!isOnline) return;
-  const nextService = selectedService || activeService || (typeof window !== "undefined" ? localStorage.getItem("driverActiveService") : null) || "taxi";
+  const nextService = selectedService || activeService || (typeof window !== "undefined" ? localStorage.getItem("driver_active_service") : null) || "taxi";
   syncPresenceService(nextService).catch(() => {});
 }, [isOnline, selectedService, activeService]);
 

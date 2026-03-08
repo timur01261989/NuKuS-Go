@@ -141,7 +141,6 @@ export default function useRealtimeDrivers({ enabled, center, radiusMeters = 200
     // Build a set of "online & not busy" identifiers.
     // Support both schema variants:
     //  - driver_locations.driver_id references drivers.user_id
-    //  - driver_locations.driver_id references drivers.id
     const onlineSet = new Set();
     const idToUserId = new Map();
 
@@ -156,7 +155,7 @@ export default function useRealtimeDrivers({ enabled, center, radiusMeters = 200
     return (locs || [])
       .filter((l) => onlineSet.has(l.driver_id))
       .map((l) => ({
-        // Prefer returning user_id when we can map drivers.id -> drivers.user_id
+        // Return canonical driver user_id whenever it is available
         id: idToUserId.get(l.driver_id) || l.driver_id,
         lat: l.lat,
         lng: l.lng,

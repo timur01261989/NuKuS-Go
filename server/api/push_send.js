@@ -1,5 +1,5 @@
 import { json, badRequest, serverError } from '../_shared/cors.js';
-import { getSupabaseAdmin } from '../_shared/supabase.js';
+import { getSupabaseAdmin, getAuthedUserId } from '../_shared/supabase.js';
 
 function hasEnv() {
   return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.FCM_SERVER_KEY);
@@ -26,14 +26,14 @@ async function fcmSend({ serverKey, token, title, body, data }) {
 
 /**
  * POST /api/push/send
- * body: { user_id, role, title, body, data? }
+ * body: { target_user_id?, user_id?, role, title, body, data? }
  */
 export default async function handler(req, res) {
   try {
     if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Method not allowed' });
     const body0 = typeof req.body === 'string' ? JSON.parse(req.body||'{}') : (req.body||{});
 
-    const user_id = String(body0.user_id || '').trim();
+    const user_id = String(body0.target_user_id || body0.user_id || (await getAuthedUserId(req, getSupabaseAdmin())) || '').trim();
     const role = String(body0.role || '').trim();
     const title = String(body0.title || 'UniGo').trim();
     const body = String(body0.body || '').trim();

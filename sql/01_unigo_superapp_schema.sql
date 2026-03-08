@@ -368,7 +368,6 @@ create index if not exists idx_billing_transactions_source on public.billing_tra
 create table if not exists public.orders (
   id uuid primary key default gen_random_uuid(),
   client_id uuid not null references public.profiles(id) on delete cascade,
-  passenger_id uuid generated always as (client_id) stored,
   driver_id uuid references public.profiles(id) on delete set null,
   service_type text not null check (service_type in ('taxi','delivery','inter_district','inter_city','freight')),
   status text not null default 'searching' check (status in ('draft','pending','searching','offered','accepted','arrived','in_progress','in_trip','completed','cancelled_by_client','cancelled_by_driver','cancelled','expired')),
@@ -826,21 +825,7 @@ $$;
 commit;
 
 
--- Compatibility read aliases for legacy code
-create or replace view public.auto_ads as
-select * from public.auto_market_ads;
-
-create or replace view public.auto_ad_images as
-select id, ad_id, image_url as url, sort_order, created_at from public.auto_market_images;
-
-create or replace view public.auto_payments as
-select id, ad_id, user_id, provider, amount_uzs, status, payment_purpose, meta, created_at, paid_at from public.auto_market_payments;
-
-create or replace view public.auto_promotions as
-select id, ad_id, user_id, promo_type, amount_uzs, status, starts_at, ends_at, created_at from public.auto_market_promotions;
-
-create or replace view public.auto_contact_reveals as
-select id, ad_id, user_id, price_uzs, created_at from public.auto_market_contact_reveals;
+-- Compatibility read aliases intentionally removed for hard-clean single-ID schema.
 
 
 -- =========================

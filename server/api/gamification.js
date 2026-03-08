@@ -140,7 +140,7 @@ async function getMissions(sb) {
 
 async function useBonus(sb, body) {
   const { user_id, points, order_id } = body;
-  if (!user_id || !points || points <= 0) return { ok: false, error: "user_id va points kerak" };
+  if (!user_id || !points || points <= 0) return { ok: false, error: "auth user va points kerak" };
 
   const { data: bon } = await sb.from("client_bonuses").select("points").eq("user_id", user_id).maybeSingle();
   const current = bon?.points || 0;
@@ -223,7 +223,8 @@ export default async function handler(req, res) {
   try {
     if (req.method === "GET") {
       const action = url.searchParams.get("action") || "";
-      const userId = url.searchParams.get("user_id") || "";
+      const authedUserId = await getAuthedUserId(req, sb);
+      const userId = authedUserId || url.searchParams.get("user_id") || "";
 
       if (action === "driver_status") {
         const result = await getDriverStatus(sb, userId);
@@ -247,9 +248,12 @@ export default async function handler(req, res) {
     if (req.method === "POST") {
       const body = await readBody(req);
       const action = body.action || "";
-      const callerUserId = (await getAuthedUserId(req, sb)) || body.caller_user_id || "";
+      const callerUserId = (await getAuthedUserId(req, sb)) || "";
 
-      if (action === "use_bonus") return json(res, 200, await useBonus(sb, body));
+      if (action === "use_bonus") {
+        const authedUserId = await getAuthedUserId(req, sb);
+        return json(res, 200, await useBonus(sb, { ...body, user_id: authedUserId || body.user_id || null }));
+      }
       if (action === "admin_update_level") return json(res, 200, await adminUpdateLevel(sb, body, callerUserId));
       if (action === "admin_update_mission") return json(res, 200, await adminUpdateMission(sb, body, callerUserId));
       if (action === "admin_create_mission") return json(res, 200, await adminCreateMission(sb, body, callerUserId));

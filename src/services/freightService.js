@@ -47,8 +47,8 @@ export const freightApi = {
   cargoStatus: ({ cargoId }) => api.post("/api/freight", { action: "cargo_status", cargoId }),
   matchVehicles: ({ cargoId, radiusKm = 30 }) => api.post("/api/freight", { action: "match_vehicles", cargoId, radiusKm }),
   listOffers: ({ cargoId }) => api.post("/api/freight", { action: "list_offers", cargoId }),
-  acceptOffer: ({ cargoId, offerId, ownerId }) =>
-    api.post("/api/freight", { action: "accept_offer", cargoId, offerId, ownerId }),
+  acceptOffer: ({ cargoId, offerId }) =>
+    api.post("/api/freight", { action: "accept_offer", cargoId, offerId }),
 
   // Driver
   upsertVehicle: (payload) => api.post("/api/freight", { action: "upsert_vehicle", ...payload }),

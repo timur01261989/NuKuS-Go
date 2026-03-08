@@ -61,7 +61,6 @@ export function useBonusPoints({ userId, points, orderId }) {
 export function adminUpdateLevel(callerUserId, levelId, data) {
   return postJson("/api/gamification", {
     action: "admin_update_level",
-    caller_user_id: callerUserId,
     level_id: levelId,
     data,
   });
@@ -71,7 +70,6 @@ export function adminUpdateLevel(callerUserId, levelId, data) {
 export function adminUpdateMission(callerUserId, missionId, data) {
   return postJson("/api/gamification", {
     action: "admin_update_mission",
-    caller_user_id: callerUserId,
     mission_id: missionId,
     data,
   });
@@ -81,7 +79,6 @@ export function adminUpdateMission(callerUserId, missionId, data) {
 export function adminCreateMission(callerUserId, data) {
   return postJson("/api/gamification", {
     action: "admin_create_mission",
-    caller_user_id: callerUserId,
     data,
   });
 }
@@ -90,7 +87,6 @@ export function adminCreateMission(callerUserId, data) {
 export function adminDeleteMission(callerUserId, missionId) {
   return postJson("/api/gamification", {
     action: "admin_delete_mission",
-    caller_user_id: callerUserId,
     mission_id: missionId,
   });
 }

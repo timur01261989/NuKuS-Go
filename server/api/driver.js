@@ -20,7 +20,7 @@ async function authUser(req, sb) {
 async function updatePresence(req, res, body = {}) {
   const sb = getSupabaseAdmin();
   const driverId = normalizeDriverId(body);
-  if (!driverId) return reply(req, res, 400, { ok: false, error: 'driver_id kerak' });
+  if (!driverId) return reply(req, res, 400, { ok: false, error: 'Auth driver kerak' });
   const user = await getAuthedUser(req, sb);
   if (user && user.id !== driverId) return reply(req, res, 403, { ok: false, error: 'Token user mos emas' });
 

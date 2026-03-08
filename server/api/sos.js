@@ -12,7 +12,7 @@ export async function sos_handler(req, res) {
     const sb = getSupabaseAdmin();
     const body = typeof req.body === 'string' ? JSON.parse(req.body||'{}') : (req.body||{});
 
-    const user_id = (await getAuthedUserId(req, sb)) || String(body.user_id||'').trim();
+    const user_id = await getAuthedUserId(req, sb);
     if (!user_id) return badRequest(res, 'Auth user kerak');
 
     const order_id = body.order_id ? String(body.order_id).trim() : null;

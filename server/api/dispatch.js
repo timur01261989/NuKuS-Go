@@ -23,7 +23,7 @@ async function driverPing(req, res, body) {
   const authedUserId = await getAuthedUserId(req, sb);
   const explicitDriverId = String(body.driver_id || body.driverId || '').trim();
   const driver_id = authedUserId || explicitDriverId;
-  if (!driver_id) return badRequest(res, 'driver_id kerak');
+  if (!driver_id) return badRequest(res, 'Auth driver kerak');
   if (authedUserId && explicitDriverId && authedUserId !== explicitDriverId) return json(res, 403, { ok: false, error: 'driver_id token user_id bilan mos emas' });
 
   const { data: driver } = await sb.from('drivers').select('user_id,is_verified').eq('user_id', driver_id).maybeSingle();

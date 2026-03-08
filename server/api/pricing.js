@@ -29,7 +29,7 @@
  *  6. Narxni hisoblaydi va qaytaradi
  */
 import { json, badRequest, serverError } from "../_shared/cors.js";
-import { getSupabaseAdmin } from "../_shared/supabase.js";
+import { getSupabaseAdmin, getAuthedUserId } from "../_shared/supabase.js";
 
 function hasEnv() {
   return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -287,7 +287,7 @@ export default async function handler(req, res) {
     if (req.method === "POST") {
       const body = await readBody(req);
       const action = body.action || "";
-      const callerUserId = body.caller_user_id || "";
+      const callerUserId = (await getAuthedUserId(req, sb)) || "";
 
       if (action === "admin_update_surge") return json(res, 200, await adminUpdateSurge(sb, body, callerUserId));
       if (action === "admin_create_surge") return json(res, 200, await adminCreateSurge(sb, body, callerUserId));

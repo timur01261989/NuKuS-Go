@@ -44,7 +44,7 @@ export default function DriverHome({ onLogout }) {
 
   // --- STATE ---
   const [selectedService, setSelectedService] = useState(
-    localStorage.getItem("driverActiveService") || null
+    localStorage.getItem("driver_active_service") || null
   );
   const [profileOpen, setProfileOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(false);
@@ -61,9 +61,9 @@ export default function DriverHome({ onLogout }) {
   // Xizmatni saqlash
   useEffect(() => {
     if (selectedService) {
-      localStorage.setItem("driverActiveService", selectedService);
+      localStorage.setItem("driver_active_service", selectedService);
     } else {
-      localStorage.removeItem("driverActiveService");
+      localStorage.removeItem("driver_active_service");
     }
   }, [selectedService]);
 

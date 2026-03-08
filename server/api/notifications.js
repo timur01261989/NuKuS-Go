@@ -45,13 +45,13 @@ export default async function handler(req, res) {
   const sb = getSupabaseAdmin();
   const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
   const authedUserId = await getAuthedUserId(req, sb);
-  const userId = String(authedUserId || body.user_id || body.driver_id || "").trim();
+  const userId = String(body.target_user_id || body.user_id || authedUserId || "").trim();
   const title = String(body.title || "UniGo").trim();
   const notifBody = String(body.body || "").trim();
   const url = String(body.url || "/").trim();
   const tag = String(body.tag || "unigo").trim();
 
-  if (!userId) return badRequest(res, "user_id yoki driver_id kerak");
+  if (!userId) return badRequest(res, "target_user_id kerak");
   if (!title && !notifBody) return badRequest(res, "title yoki body kerak");
 
   const { data: subs, error: subErr } = await sb

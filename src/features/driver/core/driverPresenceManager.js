@@ -36,7 +36,7 @@ async function postPresenceState(body) {
   await fetch(`${getApiBase()}/api/driver-state`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ driver_id: driverId, ...body }),
+    body: JSON.stringify(body),
   }).catch(() => {});
 }
 

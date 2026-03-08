@@ -24,10 +24,10 @@ export default async function handler(req, res) {
     const authedUserId = await getAuthedUserId(req, sb);
 
     if (method === 'POST' && (action === 'thread' || path.includes('/support/thread'))) {
+      if (!authedUserId) return badRequest(res, 'Auth user kerak');
       const order_id = body.order_id ?? null;
-      const user_id = authedUserId || body.user_id || body.driver_id || null;
-      const driver_id = body.driver_id ?? null;
-      if (!user_id) return badRequest(res, 'Auth user kerak');
+      const user_id = authedUserId;
+      const driver_id = body.related_driver_id ?? body.driver_id ?? null;
 
       let query = sb.from('support_threads').select('*').eq('status', 'open').eq('user_id', user_id).order('created_at', { ascending: false }).limit(1);
       if (order_id) query = query.eq('order_id', order_id);
@@ -56,7 +56,7 @@ export default async function handler(req, res) {
     if (method === 'POST' && (action === 'message' || path.includes('/support/message'))) {
       const thread_id = String(body.thread_id || '').trim();
       const sender_role = String(body.sender_role || '').trim();
-      const sender_id = authedUserId || body.sender_id || null;
+      const sender_id = authedUserId || null;
       const message = String(body.message || '').trim();
       if (!thread_id || !sender_role || !message) return badRequest(res, 'thread_id, sender_role, message required');
       if (!sender_id) return badRequest(res, 'Auth user kerak');
@@ -84,6 +84,9 @@ export default async function handler(req, res) {
 
       const { data: th, error: te } = await sb.from('support_threads').select('*').eq('id', thread_id).maybeSingle();
       if (te) return json(res, 200, { ok: false, error: te.message || String(te) });
+      if (authedUserId && th?.user_id && String(th.user_id) !== String(authedUserId)) {
+        return json(res, 403, { ok: false, error: 'Forbidden' });
+      }
 
       const { data: msgs, error: ge } = await sb.from('support_messages').select('*').eq('thread_id', thread_id).order('created_at', { ascending: true }).limit(100);
       if (ge) return json(res, 200, { ok: false, error: ge.message || String(ge) });
@@ -92,9 +95,9 @@ export default async function handler(req, res) {
     }
 
     if (method === 'GET' && (action === 'list' || path.includes('/support/list'))) {
-      let query = sb.from('support_threads').select('*').order('updated_at', { ascending: false }).limit(50);
+      if (!authedUserId) return badRequest(res, 'Auth user kerak');
+      let query = sb.from('support_threads').select('*').eq('user_id', authedUserId).order('updated_at', { ascending: false }).limit(50);
       if (q.order_id) query = query.eq('order_id', q.order_id);
-      if (authedUserId) query = query.eq('user_id', authedUserId);
       const { data, error } = await query;
       if (error) return json(res, 200, { ok: false, error: error.message || String(error) });
       return json(res, 200, { ok: true, threads: data || [] });

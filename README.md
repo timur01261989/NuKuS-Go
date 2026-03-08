@@ -31,3 +31,9 @@ Bu paket yangi yagona schema asosida tozalangan variant.
 
 ## Eslatma
 Bu paket katta rework qilingan variant. Build va runtime testni lokal yoki Vercel muhitingizda tekshirish kerak.
+
+## Single ID arxitektura
+
+- `auth.users.id` barcha asosiy jadvallarda yagona identifikator sifatida ishlatiladi.
+- `profiles.id`, `drivers.user_id`, `driver_presence.driver_id`, `wallets.user_id`, `orders.client_id`, `orders.driver_id`, `auto_market_ads.owner_user_id`, `auto_market_payments.user_id` shu modelga bog'langan.
+- Legacy fallback API maydonlari imkon qadar tozalangan; yangi chaqiruvlarda auth token asosiy manba bo'lishi kerak.

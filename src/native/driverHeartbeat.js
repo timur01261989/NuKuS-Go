@@ -24,7 +24,7 @@ export function startHeartbeat({
   getAuthToken,
 }) {
   stopHeartbeat();
-  if (!driverId) throw new Error('driverId required');
+  if (!driverId && typeof getAuthToken !== 'function') throw new Error('driverId or auth token required');
   if (typeof getPosition !== 'function') throw new Error('getPosition required');
 
   const tick = async () => {
@@ -35,8 +35,7 @@ export function startHeartbeat({
       const token = await (getAuthToken?.() ?? null);
 
       await postJson(`${baseUrl}/api/presence/heartbeat`, {
-        driver_id: driverId,
-        lat: pos?.lat,
+                lat: pos?.lat,
         lng: pos?.lng,
         speed: pos?.speed,
         heading: pos?.heading,

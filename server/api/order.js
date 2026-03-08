@@ -76,7 +76,7 @@ function normalizeOrderPayload(body = {}, clientId = null) {
     service_type,
     pickup,
     dropoff,
-    status: String(body.status || 'searching').toLowerCase(),
+    status: String(body.status || 'created').toLowerCase(),
     price_uzs,
     route_meta: {
       distance_km: Number(body.distance_km ?? body.distanceKm ?? 0) || 0,

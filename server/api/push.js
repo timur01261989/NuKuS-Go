@@ -17,7 +17,7 @@ export default async function handler(req, res) {
     if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Method not allowed' });
     const body = typeof req.body === 'string' ? JSON.parse(req.body||'{}') : (req.body||{});
 
-    const user_id = String((await getAuthedUserId(req, getSupabaseAdmin())) || body.user_id || '').trim();
+    const user_id = String((await getAuthedUserId(req, getSupabaseAdmin())) || '').trim();
     const role = String(body.role || '').trim(); // 'driver' | 'client' | 'admin'
     const fcm_token = String(body.fcm_token || '').trim();
 

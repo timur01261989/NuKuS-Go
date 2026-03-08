@@ -155,7 +155,7 @@ export async function notify_handler(req, res) {
   try {
     if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Method not allowed' });
     const body = typeof req.body === 'string' ? JSON.parse(req.body||'{}') : (req.body||{});
-    const user_id = String(body.user_id||'').trim();
+    const user_id = String(body.target_user_id || body.user_id || '').trim();
     if (!user_id) return badRequest(res, 'user_id kerak');
     if (!hasSupabaseEnv()) return serverError(res, 'SUPABASE_URL va service role key (SUPABASE_SERVICE_ROLE_KEY) server envda yo\'q');
 

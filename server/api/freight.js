@@ -12,7 +12,7 @@
  *   - cargo_tracking_points (ixtiyoriy)
  */
 
-import { getSupabaseAdmin } from "../_shared/supabase.js";
+import { getSupabaseAdmin, getAuthedUserId } from "../_shared/supabase.js";
 import { haversineKm } from "../_shared/geo.js";
 
 
@@ -214,14 +214,14 @@ export default async function freightHandler(req, res) {
     // Cargo (Client)
     // =====================
     if (action === "create_cargo") {
-      const ownerId = body.ownerId;
+      const clientId = (await getAuthedUserId(req, sb)) || body.clientId || body.ownerUserId || body.ownerId;
       const pickup = pickLatLng(body.pickup);
       const dropoff = pickLatLng(body.dropoff);
-      if (!ownerId) return json(res, 400, { error: "ownerId required" });
+      if (!clientId) return json(res, 400, { error: "clientId required" });
       if (!pickup || !dropoff) return json(res, 400, { error: "pickup/dropoff latlng required" });
 
       const row = {
-        owner_id: ownerId,
+        client_id: clientId,
         title: body.title || body.cargoName || null,
         description: body.note || null,
         cargo_type: body.cargoType || null,
@@ -244,7 +244,7 @@ export default async function freightHandler(req, res) {
 
     if (action === "cancel_cargo") {
       const cargoId = body.cargoId;
-      const actorId = body.actorId || null;
+      const actorId = (await getAuthedUserId(req, sb)) || body.actorId || null;
       if (!cargoId) return json(res, 400, { error: "cargoId required" });
       const { data, error } = await sb.from("cargo_orders").update({ status: "cancelled" }).eq("id", cargoId).select("*").single();
       if (error) throw error;
@@ -323,7 +323,7 @@ export default async function freightHandler(req, res) {
     if (action === "accept_offer") {
       const cargoId = body.cargoId;
       const offerId = body.offerId;
-      const ownerId = body.ownerId || null;
+      const ownerId = (await getAuthedUserId(req, sb)) || body.ownerId || null;
       if (!cargoId || !offerId) return json(res, 400, { error: "cargoId & offerId required" });
 
       const { data: accepted, error: ae } = await sb
@@ -346,7 +346,7 @@ export default async function freightHandler(req, res) {
         .single();
       if (ce) throw ce;
 
-      await insertStatusEvent(sb, { cargoId, status: "driver_selected", actorId: ownerId, note: "offer accepted" });
+      await insertStatusEvent(sb, { cargoId, status: "driver_selected", actorId: clientId, note: "offer accepted" });
       return json(res, 200, { ok: true, cargo, offer: accepted });
     }
 
@@ -354,7 +354,7 @@ export default async function freightHandler(req, res) {
     // Vehicle (Driver)
     // =====================
     if (action === "upsert_vehicle") {
-      const driverId = body.driverId;
+      const driverId = (await getAuthedUserId(req, sb)) || body.driverId;
       if (!driverId) return json(res, 400, { error: "driverId required" });
 
       const row = {
@@ -449,7 +449,7 @@ export default async function freightHandler(req, res) {
     if (action === "quick_offer") {
       const cargoId = body.cargoId;
       const vehicleId = body.vehicleId;
-      const driverId = body.driverId;
+      const driverId = (await getAuthedUserId(req, sb)) || body.driverId;
       const etaMinutes = body.etaMinutes ?? 20;
       const note = body.note || "Tez taklif";
       if (!cargoId || !vehicleId || !driverId) return json(res, 400, { error: "cargoId, vehicleId, driverId required" });
@@ -515,7 +515,7 @@ export default async function freightHandler(req, res) {
     if (action === "create_offer") {
       const cargoId = body.cargoId;
       const vehicleId = body.vehicleId;
-      const driverId = body.driverId;
+      const driverId = (await getAuthedUserId(req, sb)) || body.driverId;
       const price = Number(body.price);
       if (!cargoId || !vehicleId || !driverId) return json(res, 400, { error: "cargoId, vehicleId, driverId required" });
       if (!Number.isFinite(price) || price <= 0) return json(res, 400, { error: "price must be > 0" });
@@ -543,7 +543,7 @@ export default async function freightHandler(req, res) {
     if (action === "driver_update_status") {
       const cargoId = body.cargoId;
       const status = String(body.status || "");
-      const actorId = body.actorId || null;
+      const actorId = (await getAuthedUserId(req, sb)) || body.actorId || null;
       const allowed = new Set(["loading", "in_transit", "delivered", "closed"]);
       if (!cargoId || !allowed.has(status)) return json(res, 400, { error: "cargoId + valid status required" });
       const { data, error } = await sb.from("cargo_orders").update({ status }).eq("id", cargoId).select("*").single();

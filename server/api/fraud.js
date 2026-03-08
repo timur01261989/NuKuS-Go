@@ -58,7 +58,7 @@ export default async function handler(req, res) {
     }
 
     if (action === "fingerprint") {
-      const user_id = (await getAuthedUserId(req, sb)) || body.user_id;
+      const user_id = await getAuthedUserId(req, sb);
       const device_hash = String(body.device_hash || "").trim();
       if (!user_id || !device_hash) return badRequest(res, "user_id va device_hash kerak");
 

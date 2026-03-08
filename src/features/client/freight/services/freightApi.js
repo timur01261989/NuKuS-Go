@@ -23,8 +23,8 @@ export async function listOffers({ cargoId }) {
   return freightApi.listOffers({ cargoId });
 }
 
-export async function acceptOffer({ cargoId, offerId, ownerId }) {
-  return freightApi.acceptOffer({ cargoId, offerId, ownerId });
+export async function acceptOffer({ cargoId, offerId }) {
+  return freightApi.acceptOffer({ cargoId, offerId });
 }
 
 export async function nominatimReverse(lat, lng, signal) {

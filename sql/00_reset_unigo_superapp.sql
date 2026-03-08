@@ -33,7 +33,6 @@ DROP TABLE IF EXISTS public.auto_market_ads CASCADE;
 DROP TABLE IF EXISTS public.profiles CASCADE;
 
 -- Optional old objects from previous builds
-DROP TABLE IF EXISTS public.auto_ads CASCADE;
 DROP TABLE IF EXISTS public.auto_ad_images CASCADE;
 DROP TABLE IF EXISTS public.auto_favorites CASCADE;
 DROP TABLE IF EXISTS public.auto_price_history CASCADE;

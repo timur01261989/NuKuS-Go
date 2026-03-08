@@ -19,7 +19,7 @@ export default async function handler(req, res) {
       const authedUserId = await getAuthedUserId(req, sb);
       const explicitDriverId = String(body.driver_id || '').trim();
       const driver_id = String(authedUserId || explicitDriverId || '').trim();
-      if (!driver_id) return badRequest(res, 'driver_id required');
+      if (!driver_id) return badRequest(res, 'Auth driver kerak');
       if (authedUserId && explicitDriverId && authedUserId !== explicitDriverId) return badRequest(res, 'driver_id token user_id bilan mos emas');
 
       const lat = body.lat === undefined ? null : Number(body.lat);

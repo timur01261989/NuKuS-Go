@@ -136,7 +136,6 @@ function Inner() {
     const hide = message.loading(cp("Yuk joylanmoqda..."), 0);
     try {
       const payload = {
-        ownerId: user.id,
         pickup,
         dropoff,
         cargoName,
@@ -201,7 +200,7 @@ function Inner() {
       if (!cargoId || !offerId) return;
       const hide = message.loading("Taklif qabul qilinmoqda...", 0);
       try {
-        await acceptOffer({ cargoId, offerId, ownerId: user?.id || null });
+        await acceptOffer({ cargoId, offerId });
         message.success(cp("Haydovchi tanlandi ✅"));
         await refresh({ silent: true });
       } catch (e) {
