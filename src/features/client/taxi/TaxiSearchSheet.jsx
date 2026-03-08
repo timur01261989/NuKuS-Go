@@ -14,7 +14,7 @@ import { nominatimReverse as _nominatimReverse } from "../shared/geo/nominatim";
 
 /**
  * TaxiSearchSheet
- * - "Qaerga borasiz?" qidiruv oynasi (bottom Drawer)
+ * - "{cp("Qaerga borasiz?")}" qidiruv oynasi (bottom Drawer)
  * - Pickup va Destination maydonlari
  * - Nominatim natijalari + saved places
  *
@@ -44,6 +44,7 @@ export default function TaxiSearchSheet({
   openPickupMapEdit,
   openDestMapSelect,
 }) {
+  const { cp } = useClientText();
   const [activeField, setActiveField] = useState("dest"); // 'pickup' | 'dest'
 
   const listData = useMemo(() => {
@@ -81,7 +82,7 @@ export default function TaxiSearchSheet({
               setStep?.("main");
             }}
           />
-          <div style={{ fontWeight: 800 }}>Qaerga borasiz?</div>
+          <div style={{ fontWeight: 800 }}>{cp("Qaerga borasiz?")}</div>
           <Button type="text" icon={<CloseOutlined />} onClick={() => setSearchOpen?.(false)} />
         </div>
 
@@ -92,12 +93,12 @@ export default function TaxiSearchSheet({
               <EnvironmentOutlined />
             </div>
             <div style={{ flex: 1 }}>
-              <div className="yg-search-cap">Yo‘lovchini olish nuqtasi</div>
+              <div className="yg-search-cap">{cp("Yo‘lovchini olish nuqtasi")}</div>
               <Input
                 value={pickupSearchText}
                 onChange={(e) => setPickupSearchText?.(e.target.value)}
                 onFocus={() => setActiveField("pickup")}
-                placeholder={pickupAddress || "Manzil kiriting..."}
+                placeholder={pickupAddress || cp("Manzil kiriting...")}
                 bordered={false}
               />
             </div>
@@ -109,7 +110,7 @@ export default function TaxiSearchSheet({
                 openPickupMapEdit?.();
               }}
             >
-              Xarita
+              {cp("Xarita")}
             </Button>
           </div>
 
@@ -119,12 +120,12 @@ export default function TaxiSearchSheet({
               <FlagOutlined />
             </div>
             <div style={{ flex: 1 }}>
-              <div className="yg-search-cap">Yakuniy manzil</div>
+              <div className="yg-search-cap">{cp("Yakuniy manzil")}</div>
               <Input
                 value={destSearchText}
                 onChange={(e) => setDestSearchText?.(e.target.value)}
                 onFocus={() => setActiveField("dest")}
-                placeholder="Qaerga borasiz?"
+                placeholder="{cp("Qaerga borasiz?")}"
                 bordered={false}
               />
             </div>
@@ -136,16 +137,16 @@ export default function TaxiSearchSheet({
                 openDestMapSelect?.();
               }}
             >
-              Xarita
+              {cp("Xarita")}
             </Button>
           </div>
 
           <div style={{ padding: "0 18px 10px", display: "flex", gap: 8 }}>
             <Tag color={activeField === "pickup" ? "blue" : "default"} style={{ margin: 0 }}>
-              Pickup
+              {cp("Pickup")}
             </Tag>
             <Tag color={activeField === "dest" ? "green" : "default"} style={{ margin: 0 }}>
-              Destination
+              {cp("Destination")}
             </Tag>
             {searchLoading && <Spin size="small" style={{ marginLeft: "auto" }} />}
           </div>
@@ -156,7 +157,7 @@ export default function TaxiSearchSheet({
         {/* Saved places */}
         {listData.saved.length > 0 && (
           <>
-            <Typography.Text strong>Mening manzillarim</Typography.Text>
+            <Typography.Text strong>{cp("Mening manzillarim")}</Typography.Text>
             <List
               style={{ marginTop: 8, marginBottom: 14 }}
               dataSource={listData.saved}
@@ -177,7 +178,7 @@ export default function TaxiSearchSheet({
                     title={
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <StarFilled style={{ color: "#faad14" }} />
-                        <span style={{ fontWeight: 700 }}>{p.name || "Manzil"}</span>
+                        <span style={{ fontWeight: 700 }}>{p.name || cp("Manzil")}</span>
                       </div>
                     }
                     description={<div style={{ opacity: 0.85 }}>{p.label}</div>}
@@ -190,7 +191,7 @@ export default function TaxiSearchSheet({
 
         {/* Search results */}
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Typography.Text strong>Natijalar</Typography.Text>
+          <Typography.Text strong>{cp("Natijalar")}</Typography.Text>
           {searchLoading && <Spin size="small" />}
         </div>
 
@@ -201,7 +202,7 @@ export default function TaxiSearchSheet({
             <List.Item className="yg-list-item" onClick={() => handlePick(item)}>
               <List.Item.Meta
                 title={<div style={{ fontWeight: 700 }}>{item.label}</div>}
-                description={<div style={{ opacity: 0.75 }}>{activeField === "pickup" ? "Pickup" : "Destination"}</div>}
+                description={<div style={{ opacity: 0.75 }}>{activeField === "pickup" ? cp("Pickup") : cp("Destination")}</div>}
               />
             </List.Item>
           )}

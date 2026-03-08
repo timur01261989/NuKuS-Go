@@ -156,6 +156,7 @@ function LocateMeButton({ mapRef, userLoc, bottom = 240, onRequestLocate }) {
 
 /** --- main component --- */
 export default function ClientTaxiPage() {
+  const { cp } = useClientText();
   const navigate = useNavigate();
   const mapRef = useRef(null);
   const tariffSectionRef = useRef(null);
@@ -504,7 +505,7 @@ export default function ClientTaxiPage() {
         <div className="yg-field-value">{dest.address || cp("Qaerga borasiz?")}</div>
       </div>
       <Button size="small" className="yg-chip" onClick={openDestinationSearch}>
-        {dest.address ? cp("O'zgartirish") : "Qidirish"}
+        {dest.address ? cp("O'zgartirish") : cp("Qidirish")}
       </Button>
     </div>
   );

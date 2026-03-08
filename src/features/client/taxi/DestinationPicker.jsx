@@ -19,12 +19,13 @@ export default function DestinationPicker({
   message,
   onConfirm,
 }) {
+  const { cp } = useClientText();
   return (
     <div className={"yg-sheet " + (showSheet ? "" : "hidden")}>
       <div className="yg-dest-mini">
         <div className="yg-dest-mini-left">
-          <div className="yg-field-label">Yakuniy nuqta</div>
-          <div className="yg-field-value">{dest?.address || "Manzil aniqlanmoqda..."}</div>
+          <div className="yg-field-label">{cp("Yakuniy nuqta")}</div>
+          <div className="yg-field-value">{dest?.address || cp("Manzil aniqlanmoqda...")}</div>
         </div>
 
         <div className="yg-dest-mini-right">
@@ -37,14 +38,14 @@ export default function DestinationPicker({
               if (pickup?.latlng && dest?.latlng) {
                 const d = haversineKm(pickup.latlng, dest.latlng);
                 if (d > MAX_KM) {
-                  message?.error?.(`Masofa belgilangan me'yoridan ortiq (${MAX_KM} km)`);
+                  message?.error?.(`${cp("Masofa belgilangan me'yoridan ortiq")} (${MAX_KM} km)`);
                   return;
                 }
               }
               onConfirm?.();
             }}
           >
-            Tayyor
+            {cp("Tayyor")}
           </Button>
         </div>
       </div>
