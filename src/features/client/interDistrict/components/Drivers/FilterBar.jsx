@@ -1,7 +1,7 @@
 import React from "react";
 import { Checkbox, Space, Typography, Card } from "antd";
 import { useDistrict } from "../../context/DistrictContext";
-import { useClientText } from "../../shared/i18n_clientLocalize";
+import { useClientText } from "../../../shared/i18n_clientLocalize";
 
 /**
  * FilterBar.jsx
