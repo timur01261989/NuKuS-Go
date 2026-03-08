@@ -111,11 +111,11 @@ async function settleWalletOnComplete(sb, order, actor) {
 
   if (!use_wallet) return { ok: false, skipped: true, reason: 'order not marked as wallet payment' };
 
-  const passenger_id = order?.passenger_id;
+  const client_id = order?.client_id;
   const driver_id = order?.driver_id;
   const price = Number(order?.price || 0);
 
-  if (!passenger_id || !driver_id || !(price > 0)) {
+  if (!client_id || !driver_id || !(price > 0)) {
     return { ok: false, skipped: true, reason: 'missing passenger/driver/price' };
   }
 
@@ -124,8 +124,8 @@ async function settleWalletOnComplete(sb, order, actor) {
   const meta = { order_id: order.id, actor: actor || null, type: 'ride_settlement' };
 
   try {
-    await walletTx(sb, { user_id: passenger_id, amount_uzs: price, kind: 'spend', description: 'Ride payment', order_id: order.id, meta });
-    await updateWalletBalance(sb, passenger_id, -price);
+    await walletTx(sb, { user_id: client_id, amount_uzs: price, kind: 'spend', description: 'Ride payment', order_id: order.id, meta });
+    await updateWalletBalance(sb, client_id, -price);
 
     await walletTx(sb, { user_id: driver_id, amount_uzs: price, kind: 'bonus', description: 'Ride earning', order_id: order.id, meta });
     await updateWalletBalance(sb, driver_id, +price);
@@ -148,8 +148,8 @@ async function applyCancelPenalty(sb, order, body) {
 
   if (!requestPenalty && !late) return { ok: false, skipped: true, reason: 'not late cancel' };
 
-  const passenger_id = order?.passenger_id;
-  if (!passenger_id) return { ok: false, skipped: true, reason: 'missing passenger_id' };
+  const client_id = order?.client_id;
+  if (!client_id) return { ok: false, skipped: true, reason: 'missing client_id' };
 
   // Default penalty. Can be made configurable later.
   const penalty_uzs = Number(body.penalty_uzs || 5000);
@@ -158,8 +158,8 @@ async function applyCancelPenalty(sb, order, body) {
   const meta = { order_id: order.id, type: 'cancel_penalty', reason: body.reason || null };
 
   try {
-    await walletTx(sb, { user_id: passenger_id, amount_uzs: penalty_uzs, kind: 'spend', description: 'Cancel penalty', order_id: order.id, meta });
-    await updateWalletBalance(sb, passenger_id, -penalty_uzs);
+    await walletTx(sb, { user_id: client_id, amount_uzs: penalty_uzs, kind: 'spend', description: 'Cancel penalty', order_id: order.id, meta });
+    await updateWalletBalance(sb, client_id, -penalty_uzs);
     return { ok: true, penalty_applied: true, penalty_uzs };
   } catch (e) {
     return { ok: false, error: e };

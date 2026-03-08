@@ -191,7 +191,7 @@ async function handleOrderPhones(req, res, sb) {
       })
     }
 
-    const ord = await sb.from('orders').select('id, passenger_id, driver_id, status').eq('id', order_id).maybeSingle()
+    const ord = await sb.from('orders').select('id, client_id, driver_id, status').eq('id', order_id).maybeSingle()
     if (ord.error) {
       return safeJson(res, 500, { code: 500, message: ord.error.message })
     }
@@ -201,10 +201,10 @@ async function handleOrderPhones(req, res, sb) {
     }
 
     const rid = String(requester_id)
-    const passenger_id = order.passenger_id ? String(order.passenger_id) : ''
+    const client_id = order.client_id ? String(order.client_id) : ''
     const driver_id = order.driver_id ? String(order.driver_id) : ''
 
-    const requesterIsPassenger = passenger_id && rid === passenger_id
+    const requesterIsPassenger = client_id && rid === client_id
     const requesterIsDriver = driver_id && rid === driver_id
     if (!requesterIsPassenger && !requesterIsDriver) {
       return safeJson(res, 403, {
@@ -214,12 +214,12 @@ async function handleOrderPhones(req, res, sb) {
       })
     }
 
-    const otherId = requesterIsDriver ? passenger_id : driver_id
+    const otherId = requesterIsDriver ? client_id : driver_id
     if (!otherId) {
       return safeJson(res, 409, {
         code: 409,
         message: 'Other party not assigned yet',
-        details: requesterIsDriver ? 'passenger_id missing' : 'driver_id missing'
+        details: requesterIsDriver ? 'client_id missing' : 'driver_id missing'
       })
     }
 
@@ -337,10 +337,10 @@ export default async function handler(req, res) {
     const body = await readBody(req)
 
     // Map fields from your client (keep both old/new names)
-    const from_location = body.from_location ?? body.from ?? body.fromLocation ?? body.from_address ?? null
-    const to_location = body.to_location ?? body.to ?? body.toLocation ?? body.to_address ?? null
-    const passenger_id = body.passenger_id ?? body.user_id ?? body.passengerId ?? null
-    const clientPrice = Number(body.price ?? body.fare ?? 0) || 0
+    const from_location = body.from_location ?? body.pickup ?? body.from ?? body.fromLocation ?? body.from_address ?? null
+    const to_location = body.to_location ?? body.dropoff ?? body.to ?? body.toLocation ?? body.to_address ?? null
+    const client_id = body.client_id ?? body.user_id ?? body.passengerId ?? null
+    const clientPrice = Number(body.price_uzs ?? body.price ?? body.fare ?? 0) || 0
     const service_type = body.service_type ?? body.serviceType ?? body.service ?? 'taxi'
     const tariff_id = body.tariff_id ?? body.tariffId ?? null
     const distance_km = Number(body.distance_km ?? body.distanceKm ?? 0) || 0
@@ -648,16 +648,19 @@ async function dispatchOrderToDriversSmart(orderRow) {
     }
 
     const insertPayload = {
-      passenger_id,
-      from_location,
-      to_location,
-      price: finalPrice,
-      status: body.status ?? 'pending',
+      client_id,
+      pickup: from_location,
+      dropoff: to_location,
+      price_uzs: finalPrice,
+      status: body.status ?? 'searching',
       service_type,
-      // Optional (safe) extra fields. If DB isn't migrated yet, we'll retry without these.
-      distance_km,
-      duration_min,
-      // created_at: let DB default handle it if column has default now()
+      route_meta: { distance_km, duration_min },
+      cargo_title: body.cargo_title ?? body.cargo_name ?? null,
+      cargo_weight_kg: body.cargo_weight_kg ?? body.weight_kg ?? null,
+      cargo_volume_m3: body.cargo_volume_m3 ?? body.volume_m3 ?? null,
+      passenger_count: body.passenger_count ?? body.seat_count ?? 1,
+      payment_method: body.payment_method ?? 'cash',
+      note: body.note ?? null,
     }
 
     let data = null;
@@ -679,8 +682,12 @@ async function dispatchOrderToDriversSmart(orderRow) {
 
       // Remove columns that may not exist yet (safe progressive fallback)
       if (msg.includes('service_type')) delete fallbackPayload.service_type;
-      if (msg.includes('distance_km') || msg.includes('distance km')) delete fallbackPayload.distance_km;
-      if (msg.includes('duration_min') || msg.includes('duration min')) delete fallbackPayload.duration_min;
+      if (msg.includes('route_meta')) delete fallbackPayload.route_meta;
+      if (msg.includes('cargo_weight_kg')) delete fallbackPayload.cargo_weight_kg;
+      if (msg.includes('cargo_volume_m3')) delete fallbackPayload.cargo_volume_m3;
+      if (msg.includes('passenger_count')) delete fallbackPayload.passenger_count;
+      if (msg.includes('payment_method')) delete fallbackPayload.payment_method;
+      if (msg.includes('note')) delete fallbackPayload.note;
 
       // Retry once with reduced payload
       ins = await supabase
@@ -700,7 +707,7 @@ async function dispatchOrderToDriversSmart(orderRow) {
       from_status: null,
       to_status: data?.status ?? insertPayload.status ?? 'pending',
       actor_role: 'client',
-      actor_id: passenger_id,
+      actor_id: client_id,
     });
 
     if (error) {

@@ -33,7 +33,7 @@ async function getAuthUserId() {
 
 function normalizeAdRow(row) {
   if (!row) return row;
-  const images = (row.images || []).map((x) => x.url).filter(Boolean);
+  const images = (row.images || []).map((x) => x.url || x.image_url).filter(Boolean);
   return {
     ...row,
     images,
@@ -148,9 +148,9 @@ export async function listCars(filters = {}, { page = 1, pageSize = 12 } = {}) {
     const to = from + pageSize - 1;
 
     let q = supabase
-      .from("auto_ads")
-      .select("*, images:auto_ad_images(url, sort_order)", { count: "exact" })
-      .in("status", ["active", "pending"])
+      .from("auto_market_ads")
+      .select("*, images:auto_market_images(image_url, sort_order)", { count: "exact" })
+      .in("status", ["active", "pending_review", "pending_payment"])
       .order("is_top", { ascending: false })
       .order("created_at", { ascending: false })
       .range(from, to);
@@ -167,17 +167,17 @@ export async function listCars(filters = {}, { page = 1, pageSize = 12 } = {}) {
     if (filters.model) q = q.eq("model", filters.model);
     if (filters.yearFrom) q = q.gte("year", Number(filters.yearFrom));
     if (filters.yearTo) q = q.lte("year", Number(filters.yearTo));
-    if (filters.minPrice) q = q.gte("price", Number(filters.minPrice));
-    if (filters.maxPrice) q = q.lte("price", Number(filters.maxPrice));
-    if (filters.kredit) q = q.eq("kredit", true);
-    if (filters.exchange) q = q.eq("exchange", true);
+    if (filters.minPrice) q = q.gte("price_uzs", Number(filters.minPrice));
+    if (filters.maxPrice) q = q.lte("price_uzs", Number(filters.maxPrice));
+    if (filters.kredit) q = q.eq("is_credit", true);
+    if (filters.exchange) q = q.eq("is_exchange", true);
 
     switch (filters.sort) {
       case "cheap":
-        q = q.order("price", { ascending: true });
+        q = q.order("price_uzs", { ascending: true });
         break;
       case "expensive":
-        q = q.order("price", { ascending: false });
+        q = q.order("price_uzs", { ascending: false });
         break;
       case "year_new":
         q = q.order("year", { ascending: false });
@@ -204,8 +204,8 @@ export async function getCarById(id) {
     await supabase.rpc("auto_market_inc_view", { p_ad_id: id }).catch(() => {});
 
     const { data, error } = await supabase
-      .from("auto_ads")
-      .select("*, images:auto_ad_images(url, sort_order)")
+      .from("auto_market_ads")
+      .select("*, images:auto_market_images(image_url, sort_order)")
       .eq("id", id)
       .maybeSingle();
 
@@ -213,7 +213,7 @@ export async function getCarById(id) {
     if (!data) throw new Error("E'lon topilmadi");
 
     const row = normalizeAdRow(data);
-    const is_owner = uid && String(row.user_id) === String(uid);
+    const is_owner = uid && String(row.owner_user_id || row.user_id) === String(uid);
     return {
       ...row,
       is_owner,
@@ -258,9 +258,9 @@ export async function createCarAd(draft) {
     const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
     const { count: dailyCount } = await supabase
-      .from("auto_ads")
+      .from("auto_market_ads")
       .select("id", { count: "exact", head: true })
-      .eq("user_id", uid)
+      .eq("owner_user_id", uid)
       .gte("created_at", dayAgo);
 
     if ((dailyCount || 0) >= 10) throw new Error("Bir kunda 10 tadan ko'p e'lon joylab bo'lmaydi");
@@ -270,7 +270,7 @@ export async function createCarAd(draft) {
     const title = (draft?.title || "").trim();
     if (phone && (vin || title)) {
       let dupQ = supabase
-        .from("auto_ads")
+        .from("auto_market_ads")
         .select("id", { count: "exact", head: true })
         .eq("seller_phone", phone);
       if (vin) dupQ = dupQ.eq("vin", vin);
@@ -280,14 +280,14 @@ export async function createCarAd(draft) {
     }
 
     const payload = {
-      user_id: uid,
+      owner_user_id: uid,
       title: title || `${draft.brand || ""} ${draft.model || ""}`.trim(),
       brand: draft.brand || null,
       model: draft.model || null,
       year: draft.year ? Number(draft.year) : null,
-      mileage: draft.mileage !== undefined ? Number(draft.mileage) : null,
-      price: draft.price ? Number(draft.price) : null,
-      currency: draft.currency || "UZS",
+      mileage_km: draft.mileage !== undefined ? Number(draft.mileage) : null,
+      price_uzs: draft.price ? Number(draft.price) : null,
+      currency_code: draft.currency || "UZS",
       city: draft.city || null,
       location: draft.location || null,
       fuel_type: draft.fuel_type || null,
@@ -298,12 +298,12 @@ export async function createCarAd(draft) {
       engine: draft.engine || null,
       description: draft.description || null,
       vin: vin || null,
-      kredit: !!draft.kredit,
-      exchange: !!draft.exchange,
+      is_credit: !!draft.kredit,
+      is_exchange: !!draft.exchange,
       comfort: draft.comfort || null,
       status: "pending",
       is_top: !!draft.is_top,
-      views: 0,
+      views_count: 0,
       seller_name: draft?.seller?.name || draft?.seller_name || null,
       seller_phone: phone || null,
       seller_rating: draft?.seller?.rating || draft?.seller_rating || null,
@@ -312,7 +312,7 @@ export async function createCarAd(draft) {
     };
 
     const { data: inserted, error } = await supabase
-      .from("auto_ads")
+      .from("auto_market_ads")
       .insert(payload)
       .select("*")
       .single();
@@ -324,17 +324,17 @@ export async function createCarAd(draft) {
       .filter(Boolean);
 
     if (images.length) {
-      const rows = images.map((url, idx) => ({ ad_id: inserted.id, url, sort_order: idx }));
-      await supabase.from("auto_ad_images").insert(rows);
+      const rows = images.map((url, idx) => ({ ad_id: inserted.id, image_url: url, sort_order: idx }));
+      await supabase.from("auto_market_images").insert(rows);
     }
 
-    if (payload.price) {
+    if (payload.price_uzs) {
       await supabase
         .from("auto_price_history")
-        .insert({ ad_id: inserted.id, at: now, price: payload.price, currency: payload.currency });
+        .insert({ ad_id: inserted.id, at: now, price: payload.price_uzs, currency: payload.currency_code });
     }
 
-    return normalizeAdRow({ ...inserted, images: images.map((url, idx) => ({ url, sort_order: idx })) });
+    return normalizeAdRow({ ...inserted, images: images.map((url, idx) => ({ image_url: url, sort_order: idx })) });
   } catch (e) {
     if (isMissingRelationError(e)) return mock.createCarAd(draft);
     throw new Error(e?.message || "Auto Market: createCarAd xatosi");
@@ -348,9 +348,9 @@ export async function myAds() {
 
   try {
     const { data, error } = await supabase
-      .from("auto_ads")
-      .select("*, images:auto_ad_images(url, sort_order)")
-      .eq("user_id", uid)
+      .from("auto_market_ads")
+      .select("*, images:auto_market_images(image_url, sort_order)")
+      .eq("owner_user_id", uid)
       .order("created_at", { ascending: false });
 
     if (error) throw error;
@@ -366,7 +366,7 @@ export async function markAdStatus(id, status) {
 
   try {
     const { data, error } = await supabase
-      .from("auto_ads")
+      .from("auto_market_ads")
       .update({ status, updated_at: new Date().toISOString() })
       .eq("id", id)
       .select("*")
@@ -409,7 +409,7 @@ export async function getFavorites() {
 
   try {
     const { data, error } = await supabase
-      .from("auto_favorites")
+      .from("auto_market_favorites")
       .select("ad_id")
       .eq("user_id", uid);
 
@@ -428,7 +428,7 @@ export async function toggleFavorite(adId) {
 
   try {
     const { data: existing, error: exErr } = await supabase
-      .from("auto_favorites")
+      .from("auto_market_favorites")
       .select("id")
       .eq("user_id", uid)
       .eq("ad_id", adId)
@@ -437,10 +437,10 @@ export async function toggleFavorite(adId) {
     if (exErr) throw exErr;
 
     if (existing?.id) {
-      const { error } = await supabase.from("auto_favorites").delete().eq("id", existing.id);
+      const { error } = await supabase.from("auto_market_favorites").delete().eq("id", existing.id);
       if (error) throw error;
     } else {
-      const { error } = await supabase.from("auto_favorites").insert({ user_id: uid, ad_id: adId });
+      const { error } = await supabase.from("auto_market_favorites").insert({ user_id: uid, ad_id: adId });
       if (error) throw error;
     }
 
@@ -458,7 +458,7 @@ export async function listFavoriteCars(filters = {}) {
 
   try {
     const { data: favs, error: fErr } = await supabase
-      .from("auto_favorites")
+      .from("auto_market_favorites")
       .select("ad_id")
       .eq("user_id", uid);
 
@@ -467,8 +467,8 @@ export async function listFavoriteCars(filters = {}) {
     if (!ids.length) return [];
 
     let q = supabase
-      .from("auto_ads")
-      .select("*, images:auto_ad_images(url, sort_order)")
+      .from("auto_market_ads")
+      .select("*, images:auto_market_images(image_url, sort_order)")
       .in("id", ids)
       .order("created_at", { ascending: false });
 
@@ -520,7 +520,7 @@ export async function addToGaraj(ad) {
     const { error } = await supabase
       .from("auto_garaj")
       .insert({
-        user_id: uid,
+        owner_user_id: uid,
         ad_id: ad.id,
         brand: ad.brand,
         model: ad.model,
@@ -617,7 +617,7 @@ export async function createServiceBook(data) {
     const now = new Date().toISOString();
     const { data: book, error } = await supabase
       .from("auto_service_books")
-      .insert({ user_id: uid, ...data, created_at: now, updated_at: now })
+      .insert({ owner_user_id: uid, ...data, created_at: now, updated_at: now })
       .select("*")
       .single();
 

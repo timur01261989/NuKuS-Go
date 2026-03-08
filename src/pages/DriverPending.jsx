@@ -1,82 +1,115 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Button, Card, Result, Spin, Typography } from "antd";
 import { supabase } from "@/lib/supabase";
-import { useSessionProfile } from "@/shared/auth/useSessionProfile";
 import { useAppMode } from "@/providers/AppModeProvider";
-import { usePageI18n } from "./pageI18n";
+
+const { Paragraph } = Typography;
 
 export default function DriverPending() {
   const navigate = useNavigate();
   const { setAppMode } = useAppMode();
-  const { tx } = usePageI18n();
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("pending");
-  const [message, setMessage] = useState("");
-  const [checking, setChecking] = useState(false);
-  const { loading: authLoading } = useSessionProfile({ includeDriver: true, includeApplication: true });
+  const [reason, setReason] = useState("");
 
-  const fetchDriverStatus = async () => {
-    if (checking) return;
-    setChecking(true);
+  const refresh = useCallback(async () => {
+    setLoading(true);
     try {
-      setMessage("");
-      const { data: authData, error: authError } = await supabase.auth.getUser();
-      const authUser = authData?.user;
-      if (authError || !authUser) {
-        setLoading(false);
-        setChecking(false);
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData?.user;
+      if (!user?.id) {
+        navigate("/login", { replace: true });
         return;
       }
-      const { data: driverData, error: driverError } = await supabase.from("drivers").select("*").eq("user_id", authUser.id).maybeSingle();
-      if (driverError) {
-        setStatus("none");
-        setMessage(tx("technicalLoadError", "Ma'lumotlarni yuklashda texnik xatolik yuz berdi."));
-      } else if (!driverData) {
-        setStatus("none");
-        setMessage(tx("driverNotRegistered", "Siz hali haydovchi sifatida ro'yxatdan o'tmagansiz."));
-      } else if (driverData.status === "approved" || driverData.is_approved === true) {
+
+      const { data: app } = await supabase
+        .from("driver_applications")
+        .select("status,rejection_reason,updated_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const { data: driver } = await supabase
+        .from("drivers")
+        .select("is_verified")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (driver?.is_verified || String(app?.status || "").toLowerCase() === "approved") {
         setStatus("approved");
-      } else if (driverData.status === "rejected") {
-        setStatus("rejected");
-        setMessage(driverData.rejection_reason || tx("applicationRejectedDefault", "Arizangiz talablarga javob bermagani uchun rad etilgan."));
+      } else if (!app) {
+        setStatus("none");
       } else {
-        setStatus("pending");
+        setStatus(String(app.status || "pending").toLowerCase());
+        setReason(app.rejection_reason || "");
       }
-    } catch (e) {
-      console.error("Unexpected driver pending error", e);
-      setStatus("none");
-      setMessage(tx("unexpectedError", "Tizimda kutilmagan xatolik yuz berdi. Iltimos, keyinroq urinib ko'ring."));
     } finally {
       setLoading(false);
-      setChecking(false);
     }
-  };
+  }, [navigate]);
 
-  useEffect(() => { fetchDriverStatus(); }, []);
+  useEffect(() => { refresh(); }, [refresh]);
 
-  const handleReturnToClient = () => { if (setAppMode) setAppMode("client"); navigate("/"); };
-  const handleRegister = () => navigate("/driver/register");
-  const handleGoToDashboard = () => { if (setAppMode) setAppMode("driver"); navigate("/driver/dashboard"); };
+  if (loading) {
+    return <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}><Spin size="large" /></div>;
+  }
 
-  if (loading || authLoading) {
+  if (status === "approved") {
     return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", flexDirection: "column", gap: "15px", background: "#f7f9fc" }}>
-        <div className="spinner-ui" style={{ width: "50px", height: "50px", border: "6px solid #e0e0e0", borderTop: "6px solid #1677ff", borderRadius: "50%", animation: "spin-animation 1s linear infinite" }} />
-        <p style={{ color: "#8c8c8c", fontSize: "16px", fontWeight: "500" }}>{tx("loadingData", "Ma'lumotlar tekshirilmoqda...")}</p>
-        <style>{`@keyframes spin-animation {0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); }}`}</style>
-      </div>
+      <Card style={{ maxWidth: 620, margin: "40px auto", borderRadius: 20 }}>
+        <Result
+          status="success"
+          title="Arizangiz tasdiqlandi"
+          subTitle="Driver profili aktiv. Endi dashboard ga o'tib online bo'lishingiz mumkin."
+          extra={<Button type="primary" onClick={() => { setAppMode("driver"); navigate("/driver/dashboard", { replace: true }); }}>Dashboard ga o'tish</Button>}
+        />
+      </Card>
+    );
+  }
+
+  if (status === "rejected" || status === "revoked") {
+    return (
+      <Card style={{ maxWidth: 620, margin: "40px auto", borderRadius: 20 }}>
+        <Result
+          status="error"
+          title="Ariza rad etildi"
+          subTitle="Ma'lumotlarni qayta tahrirlab yana yuborishingiz mumkin."
+          extra={[
+            <Button key="edit" type="primary" onClick={() => navigate("/driver/register", { replace: true })}>Qayta topshirish</Button>,
+            <Button key="client" onClick={() => { setAppMode("client"); navigate("/client/home", { replace: true }); }}>Client rejimiga qaytish</Button>,
+          ]}
+        />
+        {reason ? <Paragraph><strong>Sabab:</strong> {reason}</Paragraph> : null}
+      </Card>
+    );
+  }
+
+  if (status === "none") {
+    return (
+      <Card style={{ maxWidth: 620, margin: "40px auto", borderRadius: 20 }}>
+        <Result
+          status="warning"
+          title="Driver arizasi topilmadi"
+          subTitle="Avval driver arizasini yuboring."
+          extra={<Button type="primary" onClick={() => navigate("/driver/register", { replace: true })}>Ro'yxatdan o'tish</Button>}
+        />
+      </Card>
     );
   }
 
   return (
-    <div style={{ padding: "24px", maxWidth: "480px", margin: "50px auto", fontFamily: "Inter, -apple-system, sans-serif" }}>
-      <div style={{ backgroundColor: "#ffffff", padding: "40px 32px", borderRadius: "20px", boxShadow: "0 10px 25px rgba(0,0,0,0.05)", textAlign: "center" }}>
-        {status === "pending" && <div><div style={{ fontSize: "70px", marginBottom: "24px" }}>⏳</div><h2 style={{ margin: "0 0 16px 0", color: "#1a1a1a", fontSize: "22px" }}>{tx("driverPendingTitle", "Arizangiz ko'rib chiqilmoqda")}</h2><p style={{ color: "#595959", lineHeight: "1.6", fontSize: "15px" }}>{tx("driverPendingText", "Siz yuborgan ma'lumotlar hozirda administratorlarimiz tomonidan tekshirilmoqda. Bu jarayon odatda 24 soat ichida yakunlanadi.")}</p><div style={{ marginTop: "32px" }}><button onClick={handleReturnToClient} style={{ width: "100%", padding: "14px", backgroundColor: "#1677ff", color: "#fff", border: "none", borderRadius: "12px", cursor: "pointer", fontWeight: "600", fontSize: "16px", transition: "all 0.2s" }}>{tx("switchToPassenger", "Yo'lovchi rejimiga o'tish")}</button><button onClick={fetchDriverStatus} disabled={checking} style={{ marginTop: "16px", display: "block", width: "100%", background: "none", border: "none", color: "#8c8c8c", textDecoration: "underline", cursor: checking ? "not-allowed" : "pointer", fontSize: "14px" }}>{checking ? tx("checking", "Tekshirilmoqda...") : tx("refreshStatus", "Holatni yangilash")}</button></div></div>}
-        {status === "approved" && <div><div style={{ fontSize: "70px", marginBottom: "24px" }}>✅</div><h2 style={{ margin: "0 0 16px 0", color: "#52c41a", fontSize: "24px" }}>{tx("congrats", "Tabriklaymiz!")}</h2><p style={{ color: "#595959", lineHeight: "1.6" }}>{tx("driverApprovedText", "Sizning haydovchilik arizangiz muvaffaqiyatli tasdiqlandi. Endi siz buyurtmalarni qabul qilishingiz mumkin.")}</p><button onClick={handleGoToDashboard} style={{ marginTop: "32px", width: "100%", padding: "16px", backgroundColor: "#52c41a", color: "#fff", border: "none", borderRadius: "12px", cursor: "pointer", fontWeight: "600", fontSize: "17px" }}>{tx("startWork", "Ishni boshlash")}</button></div>}
-        {status === "rejected" && <div><div style={{ fontSize: "70px", marginBottom: "24px" }}>❌</div><h2 style={{ margin: "0 0 16px 0", color: "#f5222d", fontSize: "22px" }}>{tx("driverRejectedTitle", "Arizangiz rad etildi")}</h2><div style={{ backgroundColor: "#fff1f0", padding: "16px", borderRadius: "12px", color: "#cf1322", marginBottom: "24px", border: "1px solid #ffa39e", textAlign: "left", fontSize: "14px" }}><strong>{tx("rejectReason", "Sabab")}:</strong> {message}</div><button onClick={handleRegister} style={{ width: "100%", padding: "14px", backgroundColor: "#fa8c16", color: "#fff", border: "none", borderRadius: "12px", cursor: "pointer", fontWeight: "600", marginBottom: "12px" }}>{tx("editInfo", "Ma'lumotlarni tahrirlash")}</button><button onClick={handleReturnToClient} style={{ width: "100%", padding: "14px", backgroundColor: "#f0f0f0", color: "#262626", border: "none", borderRadius: "12px", cursor: "pointer", fontWeight: "600" }}>{tx("continuePassenger", "Yo'lovchi sifatida davom etish")}</button></div>}
-        {status === "none" && <div><div style={{ fontSize: "70px", marginBottom: "24px" }}>⚠️</div><h2 style={{ margin: "0 0 16px 0", color: "#fa8c16", fontSize: "22px" }}>{tx("attention", "E'tibor bering")}</h2><p style={{ color: "#595959", lineHeight: "1.6", marginBottom: "24px" }}>{message}</p><button onClick={handleRegister} style={{ width: "100%", padding: "14px", backgroundColor: "#1677ff", color: "#fff", border: "none", borderRadius: "12px", cursor: "pointer", fontWeight: "600" }}>{tx("registerDriver", "Ro'yxatdan o'tish")}</button></div>}
-      </div>
-      <div style={{ textAlign: "center", marginTop: "20px", color: "#8c8c8c", fontSize: "12px" }}>{tx("systemStable", "Versiya 1.0.2 • Tizim barqaror ishlamoqda")}</div>
-    </div>
+    <Card style={{ maxWidth: 620, margin: "40px auto", borderRadius: 20 }}>
+      <Result
+        status="info"
+        title="Arizangiz tekshirilmoqda"
+        subTitle="Admin panel alohida web loyiha bo'ladi. Driver huquqlari faqat tasdiqlangandan keyin ochiladi."
+        extra={[
+          <Button key="refresh" type="primary" onClick={refresh}>Holatni yangilash</Button>,
+          <Button key="client" onClick={() => { setAppMode("client"); navigate("/client/home", { replace: true }); }}>Client rejimiga qaytish</Button>,
+        ]}
+      />
+    </Card>
   );
 }

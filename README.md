@@ -1,50 +1,44 @@
-# NUKUS TAXI (Web + Vercel + Supabase)
+# UniGo
 
-## What this is
-- Passenger web app + Driver web app
-- Vercel serverless API (Node) as the only backend
-- Supabase Postgres for data + auth
-- Designed to stay stable with 10,000+ online drivers by:
-  - strict ID model (single user id)
-  - fresh-driver filtering (TTL)
-  - DB-side nearest-driver selection (no huge JS sorting)
-  - offer queue (one active offer per order)
+Bu paket yangi **yagona ID** arxitekturaga moslashtirildi.
 
-## Single-ID rule (non‑negotiable)
-Supabase Auth creates the only identity:
-- `auth.users.id` is the ID for everyone.
-- Passenger ID = that user id.
-- Driver ID = that same user id (driver is just a role).
+## Asosiy qoida
+- `auth.users.id` hamma joy uchun bitta ID
+- `profiles.id`
+- `driver_applications.user_id`
+- `drivers.user_id`
+- `driver_presence.driver_id`
+- `wallets.user_id`
+- `orders.client_id` / `orders.driver_id`
+- `auto_market_ads.owner_user_id`
+- `auto_market_payments.user_id`
 
-Tables must follow:
-- `orders.passenger_id = auth.users.id`
-- `orders.driver_id = auth.users.id` (when assigned)
-- `driver_presence.driver_id = auth.users.id`
+## SQL ishga tushirish tartibi
+Faqat shu fayllar ishlatiladi:
+1. `sql/00_reset_unigo_superapp.sql`
+2. `sql/01_unigo_superapp_schema.sql`
+3. `sql/02_unigo_superapp_rls.sql`
 
-## Setup
-1) Install deps
-- `npm install`
+## Driver oqimi
+1. User ro'yxatdan o'tadi
+2. Driver ariza yuboradi (`driver_applications`)
+3. Admin web panel orqali approve/reject qiladi
+4. Approve bo'lgach `drivers` capability profili yaratiladi
+5. Presence va online holat faqat `driver_presence` orqali yuradi
 
-2) Configure environment
-- Copy `.env.example` to `.env`
-- Fill:
-  - `SUPABASE_URL`
-  - `SUPABASE_ANON_KEY`
-  - `SUPABASE_SERVICE_ROLE_KEY` (server only)
+## Transport turlari
+- `light_car`
+- `bus_gazel`
+- `truck`
 
-3) Apply database schema
-- Open Supabase Dashboard → SQL Editor
-- Run `supabase.sql` from this repo
+`light_car` barcha asosiy xizmatlarni ko'rishi mumkin, ammo freight dispatch faqat haydovchi limiti ichidagi kg uchun chiqadi.
 
-4) Run locally
-- `npm run dev`
+## Muhim o'zgarishlar
+- eski aralash SQL fayllar olib tashlandi
+- driver registration `drivers` ga pending row yaratmaydi
+- driver pending sahifasi `driver_applications` holatiga qaraydi
+- online/offline truth source `driver_presence`
+- auto market owner/payment ham bitta user ID bilan ishlaydi
 
-## Deploy (Vercel)
-- Import the repo
-- Add environment variables (same as `.env`)
-- Deploy
-
-## Health checks
-- Driver online should create/update a row in `driver_presence`
-- `driver_presence.updated_at` must keep updating (heartbeat)
-- Passenger order should get assigned to a driver via offers/dispatch
+## Eslatma
+Admin panel bu loyihaga aralashtirilmagan. U alohida web loyiha bo'ladi.

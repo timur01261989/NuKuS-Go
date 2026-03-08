@@ -219,12 +219,13 @@ async function payment_create(req, res) {
     const created_at = nowIso();
 
     const { error: ie } = await sb
-      .from('auto_payments')
+      .from('auto_market_payments')
       .insert([
         {
           id: payment_id,
           user_id,
           provider,
+          payment_purpose: 'wallet_topup',
           amount_uzs: Math.round(amount_uzs),
           status: 'pending',
           meta: { created_at, client: 'unigo', service: 'auto_market' },
@@ -290,7 +291,7 @@ async function payment_mark_paid(req, res) {
 
     const sb = getSupabaseAdmin();
     const { data: pay, error: pe } = await sb
-      .from('auto_payments')
+      .from('auto_market_payments')
       .select('*')
       .eq('id', payment_id)
       .maybeSingle();
@@ -299,7 +300,7 @@ async function payment_mark_paid(req, res) {
     if (pay.status === 'paid') return json(res, 200, { ok: true, status: 'paid', already: true });
 
     const { error: ue } = await sb
-      .from('auto_payments')
+      .from('auto_market_payments')
       .update({ status: 'paid', paid_at: nowIso(), provider: provider || pay.provider })
       .eq('id', payment_id);
     if (ue) throw ue;
@@ -397,13 +398,13 @@ async function promo_buy(req, res) {
 
     // Ad ownership check (faqat o'z e'loniga promo)
     const { data: ad, error: ae } = await sb
-      .from('auto_ads')
-      .select('id,user_id,is_top,status')
+      .from('auto_market_ads')
+      .select('id,owner_user_id,is_top,status')
       .eq('id', ad_id)
       .maybeSingle();
     if (ae) throw ae;
     if (!ad) return json(res, 404, { ok: false, error: "E'lon topilmadi" });
-    if (String(ad.user_id) !== user_id) return json(res, 403, { ok: false, error: "Faqat o'zingizning e'loningizga promo qilasiz" });
+    if (String(ad.owner_user_id) !== user_id) return json(res, 403, { ok: false, error: "Faqat o'zingizning e'loningizga promo qilasiz" });
 
     // Charge wallet
     const charged = await debitWallet(sb, user_id, price, { service: 'auto_market', action: 'promo', promo_type, ad_id });
@@ -415,15 +416,15 @@ async function promo_buy(req, res) {
     const expires_at = days > 0 ? new Date(now.getTime() + days * 24 * 60 * 60 * 1000).toISOString() : null;
 
     const { data: promo, error: pe } = await sb
-      .from('auto_promotions')
+      .from('auto_market_promotions')
       .insert([
         {
           user_id,
           ad_id,
           promo_type,
-          price_uzs: Math.round(price),
-          started_at: nowIso(),
-          expires_at,
+          amount_uzs: Math.round(price),
+          starts_at: nowIso(),
+          ends_at: expires_at,
           status: 'active',
         },
       ])
@@ -432,12 +433,12 @@ async function promo_buy(req, res) {
     if (pe) throw pe;
 
     if (makeTop) {
-      await sb.from('auto_ads').update({ is_top: true, updated_at: nowIso() }).eq('id', ad_id);
+      await sb.from('auto_market_ads').update({ is_top: true, updated_at: nowIso() }).eq('id', ad_id);
     }
 
     if (promo_type === 'raise') {
       // raise: updated_at ni yangilab ro'yxatda yuqoriga chiqarsin
-      await sb.from('auto_ads').update({ updated_at: nowIso() }).eq('id', ad_id);
+      await sb.from('auto_market_ads').update({ updated_at: nowIso() }).eq('id', ad_id);
     }
 
     return json(res, 200, { ok: true, promo, balance_uzs: charged.balance_uzs });
@@ -460,21 +461,21 @@ async function contact_reveal(req, res) {
     const user_id = String(auth.user.id);
 
     const { data: ad, error: ae } = await sb
-      .from('auto_ads')
-      .select('id,user_id,seller_phone,status')
+      .from('auto_market_ads')
+      .select('id,owner_user_id,seller_phone,status')
       .eq('id', ad_id)
       .maybeSingle();
     if (ae) throw ae;
     if (!ad) return json(res, 404, { ok: false, error: "E'lon topilmadi" });
 
     // Owner: free
-    if (String(ad.user_id) === user_id) {
+    if (String(ad.owner_user_id) === user_id) {
       return json(res, 200, { ok: true, phone: ad.seller_phone || null, price_uzs: 0, owner: true });
     }
 
     // Already revealed?
     const { data: existing, error: ee } = await sb
-      .from('auto_contact_reveals')
+      .from('auto_market_contact_reveals')
       .select('id,created_at')
       .eq('user_id', user_id)
       .eq('ad_id', ad_id)
@@ -493,7 +494,7 @@ async function contact_reveal(req, res) {
     }
 
     const { error: re } = await sb
-      .from('auto_contact_reveals')
+      .from('auto_market_contact_reveals')
       .insert([{ user_id, ad_id, price_uzs: Math.round(price), created_at: nowIso() }]);
     if (re) throw re;
 
@@ -521,16 +522,16 @@ async function cron_cleanup(req, res) {
 
     // Mark expired promotions
     await sb
-      .from('auto_promotions')
+      .from('auto_market_promotions')
       .update({ status: 'expired' })
       .eq('status', 'active')
-      .not('expires_at', 'is', null)
-      .lt('expires_at', now);
+      .not('ends_at', 'is', null)
+      .lt('ends_at', now);
 
     // Unset is_top for ads without active TOP promos
     // NOTE: we only unset is_top if no active TOP promotion exists
     const { data: tops, error: te } = await sb
-      .from('auto_promotions')
+      .from('auto_market_promotions')
       .select('ad_id')
       .eq('status', 'active')
       .in('promo_type', ['top_1day', 'top_3day']);
@@ -539,14 +540,14 @@ async function cron_cleanup(req, res) {
 
     // Fetch currently top ads
     const { data: topAds, error: ae } = await sb
-      .from('auto_ads')
+      .from('auto_market_ads')
       .select('id')
       .eq('is_top', true);
     if (ae) throw ae;
 
     const toUnset = (topAds || []).map((x) => String(x.id)).filter((id) => !topIds.has(id));
     if (toUnset.length) {
-      await sb.from('auto_ads').update({ is_top: false, updated_at: now }).in('id', toUnset);
+      await sb.from('auto_market_ads').update({ is_top: false, updated_at: now }).in('id', toUnset);
     }
 
     return json(res, 200, { ok: true, expired_checked: true, unset_count: toUnset.length });

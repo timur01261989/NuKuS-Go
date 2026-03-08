@@ -129,7 +129,7 @@ export async function requestTrip(req) {
 
   const payload = {
     trip_id: req.trip_id,
-    passenger_id: uid,
+    client_id: uid,
     seats_requested: req.seats_requested ?? null,
     wants_full_salon: !!req.wants_full_salon,
     pickup_address: req.pickup_address || null,
