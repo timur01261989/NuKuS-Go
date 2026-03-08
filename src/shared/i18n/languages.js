@@ -8,7 +8,9 @@ export const LANGUAGES = {
 
 export const DEFAULT_LANGUAGE = LANGUAGES.UZ;
 
-// Barcha tillar haqida metadata
+/**
+ * Tillar haqidagi asosiy ma'lumotlar
+ */
 export const AVAILABLE_LANGUAGES = [
   { key: LANGUAGES.UZ, label: "O'zbekcha", flag: "🇺🇿", nativeName: "O'zbek" },
   { key: LANGUAGES.RU, label: "Русский", flag: "🇷🇺", nativeName: "Русский" },
@@ -16,7 +18,7 @@ export const AVAILABLE_LANGUAGES = [
 ];
 
 /**
- * Til kalitini normallashtirish (noto'g'ri kalit bo'lsa default qaytaradi)
+ * Kelgan til kalitini tekshirib, tizimda borligiga ishonch hosil qiladi
  */
 export const normalizeLanguageKey = (key) => {
   const values = Object.values(LANGUAGES);
@@ -24,7 +26,7 @@ export const normalizeLanguageKey = (key) => {
 };
 
 /**
- * Berilgan tilning barcha ma'lumotlarini olish
+ * Til kaliti bo'yicha uning ob'ektini (meta-ma'lumotini) topadi
  */
 export const getLanguageMeta = (key) => {
   const normalized = normalizeLanguageKey(key);
@@ -32,10 +34,18 @@ export const getLanguageMeta = (key) => {
 };
 
 /**
- * Mahalliy tillar ro'yxatini olish (kerak bo'lsa tarjima qilingan holda)
+ * Settings.jsx dagi xatoni tuzatuvchi asosiy funksiya.
+ * Til kodiga qarab (masalan 'uz') uning nomini ('O'zbekcha') qaytaradi.
  */
-export const getLocalizedLanguages = (currentLang) => {
-  // Bu yerda mantiqni o'zingizga moslab kengaytirishingiz mumkin
+export const getLocalizedLanguageLabel = (key, _currentLang = null) => {
+  const meta = getLanguageMeta(key);
+  return meta ? meta.label : key;
+};
+
+/**
+ * Mavjud tillar ro'yxatini qaytaradi
+ */
+export const getLocalizedLanguages = (_currentLang = null) => {
   return AVAILABLE_LANGUAGES;
 };
 
@@ -45,5 +55,6 @@ export default {
   AVAILABLE_LANGUAGES,
   normalizeLanguageKey,
   getLanguageMeta,
+  getLocalizedLanguageLabel,
   getLocalizedLanguages
 };
