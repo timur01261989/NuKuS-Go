@@ -2,7 +2,7 @@ import React from "react";
 import { Select } from "antd";
 import { TRUCKS } from "../../services/truckData";
 import { useFreight } from "../../context/FreightContext";
-import { useClientText } from "../../shared/i18n_clientLocalize";
+import { useClientText } from "../../../shared/i18n_clientLocalize";
 
 export default function TruckSelector() {
   const { truckId, setTruckId, truck } = useFreight();
