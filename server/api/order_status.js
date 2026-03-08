@@ -1,5 +1,5 @@
 import { json, badRequest, serverError } from '../_shared/cors.js';
-import { getSupabaseAdmin } from '../_shared/supabase.js';
+import { getSupabaseAdmin, getAuthedUserId } from '../_shared/supabase.js';
 
 function nowIso() { return new Date().toISOString(); }
 
@@ -59,7 +59,7 @@ export default async function handler(req, res) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
     const order_id = String(body.order_id || body.id || '').trim();
     const next_status = String(body.status || body.next_status || '').toLowerCase().trim();
-    const actor_user_id = body.actor_user_id || body.user_id || null;
+    const actor_user_id = (await getAuthedUserId(req, sb)) || body.actor_user_id || null;
     if (!order_id || !next_status) return badRequest(res, 'order_id va status kerak');
 
     const { data: order, error } = await sb.from('orders').select('*').eq('id', order_id).maybeSingle();

@@ -10,7 +10,7 @@
  */
 
 import { json, badRequest, serverError, nowIso } from "../_shared/cors.js";
-import { getSupabaseAdmin } from "../_shared/supabase.js";
+import { getSupabaseAdmin, getAuthedUserId } from "../_shared/supabase.js";
 
 function envTrue(name, defaultVal = false) {
   const v = process.env[name];
@@ -58,7 +58,7 @@ export default async function handler(req, res) {
     }
 
     if (action === "fingerprint") {
-      const user_id = body.user_id;
+      const user_id = (await getAuthedUserId(req, sb)) || body.user_id;
       const device_hash = String(body.device_hash || "").trim();
       if (!user_id || !device_hash) return badRequest(res, "user_id va device_hash kerak");
 

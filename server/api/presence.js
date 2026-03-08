@@ -1,5 +1,5 @@
 import { json, badRequest, serverError, nowIso } from '../_shared/cors.js';
-import { getSupabaseAdmin } from '../_shared/supabase.js';
+import { getSupabaseAdmin, getAuthedUserId } from '../_shared/supabase.js';
 
 function hasSupabaseEnv() {
   return !!(process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY));
@@ -16,8 +16,11 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST' && (sub === 'heartbeat' || sub === 'ping' || sub === '')) {
       const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-      const driver_id = String(body.driver_id || '').trim();
+      const authedUserId = await getAuthedUserId(req, sb);
+      const explicitDriverId = String(body.driver_id || '').trim();
+      const driver_id = String(authedUserId || explicitDriverId || '').trim();
       if (!driver_id) return badRequest(res, 'driver_id required');
+      if (authedUserId && explicitDriverId && authedUserId !== explicitDriverId) return badRequest(res, 'driver_id token user_id bilan mos emas');
 
       const lat = body.lat === undefined ? null : Number(body.lat);
       const lng = body.lng === undefined ? null : Number(body.lng);

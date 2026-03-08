@@ -617,11 +617,11 @@ export function useTaxiOrder() {
           if (st === "completed" || st === "done") {
             speak(cp("Safar yakunlandi. Rahmat!"));
             const drvId = o?.driver?.id || o?.driver_id || o?.assigned_driver_id || null;
-            const clientId = o?.client_user_id || o?.user_id || null;
+            const clientId = o?.client_id || o?.user_id || null;
             setCompletedOrderForRating({
               id: orderId,
               driver_id: drvId,
-              client_user_id: clientId,
+              client_id: clientId,
             });
             setRatingVisible(true);
             const price = Number(o?.price || o?.amount || o?.priceUzs || 0);

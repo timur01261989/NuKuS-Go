@@ -27,7 +27,7 @@
  *      → admin yangi missiya yaratish
  */
 import { json, badRequest, serverError, nowIso } from "../_shared/cors.js";
-import { getSupabaseAdmin } from "../_shared/supabase.js";
+import { getSupabaseAdmin, getAuthedUserId } from "../_shared/supabase.js";
 
 function hasEnv() {
   return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -247,7 +247,7 @@ export default async function handler(req, res) {
     if (req.method === "POST") {
       const body = await readBody(req);
       const action = body.action || "";
-      const callerUserId = body.caller_user_id || body.user_id || "";
+      const callerUserId = (await getAuthedUserId(req, sb)) || body.caller_user_id || "";
 
       if (action === "use_bonus") return json(res, 200, await useBonus(sb, body));
       if (action === "admin_update_level") return json(res, 200, await adminUpdateLevel(sb, body, callerUserId));

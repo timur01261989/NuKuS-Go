@@ -1320,7 +1320,7 @@ export default function ClientTaxiPage() {
       />
 
       <ClientBonusWidget
-        userId={completedOrderForRating?.client_user_id || null}
+        userId={completedOrderForRating?.client_id || null}
         earnedPoints={earnedBonus}
         visible={bonusVisible}
         onClose={() => {

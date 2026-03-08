@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { getRequestLang, translatePayload } from '../_shared/serverI18n.js';
+import { getAuthedUserId } from '../_shared/supabase.js';
 
 function pickEnv(...names) {
   for (const n of names) {
@@ -62,7 +63,7 @@ function normalizePoint(v) {
   return null;
 }
 
-function normalizeOrderPayload(body = {}) {
+function normalizeOrderPayload(body = {}, clientId = null) {
   const pickup = normalizePoint(body.pickup ?? body.from_location ?? body.from ?? body.fromLocation ?? body.from_address);
   const dropoff = normalizePoint(body.dropoff ?? body.to_location ?? body.to ?? body.toLocation ?? body.to_address);
   const service_type = String(body.service_type ?? body.serviceType ?? body.service ?? 'taxi').toLowerCase();
@@ -71,7 +72,7 @@ function normalizeOrderPayload(body = {}) {
   const cargo_weight_kg = body.cargo_weight_kg ?? body.weight_kg ?? null;
   const cargo_volume_m3 = body.cargo_volume_m3 ?? body.volume_m3 ?? null;
   return {
-    client_id: body.client_id ?? body.user_id ?? null,
+    client_id: clientId,
     service_type,
     pickup,
     dropoff,
@@ -105,17 +106,30 @@ async function logEvent(sb, payload) {
   } catch (_) {}
 }
 
+async function handleGetOrder(req, res, sb, body) {
+  const orderId = String(body.order_id || '').trim();
+  if (!orderId) return reply(req, res, 400, { ok: false, error: 'order_id kerak' });
+  const { data, error } = await sb
+    .from('orders')
+    .select('*, driver:profiles!orders_driver_id_fkey(id,full_name,phone,avatar_url), client:profiles!orders_client_id_fkey(id,full_name,phone,avatar_url)')
+    .eq('id', orderId)
+    .maybeSingle();
+  if (error) return reply(req, res, 500, { ok: false, error: error.message });
+  if (!data) return reply(req, res, 404, { ok: false, error: 'Order topilmadi' });
+  return reply(req, res, 200, { ok: true, ...data });
+}
+
 async function handlePhones(req, res, sb) {
   const url = new URL(req.url, 'http://localhost');
   const orderId = String(url.searchParams.get('order_id') || '').trim();
-  const selfUserId = String(url.searchParams.get('self_user_id') || '').trim();
-  if (!orderId || !selfUserId) return reply(req, res, 400, { ok: false, error: 'order_id va self_user_id kerak' });
+  const selfUserId = await getAuthedUserId(req, sb);
+  if (!orderId || !selfUserId) return reply(req, res, 400, { ok: false, error: 'order_id va auth user kerak' });
   const { data: order, error } = await sb.from('orders').select('id,client_id,driver_id').eq('id', orderId).maybeSingle();
   if (error) return reply(req, res, 500, { ok: false, error: error.message });
   if (!order) return reply(req, res, 404, { ok: false, error: 'Order topilmadi' });
   const otherId = String(order.client_id) === selfUserId ? order.driver_id : order.client_id;
   if (!otherId) return reply(req, res, 200, { ok: true, phone: null });
-  let { data: profile } = await sb.from('profiles').select('phone,full_name,first_name,last_name').eq('id', otherId).maybeSingle();
+  const { data: profile } = await sb.from('profiles').select('phone,full_name,first_name,last_name').eq('id', otherId).maybeSingle();
   return reply(req, res, 200, { ok: true, phone: profile?.phone || null, other_user_id: otherId, profile: profile || null });
 }
 
@@ -128,8 +142,11 @@ export default async function handler(req, res) {
     if (isPhonesRoute) return handlePhones(req, res, admin);
     if (req.method !== 'POST') return reply(req, res, 405, { ok: false, error: 'Method not allowed' });
     const body = await readBody(req);
-    const payload = normalizeOrderPayload(body);
-    if (!payload.client_id) return reply(req, res, 400, { ok: false, error: 'client_id kerak' });
+    if (String(body.action || '').toLowerCase() === 'get') return handleGetOrder(req, res, admin, body);
+    const authedUserId = await getAuthedUserId(req, admin);
+    const clientId = authedUserId || String(body.client_id || '').trim() || null;
+    const payload = normalizeOrderPayload(body, clientId);
+    if (!payload.client_id) return reply(req, res, 401, { ok: false, error: 'Auth user kerak' });
     if (!payload.pickup || !payload.dropoff) return reply(req, res, 400, { ok: false, error: 'pickup va dropoff kerak' });
     if (payload.service_type === 'freight' && !(Number(payload.cargo_weight_kg) > 0)) {
       return reply(req, res, 400, { ok: false, error: 'Freight uchun cargo_weight_kg kerak' });

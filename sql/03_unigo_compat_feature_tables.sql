@@ -122,3 +122,33 @@ create table if not exists public.driver_locations ( id uuid primary key default
 create table if not exists public.avatars ( id uuid primary key default gen_random_uuid(), user_id uuid, image_url text, created_at timestamptz not null default now() );
 
 commit;
+
+alter table if exists public.support_threads add column if not exists order_id uuid references public.orders(id) on delete cascade;
+alter table if exists public.support_threads add column if not exists driver_id uuid references public.profiles(id) on delete set null;
+alter table if exists public.support_threads add column if not exists updated_at timestamptz not null default now();
+
+alter table if exists public.support_messages add column if not exists sender_role text;
+alter table if exists public.support_messages add column if not exists sender_id uuid references public.profiles(id) on delete set null;
+alter table if exists public.support_messages add column if not exists message text;
+
+alter table if exists public.messages add column if not exists order_id uuid references public.orders(id) on delete cascade;
+
+alter table if exists public.order_ratings add column if not exists role text;
+alter table if exists public.order_ratings add column if not exists stars int;
+
+alter table if exists public.device_fingerprints add column if not exists device_hash text;
+alter table if exists public.device_fingerprints add column if not exists platform text;
+alter table if exists public.device_fingerprints add column if not exists first_seen timestamptz;
+alter table if exists public.device_fingerprints add column if not exists last_seen timestamptz;
+alter table if exists public.device_fingerprints add column if not exists meta jsonb not null default '{}'::jsonb;
+create unique index if not exists idx_device_fingerprints_user_hash on public.device_fingerprints(user_id, device_hash);
+
+alter table if exists public.fraud_flags add column if not exists entity_type text;
+alter table if exists public.fraud_flags add column if not exists entity_id uuid;
+alter table if exists public.fraud_flags add column if not exists score numeric(10,2);
+alter table if exists public.fraud_flags add column if not exists reason text;
+alter table if exists public.fraud_flags add column if not exists meta jsonb not null default '{}'::jsonb;
+
+alter table if exists public.sos_tickets add column if not exists message text;
+alter table if exists public.sos_tickets add column if not exists lat double precision;
+alter table if exists public.sos_tickets add column if not exists lng double precision;

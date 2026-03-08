@@ -33,7 +33,7 @@ export async function createSeatRequest({
 }) {
   const payload = {
     trip_id: tripId,
-    client_user_id: clientUserId,
+    client_id: clientUserId,
     seats,
     notes,
     status: "pending",

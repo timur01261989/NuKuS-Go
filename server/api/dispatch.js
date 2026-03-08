@@ -1,5 +1,5 @@
 import { applyCors, json, badRequest, serverError } from '../_shared/cors.js';
-import { getSupabaseAdmin } from '../_shared/supabase.js';
+import { getSupabaseAdmin, getAuthedUserId } from '../_shared/supabase.js';
 
 function nowIso() { return new Date().toISOString(); }
 
@@ -20,8 +20,15 @@ async function logOrderEvent(sb, payload) {
 
 async function driverPing(req, res, body) {
   const sb = getSupabaseAdmin();
-  const driver_id = body.driver_id || body.user_id;
+  const authedUserId = await getAuthedUserId(req, sb);
+  const explicitDriverId = String(body.driver_id || body.driverId || '').trim();
+  const driver_id = authedUserId || explicitDriverId;
   if (!driver_id) return badRequest(res, 'driver_id kerak');
+  if (authedUserId && explicitDriverId && authedUserId !== explicitDriverId) return json(res, 403, { ok: false, error: 'driver_id token user_id bilan mos emas' });
+
+  const { data: driver } = await sb.from('drivers').select('user_id,is_verified').eq('user_id', driver_id).maybeSingle();
+  if (!driver?.is_verified) return json(res, 403, { ok: false, error: 'Tasdiqlangan driver kerak' });
+
   const row = {
     driver_id,
     is_online: body.is_online !== false,

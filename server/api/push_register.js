@@ -1,5 +1,5 @@
 import { json, badRequest, serverError, nowIso } from '../_shared/cors.js';
-import { getSupabaseAdmin } from '../_shared/supabase.js';
+import { getSupabaseAdmin, getAuthedUserId } from '../_shared/supabase.js';
 
 function hasEnv() {
   return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -9,7 +9,7 @@ export async function register(req, res) {
   try {
     if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Method not allowed' });
     const body = typeof req.body === 'string' ? JSON.parse(req.body||'{}') : (req.body||{});
-    const user_id = String(body.user_id || '').trim();
+    const user_id = String((await getAuthedUserId(req, getSupabaseAdmin())) || body.user_id || '').trim();
     const role = String(body.role || '').trim();
     const fcm_token = String(body.fcm_token || '').trim();
     if (!user_id) return badRequest(res, 'user_id required');

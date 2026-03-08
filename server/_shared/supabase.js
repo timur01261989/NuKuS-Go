@@ -8,11 +8,31 @@ export function getSupabaseAdmin() {
     throw new Error('SUPABASE_URL yoki SUPABASE_SERVICE_ROLE_KEY topilmadi!');
   }
 
-  // Admin klienti - RLS qoidalarini chetlab o'tadi
-  return createClient(url, key, { 
-    auth: { 
+  return createClient(url, key, {
+    auth: {
       persistSession: false,
-      autoRefreshToken: false 
-    } 
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
   });
+}
+
+export function getBearerToken(req) {
+  const h = req?.headers?.authorization || req?.headers?.Authorization || '';
+  const m = String(h).match(/^Bearer\s+(.+)$/i);
+  return m ? m[1].trim() : '';
+}
+
+export async function getAuthedUser(req, sb = null) {
+  const token = getBearerToken(req);
+  if (!token) return null;
+  const client = sb || getSupabaseAdmin();
+  const { data, error } = await client.auth.getUser(token);
+  if (error) return null;
+  return data?.user || null;
+}
+
+export async function getAuthedUserId(req, sb = null) {
+  const user = await getAuthedUser(req, sb);
+  return user?.id || null;
 }

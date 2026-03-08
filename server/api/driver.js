@@ -1,5 +1,5 @@
 import { getRequestLang, translatePayload } from '../_shared/serverI18n.js';
-import { getSupabaseAdmin } from '../_shared/supabase.js';
+import { getSupabaseAdmin, getAuthedUser } from '../_shared/supabase.js';
 
 function reply(req, res, status, payload) {
   const lang = getRequestLang(req, payload && typeof payload === 'object' ? payload : null);
@@ -7,7 +7,7 @@ function reply(req, res, status, payload) {
 }
 
 function num(v) { const n = Number(v); return Number.isFinite(n) ? n : null; }
-function normalizeDriverId(body = {}) { return body.driver_id || body.driverId || body.user_id || body.userId || null; }
+function normalizeDriverId(body = {}) { return body.driver_id || body.driverId || null; }
 
 async function authUser(req, sb) {
   const h = req.headers?.authorization || req.headers?.Authorization || '';
@@ -21,7 +21,7 @@ async function updatePresence(req, res, body = {}) {
   const sb = getSupabaseAdmin();
   const driverId = normalizeDriverId(body);
   if (!driverId) return reply(req, res, 400, { ok: false, error: 'driver_id kerak' });
-  const user = await authUser(req, sb);
+  const user = await getAuthedUser(req, sb);
   if (user && user.id !== driverId) return reply(req, res, 403, { ok: false, error: 'Token user mos emas' });
 
   const { data: driver } = await sb.from('drivers').select('user_id,is_verified').eq('user_id', driverId).maybeSingle();
