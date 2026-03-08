@@ -34,8 +34,12 @@ export default function ClientSidebar({ open, onClose, profile }) {
           const j = await getWalletBalance(user.id);
           const bal = typeof j?.balance_uzs === 'number' ? j.balance_uzs : null;
           if (mounted) setBalanceUZS(bal);
-        } catch {}
-      } catch {}
+        } catch (err) {
+          console.error("Balance fetch error:", err);
+        }
+      } catch (err) {
+        console.error("Auth error:", err);
+      }
     })();
     return () => {
       mounted = false;
@@ -48,22 +52,44 @@ export default function ClientSidebar({ open, onClose, profile }) {
   };
 
   const balanceLabel = formatClientMoney(language, balanceUZS);
+  
   if (!open) return null;
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
-      <aside className="fixed inset-y-0 left-0 z-50 w-80 max-w-[85%] bg-white dark:bg-background-dark shadow-2xl flex flex-col">
+      <div 
+        className="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-sm transition-opacity" 
+        onClick={onClose} 
+      />
+      <aside className="fixed inset-y-0 left-0 z-50 w-80 max-w-[85%] bg-white dark:bg-background-dark shadow-2xl flex flex-col transition-transform">
         <div className="p-6 bg-primarySidebar/10 dark:bg-primarySidebar/5 border-b border-primarySidebar/10">
-          <div className="flex items-center gap-4">
-            <div className="size-16 rounded-full border-2 border-primarySidebar overflow-hidden bg-white flex items-center justify-center">
-              {avatarUrl ? <img className="w-full h-full object-cover" alt="avatar" src={avatarUrl} /> : <span className="text-xl font-bold text-primarySidebar">{initial}</span>}
+          {/* Profil ma'lumotlarini ko'rish va tahrirlash bo'limi */}
+          <div 
+            className="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => go('/client/profile')}
+          >
+            <div className="relative group">
+              <div className="size-16 rounded-full border-2 border-primarySidebar overflow-hidden bg-white flex items-center justify-center">
+                {avatarUrl ? (
+                  <img className="w-full h-full object-cover" alt="avatar" src={avatarUrl} />
+                ) : (
+                  <span className="text-xl font-bold text-primarySidebar">{initial}</span>
+                )}
+              </div>
+              <div className="absolute -bottom-1 -right-1 size-6 bg-primarySidebar rounded-full flex items-center justify-center border-2 border-white dark:border-background-dark">
+                <span className="material-symbols-outlined text-white text-[14px]">edit</span>
+              </div>
             </div>
-            <div className="flex flex-col">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white leading-tight">{fullName}</h2>
+            
+            <div className="flex flex-col flex-1">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white leading-tight truncate">
+                {fullName}
+              </h2>
               <div className="flex items-center gap-1.5 mt-1">
                 <span className="size-2 rounded-full bg-green-500" />
-                <span className="text-sm font-medium text-slate-500 dark:text-slate-400 italic">{t.passenger || t.userLabel || "Yo‘lovchi"}</span>
+                <span className="text-sm font-medium text-slate-500 dark:text-slate-400 italic">
+                  {t.passenger || t.userLabel || "Yo‘lovchi"}
+                </span>
               </div>
             </div>
           </div>
@@ -84,17 +110,42 @@ export default function ClientSidebar({ open, onClose, profile }) {
         </div>
 
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-          <button type="button" className="w-full flex items-center gap-4 p-3 rounded-xl transition-colors bg-primarySidebar/10 text-primarySidebar border border-primarySidebar/20 text-left" onClick={() => go('/driver-mode', { replace: true, state: { from: location.pathname } })}>
+          <button 
+            type="button" 
+            className="w-full flex items-center gap-4 p-3 rounded-xl transition-colors bg-primarySidebar/10 text-primarySidebar border border-primarySidebar/20 text-left" 
+            onClick={() => go('/driver-mode', { replace: true, state: { from: location.pathname } })}
+          >
             <span className="material-symbols-outlined" data-no-auto-translate="true">local_taxi</span>
             <span className="font-semibold">{t.workAsDriver}</span>
           </button>
 
           <div className="py-2"><div className="h-px bg-slate-100 dark:bg-slate-800 mx-3" /></div>
 
-          <SidebarItem icon="location_on" label={t.myAddresses} onClick={() => go('/client/addresses')} />
-          <SidebarItem icon="history" label={t.history} onClick={() => go('/client/orders')} />
-          <SidebarItem icon="payments" label={t.paymentMethods} onClick={() => go('/client/payment-methods')} />
-          <SidebarItem icon="card_giftcard" label={t.promos} onClick={() => go('/client/promo')} />
+          <SidebarItem 
+            icon="person" 
+            label={t.profileSettings || "Profil ma'lumotlari"} 
+            onClick={() => go('/client/profile')} 
+          />
+          <SidebarItem 
+            icon="location_on" 
+            label={t.myAddresses} 
+            onClick={() => go('/client/addresses')} 
+          />
+          <SidebarItem 
+            icon="history" 
+            label={t.history} 
+            onClick={() => go('/client/orders')} 
+          />
+          <SidebarItem 
+            icon="payments" 
+            label={t.paymentMethods} 
+            onClick={() => go('/client/payment-methods')} 
+          />
+          <SidebarItem 
+            icon="card_giftcard" 
+            label={t.promos} 
+            onClick={() => go('/client/promo')} 
+          />
 
           <div className="py-2"><div className="h-px bg-slate-100 dark:bg-slate-800 mx-3" /></div>
 
@@ -103,7 +154,11 @@ export default function ClientSidebar({ open, onClose, profile }) {
         </nav>
 
         <div className="p-6 border-t border-slate-100 dark:border-slate-800">
-          <button type="button" className="flex items-center gap-3 w-full text-slate-500 dark:text-slate-400 hover:text-red-500 transition-colors group" onClick={() => go('/logout')}>
+          <button 
+            type="button" 
+            className="flex items-center gap-3 w-full text-slate-500 dark:text-slate-400 hover:text-red-500 transition-colors group" 
+            onClick={() => go('/logout')}
+          >
             <span className="material-symbols-outlined group-hover:rotate-180 transition-transform duration-300">logout</span>
             <span className="font-medium">{t.logout}</span>
           </button>
@@ -117,8 +172,20 @@ export default function ClientSidebar({ open, onClose, profile }) {
 
 function SidebarItem({ icon, label, active, onClick }) {
   return (
-    <button type="button" className={cx('w-full flex items-center gap-4 p-3 rounded-xl transition-colors text-left', active ? 'bg-primarySidebar/10 text-primarySidebar border border-primarySidebar/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300')} onClick={onClick}>
-      <span className={cx('material-symbols-outlined', active ? '' : 'text-slate-400')} data-no-auto-translate="true">{icon}</span>
+    <button 
+      type="button" 
+      className={cx(
+        'w-full flex items-center gap-4 p-3 rounded-xl transition-colors text-left', 
+        active ? 'bg-primarySidebar/10 text-primarySidebar border border-primarySidebar/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+      )} 
+      onClick={onClick}
+    >
+      <span 
+        className={cx('material-symbols-outlined', active ? '' : 'text-slate-400')} 
+        data-no-auto-translate="true"
+      >
+        {icon}
+      </span>
       <span className={cx(active ? 'font-semibold' : 'font-medium')}>{label}</span>
     </button>
   );
