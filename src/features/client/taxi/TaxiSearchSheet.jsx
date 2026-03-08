@@ -8,13 +8,10 @@ import {
   FlagOutlined,
   StarFilled,
 } from "@ant-design/icons";
-import { haversineKm } from "../shared/geo/haversine";
-import { nominatimReverse as _nominatimReverse } from "../shared/geo/nominatim";
-
 
 /**
  * TaxiSearchSheet
- * - "{cp("Qaerga borasiz?")}" qidiruv oynasi (bottom Drawer)
+ * - "Qaerga borasiz?" qidiruv oynasi (bottom Drawer)
  * - Pickup va Destination maydonlari
  * - Nominatim natijalari + saved places
  *
@@ -83,7 +80,11 @@ export default function TaxiSearchSheet({
             }}
           />
           <div style={{ fontWeight: 800 }}>{cp("Qaerga borasiz?")}</div>
-          <Button type="text" icon={<CloseOutlined />} onClick={() => setSearchOpen?.(false)} />
+          <Button
+            type="text"
+            icon={<CloseOutlined />}
+            onClick={() => setSearchOpen?.(false)}
+          />
         </div>
 
         <div className="yg-search-fields">
@@ -125,7 +126,7 @@ export default function TaxiSearchSheet({
                 value={destSearchText}
                 onChange={(e) => setDestSearchText?.(e.target.value)}
                 onFocus={() => setActiveField("dest")}
-                placeholder="{cp("Qaerga borasiz?")}"
+                placeholder={cp("Qaerga borasiz?")}
                 bordered={false}
               />
             </div>
@@ -202,7 +203,11 @@ export default function TaxiSearchSheet({
             <List.Item className="yg-list-item" onClick={() => handlePick(item)}>
               <List.Item.Meta
                 title={<div style={{ fontWeight: 700 }}>{item.label}</div>}
-                description={<div style={{ opacity: 0.75 }}>{activeField === "pickup" ? cp("Pickup") : cp("Destination")}</div>}
+                description={
+                  <div style={{ opacity: 0.75 }}>
+                    {activeField === "pickup" ? cp("Pickup") : cp("Destination")}
+                  </div>
+                }
               />
             </List.Item>
           )}
