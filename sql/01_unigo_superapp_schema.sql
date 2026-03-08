@@ -25,8 +25,8 @@ create table if not exists public.profiles (
   full_name text,
   avatar_url text,
   language_code text not null default 'uz_latn',
-  role text not null default 'client' check (role in ('client','driver','both','admin')),
-  current_role text not null default 'client' check (current_role in ('client','driver','both','admin')),
+  "role" text not null default 'client',
+  "current_role" text not null default 'client',
   first_name text,
   last_name text,
   father_name text,
@@ -35,11 +35,13 @@ create table if not exists public.profiles (
   is_deleted boolean not null default false,
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  constraint profiles_role_check check ("role" in ('client','driver','both','admin')),
+  constraint profiles_current_role_check check ("current_role" in ('client','driver','both','admin'))
 );
 
 create index if not exists idx_profiles_phone on public.profiles(phone);
-create index if not exists idx_profiles_role on public.profiles(current_role);
+create index if not exists idx_profiles_role on public.profiles("current_role");
 
 drop trigger if exists trg_profiles_touch_updated_at on public.profiles;
 create trigger trg_profiles_touch_updated_at
@@ -263,8 +265,8 @@ begin
   on conflict (driver_id) do nothing;
 
   update public.profiles
-     set role = case when role = 'client' then 'both' else role end,
-         current_role = case when current_role = 'client' then 'both' else current_role end,
+     set "role" = case when "role" = 'client' then 'both' else "role" end,
+         "current_role" = case when "current_role" = 'client' then 'both' else "current_role" end,
          updated_at = now()
    where id = app_row.user_id;
 end;
