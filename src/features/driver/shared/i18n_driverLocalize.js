@@ -1,157 +1,28 @@
-import { useMemo } from "react";
-import { useLanguage } from "@/shared/i18n/useLanguage";
+import { useMemo } from 'react';
+import { useLanguage } from '@/shared/i18n/useLanguage';
+import { translatePhrase } from '@/shared/i18n/domPhraseTranslations';
 
-const phraseMap = {
-  ru: {
-    "Haydovchi": "Водитель",
-    "Haydovchi Paneli": "Панель водителя",
-    "Haydovchi — Eltish paneli": "Панель водителя — доставка",
-    "Shahar, tumanlar aro va viloyatlar aro eltish buyurtmalarini shu yerdan qabul qilasiz.": "Здесь вы принимаете городские, межрайонные и межобластные заказы на доставку.",
-    "Hammasi": "Все",
-    "Shahar": "Город",
-    "Tumanlar aro": "Межрайонные",
-    "Viloyatlar aro": "Межобластные",
-    "Qabul qilish": "Принять",
-    "Buyumni oldim": "Забрал посылку",
-    "Topshirildi": "Доставлено",
-    "Qabul qiluvchiga qo‘ng‘iroq": "Позвонить получателю",
-    "Olash joyi:": "Место забора:",
-    "Topshirish joyi:": "Место доставки:",
-    "Qabul qiluvchi:": "Получатель:",
-    "Jo‘natuvchi:": "Отправитель:",
-    "Izoh:": "Комментарий:",
-    "Eltish holati yangilandi": "Статус доставки обновлен",
-    "Hozircha eltish buyurtmalari yo‘q": "Пока нет заказов на доставку",
-    "Avval boshqa xizmatni offline qiling": "Сначала переведите другой сервис в офлайн",
-    "Siz Online rejimdasiz": "Вы в онлайн-режиме",
-    "Siz Offline rejimdasiz": "Вы в офлайн-режиме",
-    "Statusni o'zgartirishda xatolik!": "Ошибка при изменении статуса!",
-    "Haydovchi holati": "Статус водителя",
-    "Siz hozir": "Сейчас вы",
-    "onlayn": "онлайн",
-    "oflayn": "офлайн",
-    "Shahar ichida taksi": "Городское такси",
-    "Eng tezkor va qulay narxlar": "Быстро и удобно по выгодной цене",
-    "Yuk tashish": "Грузоперевозки",
-    "Eltish xizmati": "Доставка",
-    "Asosiy": "Главная",
-    "Buyurtmalar tarixi": "История заказов",
-    "Sozlamalar": "Настройки",
-    "Foydalanuvchi": "Пользователь",
-    "Yo‘lovchi": "Пассажир",
-    "Hamyon": "Кошелек",
-    "Buyurtmalar": "Заказы",
-    "Tizimdan chiqish": "Выйти",
-    "Profil": "Профиль",
-    "Top haydovchilar": "Топ водители",
-    "Nukus Go reytingida o'z o'rningizni ko'ring": "Посмотрите свое место в рейтинге Nukus Go",
-    "Hamyon va balans": "Кошелек и баланс",
-    "Daromadlarni ko'rish va pul yechish": "Просмотр доходов и вывод средств",
-    "Jami safarlar": "Всего поездок",
-    "Reyting": "Рейтинг",
-    "Mashina ma'lumotlari": "Данные автомобиля",
-    "Model:": "Модель:",
-    "Rangi:": "Цвет:",
-    "Davlat raqami:": "Госномер:",
-    "Pul yechish": "Вывод средств",
-    "Minimal yechish miqdori 10 000 so'm": "Минимальная сумма вывода 10 000 сум",
-    "kartangizga o'tkazilsinmi?": "перевести на вашу карту?",
-    "So'rov qabul qilindi, 24 soat ichida tushadi.": "Запрос принят, поступит в течение 24 часов.",
-    "Hamyon": "Кошелек",
-    "Asosiy balans": "Основной баланс",
-    "KARTAGA YECHISH": "ВЫВЕСТИ НА КАРТУ",
-    "Oxirgi harakatlar": "Последние операции",
-    "Tranzaksiyalar yo'q": "Нет транзакций",
-    "Iltimos, tizimga qayta kiring": "Пожалуйста, войдите снова",
-    "Yangi buyurtma tushdi!": "Поступил новый заказ!",
-    "Ulgurmadingiz, buyurtmani boshqa haydovchi oldi.": "Вы не успели, заказ взял другой водитель.",
-    "Buyurtma qabul qilindi!": "Заказ принят!",
-    "Xatolik: ": "Ошибка: ",
-    "Mijozga xabar yuborildi: Yetib keldingiz!": "Клиенту отправлено сообщение: Вы прибыли!",
-    "Safar boshlandi!": "Поездка началась!",
-    "Safar yakunlandi!": "Поездка завершена!",
-    "Yo'lovchi raqami topilmadi": "Номер пассажира не найден",
-    "Qo'ng'iroq uchun raqam olinmadi: ": "Не удалось получить номер для звонка: ",
-    "Driver home": "Главная водителя",
-    "Shaxsiy ma'lumotlar": "Личные данные",
-    "Mashina": "Автомобиль",
-    "Guvohnoma": "Удостоверение",
-    "Majburiy rasmlarni yuklang": "Загрузите обязательные фото",
-    "User not authenticated": "Пользователь не авторизован",
-    "Selfi va pasport rasmlari majburiy": "Селфи и фото паспорта обязательны",
-    "Texpasport (oldi/orqasi) majburiy": "Техпаспорт (лицевая/обратная сторона) обязателен",
-    "Guvohnoma (oldi/orqasi) majburiy": "Удостоверение (лицевая/обратная сторона) обязательно",
-    "Reys muvaffaqiyatli e'lon qilindi!": "Рейс успешно опубликован!",
-    "Yangi buyurtma keldi!": "Поступил новый заказ!",
-    "Hozir onlaynsiz": "Сейчас онлайн",
-    "Oflayn holatdasiz": "Вы офлайн",
-    "Shahar ichida taksi": "Городское такси",
-    "Yuk tashish": "Грузоперевозки",
-    "Eltish xizmati": "Доставка",
-    "Viloyatlar aro": "Межобластные",
-    "Tumanlar aro": "Межрайонные",
-    "Hozircha": "Пока",
-  },
-  en: {
-    "Haydovchi": "Driver",
-    "Haydovchi Paneli": "Driver Panel",
-    "Haydovchi — Eltish paneli": "Driver Delivery Panel",
-    "Shahar, tumanlar aro va viloyatlar aro eltish buyurtmalarini shu yerdan qabul qilasiz.": "Accept city, inter-district and inter-regional delivery orders here.",
-    "Hammasi": "All", "Shahar": "City", "Tumanlar aro": "Inter-district", "Viloyatlar aro": "Inter-regional",
-    "Qabul qilish": "Accept", "Buyumni oldim": "Picked up", "Topshirildi": "Delivered",
-    "Qabul qiluvchiga qo‘ng‘iroq": "Call receiver", "Eltish holati yangilandi": "Delivery status updated",
-    "Hozircha eltish buyurtmalari yo‘q": "No delivery orders yet",
-    "Avval boshqa xizmatni offline qiling": "Take the other service offline first",
-    "Siz Online rejimdasiz": "You are online", "Siz Offline rejimdasiz": "You are offline",
-    "Statusni o'zgartirishda xatolik!": "Error changing status!",
-    "Haydovchi holati": "Driver status", "Siz hozir": "You are currently", "onlayn": "online", "oflayn": "offline",
-    "Shahar ichida taksi": "City taxi", "Eng tezkor va qulay narxlar": "Fast and convenient prices",
-    "Yuk tashish": "Freight", "Eltish xizmati": "Delivery", "Asosiy": "Home",
-    "Buyurtmalar tarixi": "Order history", "Sozlamalar": "Settings", "Foydalanuvchi": "User", "Yo‘lovchi": "Passenger",
-    "Hamyon": "Wallet", "Buyurtmalar": "Orders", "Tizimdan chiqish": "Logout",
-    "Profil": "Profile", "Top haydovchilar": "Top drivers",
-    "Nukus Go reytingida o'z o'rningizni ko'ring": "See your place in Nukus Go ranking",
-    "Hamyon va balans": "Wallet and balance", "Daromadlarni ko'rish va pul yechish": "View earnings and withdraw money",
-    "Jami safarlar": "Total trips", "Reyting": "Rating", "Mashina ma'lumotlari": "Vehicle details",
-    "Model:": "Model:", "Rangi:": "Color:", "Davlat raqami:": "Plate number:",
-    "Pul yechish": "Withdraw", "Minimal yechish miqdori 10 000 so'm": "Minimum withdrawal amount is 10,000 UZS",
-    "So'rov qabul qilindi, 24 soat ichida tushadi.": "Request accepted, it will arrive within 24 hours.",
-    "Asosiy balans": "Main balance", "KARTAGA YECHISH": "WITHDRAW TO CARD",
-    "Oxirgi harakatlar": "Recent activity", "Tranzaksiyalar yo'q": "No transactions",
-    "Iltimos, tizimga qayta kiring": "Please sign in again", "Yangi buyurtma tushdi!": "New order arrived!",
-    "Ulgurmadingiz, buyurtmani boshqa haydovchi oldi.": "Too late, another driver accepted the order.",
-    "Buyurtma qabul qilindi!": "Order accepted!", "Xatolik: ": "Error: ",
-    "Mijozga xabar yuborildi: Yetib keldingiz!": "Customer notified: You have arrived!",
-    "Safar boshlandi!": "Trip started!", "Safar yakunlandi!": "Trip completed!",
-    "Yo'lovchi raqami topilmadi": "Passenger phone not found",
-    "Qo'ng'iroq uchun raqam olinmadi: ": "Could not get a number for the call: ",
-    "Shaxsiy ma'lumotlar": "Personal information", "Mashina": "Vehicle", "Guvohnoma": "License",
-    "Majburiy rasmlarni yuklang": "Upload the required images",
-    "User not authenticated": "User not authenticated",
-    "Selfi va pasport rasmlari majburiy": "Selfie and passport photos are required",
-    "Texpasport (oldi/orqasi) majburiy": "Vehicle registration photos are required",
-    "Guvohnoma (oldi/orqasi) majburiy": "License photos are required",
-    "Reys muvaffaqiyatli e'lon qilindi!": "Trip published successfully!",
-    "Yangi buyurtma keldi!": "New order arrived!",
-    "Hozir onlaynsiz": "Currently online", "Oflayn holatdasiz": "You are offline"
-  }
-};
+function normalizeLanguageKey(key) {
+  const v = String(key || '').toLowerCase();
+  if (v === 'uz') return 'uz_lotin';
+  if (v === 'qq' || v === 'qq_latin') return 'qq_lotin';
+  if (v === 'qq_kir' || v === 'qq_kiril') return 'qq_kirill';
+  if (v === 'uz_kiril') return 'uz_kirill';
+  return v || 'uz_lotin';
+}
 
-export function translateDriverPhrase(language, text) {
-  if (!text) return text;
-  const lang = language || 'uz_lotin';
-  if (lang === 'uz_lotin') return text;
-  return phraseMap[lang]?.[text] || text;
+export function translateDriverPhrase(language, text, key = '') {
+  return translatePhrase(normalizeLanguageKey(language), text || key);
 }
 
 export function useDriverText() {
   const langCtx = useLanguage() || {};
-  const language = langCtx.language || langCtx.langKey || 'uz_lotin';
+  const language = normalizeLanguageKey(langCtx.language || langCtx.langKey || 'uz_lotin');
   const tr = langCtx.tr;
   const cp = useMemo(() => (fallback, key) => {
-    const translatedFallback = translateDriverPhrase(language, fallback);
-    if (key && typeof tr === 'function') return tr(key, translatedFallback);
-    return translatedFallback;
+    const translatedByKey = key && typeof tr === 'function' ? tr(key, '') : '';
+    if (translatedByKey && translatedByKey !== key) return translatedByKey;
+    return translateDriverPhrase(language, fallback, key);
   }, [language, tr]);
   return { ...langCtx, language, cp };
 }
