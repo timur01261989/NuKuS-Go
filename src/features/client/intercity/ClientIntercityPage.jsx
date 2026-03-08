@@ -143,10 +143,10 @@ function SeatSelector({ trip, selectedSeats, onToggleSeat }) {
   if (isCar) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "center", background: "#f0f2f5", padding: 16, borderRadius: 12 }}>
-        <div style={{ fontWeight: 600, marginBottom: 4 }}>{`${t.lightCar} ${cp("sxemasi")}`}</div>
+        <div style={{ fontWeight: 600, marginBottom: 4 }}>{`${t.lightCar || cp("Yengil mashina")} ${cp("sxemasi")}`}</div>
         {/* Oldi qator */}
         <div style={{ display: "flex", gap: 20 }}>
-          <div style={driverSeatStyle}>Rul</div>
+          <div style={driverSeatStyle}>{cp("Rul")}</div>
           <div style={seatStyle("A1")} onClick={() => onToggleSeat("A1")}>A1</div>
         </div>
         {/* Orqa qator */}
@@ -347,18 +347,18 @@ export default function ClientIntercityPage() {
 
   const handleConfirmBooking = () => {
     if (selectedSeats.length === 0) {
-      message.error("Kamida bitta o'rindiq tanlang!");
+      message.error(cp("Kamida bitta o'rindiq tanlang!"));
       return;
     }
     // Bu yerda serverga booking yuborish logikasi bo'ladi
-    message.success(`${selectedSeats.length} ta joy (${selectedSeats.join(", ")}) bron qilindi!`);
+    message.success(`${selectedSeats.length} ${cp("ta")} ${cp("joy bor").replace(" bor","")} (${selectedSeats.join(", ")}) ${cp("bron qilindi") || "bron qilindi"}!`);
     setBookingDrawerOpen(false);
     setDrawerOpen(false);
   };
 
   return (
     <div style={{ padding: 16, maxWidth: 820, margin: "0 auto", paddingBottom: 80 }}>
-      <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 16 }}>Viloyatlar aro qatnov</div>
+      <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 16 }}>{cp("Viloyatlar aro")}</div>
 
       {/* MAP PREVIEW */}
       <div style={{ borderRadius: 16, overflow: "hidden", border: "1px solid #eee", marginBottom: 16, boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
@@ -387,7 +387,7 @@ export default function ClientIntercityPage() {
       {/* SEARCH FORM */}
       <div style={{ display: "grid", gap: 12 }}>
         <RegionDistrictSelect
-          label="Qayerdan"
+          label={cp("Qayerdan")}
           region={from.region}
           district={from.district}
           onChange={(val) => setFrom(val)}
@@ -397,7 +397,7 @@ export default function ClientIntercityPage() {
         {/* PICKUP TOGGLE */}
         <div style={{ background: "#f5f5f5", padding: 10, borderRadius: 12 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: pickupMode === 'address' ? 10 : 0 }}>
-            <span style={{ fontSize: 13, fontWeight: 600 }}>Manzildan olib ketish</span>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>{cp("Manzildan olib ketish") || "Manzildan olib ketish"}</span>
             <Switch 
               checked={pickupMode === 'address'} 
               onChange={(v) => setPickupMode(v ? 'address' : 'point')} 
@@ -410,12 +410,12 @@ export default function ClientIntercityPage() {
                 icon={<EnvironmentOutlined />} 
                 block 
                 onClick={() => {
-                  if (!fromLL) { message.warning("Avval viloyatni tanlang"); return; }
+                  if (!fromLL) { message.warning(cp("Avval viloyatni tanlang")); return; }
                   setPickupPoint(pickupPoint || fromLL); 
                   setPickupPickerOpen(true); 
                 }}
               >
-                Xaritadan manzilni tanlash
+                {cp("Xaritadan manzilni tanlash") || "Xaritadan manzilni tanlash"}
               </Button>
               {pickupAddressName && (
                 <div style={{ fontSize: 12, color: "#666", background: "#fff", padding: 8, borderRadius: 6, border: "1px solid #ddd" }}>

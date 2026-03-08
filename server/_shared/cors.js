@@ -1,3 +1,4 @@
+import { getRequestLang, translatePayload } from './serverI18n.js';
 import crypto from "crypto";
 
 /** * CORS sarlavhalarini qo'yish. 
@@ -15,8 +16,9 @@ export function applyCors(req, res) {
 export function json(res, status, body) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
-  // Agar body bo'sh bo'lsa, null qaytaradi, aks holda JSON qiladi
-  res.end(JSON.stringify(body === undefined ? null : body));
+  const lang = getRequestLang(res?.req, body && typeof body === 'object' ? body : null);
+  const translated = translatePayload(body === undefined ? null : body, lang);
+  res.end(JSON.stringify(translated));
 }
 
 /** 400 Bad Request qaytarish */

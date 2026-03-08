@@ -18,29 +18,29 @@ import React, { useState } from "react";
 import { Modal, Rate, Input, Button, Typography, Space, Tag, message } from "antd";
 import { StarFilled, SmileOutlined, MehOutlined, FrownOutlined } from "@ant-design/icons";
 import { supabase } from "@/lib/supabase";
+import { useLanguage } from "@/shared/i18n/useLanguage";
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 
 // Yaxshi baho (4-5) uchun teg'lar
-const GOOD_TAGS = [
-  { label: "Tozalik", emoji: "🧼" },
-  { label: "Yoqimli muloqot", emoji: "😊" },
-  { label: "Tez keldi", emoji: "⚡" },
-  { label: "Xavfsiz haydash", emoji: "🛡️" },
-  { label: "Muzika yoqdi", emoji: "🎵" },
-  { label: "Yo'l bildi", emoji: "🗺️" },
-];
-
-// Yomon baho (1-3) uchun teg'lar
-const BAD_TAGS = [
-  { label: "Kech keldi", emoji: "⏰" },
-  { label: "Qo'pol muloqot", emoji: "😤" },
-  { label: "Tez haydadi", emoji: "💨" },
-  { label: "Mashina yoqimli emas", emoji: "🚗" },
-];
-
 export default function RatingModal({ visible, order, onFinish }) {
+  const { tr } = useLanguage();
+  const GOOD_TAGS = [
+    { label: tr("rating.cleanliness", "Tozalik"), emoji: "🧼" },
+    { label: tr("rating.politeCommunication", "Yoqimli muloqot"), emoji: "😊" },
+    { label: tr("rating.arrivedFast", "Tez keldi"), emoji: "⚡" },
+    { label: tr("rating.safeDriving", "Xavfsiz haydash"), emoji: "🛡️" },
+    { label: tr("rating.music", "Muzika yoqdi"), emoji: "🎵" },
+    { label: tr("rating.knowsRoute", "Yo'l bildi"), emoji: "🗺️" },
+  ];
+
+  const BAD_TAGS = [
+    { label: tr("rating.arrivedLate", "Kech keldi"), emoji: "⏰" },
+    { label: tr("rating.rudeCommunication", "Qo'pol muloqot"), emoji: "😤" },
+    { label: tr("rating.droveFast", "Tez haydadi"), emoji: "💨" },
+    { label: tr("rating.unpleasantCar", "Mashina yoqimli emas"), emoji: "🚗" },
+  ];
   const [stars, setStars] = useState(5);
   const [comment, setComment] = useState("");
   const [selectedTags, setSelectedTags] = useState([]);
@@ -89,17 +89,17 @@ export default function RatingModal({ visible, order, onFinish }) {
       if (error) {
         // Duplicate reyting — foydalanuvchi qayta ko'rsatganida
         if (error.code === "23505") {
-          message.info("Siz allaqachon baholagan edingiz");
+          message.info(tr("rating.alreadyRated", "Siz allaqachon baholagan edingiz"));
           onFinish?.();
           return;
         }
         throw error;
       }
 
-      message.success("Bahoingiz uchun rahmat!");
+      message.success(tr("rating.thanks", "Bahoingiz uchun rahmat!"));
       onFinish?.();
     } catch (err) {
-      message.error("Xatolik: " + (err.message || "Baholash saqlanmadi"));
+      message.error(`${tr("common.error", "Xatolik")}: ${err.message || tr("rating.saveFailed", "Baholash saqlanmadi")}`);
     } finally {
       setLoading(false);
     }
@@ -130,9 +130,9 @@ export default function RatingModal({ visible, order, onFinish }) {
       <div style={{ marginBottom: 16 }}>{FaceIcon}</div>
 
       <Title level={3} style={{ marginBottom: 4 }}>
-        Safar qanday o'tdi?
+        {tr("rating.tripHowWasIt", "Safar qanday o'tdi?")}
       </Title>
-      <Text type="secondary">Haydovchining xizmatini baholang</Text>
+      <Text type="secondary">{tr("rating.rateDriverService", "Haydovchining xizmatini baholang")}</Text>
 
       {/* Yulduzchalar */}
       <div style={{ margin: "20px 0 16px" }}>
@@ -173,7 +173,7 @@ export default function RatingModal({ visible, order, onFinish }) {
 
       {/* Ixtiyoriy matn */}
       <TextArea
-        placeholder="Fikringizni qoldiring (ixtiyoriy)..."
+        placeholder={tr("rating.leaveCommentOptional", "Fikringizni qoldiring (ixtiyoriy)...")}
         rows={2}
         value={comment}
         onChange={(e) => setComment(e.target.value)}
@@ -198,7 +198,7 @@ export default function RatingModal({ visible, order, onFinish }) {
           border: "none",
         }}
       >
-        YUBORISH
+        {tr("common.submitUpper", "YUBORISH")}
       </Button>
 
       {/* O'tkazib yuborish */}
@@ -208,7 +208,7 @@ export default function RatingModal({ visible, order, onFinish }) {
         onClick={handleSkip}
         style={{ marginTop: 10, color: "#999", fontSize: 13 }}
       >
-        O'tkazib yuborish
+        {tr("common.skip", "O'tkazib yuborish")}
       </Button>
     </Modal>
   );

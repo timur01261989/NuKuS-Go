@@ -15,6 +15,7 @@ import { MapContainer, TileLayer } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
 import { setupNotifications } from "../services/notifications";
+import { usePageI18n } from "./pageI18n";
 
 // ✅ Sizdagi real map components (screenshotdagi papka)
 import MapCenterPicker from "../features/map/components/MapCenterPicker";
@@ -36,6 +37,7 @@ const DEFAULT_LOC = [42.4619, 59.6166]; // fallback
 
 export default function MainPage() {
   const navigate = useNavigate();
+  const { t, tx } = usePageI18n();
   const [menuOpen, setMenuOpen] = useState(false);
 
   // ===================== UI STATE =====================
@@ -53,8 +55,8 @@ export default function MainPage() {
   const [targetLoc, setTargetLoc] = useState(DEFAULT_LOC);
 
   // ===================== ADDRESS STATE =====================
-  const [userAddress, setUserAddress] = useState("Aniqlanmoqda...");
-  const [targetAddress, setTargetAddress] = useState("Manzil tanlanmagan");
+  const [userAddress, setUserAddress] = useState(tx("loadingRoute", "Aniqlanmoqda..."));
+  const [targetAddress, setTargetAddress] = useState(tx("addressNotSelected", "Manzil tanlanmagan"));
 
   // ===================== ROUTE STATE =====================
   const [distanceMeters, setDistanceMeters] = useState(0);
@@ -263,7 +265,7 @@ export default function MainPage() {
         width={300}
         bodyStyle={{ padding: 12 }}
       >
-        <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 8 }}>Menu</div>
+        <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 8 }}>{t.menu || tx("menu", "Menu")}</div>
         <Divider style={{ margin: "10px 0" }} />
 
         <Button
@@ -275,7 +277,7 @@ export default function MainPage() {
             navigate("/driver-mode");
           }}
         >
-          Haydovchi bo‘lib ishlash
+          {tx("workAsDriver", "Haydovchi bo‘lib ishlash")}
         </Button>
 
         <Button
@@ -287,7 +289,7 @@ export default function MainPage() {
             navigate("/addresses");
           }}
         >
-          Mening manzillarim
+          {t.myAddresses || tx("myAddressesLabel", "Mening manzillarim")}
         </Button>
 
         <Button
@@ -299,7 +301,7 @@ export default function MainPage() {
             navigate("/settings");
           }}
         >
-          Sozlamalar
+          {t.settings || tx("settingsLabel", "Sozlamalar")}
         </Button>
 
         <Button
@@ -311,7 +313,7 @@ export default function MainPage() {
             navigate("/orders");
           }}
         >
-          Buyurtmalar tarixi
+          {tx("ordersHistoryTitle", "Buyurtmalar tarixi")}
         </Button>
 
         <div style={{ position: "absolute", left: 12, right: 12, bottom: 12 }}>
@@ -324,7 +326,7 @@ export default function MainPage() {
               navigate("/support");
             }}
           >
-            Qo‘llab-quvvatlash
+            {tx("supportSection", "Qo‘llab-quvvatlash")}
           </Button>
 
           <Button
@@ -337,7 +339,7 @@ export default function MainPage() {
               navigate("/logout");
             }}
           >
-            Chiqish
+            {t.logout || tx("logout", "Chiqish")}
           </Button>
         </div>
       </Drawer>
@@ -353,7 +355,7 @@ export default function MainPage() {
           borderRadius: 14,
         }}
       >
-        Orqaga
+        {t.back || tx("backLabel", "Orqaga")}
       </Button>
 
       {/* TOP INFO CARD */}
@@ -373,20 +375,20 @@ export default function MainPage() {
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div>
-            <Text type="secondary">Siz:</Text>{" "}
+            <Text type="secondary">{tx("youLabel", "Siz")}:</Text>{" "}
             <Text style={{ lineHeight: 1.2 }}>{userAddress}</Text>
           </div>
 
           <div>
-            <Text type="secondary">Manzil:</Text>{" "}
+            <Text type="secondary">{tx("addressLabel", "Manzil")}:</Text>{" "}
             <Text style={{ lineHeight: 1.2 }}>{targetAddress}</Text>
           </div>
 
           {selectingFromMap ? (
             <Text type="secondary">
               {isMoving
-                ? "Xaritani qo‘yib yuboring — manzil olinadi..."
-                : "Xaritani suring — markaz manzil bo‘ladi"}
+                ? tx("dragMapRelease", "Xaritani qo‘yib yuboring — manzil olinadi...")
+                : tx("dragMapMove", "Xaritani suring — markaz manzil bo‘ladi")}
             </Text>
           ) : null}
         </div>
@@ -443,7 +445,7 @@ export default function MainPage() {
         }}
       >
         <Title level={5} style={{ margin: 0 }}>
-          Taxi buyurtma
+          {tx("taxiOrderTitle", "Taxi buyurtma")}
         </Title>
 
         {/* BUTTONS */}
@@ -453,7 +455,7 @@ export default function MainPage() {
             onClick={toggleSelecting}
             style={{ flex: 1, borderRadius: 14 }}
           >
-            {selectingFromMap ? "Tanlash yakunlandi" : "Xaritadan tanlash"}
+            {selectingFromMap ? tx("finishSelection", "Tanlash yakunlandi") : tx("pickOnMap", "Xaritadan tanlash")}
           </Button>
 
           <Button
@@ -461,7 +463,7 @@ export default function MainPage() {
             onClick={toggleSearch}
             style={{ flex: 1, borderRadius: 14 }}
           >
-            {isSearching ? "Qidirishni to‘xtatish" : "Haydovchi qidirish"}
+            {isSearching ? tx("stopSearch", "Qidirishni to‘xtatish") : tx("searchDriver", "Haydovchi qidirish")}
           </Button>
         </div>
 
@@ -475,11 +477,11 @@ export default function MainPage() {
           }}
         >
           <Text>
-            Masofa: <b>{distanceKm} km</b>
+            {tx("distance", "Masofa")}: <b>{distanceKm} km</b>
           </Text>
 
           <Text>
-            Narx: <b>{priceUzs.toLocaleString("ru-RU")} so‘m</b>
+            {tx("price", "Narx")}: <b>{priceUzs.toLocaleString("ru-RU")} {tx("som", "so‘m")}</b>
           </Text>
         </div>
 
@@ -489,7 +491,7 @@ export default function MainPage() {
             onClick={() => setShowPricing((v) => !v)}
             style={{ flex: 1, borderRadius: 14 }}
           >
-            {showPricing ? "Route yashirish" : "Route ko‘rsatish"}
+            {showPricing ? tx("hideRoute", "Route yashirish") : tx("showRoute", "Route ko‘rsatish")}
           </Button>
 
           <Button
@@ -507,7 +509,7 @@ export default function MainPage() {
               });
             }}
           >
-            Buyurtma berish
+            {tx("placeOrder", "Buyurtma berish")}
           </Button>
         </div>
       </div>

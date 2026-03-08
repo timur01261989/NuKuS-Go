@@ -3,6 +3,7 @@ import { Card, DatePicker, TimePicker, Typography, Space, Button } from "antd"; 
 import { ClockCircleOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { useDistrict } from "../../context/DistrictContext";
+import { useClientText } from "../../shared/i18n_clientLocalize";
 
 /**
  * DepartureTime.jsx (Client)
@@ -15,6 +16,7 @@ import { useDistrict } from "../../context/DistrictContext";
 export default function DepartureTime() {
   // YANGI: Contextdan setIsHamyo ni ham chaqirib oldik
   const { departDate, setDepartDate, departTime, setDepartTime, setIsHamyo } = useDistrict();
+  const { cp } = useClientText();
 
   // default: bugun + 1 soat (Eski kod o'zgarishsiz qoldi)
   useEffect(() => {
@@ -47,14 +49,14 @@ export default function DepartureTime() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <ClockCircleOutlined style={{ color: "#1677ff" }} />
-          <Typography.Text style={{ fontWeight: 700 }}>Ketish vaqti</Typography.Text>
+          <Typography.Text style={{ fontWeight: 700 }}>{cp("Ketish vaqti")}</Typography.Text>
         </div>
         
         {/* YANGI: Holatni ko'rsatib turuvchi jonli matn */}
         {departDate && dayjs(departDate).isAfter(dayjs(), 'day') ? (
-          <Typography.Text style={{ fontSize: 12, color: "#fa8c16", fontWeight: 600 }}>📅 Hamyo'l rejimi</Typography.Text>
+          <Typography.Text style={{ fontSize: 12, color: "#fa8c16", fontWeight: 600 }}>📅 {cp("Hamyo'l rejimi")}</Typography.Text>
         ) : (
-          <Typography.Text style={{ fontSize: 12, color: "#52c41a", fontWeight: 600 }}>⚡ Tezkor qidiruv</Typography.Text>
+          <Typography.Text style={{ fontSize: 12, color: "#52c41a", fontWeight: 600 }}>⚡ {cp("Tezkor qidiruv")}</Typography.Text>
         )}
       </div>
 
@@ -81,7 +83,7 @@ export default function DepartureTime() {
       {/* Eski sana va soat tanlash kalendari */}
       <Space style={{ width: "100%" }} size={10}>
         <div style={{ flex: 1 }}>
-          <Typography.Text style={{ fontSize: 12, opacity: 0.7 }}>Sana</Typography.Text>
+          <Typography.Text style={{ fontSize: 12, opacity: 0.7 }}>{cp("Sana")}</Typography.Text>
           <DatePicker
             value={departDate ? dayjs(departDate, "YYYY-MM-DD") : null}
             onChange={(v) => setDepartDate(v ? v.format("YYYY-MM-DD") : null)}
@@ -91,7 +93,7 @@ export default function DepartureTime() {
           />
         </div>
         <div style={{ flex: 1 }}>
-          <Typography.Text style={{ fontSize: 12, opacity: 0.7 }}>Soat</Typography.Text>
+          <Typography.Text style={{ fontSize: 12, opacity: 0.7 }}>{cp("Soat")}</Typography.Text>
           <TimePicker
             value={departTime ? dayjs(departTime, "HH:mm") : null}
             onChange={(v) => setDepartTime(v ? v.format("HH:mm") : null)}

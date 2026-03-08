@@ -1,3 +1,4 @@
+import { serviceT } from "../services/serviceI18n.js";
 import imageCompression from 'browser-image-compression';
 
 /**
@@ -16,7 +17,7 @@ export async function compressImage(file) {
     const compressedFile = await imageCompression(file, options);
     return compressedFile;
   } catch (error) {
-    console.error("Kichraytirishda xato:", error);
+    console.error(serviceT("image_compress_error"), error);
     return file; // Xato bo'lsa asl holicha qaytaradi
   }
 }

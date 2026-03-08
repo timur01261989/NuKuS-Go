@@ -239,4 +239,24 @@ export default {
     notEntered: "Kiritilmagan",
     daysLeft: "kun qoldi",
   },
+
+  autoExtra: {
+    select: "Таңлаң",
+    chooseBrandFirst: "Алдымен марканы таңдаң",
+    brandAndModel: "Марка ҳәм модель",
+    brand: "Марка",
+    model: "Модель",
+    tipCorrectName: "Кеңес: Машина атын дурыс таңдаң — излеўде тез шығады.",
+    specs: "Параметрлер",
+    fuelType: "Жанармай түри",
+    transmission: "Берилис қутысы",
+    color: "Түси",
+    bodyCondition: "Кузов ҳолаты (Краска)",
+    bodyConditionHint: "Машина бөлшеклерин басып, ҳолатын белгилең",
+    hood: "Капот", left: "Шеп", roof: "Төбе", right: "Оң", trunk: "Багаж",
+    clean: "Таза", painted: "Боялған", replaced: "Алмасқан", options: "Комплектация ҳәм опциялар",
+    vikupGive: "Викупқа бериў", photos: "Сүўретлер", photosHelp: "Кеминде 1, көби менен 10 сүўрет.", hidePlateAi: "Номерди жасырыў (AI)", hidePlateHint: "Сүўреттеги мәмлекет номерин булдыратыў", choosePhoto: "Сүўрет таңлаў", aiAnalyzing: "AI сүўретти таллап атыр...", aiDetected: "AI анықлады:", aiConfirm: "Тастыйықлаң яки өткізбең", aiApply: "Аўа, дурыс", aiReject: "Яқ", uploadError: "Сүўрет жүклеўде қәте", blurSuccess: "AI: Мәмлекет номерлери жасырылды!", aiApplied: "AI нәтийжелери қолланылды!", priceAndDesc: "Баҳа ҳәм түсиндирме", currency: "Валюта", title: "Сарлаўҳа", description: "Түсиндирме", contact: "Контакт", phone: "Телефон", city: "Қала", name: "Аты", filterExpanded: "Кеңейтилген фильтр", query: "Излеў", yearFrom: "Жыл (ден)", yearTo: "Жыл (ға шекем)", minPrice: "Мин баҳа", maxPrice: "Макс баҳа", kredit: "Кредит", exchange: "Обмен", nearby: "Жақын ара", radius: "Радиус (км)", spareParts: "Запчастьлар", sparePartsSub: "Базардағы барлық деталлар бир жайда", sell: "Сатыў", searchParts: "Запчасть атын излең...", forCar: "ушын", premium: "Премиум", phoneMissing: "Телефон номери көрсетилмеген", fillRequired: "Тийкарғы майданларды толтырың", adAdded: "Эъланыңыз табыслы қосылды!", genericError: "Қәте жүз берди", fairPrice: "Базар баҳасы", fairCheap: "Базардан арзанырақ", fairExpensive: "Базардан қымбатырақ", fairNormal: "Базар баҳасында", mainSpecs: "Тийкарғы параметрлер", engine: "Мотор", priceHistory: "Баҳа тарийхы", safetyTips: "Қәўипсизлик мәслиҳатлары", noAdvance: "Алдын ала пул жибермең.", checkDocs: "Ҳүжжетлерди тексериң.", meetPublic: "Ушырасыўды адам көп жайда белгилең.", checkVin: "Номер ҳәм VIN сайлығын тексериң.", vikupCalc: "Викуп калькуляторы", monthlyCalc: "Айлық төлемди есаплаң", carPrice: "Машина баҳасы", initialPayment: "Басланғыш төлем", monthlyPayment: "Айлық төлем", term: "Мүддет", annualRate: "Процент (жыллық %)", totalPayment: "Умумий төлем", avgMonthly: "Айлық (орташа)", overpay: "Артықша төлем", interestFree: "Процентсиз викуп!", fullGraph: "Толық графикти көриў"
+  },
+  static: { fuels: { "Benzin":"Бензин","Gaz-Metan":"Газ-Метан","Gaz-Propan":"Газ-Пропан","Dizel":"Дизель","Gibrid":"Гибрид","Elektro":"Электро" }, transmissions: { "Avtomat":"Автомат","Mexanika":"Механика" }, colors: { "Oq":"Ақ","Qora":"Қара","Kulrang":"Күл рәң","Ko'k":"Көк","Qizil":"Қызыл","Yashil":"Жасыл","Sariq":"Сары","Bej":"Беж" }, zapConditions: { "new":"Жаңа", "used":"Пайдаланылған", "damaged":"Зақымланған" } },
+
 };

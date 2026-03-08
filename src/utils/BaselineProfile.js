@@ -1,3 +1,5 @@
+import { serviceT } from "../services/serviceI18n.js";
+
 // Yandex Go Baseline Profile mantiqi simulyatsiyasi
 export const prioritizeAssets = () => {
   const essentialAssets = [
@@ -12,5 +14,5 @@ export const prioritizeAssets = () => {
     document.head.appendChild(link);
   });
 
-  console.log("Baseline Profile: Muhim resurslar ustuvorligi belgilandi.");
+  console.log(serviceT("baseline_profile_ready"));
 };

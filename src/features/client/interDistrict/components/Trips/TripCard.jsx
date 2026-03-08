@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { useClientText } from "../../../shared/i18n_clientLocalize";
+import { useClientText } from "../../shared/i18n_clientLocalize";
 import { Card, Space, Tag, Typography, Button, Divider } from "antd";
 
 /**
@@ -67,7 +67,7 @@ export default function TripCard({ trip, onRequest }) {
 
           {trip.tariff === "pitak" && trip.pitak_id && (
             <div style={{ marginTop: 8, color: "#555", fontSize: 13 }}>
-              Stoyanka (Pitak): <b style={{ color: "#333" }}>{trip.pitak_title || cp("Tanlangan pitak")}</b>
+              {cp("Stoyanka (Pitak):") || "Stoyanka (Pitak):"} <b style={{ color: "#333" }}>{trip.pitak_title || cp("Tanlangan pitak")}</b>
             </div>
           )}
 

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Alert, Button, Card, Collapse, Divider, Input, Space, Typography } from "antd";
 import { useLocation } from "react-router-dom";
+import { usePageI18n } from "./pageI18n";
 
 const { Title, Text } = Typography;
 
@@ -11,6 +12,7 @@ const { Title, Text } = Typography;
  */
 export default function DevHub() {
   const location = useLocation();
+  const { tx } = usePageI18n();
   const qp = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const ok = qp.get("dev") === "1";
 
@@ -48,7 +50,6 @@ export default function DevHub() {
       title: "FraudFlagsPanel (flags list)",
       load: () => import("../features/admin/FraudFlagsPanel.jsx"),
       },
-,
       {
         key: "AddressAutocomplete",
         kind: "component",
@@ -188,12 +189,12 @@ export default function DevHub() {
         <Alert
           type="warning"
           showIcon
-          message="DevHub yopiq"
+          message={tx("devHubClosed", "DevHub yopiq")}
           description={
             <div>
-              <div>Ochish uchun URL: <Text code>/__dev?dev=1</Text></div>
+              <div>{tx("devHubOpen", "Ochish uchun URL")}: <Text code>/__dev?dev=1</Text></div>
               <div style={{ marginTop: 8 }}>
-                Bu sahifa production behavior'ni o‘zgartirmaslik uchun yashirilgan.
+                {tx("devHubHidden", "Bu sahifa production behavior'ni o‘zgartirmaslik uchun yashirilgan.")}
               </div>
             </div>
           }
@@ -246,7 +247,7 @@ export default function DevHub() {
         type="info"
         showIcon
         message="Eslatma"
-        description="Bu sahifa faqat dev/diagnostika uchun. Asosiy ilova oqimi va UI o‘zgarmaydi."
+        description={tx("devDesc", "Bu sahifa faqat dev/diagnostika uchun. Asosiy ilova oqimi va UI o‘zgarmaydi.")}
         style={{ marginBottom: 12 }}
       />
 
@@ -266,7 +267,7 @@ export default function DevHub() {
         items={[
           {
             key: "modules",
-            label: "Modullar ro‘yxati",
+            label: tx("moduleList", "Modullar ro‘yxati"),
             children: (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 12 }}>
                 {filtered.map((d) => {
@@ -310,7 +311,7 @@ export default function DevHub() {
             children: (
               <div style={{ maxHeight: 320, overflow: "auto", fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: 12 }}>
                 {logs.length === 0 ? (
-                  <Text type="secondary">Hali log yo‘q.</Text>
+                  <Text type="secondary">{tx("noLogs", "Hali log yo‘q.")}</Text>
                 ) : (
                   logs.map((l, i) => (
                     <div key={i}>

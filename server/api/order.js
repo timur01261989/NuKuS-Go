@@ -1,3 +1,4 @@
+import { getRequestLang, translatePayload } from '../_shared/serverI18n.js'
 // api/order.js  (Vercel Serverless Function for a Vite SPA)
 // Creates an order in Supabase.
 //
@@ -34,7 +35,9 @@ function setCors(res) {
 function safeJson(res, status, payload) {
   res.statusCode = status
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
-  res.end(JSON.stringify(payload))
+  const lang = getRequestLang(res?.req, payload && typeof payload === 'object' ? payload : null)
+  const translated = translatePayload(payload, lang)
+  res.end(JSON.stringify(translated))
 }
 
 function nowIso() { return new Date().toISOString(); }

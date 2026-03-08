@@ -1,3 +1,4 @@
+import { useClientText } from "../shared/i18n_clientLocalize";
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button, Card, Empty, List, Spin, Typography } from "antd";

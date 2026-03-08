@@ -59,7 +59,7 @@ async function estimateLocal({ service_type = "standard", distance_km = 0, durat
     currency: cfg.currency || "UZS",
     multiplier: mult,
     surge_active: mult > 1,
-    surge_reason: mult > 1 ? "Tun tarifi" : null,
+    surge_reason: mult > 1 ? serviceT("night_tariff") : null,
     source: "local",
   };
 }
@@ -77,7 +77,7 @@ async function estimateFromServer({ service_type, distance_km, duration_min, lat
   const r = await fetch(`${API_BASE}/api/pricing?${params}`, { signal: AbortSignal.timeout(4000) });
   if (!r.ok) throw new Error(`Pricing API: HTTP ${r.status}`);
   const j = await r.json();
-  if (!j.ok) throw new Error(j.error || "Pricing API xatosi");
+  if (!j.ok) throw new Error(j.error || serviceT("pricing_api_error"));
   return { ...j, source: "server" };
 }
 

@@ -63,7 +63,7 @@ export default function ClientSidebar({ open, onClose, profile }) {
               <h2 className="text-lg font-bold text-slate-900 dark:text-white leading-tight">{fullName}</h2>
               <div className="flex items-center gap-1.5 mt-1">
                 <span className="size-2 rounded-full bg-green-500" />
-                <span className="text-sm font-medium text-slate-500 dark:text-slate-400 italic">{t.passenger}</span>
+                <span className="text-sm font-medium text-slate-500 dark:text-slate-400 italic">{t.passenger || t.userLabel || "Yo‘lovchi"}</span>
               </div>
             </div>
           </div>

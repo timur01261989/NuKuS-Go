@@ -2,10 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { List, Card, Typography, Tag, Button, Spin, Empty } from 'antd';
 import { ClockCircleOutlined, EnvironmentFilled, ArrowLeftOutlined, RightOutlined } from '@ant-design/icons';
 import { supabase } from '@/lib/supabase';
+import { useLanguage } from '@/shared/i18n/useLanguage';
 
 const { Title, Text } = Typography;
 
 export default function RideHistory({ userId, role, onBack }) {
+  const { tr, langKey } = useLanguage();
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -52,7 +54,7 @@ export default function RideHistory({ userId, role, onBack }) {
 
   const formatDate = (dateStr) => {
     const d = new Date(dateStr);
-    return d.toLocaleDateString('uz-UZ', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString(langKey === 'ru' ? 'ru-RU' : langKey === 'en' ? 'en-US' : 'uz-UZ', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
   };
 
   return (
@@ -60,13 +62,13 @@ export default function RideHistory({ userId, role, onBack }) {
       {/* HEADER */}
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 25 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={onBack} type="text" shape="circle" />
-        <Title level={4} style={{ margin: '0 0 0 15px', fontFamily: 'YangoHeadline' }}>Safarlar tarixi</Title>
+        <Title level={4} style={{ margin: '0 0 0 15px', fontFamily: 'YangoHeadline' }}>{tr('rideHistory.title', 'Safarlar tarixi')}</Title>
       </div>
 
       {loading ? (
         <div style={{ textAlign: 'center', marginTop: 50 }}><Spin size="large" /></div>
       ) : history.length === 0 ? (
-        <Empty description="Hozircha safarlar yo'q" />
+        <Empty description={tr('rideHistory.empty', "Hozircha safarlar yo'q")} />
       ) : (
         <List
           dataSource={history}
@@ -80,7 +82,7 @@ export default function RideHistory({ userId, role, onBack }) {
                    <ClockCircleOutlined /> {formatDate(item.created_at)}
                 </Text>
                 <Tag color={item.status === 'completed' ? 'green' : 'red'} style={{ borderRadius: 6, margin: 0 }}>
-                  {item.status === 'completed' ? 'Yakunlandi' : 'Bekor qilingan'}
+                  {item.status === 'completed' ? tr('rideHistory.completed', 'Yakunlandi') : tr('rideHistory.cancelled', 'Bekor qilingan')}
                 </Tag>
               </div>
 
@@ -93,20 +95,20 @@ export default function RideHistory({ userId, role, onBack }) {
                 </div>
                 <div style={{ flex: 1 }}>
                   <Text strong style={{ display: 'block', fontSize: 14, fontFamily: 'YangoHeadline' }}>
-                    {item.pickup_address || "Boshlang'ich nuqta"}
+                    {item.pickup_address || tr('rideHistory.startPoint', "Boshlang'ich nuqta")}
                   </Text>
                   <div style={{ height: 12 }} />
                   <Text strong style={{ display: 'block', fontSize: 14, fontFamily: 'YangoHeadline' }}>
-                    {item.destination_address || "Manzilga yetib borildi"}
+                    {item.destination_address || tr("rideHistory.destinationReached", "Manzilga yetib borildi")}
                   </Text>
                 </div>
               </div>
 
               <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                   <Text type="secondary" style={{ fontSize: 12 }}>Safar narxi:</Text>
+                   <Text type="secondary" style={{ fontSize: 12 }}>{tr('rideHistory.tripPrice', 'Safar narxi:')}</Text>
                    <div style={{ fontSize: 18, fontWeight: 'bold', fontFamily: 'YangoHeadline' }}>
-                     {item.price?.toLocaleString()} so'm
+                     {item.price?.toLocaleString()} {tr('common.sum', "so'm")}
                    </div>
                 </div>
                 <Button type="text" icon={<RightOutlined />} />

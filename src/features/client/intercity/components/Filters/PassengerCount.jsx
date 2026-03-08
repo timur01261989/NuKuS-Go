@@ -2,11 +2,13 @@ import React from "react";
 import { Button, Typography } from "antd";
 import { UserOutlined } from "@ant-design/icons";
 import { useIntercity } from "../../context/IntercityContext";
+import { useClientText } from "../../shared/i18n_clientLocalize";
 
 const { Text } = Typography;
 
 export default function PassengerCount() {
   const { passengers, setPassengers, selectedSeats, setSelectedSeats } = useIntercity();
+  const { cp } = useClientText();
 
   const set = (n) => {
     setPassengers(n);
@@ -20,7 +22,7 @@ export default function PassengerCount() {
         icon={<UserOutlined />}
         style={{ borderRadius: 14, height: 44, boxShadow: "0 6px 16px rgba(0,0,0,0.06)" }}
       >
-        <Text style={{ fontWeight: 700 }}>{passengers} ta</Text>
+        <Text style={{ fontWeight: 700 }}>{passengers} {cp("ta")}</Text>
       </Button>
 
       <div style={{ display: "flex", gap: 8 }}>

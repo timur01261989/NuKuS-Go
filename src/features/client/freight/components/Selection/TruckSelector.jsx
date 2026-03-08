@@ -2,9 +2,11 @@ import React from "react";
 import { Select } from "antd";
 import { TRUCKS } from "../../services/truckData";
 import { useFreight } from "../../context/FreightContext";
+import { useClientText } from "../../shared/i18n_clientLocalize";
 
 export default function TruckSelector() {
   const { truckId, setTruckId, truck } = useFreight();
+  const { cp } = useClientText();
 
   return (
     <div style={{ display: "grid", gap: 10 }}>
@@ -21,7 +23,7 @@ export default function TruckSelector() {
         }))}
       />
       <div style={{ fontSize: 12, opacity: 0.8 }}>
-        Tanlangan: <b>{truck?.title}</b> · {truck?.capacity}
+        {cp("Tanlangan:")} <b>{truck?.title}</b> · {truck?.capacity}
       </div>
     </div>
   );

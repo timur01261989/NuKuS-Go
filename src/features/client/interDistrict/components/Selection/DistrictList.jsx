@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { useClientText } from "../../../shared/i18n_clientLocalize";
+import { useClientText } from "../../shared/i18n_clientLocalize";
 import { Card, Col, Row, Select, Space, Switch, Typography, Button } from "antd";
 import { EnvironmentOutlined } from "@ant-design/icons";
 import { REGIONS, getDistrictsByRegion } from "../../services/districtData";
@@ -34,21 +34,21 @@ export default function DistrictList({ onOpenPicker, onLocateMe }) {
   const districts = useMemo(() => getDistrictsByRegion(regionId), [regionId]);
 
   const optionsRegion = useMemo(
-    () => REGIONS.map((r) => ({ value: r.id, label: r.name })),
+    () => REGIONS.map((r) => ({ value: r.id, label: cp(r.name) })),
     []
   );
 
   const optionsDistrict = useMemo(
-    () => districts.map((d) => ({ value: d.name, label: d.name })),
+    () => districts.map((d) => ({ value: d.name, label: cp(d.name) })),
     [districts]
   );
 
   return (
     <Card style={{ borderRadius: 18 }}>
-      <Typography.Text style={{ fontWeight: 700 }}>Tumanlar aro</Typography.Text>
+      <Typography.Text style={{ fontWeight: 700 }}>{cp("Tumanlar aro")}</Typography.Text>
 
       <div style={{ marginTop: 12 }}>
-        <Typography.Text style={{ fontSize: 12, opacity: 0.7 }}>Hududni tanlang</Typography.Text>
+        <Typography.Text style={{ fontSize: 12, opacity: 0.7 }}>{cp("Hududni tanlang")}</Typography.Text>
         <Select
           value={regionId}
           onChange={(v) => {
@@ -64,23 +64,23 @@ export default function DistrictList({ onOpenPicker, onLocateMe }) {
 
       <Row gutter={10} style={{ marginTop: 12 }}>
         <Col span={12}>
-          <Typography.Text style={{ fontSize: 12, opacity: 0.7 }}>Qaerdan</Typography.Text>
+          <Typography.Text style={{ fontSize: 12, opacity: 0.7 }}>{cp("Qaerdan")}</Typography.Text>
           <Select
             value={fromDistrict}
             onChange={(v) => setFromDistrict(v)}
             options={optionsDistrict}
-            placeholder="Tanlang"
+            placeholder={cp("Tanlang")}
             style={{ width: "100%", marginTop: 6 }}
             size="large"
           />
         </Col>
         <Col span={12}>
-          <Typography.Text style={{ fontSize: 12, opacity: 0.7 }}>Qaerga</Typography.Text>
+          <Typography.Text style={{ fontSize: 12, opacity: 0.7 }}>{cp("Qaerga")}</Typography.Text>
           <Select
             value={toDistrict}
             onChange={(v) => setToDistrict(v)}
             options={optionsDistrict}
-            placeholder="Tanlang"
+            placeholder={cp("Tanlang")}
             style={{ width: "100%", marginTop: 6 }}
             size="large"
           />
@@ -89,7 +89,7 @@ export default function DistrictList({ onOpenPicker, onLocateMe }) {
 
       <div style={{ marginTop: 14 }}>
         <Space align="center" style={{ width: "100%", justifyContent: "space-between" }}>
-          <Typography.Text style={{ fontWeight: 600 }}>Manzildan manzilgacha</Typography.Text>
+          <Typography.Text style={{ fontWeight: 600 }}>{cp("Manzildan manzilgacha")}</Typography.Text>
           <Switch
             checked={doorToDoor}
             onChange={(v) => {
@@ -100,8 +100,7 @@ export default function DistrictList({ onOpenPicker, onLocateMe }) {
           />
         </Space>
         <Typography.Text style={{ fontSize: 12, opacity: 0.7, display: "block", marginTop: 6 }}>
-          Yoqilsa: siz turgan joy avtomatik aniqlanadi, xohlasangiz xaritadan o‘zgartirasiz.
-          cp("Qaerga (manzil)") majburiy emas.
+          {cp("Yoqilsa: siz turgan joy avtomatik aniqlanadi, xohlasangiz xaritadan o‘zgartirasiz.")} {cp("Qaerga (manzil)")} {cp("Ixtiyoriy (majburiy emas)")}.
         </Typography.Text>
       </div>
 
@@ -112,8 +111,8 @@ export default function DistrictList({ onOpenPicker, onLocateMe }) {
               <Space>
                 <EnvironmentOutlined />
                 <div>
-                  <div style={{ fontWeight: 600 }}>Qaerdan (manzil)</div>
-                  <div style={{ fontSize: 12, opacity: 0.7 }}>{pickupAddress || "Aniqlanmagan"}</div>
+                  <div style={{ fontWeight: 600 }}>{cp("Qaerdan")} ({cp("Aniq manzil")})</div>
+                  <div style={{ fontSize: 12, opacity: 0.7 }}>{pickupAddress || cp("Aniqlanmagan")}</div>
                 </div>
               </Space>
               <Button onClick={() => onOpenPicker?.("pickup")} style={{ borderRadius: 12 }}>
@@ -127,7 +126,7 @@ export default function DistrictList({ onOpenPicker, onLocateMe }) {
               <Space>
                 <EnvironmentOutlined />
                 <div>
-                  <div style={{ fontWeight: 600 }}>Qaerga (manzil)</div>
+                  <div style={{ fontWeight: 600 }}>{cp("Qaerga")} ({cp("Aniq manzil")})</div>
                   <div style={{ fontSize: 12, opacity: 0.7 }}>
                     {dropoffAddress || cp("Ixtiyoriy (majburiy emas)")}
                   </div>

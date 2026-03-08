@@ -1,8 +1,10 @@
 import React from "react";
 import { Card, Tag, Typography } from "antd";
+import { useClientText } from "../../shared/i18n_clientLocalize";
 const { Text } = Typography;
 
 export default function TruckCard({ truck, selected, onClick }) {
+  const { cp } = useClientText();
   return (
     <Card hoverable onClick={onClick} style={{ borderRadius: 18, border: selected ? "2px solid #1677ff" : "1px solid rgba(0,0,0,.08)" }} bodyStyle={{ padding: 14 }}>
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
@@ -16,7 +18,7 @@ export default function TruckCard({ truck, selected, onClick }) {
           </div>
           <Text type="secondary" style={{ fontSize: 12 }}>{truck.subtitle}</Text>
           <div style={{ marginTop: 6, fontSize: 12 }}>
-            <Text strong>Sig‘im:</Text> <Text type="secondary">{truck.capacity}</Text>
+            <Text strong>{cp("Sig‘im:")}</Text> <Text type="secondary">{truck.capacity}</Text>
           </div>
         </div>
       </div>

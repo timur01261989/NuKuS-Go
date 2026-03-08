@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
+import { useLanguage } from "@/shared/i18n/useLanguage";
 
 export default function ClientProfile() {
   const { t } = useLanguage();
@@ -46,7 +47,7 @@ export default function ClientProfile() {
         >
           <span className="material-symbols-outlined">arrow_back</span>
         </button>
-        <h1 className="text-lg font-bold">Profil</h1>
+        <h1 className="text-lg font-bold">{t.profile || "Profil"}</h1>
         <div className="w-10" />
       </div>
 
@@ -77,21 +78,21 @@ export default function ClientProfile() {
                 className="w-full neumorphic-inset-dark py-3 rounded-xl text-slate-200 font-semibold active:scale-95"
                 onClick={() => navigate("/settings")}
               >
-                Sozlamalar
+                {t.settings || "Sozlamalar"}
               </button>
               <button
                 type="button"
                 className="w-full neumorphic-inset-dark py-3 rounded-xl text-slate-200 font-semibold active:scale-95"
                 onClick={() => navigate("/support")}
               >
-                Yordam
+                {t.support || "Yordam"}
               </button>
               <button
                 type="button"
                 className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-xl active:scale-95"
                 onClick={signOut}
               >
-                Chiqish
+                {t.logout || "Chiqish"}
               </button>
             </div>
           </>

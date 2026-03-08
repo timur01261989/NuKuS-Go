@@ -286,6 +286,5 @@ export default function App() {
         </LanguageProvider>
       </ConfigProvider>
     </AppModeProvider>
-    // ✅ CLOSING TAG - AppModeProvider OXIRGI
   );
 }

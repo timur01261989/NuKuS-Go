@@ -1,6 +1,8 @@
 export const translations = {
   uz_lotin: {
 
+    selectRegion: "Viloyatni tanlang", selectDistrict: "Tumanni tanlang (ixtiyoriy)", notSelected: "(Tanlanmagan)", pageOpenFailed: "Sahifa ochilmadi", sendConsoleErrorHint: "Konsolda chiqgan xatoni rasmga oling va yuboring — shu xatoning o‘zini tuzatamiz.", unknownError: "Noma'lum xato", details: "Tafsilotlar", confirm: "Tasdiqlash", cancel: "Bekor qilish", orderTitle: "Buyurtma", qq_region: "Qoraqalpog‘iston", and_region: "Andijon", bux_region: "Buxoro", far_region: "Farg‘ona", jiz_region: "Jizzax", nam_region: "Namangan", nav_region: "Navoiy", qas_region: "Qashqadaryo", sam_region: "Samarqand", sur_region: "Surxondaryo", sir_region: "Sirdaryo", tosh_region: "Toshkent viloyati", tsh_region: "Toshkent shahri", xor_region: "Xorazm",
+
     appName: "UniGo", loginTitle: "Tizimga kirish", appTagline: "Yagona Yechim", language: "Til", languageChanged: "Til o'zgartirildi",
     settingsTitle: "Sozlamalar", notifications: "Bildirishnomalar", notificationsOn: "Bildirishnomalar yoqildi", notificationsOff: "Bildirishnomalar o'chirildi",
     notificationsHint: "Hozircha UI holati saqlanadi", nightMode: "Tungi rejim", nightModeHint: "Auto / On / Off", nightModeAuto: "Tungi rejim: Avto", nightModeOn: "Tungi rejim: Yoqildi", nightModeOff: "Tungi rejim: O'chirildi",
@@ -89,6 +91,8 @@ export const translations = {
 
   uz_kirill: {
 
+    selectRegion: "Вилоятни танланг", selectDistrict: "Туманни танланг (ихтиёрий)", notSelected: "(Танланмаган)", pageOpenFailed: "Саҳифа очилмади", sendConsoleErrorHint: "Консолда чиққан хатони расмга олинг ва юборинг — шу хатонинг ўзини тузатамиз.", unknownError: "Номаълум хато", details: "Тафсилотлар", confirm: "Тасдиқлаш", cancel: "Бекор қилиш", orderTitle: "Буюртма", qq_region: "Қорақалпоғистон", and_region: "Андижон", bux_region: "Бухоро", far_region: "Фарғона", jiz_region: "Жиззах", nam_region: "Наманган", nav_region: "Навоий", qas_region: "Қашқадарё", sam_region: "Самарқанд", sur_region: "Сурхондарё", sir_region: "Сирдарё", tosh_region: "Тошкент вилояти", tsh_region: "Тошкент шаҳри", xor_region: "Хоразм",
+
     appName: "UniGo", loginTitle: "Тизимга кириш", appTagline: "Ягона Ечим", language: "Тил", languageChanged: "Тил ўзгартирилди",
     settingsTitle: "Созламалар", notifications: "Билдиришномалар", notificationsOn: "Билдиришномалар ёқилди", notificationsOff: "Билдиришномалар ўчирилди",
     notificationsHint: "Ҳозирча UI ҳолати сақланади", nightMode: "Тунги режим", nightModeHint: "Auto / On / Off", nightModeAuto: "Тунги режим: Авто", nightModeOn: "Тунги режим: Ёқилди", nightModeOff: "Тунги режим: Ўчирилди",
@@ -161,6 +165,8 @@ export const translations = {
 
   qq_lotin: {
 
+    selectRegion: "Wálayattı tańlań", selectDistrict: "Rayondı tańlań (ixtiyariy)", notSelected: "(Tańlanbaǵan)", pageOpenFailed: "Bet ashılmadı", sendConsoleErrorHint: "Konsolda shıqqan qátelikti súwretke alıń hám jiberiń — sol qátelikti tuzatamız.", unknownError: "Belgisiz qátelik", details: "Tafsılatlar", confirm: "Tastıyıqlaw", cancel: "Biykar qılıw", orderTitle: "Buyırtpa", qq_region: "Qaraqalpaqstan", and_region: "Ándijan", bux_region: "Buxara", far_region: "Fargana", jiz_region: "Jizzax", nam_region: "Namangan", nav_region: "Nawayı", qas_region: "Qashqadarya", sam_region: "Samarqand", sur_region: "Surxondarya", sir_region: "Sırdarya", tosh_region: "Tashkent wálayatı", tsh_region: "Tashkent qalası", xor_region: "Xorezm",
+
     appName: "UniGo", loginTitle: "Sistemaǵa kiriw", appTagline: "Yagona Yechim", language: "Til", languageChanged: "Til ózgertildi", settingsTitle: "Sazlawlar", notifications: "Bildiriwler", notificationsOn: "Bildiriwler jaqıldı", notificationsOff: "Bildiriwler óshirildi", current: "Házir", auto: "Auto", on: "On", off: "Off", welcome: "Xosh kelipsiz", cityTaxi: "Qala ishinde taksi", cityTaxiHint: "Tez hám isenimli xızmet", orderNow: "Buyırtpa beriw", services: "Xızmetler", all: "Hámmesi", autoMarketTitle: "Avto Sawdo", autoMarketHint: "Mashina satıp alıń hám satıń", newCars: "Jańa qosılǵan mashinalar", viewAll: "Bárshesi", home: "Tiykarǵı", orders: "Buyırtpalar", wallet: "Hamyan", profile: "Profil", passenger: "Jolawshı", balance: "Balans", rating: "Reyting", myAddresses: "Meniń mánzillerim", paymentMethods: "Tólew usılları", promos: "Promokodlar", help: "Járdem", phoneLabel: "Telefon nomeri", phoneRequired: "Telefon nomerin tolıq kiritiń (9 san).", passwordRequired: "Paroldi kiritiń.", invalidLogin: "Telefon nomeri yamasa parol qáte!", forgotPassword: "Paroldi umıttıńız ba?", signup: "Dizimnen ótiw", loading: "Kútilmekte...", sending: "Jiberilmekte...", saving: "Saqlanbaqta...", enterPhoneFull: "Telefon nomerin tolıq kiritiń (9 san).", codeMustBe4: "Kod 4 san bolıwı kerek.", passwordMin6: "Parol keminde 6 belgili bolsin.", veryWeak: "Ábden ápiwayi", medium: "Orta", strongPassword: "Kúshli parol", demoPlaceholder: "Bul bet házir placeholder.",    greeting: "Xayrli kún!", appSubtitle: "Aydawshı hám jolawshılar ushın",
     phonePlaceholder: "90 123 45 67", password: "Parol",
     remember: "Este saqlaw", forgot: "Paroldi umıttıńızba?",
@@ -226,6 +232,8 @@ export const translations = {
 
   qq_kirill: {
 
+    selectRegion: "Ўәлаятты таӊлаӊ", selectDistrict: "Районды таӊлаӊ (ихтиярий)", notSelected: "(Таңланбаған)", pageOpenFailed: "Бет ашылмады", sendConsoleErrorHint: "Консолда шыққан қәтеликти сүўретке алың ҳәм жибериң — сол қәтеликти түзетемиз.", unknownError: "Белгисиз қәтелик", details: "Тәфсилатлар", confirm: "Тастыйықлаў", cancel: "Бийкар қылыў", orderTitle: "Буйыртпа", qq_region: "Қарақалпақстан", and_region: "Әндижан", bux_region: "Бухара", far_region: "Фарғана", jiz_region: "Жиззах", nam_region: "Наманган", nav_region: "Наўайы", qas_region: "Қашқадарья", sam_region: "Самарқанд", sur_region: "Сурхандарья", sir_region: "Сырдарья", tosh_region: "Ташкент ўәлаяты", tsh_region: "Ташкент қаласы", xor_region: "Хорезм",
+
     appName: "UniGo", loginTitle: "Системаға кириў", appTagline: "Ягона Ечим", language: "Тил", languageChanged: "Тил өзгертилди", settingsTitle: "Сазлаўлар", notifications: "Билдириўлер", notificationsOn: "Билдириўлер жағылды", notificationsOff: "Билдириўлер өширилди", current: "Ҳәзир", auto: "Авто", on: "On", off: "Off", welcome: "Хош келипсиз", cityTaxi: "Қала ишинде такси", cityTaxiHint: "Тез ҳәм исенимли хызмет", orderNow: "Буйыртпа бериў", services: "Хызметлер", all: "Ҳәммеси", autoMarketTitle: "Авто Савдо", autoMarketHint: "Машина сатып алың ҳәм сатың", newCars: "Жаңа қосылған машиналар", viewAll: "Баршасы", home: "Тийкарғы", orders: "Буйыртпалар", wallet: "Ҳамян", profile: "Профиль", passenger: "Жолаўшы", balance: "Баланс", rating: "Рейтинг", myAddresses: "Мениң мәнзиллерим", paymentMethods: "Төлеў усыллары", promos: "Промокодлар", help: "Жәрдем", phoneLabel: "Телефон номери", phoneRequired: "Телефон номерин толық киритиң (9 сан).", passwordRequired: "Парольди киритиң.", invalidLogin: "Телефон номери ямаса пароль қәте!", forgotPassword: "Парольди умыттыңыз ба?", signup: "Дизимнен өтиў", loading: "Күтилиўде...", sending: "Жиберилмекте...", saving: "Сақланбақта...", enterPhoneFull: "Телефон номерин толық киритиң (9 сан).", codeMustBe4: "Код 4 сан болыўы керек.", passwordMin6: "Пароль кеминде 6 белгили болсын.", veryWeak: "Әбден әпиўайы", medium: "Орта", strongPassword: "Күшли пароль", demoPlaceholder: "Бул бет ҳәзир placeholder.",    greeting: "Хайрлы күн!", appSubtitle: "Айдаўшы ҳәм жолаўшылар ушын",
     phonePlaceholder: "90 123 45 67", password: "Пароль",
     remember: "Эсте сақлаў", forgot: "Парольди умыттыңызба?",
@@ -290,6 +298,8 @@ export const translations = {
   },
 
   ru: {
+
+    selectRegion: "Выберите область", selectDistrict: "Выберите район (необязательно)", notSelected: "(Не выбрано)", pageOpenFailed: "Страница не открылась", sendConsoleErrorHint: "Сделайте скрин ошибки из консоли и отправьте — исправим именно эту ошибку.", unknownError: "Неизвестная ошибка", details: "Подробности", confirm: "Подтвердить", cancel: "Отмена", orderTitle: "Заказ", qq_region: "Каракалпакстан", and_region: "Андижан", bux_region: "Бухара", far_region: "Фергана", jiz_region: "Джизак", nam_region: "Наманган", nav_region: "Навои", qas_region: "Кашкадарья", sam_region: "Самарканд", sur_region: "Сурхандарья", sir_region: "Сырдарья", tosh_region: "Ташкентская область", tsh_region: "Город Ташкент", xor_region: "Хорезм",
 
     appName: "UniGo", loginTitle: "Вход в систему", appTagline: "Единое решение", language: "Язык", languageChanged: "Язык изменён",
     settingsTitle: "Настройки", notifications: "Уведомления", notificationsOn: "Уведомления включены", notificationsOff: "Уведомления отключены", notificationsHint: "Пока сохраняется только состояние UI", nightMode: "Ночной режим", nightModeHint: "Auto / On / Off", nightModeAuto: "Ночной режим: Авто", nightModeOn: "Ночной режим: Включён", nightModeOff: "Ночной режим: Выключен",
@@ -358,6 +368,8 @@ export const translations = {
   },
 
   en: {
+
+    selectRegion: "Select region", selectDistrict: "Select district (optional)", notSelected: "(Not selected)", pageOpenFailed: "Page failed to open", sendConsoleErrorHint: "Take a screenshot of the console error and send it — we will fix that exact error.", unknownError: "Unknown error", details: "Details", confirm: "Confirm", cancel: "Cancel", orderTitle: "Order", qq_region: "Karakalpakstan", and_region: "Andijan", bux_region: "Bukhara", far_region: "Fergana", jiz_region: "Jizzakh", nam_region: "Namangan", nav_region: "Navoi", qas_region: "Kashkadarya", sam_region: "Samarkand", sur_region: "Surkhandarya", sir_region: "Syrdarya", tosh_region: "Tashkent Region", tsh_region: "Tashkent City", xor_region: "Khorezm",
 
     appName: "UniGo", loginTitle: "Sign in", appTagline: "One solution", language: "Language", languageChanged: "Language changed",
     settingsTitle: "Settings", notifications: "Notifications", notificationsOn: "Notifications enabled", notificationsOff: "Notifications disabled", notificationsHint: "Only UI state is stored for now", nightMode: "Night mode", nightModeHint: "Auto / On / Off", nightModeAuto: "Night mode: Auto", nightModeOn: "Night mode: On", nightModeOff: "Night mode: Off",

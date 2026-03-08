@@ -1,5 +1,6 @@
 import React from "react";
 import { Card } from "antd";
+import { useClientText } from "../../shared/i18n_clientLocalize";
 
 const CHIPS = [
   { id: "document", label: "Hujjat", emoji: "📄" },
@@ -10,11 +11,19 @@ const CHIPS = [
 ];
 
 export default function ParcelTypeChips({ value, onChange }) {
+  const { cp } = useClientText();
+  const chips = [
+    { id: "document", label: cp("Hujjat"), emoji: "📄" },
+    { id: "keys", label: cp("Kalit"), emoji: "🔑" },
+    { id: "box_small", label: cp("Kichik quti"), emoji: "📦" },
+    { id: "box_large", label: cp("Katta quti"), emoji: "🧰" },
+    { id: "flowers", label: cp("Gul"), emoji: "💐" },
+  ];
   return (
     <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
-      <div style={{ fontWeight: 1000, marginBottom: 10 }}>Yuk turi</div>
+      <div style={{ fontWeight: 1000, marginBottom: 10 }}>{cp("Yuk turi")}</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-        {CHIPS.map((c) => {
+        {chips.map((c) => {
           const active = value === c.id;
           return (
             <button

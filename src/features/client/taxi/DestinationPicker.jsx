@@ -1,3 +1,4 @@
+import { useClientText } from "../shared/i18n_clientLocalize";
 import React from "react";
 import { Button } from "antd";
 import { CheckOutlined } from "@ant-design/icons";

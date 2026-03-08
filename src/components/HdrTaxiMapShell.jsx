@@ -1,3 +1,4 @@
+import { ct } from "./shared/i18n_componentLocalize";
 import React from "react";
 import { Button } from "antd";
 
@@ -15,13 +16,19 @@ export default function HdrTaxiMapShell({
   etaText = "—",
   priceText = "—",
   distanceText = "—",
-  title = "Buyurtma",
-  subtitle = "Tafsilotlar",
+  title,
+  subtitle,
   onCancel,
   onConfirm,
-  cancelText = "Bekor qilish",
-  confirmText = "Tasdiqlash",
+  cancelText,
+  confirmText,
 }) {
+  const safeTitle = title || ct("orderTitle", ct("orders", "Buyurtma"));
+  const safeSubtitle = subtitle || ct("details", "Tafsilotlar");
+  const safeCancelText = cancelText || ct("cancelOrder", ct("cancel", "Bekor qilish"));
+  const safeConfirmText = confirmText || ct("confirm", "Tasdiqlash");
+  const distanceLabel = ct("distance", "Masofa");
+  const priceLabel = ct("price", "Narx");
   return (
     <div className="hdr-map-shell">
       {children}
@@ -33,13 +40,13 @@ export default function HdrTaxiMapShell({
             <span className="sub">{etaText}</span>
           </div>
           <div className="hdr-chip">
-            <span>Masofa</span>
+            <span>{distanceLabel}</span>
             <span className="sub">{distanceText}</span>
           </div>
         </div>
 
         <div className="hdr-chip">
-          <span>Narx</span>
+          <span>{priceLabel}</span>
           <span className="sub">{priceText}</span>
         </div>
       </div>
@@ -49,17 +56,17 @@ export default function HdrTaxiMapShell({
         <div className="hdr-sheet-body">
           <div className="hdr-row">
             <div>
-              <div className="hdr-title">{title}</div>
-              <div className="hdr-subtitle">{subtitle}</div>
+              <div className="hdr-title">{safeTitle}</div>
+              <div className="hdr-subtitle">{safeSubtitle}</div>
             </div>
           </div>
 
           <div className="hdr-actions">
             <Button onClick={onCancel} className="hdr-btn-neon">
-              {cancelText}
+              {safeCancelText}
             </Button>
             <Button type="primary" onClick={onConfirm}>
-              {confirmText}
+              {safeConfirmText}
             </Button>
           </div>
         </div>

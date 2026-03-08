@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { Button, Typography, message } from "antd";
 import { useIntercity } from "../../context/IntercityContext";
+import { useClientText } from "../../shared/i18n_clientLocalize";
 import Legend from "./Legend";
 
 const { Text } = Typography;
@@ -16,6 +17,7 @@ const SEATS = ["A1", "A2", "B1", "B2"];
 
 export default function SeatSelector({ busySeats = [] }) {
   const { passengers, selectedSeats, setSelectedSeats } = useIntercity();
+  const { cp } = useClientText();
 
   const busy = useMemo(() => new Set(busySeats), [busySeats]);
   const mine = useMemo(() => new Set(selectedSeats), [selectedSeats]);
@@ -29,7 +31,7 @@ export default function SeatSelector({ busySeats = [] }) {
     }
 
     if (selectedSeats.length >= passengers) {
-      message.warning(`Maksimal ${passengers} ta o'rindiq tanlash mumkin`);
+      message.warning(`${cp("Maksimal")} ${passengers} ${cp("ta")} ${cp("O'rindiq tanlash")}`);
       return;
     }
 
@@ -61,9 +63,9 @@ export default function SeatSelector({ busySeats = [] }) {
   return (
     <div style={{ display: "grid", gap: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <Text style={{ fontWeight: 800 }}>O'rindiq tanlash</Text>
+        <Text style={{ fontWeight: 800 }}>{cp("O'rindiq tanlash")}</Text>
         <Text type="secondary" style={{ fontSize: 12 }}>
-          Tanlangan: {selectedSeats.length}/{passengers}
+          {cp("Tanlangan:")} {selectedSeats.length}/{passengers}
         </Text>
       </div>
 

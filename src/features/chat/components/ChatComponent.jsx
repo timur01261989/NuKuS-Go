@@ -2,13 +2,18 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Drawer, Input, Button, List, Typography, Badge, Space } from 'antd';
 import { SendOutlined, CheckOutlined, MessageOutlined } from '@ant-design/icons';
 import { supabase } from '@/lib/supabase';
+import { useLanguage } from '@/shared/i18n/useLanguage';
 
 const { Text } = Typography;
 
-// Yango-style tayyor shablonlar
-const QUICK_REPLIES = ["Chiqyapman", "Qayerdasiz?", "Kirish oldidaman", "Hozir yetib boraman"];
-
 export default function ChatComponent({ orderId, userId, visible, onClose }) {
+  const { tr } = useLanguage();
+  const QUICK_REPLIES = [
+    tr("chat.quick.onMyWay", "Chiqyapman"),
+    tr("chat.quick.whereAreYou", "Qayerdasiz?"),
+    tr("chat.quick.atEntrance", "Kirish oldidaman"),
+    tr("chat.quick.arrivingSoon", "Hozir yetib boraman"),
+  ];
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState("");
   const scrollRef = useRef(null);
@@ -59,7 +64,7 @@ export default function ChatComponent({ orderId, userId, visible, onClose }) {
 
   return (
     <Drawer
-      title="Haydovchi bilan chat"
+      title={tr("chat.titleWithDriver", "Haydovchi bilan chat")}
       placement="bottom"
       height="70vh"
       onClose={onClose}
@@ -108,7 +113,7 @@ export default function ChatComponent({ orderId, userId, visible, onClose }) {
       <Space.Compact style={{ width: '100%', marginTop: 5 }}>
         <Input 
           size="large" 
-          placeholder="Xabar yozing..." 
+          placeholder={tr("chat.writeMessage", "Xabar yozing...")} 
           value={inputValue} 
           onChange={e => setInputValue(e.target.value)}
           onPressEnter={() => sendMessage(inputValue)}

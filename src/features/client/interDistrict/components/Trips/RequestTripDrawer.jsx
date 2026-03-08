@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Drawer, Button, Space, Typography, Input, Switch, Radio, Divider } from "antd";
 import { useDistrict } from "../../context/DistrictContext"; // 1. Context import qilindi
+import { useClientText, formatClientMoney } from "../../shared/i18n_clientLocalize";
 
 /**
  * RequestTripDrawer.jsx
@@ -10,7 +11,7 @@ import { useDistrict } from "../../context/DistrictContext"; // 1. Context impor
  * - door-to-door: pickup/dropoff manzil + full salon + eltish
  * * QO'SHILGAN FUNKSIYALAR ("Yagona Reys" tizimi uchun):
  * - Narx shaffofligi (Price Transparency) va Hisoblagich
- * - To'lov turi (Naqd yoki Karta)
+ * - {cp("To'lov turi") || "To'lov turi"} (Naqd yoki Karta)
  * - Pochta (Posilka) uchun vazn toifalari
  */
 export default function RequestTripDrawer({
@@ -24,6 +25,7 @@ export default function RequestTripDrawer({
 }) {
   // 2. Contextdan kerakli state'larni olish
   const { seatState, estimatedPrice } = useDistrict();
+  const { cp, language } = useClientText();
 
   // Eski state'lar
   const [pickupAddress, setPickupAddress] = useState("");
@@ -137,25 +139,25 @@ export default function RequestTripDrawer({
                   {isDelivery && (
                     <div style={{ marginTop: 12, padding: "10px", background: "#f5f5f5", borderRadius: 8 }}>
                       <Typography.Text style={{ fontSize: 12, opacity: 0.7, display: "block", marginBottom: 6 }}>
-                        Pochta vazni (narx shunga qarab belgilanadi)
+                        {cp("Pochta vazni (narx shunga qarab belgilanadi)") || "Pochta vazni (narx shunga qarab belgilanadi)"}
                       </Typography.Text>
                       <Radio.Group 
                         value={weightCategory} 
                         onChange={(e) => setWeightCategory(e.target.value)}
                         style={{ display: "flex", flexDirection: "column", gap: 8 }}
                       >
-                        <Radio value="light">Hujjat / Kichik paket (Arzon)</Radio>
-                        <Radio value="medium">O'rtacha sumka</Radio>
-                        <Radio value="heavy">Og'ir yuk (Bir o'rindiq narxida)</Radio>
+                        <Radio value="light">{cp("Hujjat / Kichik paket (Arzon)") || "Hujjat / Kichik paket (Arzon)"}</Radio>
+                        <Radio value="medium">{cp("O'rtacha sumka") || "O'rtacha sumka"}</Radio>
+                        <Radio value="heavy">{cp("Og'ir yuk (Bir o'rindiq narxida)") || "Og'ir yuk (Bir o'rindiq narxida)"}</Radio>
                       </Radio.Group>
 
                       <div style={{ marginTop: 12 }}>
-                        <Typography.Text style={{ fontSize: 12, opacity: 0.7 }}>Eltish izohi</Typography.Text>
+                        <Typography.Text style={{ fontSize: 12, opacity: 0.7 }}>{cp("Eltish izohi") || "Eltish izohi"}</Typography.Text>
                         <Input.TextArea 
                           value={deliveryNotes} 
                           onChange={(e) => setDeliveryNotes(e.target.value)} 
                           rows={2} 
-                          placeholder="Qabul qiluvchi raqami va buyum haqida..." 
+                          placeholder={cp("Qabul qiluvchi raqami va buyum haqida...") || "Qabul qiluvchi raqami va buyum haqida..."} 
                         />
                       </div>
                     </div>
@@ -165,18 +167,18 @@ export default function RequestTripDrawer({
             </>
           )}
 
-          {/* 5. To'lov turi (Naqd / Karta) qo'shildi */}
+          {/* 5. {cp("To'lov turi") || "To'lov turi"} (Naqd / Karta) qo'shildi */}
           <Divider style={{ margin: "16px 0 8px 0" }} />
           <div>
-            <Typography.Text style={{ fontWeight: 600, display: "block", marginBottom: 8 }}>To'lov turi</Typography.Text>
+            <Typography.Text style={{ fontWeight: 600, display: "block", marginBottom: 8 }}>{cp("To'lov turi") || "To'lov turi"}</Typography.Text>
             <Radio.Group 
               value={paymentMethod} 
               onChange={(e) => setPaymentMethod(e.target.value)}
               buttonStyle="solid"
               style={{ width: "100%", display: "flex" }}
             >
-              <Radio.Button value="cash" style={{ flex: 1, textAlign: "center", borderRadius: "8px 0 0 8px" }}>💵 Naqd pul</Radio.Button>
-              <Radio.Button value="card" style={{ flex: 1, textAlign: "center", borderRadius: "0 8px 8px 0" }}>💳 Karta (Ilovadan)</Radio.Button>
+              <Radio.Button value="cash" style={{ flex: 1, textAlign: "center", borderRadius: "8px 0 0 8px" }}>💵 {cp("Naqd pul") || "Naqd pul"}</Radio.Button>
+              <Radio.Button value="card" style={{ flex: 1, textAlign: "center", borderRadius: "0 8px 8px 0" }}>💳 {cp("Karta (Ilovadan)") || "Karta (Ilovadan)"}</Radio.Button>
             </Radio.Group>
           </div>
 
@@ -184,14 +186,14 @@ export default function RequestTripDrawer({
           <div style={{ marginTop: 16, padding: "12px", background: "rgba(82, 196, 26, 0.1)", borderRadius: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <Typography.Text style={{ color: "#555" }}>
-                {isDelivery ? "Pochta xizmati:" : `Yo'l haqi (${priceDetails.selectedSeatsCount} ta joy):`}
+                {isDelivery ? (cp("Pochta xizmati:") || "Pochta xizmati:") : `${cp("Yo'l haqi") || "Yo'l haqi"} (${priceDetails.selectedSeatsCount} ${cp("ta")} ${cp("joy") || "joy"}):`}
               </Typography.Text>
               <Typography.Text style={{ fontWeight: 600 }}>
-                {priceDetails.finalPrice.toLocaleString()} so'm
+                {formatClientMoney(language, priceDetails.finalPrice)}
               </Typography.Text>
             </div>
             <Typography.Text style={{ fontSize: 11, color: "#888", display: "block", marginTop: 4 }}>
-              * Yakuniy narx haydovchi qabul qilganidan so'ng tasdiqlanadi.
+              * {cp("Yakuniy narx haydovchi qabul qilganidan so'ng tasdiqlanadi.") || "Yakuniy narx haydovchi qabul qilganidan so'ng tasdiqlanadi."}
             </Typography.Text>
           </div>
 
@@ -214,10 +216,10 @@ export default function RequestTripDrawer({
               }
               style={{ width: "100%", borderRadius: 16, height: 44 }}
             >
-              Buyurtma berish
+              {cp("Buyurtma berish")}
             </Button>
             <Button onClick={onClose} style={{ width: "100%", marginTop: 10, borderRadius: 16, height: 44 }}>
-              Bekor qilish
+              {cp("Bekor qilish")}
             </Button>
           </div>
         </>

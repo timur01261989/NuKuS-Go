@@ -129,7 +129,7 @@ function ActiveTripPanel() {
           style={{ flex: 1, borderRadius: 12, height: 44, backgroundColor: "#52c41a", fontWeight: 600 }} 
           href={`tel:${activeDriver?.phone || "+998900000000"}`}
         >
-          {t.callDriver || cp("📞 Qo'ng'iroq")}
+          {t.callDriver || cp("Qo'ng'iroq")}
         </Button>
         <Popconfirm 
           title={cp("Safarni bekor qilasizmi?")} 

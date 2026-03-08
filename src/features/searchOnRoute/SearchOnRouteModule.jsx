@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Card, Button, Typography, Space, Tag, Modal } from "antd";
 import { getCategories, searchPoi } from "../../services/poiService.js";
+import { useLanguage } from "@/shared/i18n/useLanguage";
 
 const { Text } = Typography;
 
 export function SearchOnRouteModule() {
+  const { tr } = useLanguage();
   const [cats, setCats] = useState([]);
   const [cat, setCat] = useState(null);
   const [pos, setPos] = useState(null);
@@ -52,9 +54,9 @@ export function SearchOnRouteModule() {
 
   return (
     <div style={{ padding: 12 }}>
-      <Card title="Yo‘lda qidirish" style={{ borderRadius: 16 }}>
+      <Card title={tr("searchOnRoute.title", "Yo‘lda qidirish")} style={{ borderRadius: 16 }}>
         <Text type="secondary">
-          GPS atrofidan servislarni topish (OSM level config)
+          {tr("searchOnRoute.subtitle", "GPS atrofidan servislarni topish (OSM level config)")}
         </Text>
 
         <div style={{ marginTop: 12 }}>
@@ -66,7 +68,7 @@ export function SearchOnRouteModule() {
                 style={{ cursor: "pointer", padding: "6px 10px", borderRadius: 999 }}
                 onClick={() => setCat(c.id)}
               >
-                {c.name_uz || c.name}
+                {c.name_uz || c.name_ru || c.name_en || c.name}
               </Tag>
             ))}
           </Space>
@@ -74,7 +76,7 @@ export function SearchOnRouteModule() {
 
         <div style={{ marginTop: 12 }}>
           <Text>
-            Tanlangan: <b>{current?.name_uz || current?.name}</b>
+            {tr("searchOnRoute.selected", "Tanlangan")}: <b>{current?.name_uz || current?.name_ru || current?.name_en || current?.name}</b>
           </Text>
           <Button type="link" onClick={() => setOpenHelp(true)} style={{ paddingLeft: 6 }}>
             ?
@@ -84,17 +86,17 @@ export function SearchOnRouteModule() {
         <div style={{ marginTop: 12 }}>
           <Space>
             <Button type="primary" onClick={runSearch} loading={loading}>
-              Qidirish
+              {tr("searchOnRoute.search", "Qidirish")}
             </Button>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              {pos ? `GPS: ${pos.lat.toFixed(5)}, ${pos.lon.toFixed(5)}` : "GPS yoqilmagan"}
+              {pos ? `GPS: ${pos.lat.toFixed(5)}, ${pos.lon.toFixed(5)}` : tr("searchOnRoute.gpsOff", "GPS yoqilmagan")}
             </Text>
           </Space>
         </div>
 
         <div style={{ marginTop: 16 }}>
           {!items.length && !loading ? (
-            <Text type="secondary">Natija yo‘q. (Test uchun local POI ishlaydi)</Text>
+            <Text type="secondary">{tr("searchOnRoute.noResults", "Natija yo‘q. (Test uchun local POI ishlaydi)")}</Text>
           ) : null}
 
           <Space direction="vertical" style={{ width: "100%", marginTop: 8 }}>
@@ -115,17 +117,17 @@ export function SearchOnRouteModule() {
 
       <Modal
         open={openHelp}
-        title="Qanday ishlaydi?"
+        title={tr("searchOnRoute.howItWorks", "Qanday ishlaydi?")}
         onCancel={() => setOpenHelp(false)}
         onOk={() => setOpenHelp(false)}
-        okText="Tushunarli"
+        okText={tr("common.gotIt", "Tushunarli")}
         cancelButtonProps={{ style: { display: "none" } }}
       >
         <div style={{ display: "grid", gap: 8 }}>
-          <div>1) GPS yoqilgan bo‘lsa, ilova atrofingizdan POI qidiradi.</div>
-          <div>2) Test rejimida <b>local sample POI</b> ishlaydi.</div>
+          <div>{tr("searchOnRoute.help1", "1) GPS yoqilgan bo‘lsa, ilova atrofingizdan POI qidiradi.")}</div>
+          <div>{tr("searchOnRoute.help2a", "2) Test rejimida")} <b>local sample POI</b> {tr("searchOnRoute.help2b", "ishlaydi.")}</div>
           <div>
-            3) Keyin xohlasangiz, <b>public/config/poi.json</b> da provider=overpass qilib online qidiruvni yoqasiz.
+            {tr("searchOnRoute.help3a", "3) Keyin xohlasangiz,")} <b>public/config/poi.json</b> {tr("searchOnRoute.help3b", "da provider=overpass qilib online qidiruvni yoqasiz.")}
           </div>
         </div>
       </Modal>

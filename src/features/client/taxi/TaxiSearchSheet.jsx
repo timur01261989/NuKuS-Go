@@ -1,3 +1,4 @@
+import { useClientText } from "../shared/i18n_clientLocalize";
 import React, { useMemo, useState } from "react";
 import { Button, Drawer, Input, List, Spin, Tag, Typography } from "antd";
 import {

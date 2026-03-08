@@ -15,7 +15,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import ClientDashboard from "../features/client/components/ClientDashboard";
 
-import { translations } from "@i18n/translations";
+import { usePageI18n } from "./pageI18n";
 
 // --- KOMPONENTLAR ---
 import DriverAuth from "../features/driver/components/DriverAuth";
@@ -45,9 +45,7 @@ export default function Dashboard() {
   const [currentView, setCurrentView] = useState("dashboard");
   const [loading, setLoading] = useState(true);
 
-  const savedLang = localStorage.getItem("appLang") || "uz_lotin";
-  const [langKey, setLangKey] = useState(savedLang);
-  const t = translations[langKey] || translations["uz_lotin"];
+  const { t, tx, setLanguage } = usePageI18n();
 
   // ✅ Night mode mode: "auto" | "on" | "off"
   const [nightMode, setNightMode] = useState("auto");
@@ -102,9 +100,8 @@ export default function Dashboard() {
   const toggleDrawer = () => setOpen(!open);
 
   const changeLang = (newLang) => {
-    setLangKey(newLang);
-    localStorage.setItem("appLang", newLang);
-    message.success(t.languageChanged);
+    setLanguage?.(newLang);
+    message.success(t.languageChanged || tx("languageChanged", "Til o'zgartirildi"));
   };
 
   const logout = async () => {
@@ -123,9 +120,12 @@ export default function Dashboard() {
 
   const langMenu = {
     items: [
-      { key: "uz_lotin", label: "O‘zbek (lotin)", onClick: () => changeLang("uz_lotin") },
-      { key: "uz_kiril", label: "Ўzbek (kiril)", onClick: () => changeLang("uz_kiril") },
-      { key: "ru", label: "Русский", onClick: () => changeLang("ru") },
+      { key: "uz_lotin", label: tx("currentLangUzLatin", "O‘zbek (lotin)"), onClick: () => changeLang("uz_lotin") },
+      { key: "uz_kirill", label: tx("currentLangUzCyrillic", "O‘zbek (kirill)"), onClick: () => changeLang("uz_kirill") },
+      { key: "qq_latin", label: tx("currentLangQqLatin", "Qoraqalpoq (lotin)"), onClick: () => changeLang("qq_latin") },
+      { key: "qq_kirill", label: tx("currentLangQqCyrillic", "Qoraqalpoq (kirill)"), onClick: () => changeLang("qq_kirill") },
+      { key: "ru", label: tx("currentLangRu", "Русский"), onClick: () => changeLang("ru") },
+      { key: "en", label: tx("currentLangEn", "English"), onClick: () => changeLang("en") },
     ],
   };
 
@@ -374,7 +374,7 @@ export default function Dashboard() {
           <div style={{ padding: 20 }}>
             <Title level={4}>{t.ordersHistory}</Title>
             <Text type="secondary">
-              Bu bo‘lim hali ulanmagan. Bu yerga buyurtmalar tarixini chiqaramiz.
+              {tx("ordersSectionHint", "Bu bo‘lim hali ulanmagan. Bu yerga buyurtmalar tarixini chiqaramiz.")}
             </Text>
             <div style={{ marginTop: 14 }}>
               <Button type="primary" onClick={() => setCurrentView("dashboard")}>
@@ -389,7 +389,7 @@ export default function Dashboard() {
           <div style={{ padding: 20 }}>
             <Title level={4}>{t.settings}</Title>
             <Text type="secondary">
-              Bu bo‘limda profil, til, tungi rejim va boshqa sozlamalar bo‘ladi.
+              {tx("settingsHint", "Bu bo‘limda profil, til, tungi rejim va boshqa sozlamalar bo‘ladi.")}
             </Text>
 
             {/* ✅ TUNGI REJIM BLOKI (TO‘LIQ) */}
@@ -407,9 +407,9 @@ export default function Dashboard() {
               }}
             >
               <div style={{ display: "flex", flexDirection: "column" }}>
-                <Text strong>Tungi rejim</Text>
+                <Text strong>{tx("nightModeTitle", "Tungi rejim")}</Text>
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  Auto (20:00–06:00) yoki qo‘lda ON/OFF
+                  {tx("nightModeDesc", "Auto (20:00–06:00) yoki qo‘lda ON/OFF")}
                 </Text>
 
                 <div style={{ marginTop: 10 }}>
@@ -444,7 +444,7 @@ export default function Dashboard() {
           <div style={{ padding: 20 }}>
             <Title level={4}>{t.support}</Title>
             <Text type="secondary">
-              Qo‘llab-quvvatlash bo‘limi. Telefon/Telegram/Chat qo‘shiladi.
+              {tx("supportHintLocal", "Qo‘llab-quvvatlash bo‘limi. Telefon/Telegram/Chat qo‘shiladi.")}
             </Text>
             <div style={{ marginTop: 14 }}>
               <Button onClick={() => setCurrentView("dashboard")}>
@@ -505,9 +505,9 @@ export default function Dashboard() {
             <Space>
               <Avatar icon={<UserOutlined />} />
               <div>
-                <div style={{ fontWeight: 700 }}>{t.menu}</div>
+                <div style={{ fontWeight: 700 }}>{t.menu || tx("menu", "Menyu")}</div>
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  {t.chooseSection}
+                  {t.chooseSection || tx("chooseSection", "Bo‘limni tanlang")}
                 </Text>
               </div>
             </Space>

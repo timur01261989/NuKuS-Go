@@ -8,72 +8,25 @@ const { Text } = Typography;
 export default function ReceiverForm({ value, onChange }) {
   const v = value || {};
   const set = (patch) => onChange?.({ ...v, ...patch });
-
+  const { cp } = useClientText();
   const { supported, contacts, loadContacts } = useContacts();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-
   const canOpen = useMemo(() => true, []);
-
-  const openContacts = async () => {
-    if (!canOpen) return;
-    setOpen(true);
-    setLoading(true);
-    await loadContacts();
-    setLoading(false);
-  };
-
+  const openContacts = async () => { if (!canOpen) return; setOpen(true); setLoading(true); await loadContacts(); setLoading(false); };
   return (
     <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-        <div style={{ fontWeight: 1000 }}>Qabul qiluvchi</div>
-        <Button
-          icon={<ContactsOutlined />}
-          onClick={openContacts}
-          style={{ borderRadius: 14 }}
-        >
-          Kontaktlar
-        </Button>
+        <div style={{ fontWeight: 1000 }}>{cp('Qabul qiluvchi')}</div>
+        <Button icon={<ContactsOutlined />} onClick={openContacts} style={{ borderRadius: 14 }}>{cp('Kontaktlar')}</Button>
       </div>
-
       <Form layout="vertical" style={{ marginTop: 10 }}>
-        <Form.Item label="Ism" required>
-          <Input value={v.name || ""} onChange={(e) => set({ name: e.target.value })} placeholder="Masalan: Aziz" />
-        </Form.Item>
-
-        <Form.Item label="Telefon" required>
-          <Input value={v.phone || ""} onChange={(e) => set({ phone: e.target.value })} placeholder="+998..." />
-        </Form.Item>
-
-        <Text type="secondary" style={{ fontSize: 12 }}>
-          {supported ? {cp("Kontaktlardan tanlash ishlashi mumkin.")} : {cp("Kontaktlar API yo‘q — demo ro‘yxat chiqadi.")}}
-        </Text>
+        <Form.Item label={cp('Ism')} required><Input value={v.name || ""} onChange={(e) => set({ name: e.target.value })} placeholder={cp('Masalan: Aziz')} /></Form.Item>
+        <Form.Item label={cp('Telefon')} required><Input value={v.phone || ""} onChange={(e) => set({ phone: e.target.value })} placeholder="+998..." /></Form.Item>
+        <Text type="secondary" style={{ fontSize: 12 }}>{supported ? cp('Kontaktlardan tanlash ishlashi mumkin.') : cp('Kontaktlar API yo‘q — demo ro‘yxat chiqadi.')}</Text>
       </Form>
-
-      <Modal
-        title="Kontaktlar"
-        open={open}
-        onCancel={() => setOpen(false)}
-        footer={null}
-      >
-        <List
-          loading={loading}
-          dataSource={contacts}
-          renderItem={(c) => (
-            <List.Item
-              onClick={() => {
-                set({ name: c.name || v.name, phone: c.phone });
-                setOpen(false);
-              }}
-              style={{ cursor: "pointer" }}
-            >
-              <List.Item.Meta
-                title={c.name}
-                description={c.phone}
-              />
-            </List.Item>
-          )}
-        />
+      <Modal title={cp('Kontaktlar')} open={open} onCancel={() => setOpen(false)} footer={null}>
+        <List loading={loading} dataSource={contacts} renderItem={(c) => <List.Item onClick={() => { set({ name: c.name || v.name, phone: c.phone }); setOpen(false); }} style={{ cursor: "pointer" }}><List.Item.Meta title={c.name} description={c.phone} /></List.Item>} />
       </Modal>
     </Card>
   );

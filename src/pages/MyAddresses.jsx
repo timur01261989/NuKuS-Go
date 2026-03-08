@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Button, Card, Form, Input, Typography } from "antd";
-import { useLanguage } from "@/shared/i18n/useLanguage";
+import { usePageI18n } from "./pageI18n";
 
 const { Title, Text } = Typography;
 const KEY = "savedAddresses_v1";
@@ -9,7 +9,7 @@ function load() { try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } 
 function save(list) { localStorage.setItem(KEY, JSON.stringify(list)); }
 
 export default function MyAddresses() {
-  const { t } = useLanguage();
+  const { t, tx } = usePageI18n();
   const [items, setItems] = useState(() => load());
   const [form] = Form.useForm();
 
@@ -22,7 +22,7 @@ export default function MyAddresses() {
       <Card style={{ borderRadius: 16 }}>
         <Form form={form} layout="vertical" onFinish={add}>
           <Form.Item name="label" label={t.addressName} rules={[{ required: true, message: t.nameRequired }]}>
-            <Input placeholder="Uy / Ish / ..." />
+            <Input placeholder={tx("addressesPlaceholder", "Uy / Ish / ...")} />
           </Form.Item>
           <Form.Item name="address" label={t.addressField} rules={[{ required: true, message: t.addressRequired }]}>
             <Input placeholder={t.writeAddress} />

@@ -24,6 +24,7 @@ import { Spin } from "antd";
 import { supabase } from "@/lib/supabase";
 import { useAppMode } from "@/providers/AppModeProvider";
 import { useSessionProfile } from "../shared/auth/useSessionProfile";
+import { usePageI18n } from "./pageI18n";
 // NOTE: keep helper close to routing guards.
 // RootRedirect and RoleGate must agree on the same role → home mapping.
 import { pickHomeForRole } from "../shared/routes/RoleGate";
@@ -35,6 +36,7 @@ import { pickHomeForRole } from "../shared/routes/RoleGate";
 // - Approved driver can still use client pages anytime (client mode).
 export default function RootRedirect() {
   const navigate = useNavigate();
+  const { tx } = usePageI18n();
   const didRun = useRef(false);
   const { appMode, isLoading: appModeLoading } = useAppMode();
 
@@ -118,7 +120,7 @@ export default function RootRedirect() {
 
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "70vh" }}>
-      <Spin size="large" tip="Yuklanmoqda..." />
+      <Spin size="large" tip={tx("loading", "Yuklanmoqda...")} />
     </div>
   );
 }

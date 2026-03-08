@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { message } from 'antd';
-import { useLanguage } from '@shared/i18n/useLanguage';
+import { usePageI18n } from './pageI18n';
 
 export default function ResetPassword() {
   const [step, setStep] = useState(1);
@@ -13,7 +13,7 @@ export default function ResetPassword() {
   const [passwordStrength, setPasswordStrength] = useState(0);
 
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, tx } = usePageI18n();
 
   const normalizePhoneInput = (value) => {
     let digits = String(value || '').replace(/\D/g, '').slice(0, 9);
@@ -82,7 +82,7 @@ export default function ResetPassword() {
             type="button"
             onClick={() => (step === 2 ? setStep(1) : navigate('/login'))}
             className="absolute left-0 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/60 hover:bg-white/80 border border-white/30"
-            aria-label="Back"
+            aria-label={tx("backAria", "Back")}
           >
             <svg className="w-5 h-5 text-gray-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />

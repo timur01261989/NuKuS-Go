@@ -1,7 +1,9 @@
+import { getRequestLang, translatePayload } from '../_shared/serverI18n.js';
 import { getSupabaseAdmin } from '../_shared/supabase.js';
 
 function json(res, status, payload) {
-  return res.status(status).json(payload);
+  const lang = getRequestLang(res?.req, payload && typeof payload === 'object' ? payload : null);
+  return res.status(status).json(translatePayload(payload, lang));
 }
 
 function safeNumber(v) {

@@ -1,3 +1,4 @@
+import { ct } from "./shared/i18n_componentLocalize";
 import React from "react";
 
 export default class ErrorBoundary extends React.Component {
@@ -17,12 +18,12 @@ export default class ErrorBoundary extends React.Component {
 
   render() {
     if (this.state.hasError) {
-      const txt = (this.state.error && (this.state.error.stack || String(this.state.error))) || "Unknown error";
+      const txt = (this.state.error && (this.state.error.stack || String(this.state.error))) || ct("unknownError", "Unknown error");
       return (
         <div style={{ minHeight: "100vh", padding: 16, fontFamily: "system-ui" }}>
-          <h2 style={{ margin: 0, fontSize: 18 }}>Sahifa ochilmadi</h2>
+          <h2 style={{ margin: 0, fontSize: 18 }}>{ct("pageOpenFailed", "Sahifa ochilmadi")}</h2>
           <p style={{ opacity: 0.85, marginTop: 8 }}>
-            Konsolda chiqgan xatoni rasmga oling va yuboring — shu xatoning o‘zini tuzatamiz.
+            {ct("sendConsoleErrorHint", "Konsolda chiqgan xatoni rasmga oling va yuboring — shu xatoning o‘zini tuzatamiz.")}
           </p>
           <pre
             style={{

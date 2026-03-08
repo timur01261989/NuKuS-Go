@@ -1,6 +1,7 @@
 import React from "react";
 import { Checkbox, Space, Typography, Card } from "antd";
 import { useDistrict } from "../../context/DistrictContext";
+import { useClientText } from "../../shared/i18n_clientLocalize";
 
 /**
  * FilterBar.jsx
@@ -12,6 +13,7 @@ import { useDistrict } from "../../context/DistrictContext";
  */
 export default function FilterBar() {
   const { filters, setFilters } = useDistrict();
+  const { cp } = useClientText();
 
   const handleChange = (key, val) => {
     setFilters((prev) => ({ ...prev, [key]: val }));
@@ -20,7 +22,7 @@ export default function FilterBar() {
   return (
     <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: "12px 16px" }}>
       <Typography.Text style={{ fontWeight: 700, display: "block", marginBottom: 10 }}>
-        Qo‘shimcha qulayliklar
+        {cp("Qo‘shimcha qulayliklar")}
       </Typography.Text>
       
       <Space direction="vertical" style={{ width: "100%" }}>
@@ -29,13 +31,13 @@ export default function FilterBar() {
           checked={filters.ac}
           onChange={(e) => handleChange("ac", e.target.checked)}
         >
-          ❄️ Konditsioner
+          ❄️ {cp("Konditsioner")}
         </Checkbox>
         <Checkbox
           checked={filters.trunk}
           onChange={(e) => handleChange("trunk", e.target.checked)}
         >
-          🧳 Katta yukxona (Bagaj)
+          🧳 {cp("Katta yukxona (Bagaj)")}
         </Checkbox>
 
         {/* YANGI: Yagona Reys filtrlari */}
@@ -44,7 +46,7 @@ export default function FilterBar() {
           onChange={(e) => handleChange("femaleOnly", e.target.checked)}
           style={{ color: "#eb2f96", fontWeight: 500 }}
         >
-          👩 Faqat ayollar uchun (Xavfsiz reys)
+          👩 {cp("Faqat ayollar uchun (Xavfsiz reys)")}
         </Checkbox>
         
         <Checkbox
@@ -52,7 +54,7 @@ export default function FilterBar() {
           onChange={(e) => handleChange("delivery", e.target.checked)}
           style={{ color: "#52c41a", fontWeight: 500 }}
         >
-          📦 Pochta olib ketishga rozi
+          📦 {cp("Pochta olib ketishga rozi")}
         </Checkbox>
       </Space>
     </Card>

@@ -2,6 +2,7 @@ import { getAllListings } from './marketStorage.js';
 const API_BASE = (import.meta?.env?.VITE_API_BASE || '').replace(/\/$/, '');
 
 import { loadConfig } from '../shared/config/configService.js';
+import { formatMoneyUZS } from './serviceI18n.js';
 
 const DEFAULT_CFG = {
   enabled: true,
@@ -57,10 +58,5 @@ export async function listMarketCars({ limit, sort='newest' } = {}) {
 }
 
 export function formatPriceUZS(v) {
-  const n = Number(v || 0);
-  try {
-    return new Intl.NumberFormat('uz-UZ').format(n) + " so‘m";
-  } catch {
-    return n.toString() + " so‘m";
-  }
+  return formatMoneyUZS(v);
 }
