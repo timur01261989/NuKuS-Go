@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 // MUHIM: shu import yo'lini sizdagi loyihaga moslang
-import { supabase } from "../../../lib/supabaseClient";
+import { supabase } from "../../../lib/supabase";
 
 const TRANSPORT_OPTIONS = [
   { value: "light_car", label: "Engil mashina" },
