@@ -4,6 +4,7 @@ import qqLatn from './qq_lotin.json';
 import qqKir from './qq_kirill.json';
 import ru from './ru.json';
 import en from './en.json';
+import { DEFAULT_LANGUAGE } from './languages';
 
 export const translations = {
   uz_lotin: uzLatn,
@@ -13,5 +14,9 @@ export const translations = {
   ru,
   en,
 };
+
+export function getLocaleDictionary(language) {
+  return translations[language] || translations[DEFAULT_LANGUAGE] || {};
+}
 
 export default translations;

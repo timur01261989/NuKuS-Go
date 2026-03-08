@@ -45,6 +45,7 @@ export function localizeGeoLabel(value, language = DEFAULT_LANGUAGE) {
   if (SPECIAL[input]?.[lang]) return SPECIAL[input][lang];
   let out = input;
   for (const [rx, to] of (REPL[lang] || [])) out = out.replace(rx, to);
-  if (lang === 'uz_kirill' || lang === 'qq_kirill') out = toCyr(out);
+  if (lang === 'uz_kirill') out = toCyr(out);
+  if (lang === 'qq_kirill') out = toCyr(out).replace(/ўә/gi, 'ўә');
   return out;
 }

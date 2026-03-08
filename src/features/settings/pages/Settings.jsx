@@ -1,23 +1,16 @@
-// src/features/settings/pages/Settings.jsx
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Divider, Select, Switch, Typography, message, Segmented } from 'antd';
-import { useLanguage } from '@shared/i18n/useLanguage'; // Eslatma: useLanguage hook faylingiz mavjudligiga ishonch hosil qiling
+import { useLanguage } from '@shared/i18n/useLanguage';
 import { getLocalizedLanguages, getLocalizedLanguageLabel } from '@shared/i18n/languages';
 import PageBackButton from '@/shared/components/PageBackButton';
 import { useLocation } from 'react-router-dom';
 
 const { Title, Text } = Typography;
 
-/**
- * Night mode qiymatini xavfsiz holatga keltiradi
- */
 function safeNightModeValue(v) {
   return v === 'on' || v === 'off' || v === 'auto' ? v : 'auto';
 }
 
-/**
- * LocalStorage dan boolean qiymatni xavfsiz o'qiydi
- */
 function safeBoolFromLS(v, fallback = true) {
   if (v === '1') return true;
   if (v === '0') return false;
@@ -26,106 +19,66 @@ function safeBoolFromLS(v, fallback = true) {
 
 export default function Settings() {
   const { langKey, setLanguage, t } = useLanguage();
-  
-  // Tillarni joriy tilga moslab olish (memoized)
   const localizedLanguages = useMemo(() => getLocalizedLanguages(langKey), [langKey]);
-  
   const location = useLocation();
-  
-  // Orqaga qaytish manzili (Haydovchi yoki Mijoz ekanligiga qarab)
-  const backFallback = useMemo(() => 
-    (location.pathname.startsWith('/driver') ? '/driver/dashboard' : '/client/home'), 
-    [location.pathname]
-  );
-
+  const backFallback = useMemo(() => (location.pathname.startsWith('/driver') ? '/driver/dashboard' : '/client/home'), [location.pathname]);
   const [nightMode, setNightMode] = useState('auto');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
-  // Sozlamalarni LocalStorage dan yuklash
   useEffect(() => {
     const savedNight = safeNightModeValue(localStorage.getItem('nightMode'));
     setNightMode(savedNight);
-    
     const savedNotif = safeBoolFromLS(localStorage.getItem('notificationsEnabled'), true);
     setNotificationsEnabled(savedNotif);
   }, []);
 
-  /**
-   * Tilni o'zgartirish handler-i
-   */
   const onLang = (v) => {
     setLanguage(v);
-    // Agar t.languageChanged mavjud bo'lmasa, default xabar
-    message.success(t.languageChanged || "Til muvaffaqiyatli o'zgartirildi");
+    message.success(t.languageChanged);
   };
 
-  /**
-   * Tungi rejimni o'zgartirish
-   */
   const onNightMode = (v) => {
     const next = safeNightModeValue(v);
     setNightMode(next);
     localStorage.setItem('nightMode', next);
-    
-    // Tizimga rejim o'zgarganini xabar berish (Global event)
     window.dispatchEvent(new Event('nightModeChanged'));
-    
-    // Xabarnomalar
-    if (next === 'auto') message.success(t.nightModeAuto || "Tungi rejim: Avtomatik");
-    if (next === 'on') message.success(t.nightModeOn || "Tungi rejim: Yoqildi");
-    if (next === 'off') message.success(t.nightModeOff || "Tungi rejim: O'chirildi");
+    if (next === 'auto') message.success(t.nightModeAuto);
+    if (next === 'on') message.success(t.nightModeOn);
+    if (next === 'off') message.success(t.nightModeOff);
   };
 
-  /**
-   * Bildirishnomalarni yoqish/o'chirish
-   */
   const onNotifications = (checked) => {
     setNotificationsEnabled(checked);
     localStorage.setItem('notificationsEnabled', checked ? '1' : '0');
-    message.success(checked 
-      ? (t.notificationsOn || "Bildirishnomalar yoqildi") 
-      : (t.notificationsOff || "Bildirishnomalar o'chirildi")
-    );
+    message.success(checked ? t.notificationsOn : t.notificationsOff);
   };
 
   return (
     <div style={{ padding: 14, maxWidth: 680, margin: '0 auto' }}>
-      {/* Sarlavha va Orqaga tugmasi */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
         <PageBackButton fallback={backFallback} />
         <Title level={3} style={{ margin: 0 }}>
-          {t.settingsTitle || 'Sozlamalar'}
+          {t.settingsTitle}
         </Title>
       </div>
 
       <Card style={{ borderRadius: 16 }}>
-        {/* Tilni tanlash bo'limi */}
-        <Text strong>{t.language || 'Til'}</Text>
+        <Text strong>{t.language}</Text>
         <div style={{ marginTop: 8 }}>
-          <Select 
-            key={langKey} 
-            value={langKey} 
-            options={localizedLanguages.map((lang) => ({ value: lang.key, label: lang.label }))} 
-            style={{ width: '100%' }} 
-            onChange={onLang} 
-            optionLabelProp="label" 
-            popupMatchSelectWidth={false} 
-            labelRender={({ value }) => getLocalizedLanguageLabel(value, langKey)} 
-          />
+          <Select key={langKey} value={langKey} options={localizedLanguages.map((lang) => ({ value: lang.key, label: lang.label }))} style={{ width: '100%' }} onChange={onLang} optionLabelProp="label" popupMatchSelectWidth={false} labelRender={({ value }) => getLocalizedLanguageLabel(value, langKey)} />
         </div>
 
         <Divider />
 
-        {/* Tungi rejim bo'limi */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
           <div style={{ minWidth: 220 }}>
-            <Text strong>{t.nightMode || 'Tungi rejim'}</Text>
+            <Text strong>{t.nightMode}</Text>
             <br />
             <Text type="secondary">
-              {t.nightModeHint || 'Ekran ranglarini tungi vaqtga moslash'}
+              {t.nightModeHint}
               <br />
               <span style={{ opacity: 0.85 }}>
-                {t.current || 'Hozirgi'}: <b>{nightMode}</b>
+                {t.current}: <b>{nightMode}</b>
               </span>
             </Text>
           </div>
@@ -134,21 +87,20 @@ export default function Settings() {
             value={nightMode}
             onChange={onNightMode}
             options={[
-              { label: t.auto || 'Avto', value: 'auto' },
-              { label: t.on || 'On', value: 'on' },
-              { label: t.off || 'Off', value: 'off' },
+              { label: t.auto, value: 'auto' },
+              { label: t.on, value: 'on' },
+              { label: t.off, value: 'off' },
             ]}
           />
         </div>
 
         <Divider />
 
-        {/* Bildirishnomalar bo'limi */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <Text strong>{t.notifications || 'Bildirishnomalar'}</Text>
+            <Text strong>{t.notifications}</Text>
             <br />
-            <Text type="secondary">{t.notificationsHint || 'Ilova ichidagi xabarlar haqida bildirish'}</Text>
+            <Text type="secondary">{t.notificationsHint}</Text>
           </div>
 
           <Switch checked={notificationsEnabled} onChange={onNotifications} />

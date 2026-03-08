@@ -1,1060 +1,230 @@
 import { translations } from '@i18n/translations';
+import { DEFAULT_LANGUAGE, normalizeLanguageKey } from './languages';
 
-const PHRASES = {
-
-  "Haydovchi qidirilmoqda": {
-    uz_kirill: "Ҳайдовчи қидирилмоқда",
-    qq_lotin: "Aydawshı izlenbekte",
-    qq_kirill: "Айдаўшы изленбекте",
-    ru: "Идёт поиск водителя",
-    en: "Searching for a driver",
+const MANUAL_PHRASES = {
+  "Qaerga borasiz?": {
+    uz_kirill: 'Қаерга борасиз?',
+    qq_lotin: 'Qayda barasız?',
+    qq_kirill: 'Қайда барасыз?',
+    ru: 'Куда поедете?',
+    en: 'Where to?',
   },
-  "Bekor qilish": {
-    uz_kirill: "Бекор қилиш",
-    qq_lotin: "Biykar qılıw",
-    qq_kirill: "Бийкар қылыў",
-    ru: "Отмена",
-    en: "Cancel",
+  "Hozircha saqlangan manzillar yo'q": {
+    uz_kirill: 'Ҳозирча сақланган манзиллар йўқ',
+    qq_lotin: "Házirge shekem saqlanǵan mánziller joq",
+    qq_kirill: 'Ҳәзирге шекем сақланған мәнзиллер жоқ',
+    ru: 'Сохранённых адресов пока нет',
+    en: 'No saved addresses yet',
   },
-  "Buyurtmalar tarixi": {
-    uz_kirill: "Буюртмалар тарихи",
-    qq_lotin: "Buyırtpalar tariyxı",
-    qq_kirill: "Буйыртпалар тарийхы",
-    ru: "История заказов",
-    en: "Order history",
+  'Xarita': {
+    uz_kirill: 'Харита', qq_lotin: 'Xárite', qq_kirill: 'Харите', ru: 'Карта', en: 'Map'
   },
-  "Qo'llab-quvvatlash": {
-    uz_kirill: "Қўллаб-қувватлаш",
-    qq_lotin: "Qollap-quwatlaw",
-    qq_kirill: "Қоллап-қуўатлаў",
-    ru: "Поддержка",
-    en: "Support",
+  'Buyurtma yuborilmoqda': {
+    uz_kirill: 'Буюртма юборилмоқда', qq_lotin: 'Buyırtpa jiberilmekte', qq_kirill: 'Буйыртпа жиберилмекте', ru: 'Отправка заказа', en: 'Sending order'
   },
-  "Manzil tanlanmagan": {
-    uz_kirill: "Манзил танланмаган",
-    qq_lotin: "Mánzil tańlanbaǵan",
-    qq_kirill: "Мәнзил таңланбаған",
-    ru: "Адрес не выбран",
-    en: "Address not selected",
+  'Yo‘lovchi olish nuqtasi': {
+    uz_kirill: 'Йўловчи олиш нуқтаси', qq_lotin: 'Jolawshını alıw noqatı', qq_kirill: 'Жолаўшыны алыў ноқаты', ru: 'Точка посадки пассажира', en: 'Passenger pickup point'
   },
-  "Haydovchi bo‘lib ishlash": {
-    uz_kirill: "Ҳайдовчи бўлиб ишлаш",
-    qq_lotin: "Aydawshı bolıp islew",
-    qq_kirill: "Айдаўшы болып ислеў",
-    ru: "Работать водителем",
-    en: "Work as a driver",
+  'Yakuniy nuqta': {
+    uz_kirill: 'Якуний нуқта', qq_lotin: 'Aqırǵı noqat', qq_kirill: 'Ақырғы ноқат', ru: 'Конечная точка', en: 'Final point'
   },
-  "Chiqish": {
-    uz_kirill: "Чиқиш",
-    qq_lotin: "Shıǵıw",
-    qq_kirill: "Шығыў",
-    ru: "Выйти",
-    en: "Logout",
+  'Manzil aniqlanmoqda...': {
+    uz_kirill: 'Манзил аниқланмоқда...', qq_lotin: 'Mánzil anıqlanbaqta...', qq_kirill: 'Мәнзил анықланбақта...', ru: 'Определение адреса...', en: 'Resolving address...'
   },
-  "Haydovchi qidirish": {
-    uz_kirill: "Ҳайдовчи қидириш",
-    qq_lotin: "Aydawshı izlew",
-    qq_kirill: "Айдаўшы излеў",
-    ru: "Найти водителя",
-    en: "Find driver",
+  'Shahar ichida taksi': {
+    uz_kirill: 'Шаҳар ичида такси', qq_lotin: 'Qala ishinde taksi', qq_kirill: 'Қала ишинде такси', ru: 'Городское такси', en: 'City taxi'
   },
-  "Haydovchi topildi!": {
-    uz_kirill: "Ҳайдовчи топилди!",
-    qq_lotin: "Aydawshı tabıldı!",
-    qq_kirill: "Айдаўшы табылды!",
-    ru: "Водитель найден!",
-    en: "Driver found!",
+  'Viloyatlar aro': {
+    uz_kirill: 'Вилоятлар аро', qq_lotin: 'Walayatlar arası', qq_kirill: 'Ўәлаятлар арасы', ru: 'Между областями', en: 'Inter-provincial'
   },
-  "Haydovchi kelmoqda": {
-    uz_kirill: "Ҳайдовчи келмоқда",
-    qq_lotin: "Aydawshı kelmekte",
-    qq_kirill: "Айдаўшы келмекте",
-    ru: "Водитель едет к вам",
-    en: "Driver is arriving",
+  'Tumanlar aro': {
+    uz_kirill: 'Туманлар аро', qq_lotin: 'Rayonlar arası', qq_kirill: 'Районлар арасы', ru: 'Межрайон', en: 'Inter-district'
   },
-  "Qayerdan": {
-    uz_kirill: "Қаердан",
-    qq_lotin: "Qayerden",
-    qq_kirill: "Қайерден",
-    ru: "Откуда",
-    en: "From",
+  'Yuk tashish': {
+    uz_kirill: 'Юк ташиш', qq_lotin: 'Júk tasıw', qq_kirill: 'Жүк тасыў', ru: 'Грузоперевозки', en: 'Freight'
   },
-  "Qayerga": {
-    uz_kirill: "Қаерга",
-    qq_lotin: "Qayerge",
-    qq_kirill: "Қайерге",
-    ru: "Куда",
-    en: "To",
+  'Eltish xizmati': {
+    uz_kirill: 'Элтиш хизмати', qq_lotin: 'Jetkiziw xızmeti', qq_kirill: 'Жеткизиў хизмети', ru: 'Доставка', en: 'Delivery'
   },
-  "Masofa": {
-    uz_kirill: "Масофа",
-    qq_lotin: "Aralıq",
-    qq_kirill: "Аралық",
-    ru: "Расстояние",
-    en: "Distance",
+  'Mening manzillarim': {
+    uz_kirill: 'Менинг манзилларим', qq_lotin: 'Meniń mánzillerim', qq_kirill: 'Мениң мәнзиллерим', ru: 'Мои адреса', en: 'My addresses'
   },
-  "Narx": {
-    uz_kirill: "Нарх",
-    qq_lotin: "Baha",
-    qq_kirill: "Баҳа",
-    ru: "Цена",
-    en: "Price",
+  'Natijalar': {
+    uz_kirill: 'Натижалар', qq_lotin: 'Nátiyjeler', qq_kirill: 'Нәтийжелер', ru: 'Результаты', en: 'Results'
   },
-  "Yetib keldim": {
-    uz_kirill: "Етиб келдим",
-    qq_lotin: "Jetip keldim",
-    qq_kirill: "Жетип келдим",
-    ru: "Я прибыл",
-    en: "I arrived",
+  'Tayyor': {
+    uz_kirill: 'Тайёр', qq_lotin: 'Tayár', qq_kirill: 'Таяр', ru: 'Готово', en: 'Ready'
   },
-  "Kettik": {
-    uz_kirill: "Кеттик",
-    qq_lotin: "Kettik",
-    qq_kirill: "Кеттик",
-    ru: "Поехали",
-    en: "Let's go",
+  'Masofa belgilangan me\'yoridan ortiq': {
+    uz_kirill: 'Масофа белгиланган меъёридан ортиқ', qq_lotin: 'Aralıq belgilengennen artıq', qq_kirill: 'Аралық белгиленгеннен артық', ru: 'Расстояние превышает лимит', en: 'Distance exceeds the limit'
   },
-  "Safarni yakunlash": {
-    uz_kirill: "Сафарни якунлаш",
-    qq_lotin: "Sapardı juwmaqlaw",
-    qq_kirill: "Сапарды жуўмақлаў",
-    ru: "Завершить поездку",
-    en: "Finish trip",
-  },
-  "Shahar": {
-    uz_kirill: "Шаҳар",
-    qq_lotin: "Qala",
-    qq_kirill: "Қала",
-    ru: "Город",
-    en: "City",
-  },
-  "Qo'shish": {
-    uz_kirill: "Қўшиш",
-    qq_lotin: "Qosıw",
-    qq_kirill: "Қосыў",
-    ru: "Добавить",
-    en: "Add",
-  },
-  "O'chirish": {
-    uz_kirill: "Ўчириш",
-    qq_lotin: "Óshiriw",
-    qq_kirill: "Өшириў",
-    ru: "Удалить",
-    en: "Delete",
-  },
-  "Qo'llash": {
-    uz_kirill: "Қўллаш",
-    qq_lotin: "Qollanıw",
-    qq_kirill: "Қолланыў",
-    ru: "Применить",
-    en: "Apply",
-  },
-  "To'lov usullari": {
-    uz_kirill: "Тўлов усуллари",
-    qq_lotin: "Tólew usılları",
-    qq_kirill: "Төлеў усыллары",
-    ru: "Способы оплаты",
-    en: "Payment methods",
-  },
-  "Promokodlar": {
-    uz_kirill: "Промокодлар",
-    qq_lotin: "Promokodlar",
-    qq_kirill: "Промокодлар",
-    ru: "Промокоды",
-    en: "Promo codes",
-  },
-  "Mening manzillarim": {
-    uz_kirill: "Менинг манзилларим",
-    qq_lotin: "Meniń mánzillerim",
-    qq_kirill: "Мениң мәнзиллерим",
-    ru: "Мои адреса",
-    en: "My addresses",
-  },
-  "Profil": {
-    uz_kirill: "Профил",
-    qq_lotin: "Profil",
-    qq_kirill: "Профиль",
-    ru: "Профиль",
-    en: "Profile",
-  },
-  "Hamyon": {
-    uz_kirill: "Ҳамён",
-    qq_lotin: "Hamyan",
-    qq_kirill: "Ҳамян",
-    ru: "Кошелёк",
-    en: "Wallet",
-  },
-  "Balans": {
-    uz_kirill: "Баланс",
-    qq_lotin: "Balans",
-    qq_kirill: "Баланс",
-    ru: "Баланс",
-    en: "Balance",
-  },
-  "Yangi hisob yaratish": {
-    uz_kirill: "Янги ҳисоб яратиш",
-    qq_lotin: "Jańa esap jaratıw",
-    qq_kirill: "Жаңа есап жаратыў",
-    ru: "Создать новый аккаунт",
-    en: "Create a new account",
-  },
-  "Ro'yxatdan o'tish": {
-    uz_kirill: "Рўйхатдан ўтиш",
-    qq_lotin: "Dizimnen ótiw",
-    qq_kirill: "Дизимнен өтиў",
-    ru: "Регистрация",
-    en: "Sign up",
-  },
-  "Telefon raqam": {
-    uz_kirill: "Телефон рақам",
-    qq_lotin: "Telefon nomeri",
-    qq_kirill: "Телефон номери",
-    ru: "Номер телефона",
-    en: "Phone number",
-  },
-  "Parol": {
-    uz_kirill: "Парол",
-    qq_lotin: "Parol",
-    qq_kirill: "Пароль",
-    ru: "Пароль",
-    en: "Password",
-  },
-  "Kamida 6 ta belgi": {
-    uz_kirill: "Камида 6 та белги",
-    qq_lotin: "Keminde 6 belgi",
-    qq_kirill: "Кеминде 6 белги",
-    ru: "Минимум 6 символов",
-    en: "At least 6 characters",
-  },
-  "Ism": {
-    uz_kirill: "Исм",
-    qq_lotin: "At",
-    qq_kirill: "Ат",
-    ru: "Имя",
-    en: "First name",
-  },
-  "Ismingiz": {
-    uz_kirill: "Исмингиз",
-    qq_lotin: "Atıńız",
-    qq_kirill: "Атыңыз",
-    ru: "Ваше имя",
-    en: "Your first name",
-  },
-  "Familiya": {
-    uz_kirill: "Фамилия",
-    qq_lotin: "Familiya",
-    qq_kirill: "Фамилия",
-    ru: "Фамилия",
-    en: "Last name",
-  },
-  "Familiyangiz": {
-    uz_kirill: "Фамилиянгиз",
-    qq_lotin: "Familiyańız",
-    qq_kirill: "Фамилияңыз",
-    ru: "Ваша фамилия",
-    en: "Your last name",
-  },
-  "SMS KOD OLISH": {
-    uz_kirill: "СМС КОД ОЛИШ",
-    qq_lotin: "SMS KOD ALIW",
-    qq_kirill: "СМС КОД АЛЫЎ",
-    ru: "ПОЛУЧИТЬ SMS-КОД",
-    en: "GET SMS CODE",
-  },
-  "Yuborilmoqda...": {
-    uz_kirill: "Юборилмоқда...",
-    qq_lotin: "Jiberilmekte...",
-    qq_kirill: "Жиберилмекте...",
-    ru: "Отправка...",
-    en: "Sending...",
-  },
-  "Allaqachon hisobingiz bormi?": {
-    uz_kirill: "Аллақачон ҳисобингиз борми?",
-    qq_lotin: "Esabıńız barma?",
-    qq_kirill: "Есабыңыз барма?",
-    ru: "Уже есть аккаунт?",
-    en: "Already have an account?",
-  },
-  "Kirish": {
-    uz_kirill: "Кириш",
-    qq_lotin: "Kiriw",
-    qq_kirill: "Кириў",
-    ru: "Войти",
-    en: "Login",
-  },
-  "Kod yuborildi:": {
-    uz_kirill: "Код юборилди:",
-    qq_lotin: "Kod jiberildi:",
-    qq_kirill: "Код жиберилди:",
-    ru: "Код отправлен:",
-    en: "Code sent to:",
-  },
-  "Iltimos, SMS orqali kelgan 6 xonali kodni kiriting.": {
-    uz_kirill: "Илтимос, СМС орқали келган 6 хонали кодни киритинг.",
-    qq_lotin: "SMS arqalı kelgen 6 xonali kodtı kiritiń.",
-    qq_kirill: "СМС арқалы келген 6 хоналы кодты киритиң.",
-    ru: "Введите 6-значный код из SMS.",
-    en: "Enter the 6-digit code from SMS.",
-  },
-  "SMS KOD": {
-    uz_kirill: "СМС КОД",
-    qq_lotin: "SMS KOD",
-    qq_kirill: "СМС КОД",
-    ru: "SMS КОД",
-    en: "SMS CODE",
-  },
-  "Tekshirilmoqda...": {
-    uz_kirill: "Текширилмоқда...",
-    qq_lotin: "Tekserilmekte...",
-    qq_kirill: "Тексерилмекте...",
-    ru: "Проверка...",
-    en: "Verifying...",
-  },
-  "TASDIQLASH": {
-    uz_kirill: "ТАСДИҚЛАШ",
-    qq_lotin: "TASTIYIQLAW",
-    qq_kirill: "ТАСТЫЙЫҚЛАЎ",
-    ru: "ПОДТВЕРДИТЬ",
-    en: "CONFIRM",
-  },
-  "Kod kelmadimi?": {
-    uz_kirill: "Код келмадими?",
-    qq_lotin: "Kod kelmedime?",
-    qq_kirill: "Код келмедиме?",
-    ru: "Код не пришёл?",
-    en: "Didn't get the code?",
-  },
-  "Qayta yuborish": {
-    uz_kirill: "Қайта юбориш",
-    qq_lotin: "Qayta jiberiw",
-    qq_kirill: "Қайта жибериў",
-    ru: "Отправить повторно",
-    en: "Resend",
-  },
-  "SMS kod yuborildi!": {
-    uz_kirill: "СМС код юборилди!",
-    qq_lotin: "SMS kod jiberildi!",
-    qq_kirill: "СМС код жиберилди!",
-    ru: "SMS-код отправлен!",
-    en: "SMS code sent!",
-  },
-  "SMS kod qayta yuborildi!": {
-    uz_kirill: "СМС код қайта юборилди!",
-    qq_lotin: "SMS kod qayta jiberildi!",
-    qq_kirill: "СМС код қайта жиберилди!",
-    ru: "SMS-код отправлен повторно!",
-    en: "SMS code resent!",
-  },
-  "Ismingizni kiriting.": {
-    uz_kirill: "Исмингизни киритинг.",
-    qq_lotin: "Atıńızdı kiritiń.",
-    qq_kirill: "Атыңызды киритиң.",
-    ru: "Введите имя.",
-    en: "Enter your first name.",
-  },
-  "Familiyangizni kiriting.": {
-    uz_kirill: "Фамилиянгизни киритинг.",
-    qq_lotin: "Familiyańızdı kiritiń.",
-    qq_kirill: "Фамилияңызды киритиң.",
-    ru: "Введите фамилию.",
-    en: "Enter your last name.",
-  },
-  "Telefon raqamni to'liq kiriting (9 ta raqam).": {
-    uz_kirill: "Телефон рақамни тўлиқ киритинг (9 та рақам).",
-    qq_lotin: "Telefon nomerin tolıq kiritiń (9 san).",
-    qq_kirill: "Телефон номерин толық киритиң (9 сан).",
-    ru: "Введите полный номер телефона (9 цифр).",
-    en: "Enter the full phone number (9 digits).",
-  },
-  "Parol kamida 6 ta belgidan iborat bo'lsin.": {
-    uz_kirill: "Парол камида 6 та белгидан иборат бўлсин.",
-    qq_lotin: "Parol keminde 6 belgiden ibarat bolsın.",
-    qq_kirill: "Пароль кеминде 6 белгиден ибарат болсын.",
-    ru: "Пароль должен быть не менее 6 символов.",
-    en: "Password must be at least 6 characters.",
-  },
-  "Kod 6 ta raqam bo'lishi kerak.": {
-    uz_kirill: "Код 6 та рақам бўлиши керак.",
-    qq_lotin: "Kod 6 san bolıwı kerek.",
-    qq_kirill: "Код 6 сан болыўы керек.",
-    ru: "Код должен состоять из 6 цифр.",
-    en: "Code must be 6 digits.",
-  },
-  "Telefon raqam topilmadi. Qaytadan urinib ko'ring.": {
-    uz_kirill: "Телефон рақам топилмади. Қайтaдан уриниб кўринг.",
-    qq_lotin: "Telefon nomeri tabılmadı. Qaytadan urınıp kóriń.",
-    qq_kirill: "Телефон номери табылмады. Қайтaдан урынып көриң.",
-    ru: "Номер телефона не найден. Попробуйте снова.",
-    en: "Phone number not found. Please try again.",
-  },
-  "Muvaffaqiyatli ro'yxatdan o'tdingiz!": {
-    uz_kirill: "Муваффақиятли рўйхатдан ўтдингиз!",
-    qq_lotin: "Muwapıyyatlı dizimnen óttińiz!",
-    qq_kirill: "Муваппақиятлы дизимнен өттиңиз!",
-    ru: "Регистрация успешно завершена!",
-    en: "You registered successfully!",
-  },
-  "Xatolik:": {
-    uz_kirill: "Хатолик:",
-    qq_lotin: "Qatelik:",
-    qq_kirill: "Қәтелик:",
-    ru: "Ошибка:",
-    en: "Error:",
-  },
-  "Noma'lum xatolik": {
-    uz_kirill: "Номаълум хатолик",
-    qq_lotin: "Belgisiz qatelik",
-    qq_kirill: "Белгисиз қәтелик",
-    ru: "Неизвестная ошибка",
-    en: "Unknown error",
-  },
-  "Parolni tiklash": {
-    uz_kirill: "Паролни тиклаш",
-    qq_lotin: "Paroldi tiklew",
-    qq_kirill: "Парольди тиклеў",
-    ru: "Сброс пароля",
-    en: "Reset password",
-  },
-  "Telefon raqamingizni kiriting": {
-    uz_kirill: "Телефон рақамингизни киритинг",
-    qq_lotin: "Telefon nomerińizdi kiritiń",
-    qq_kirill: "Телефон номериңизди киритиң",
-    ru: "Введите номер телефона",
-    en: "Enter your phone number",
-  },
-  "SMS kod va yangi parolni kiriting": {
-    uz_kirill: "СМС код ва янги паролни киритинг",
-    qq_lotin: "SMS kod hám jańa paroldi kiritiń",
-    qq_kirill: "СМС код ҳәм жаңа парольди киритиң",
-    ru: "Введите SMS-код и новый пароль",
-    en: "Enter the SMS code and new password",
-  },
-  "Yangi parol": {
-    uz_kirill: "Янги парол",
-    qq_lotin: "Jańa parol",
-    qq_kirill: "Жаңа пароль",
-    ru: "Новый пароль",
-    en: "New password",
-  },
-  "Parolni tasdiqlang": {
-    uz_kirill: "Паролни тасдиқланг",
-    qq_lotin: "Paroldi tastıyıqlań",
-    qq_kirill: "Парольди тастыйықлаң",
-    ru: "Подтвердите пароль",
-    en: "Confirm password",
-  },
-  "Saqlash": {
-    uz_kirill: "Сақлаш",
-    qq_lotin: "Saqlaw",
-    qq_kirill: "Сақлаў",
-    ru: "Сохранить",
-    en: "Save",
-  },
-  "Ortga": {
-    uz_kirill: "Орқага",
-    qq_lotin: "Artqa",
-    qq_kirill: "Артқа",
-    ru: "Назад",
-    en: "Back",
-  },
-  "Yuklanmoqda...": {
-    uz_kirill: "Юкланмоқда...",
-    qq_lotin: "Júklenbekte...",
-    qq_kirill: "Жүкленбекте...",
-    ru: "Загрузка...",
-    en: "Loading...",
-  },
-  "Asosiy": {
-    uz_kirill: "Асосий",
-    qq_lotin: "Tiykarǵı",
-    qq_kirill: "Тийкарғы",
-    ru: "Главная",
-    en: "Home",
-  },
-  "Tarix": {
-    uz_kirill: "Тарих",
-    qq_lotin: "Tarıyx",
-    qq_kirill: "Тарийх",
-    ru: "История",
-    en: "History",
-  },
-  "Sozlamalar": {
-    uz_kirill: "Созламалар",
-    qq_lotin: "Sazlawlar",
-    qq_kirill: "Сазлаўлар",
-    ru: "Настройки",
-    en: "Settings",
-  },
-  "Menu": {
-    uz_kirill: "Меню",
-    qq_lotin: "Menyu",
-    qq_kirill: "Меню",
-    ru: "Меню",
-    en: "Menu",
-  },
-  "Arizangiz ko'rib chiqilmoqda": {
-    uz_kirill: "Аризангиз кўриб чиқилмоқда",
-    qq_lotin: "Arızanız kórip shıǵılmaqta",
-    qq_kirill: "Арызаңыз көрип шығылмақта",
-    ru: "Ваша заявка рассматривается",
-    en: "Your application is under review",
-  },
-  "Siz yuborgan ma'lumotlar hozirda administratorlarimiz tomonidan tekshirilmoqda. Bu jarayon odatda 24 soat ichida yakunlanadi.": {
-    uz_kirill: "Сиз юборган маълумотлар ҳозирда администраторларимиз томонидан текширилмоқда. Бу жараён одатда 24 соат ичида якунланади.",
-    qq_lotin: "Siz jibergen maǵlıwmatlar administratorlar tárepinen tekserilmekte. Ádetde bul process 24 saat ishinde tamamlanadı.",
-    qq_kirill: "Сиз жиберген мағлыўматлар администраторлар тәрепинен тексерилмекте. Әдетте бул процесс 24 саат ишинде тамамланады.",
-    ru: "Отправленные вами данные сейчас проверяются администраторами. Обычно это занимает до 24 часов.",
-    en: "Your submitted information is currently being reviewed by our administrators. This usually takes up to 24 hours.",
-  },
-  "Yo'lovchi rejimiga o'tish": {
-    uz_kirill: "Йўловчи режимига ўтиш",
-    qq_lotin: "Jolawshı rejimine ótiw",
-    qq_kirill: "Жолаўшы режимине өтиў",
-    ru: "Переключиться в режим пассажира",
-    en: "Switch to passenger mode",
-  },
-  "Holatni yangilash": {
-    uz_kirill: "Ҳолатни янгилаш",
-    qq_lotin: "Statusdı jańalaw",
-    qq_kirill: "Статусты жаңалаў",
-    ru: "Обновить статус",
-    en: "Refresh status",
-  },
-  "Tabriklaymiz!": {
-    uz_kirill: "Табриклаймиз!",
-    qq_lotin: "Qutlıqlaymız!",
-    qq_kirill: "Қутлықлаймыз!",
-    ru: "Поздравляем!",
-    en: "Congratulations!",
-  },
-  "Sizning haydovchilik arizangiz muvaffaqiyatli tasdiqlandi. Endi siz buyurtmalarni qabul qilishingiz mumkin.": {
-    uz_kirill: "Сизнинг ҳайдовчилик аризангиз муваффақиятли тасдиқланди. Энди сиз буюртмаларни қабул қилишингиз мумкин.",
-    qq_lotin: "Aydawshılıq arızanız tastıyıqlandı. Endi buyırtpalardı qabıl ete alasız.",
-    qq_kirill: "Айдаўшылық арызаңыз тастыйықланды. Енди буйыртпаларды қабул ете аласыз.",
-    ru: "Ваша заявка водителя успешно одобрена. Теперь вы можете принимать заказы.",
-    en: "Your driver application has been approved. You can now accept orders.",
-  },
-  "Ishni boshlash": {
-    uz_kirill: "Ишни бошлаш",
-    qq_lotin: "Isti baslaw",
-    qq_kirill: "Исти баслаў",
-    ru: "Начать работу",
-    en: "Start working",
-  },
-  "Arizangiz rad etildi": {
-    uz_kirill: "Аризангиз рад этилди",
-    qq_lotin: "Arızanız biykar etildi",
-    qq_kirill: "Арызаңыз бийкар етилди",
-    ru: "Ваша заявка отклонена",
-    en: "Your application was rejected",
-  },
-  "Sabab:": {
-    uz_kirill: "Сабаб:",
-    qq_lotin: "Sebep:",
-    qq_kirill: "Себеп:",
-    ru: "Причина:",
-    en: "Reason:",
-  },
-  "Ma'lumotlarni tahrirlash": {
-    uz_kirill: "Маълумотларни таҳрирлаш",
-    qq_lotin: "Maǵlıwmatlardı ózgertiw",
-    qq_kirill: "Мағлыўматларды өзгертиў",
-    ru: "Изменить данные",
-    en: "Edit information",
-  },
-  "Yo'lovchi sifatida davom etish": {
-    uz_kirill: "Йўловчи сифатида давом этиш",
-    qq_lotin: "Jolawshı sıpatında davam etiw",
-    qq_kirill: "Жолаўшы сыпатында давам етиў",
-    ru: "Продолжить как пассажир",
-    en: "Continue as passenger",
-  },
-  "E'tibor bering": {
-    uz_kirill: "Эътибор беринг",
-    qq_lotin: "Názar awdarıń",
-    qq_kirill: "Назар аўдарың",
-    ru: "Обратите внимание",
-    en: "Attention",
-  },
-  "Asosiy sahifaga qaytish": {
-    uz_kirill: "Асосий саҳифага қайтиш",
-    qq_lotin: "Tiykarǵı betke qaytıw",
-    qq_kirill: "Тийкарғы бетке қайтыў",
-    ru: "Вернуться на главную",
-    en: "Return to home",
-  },
-  "Viloyatni tanlang": {
-    uz_kirill: "Вилоятни танланг",
-    qq_lotin: "Wálayattı tańlań",
-    qq_kirill: "Ўалятты таңлаң",
-    ru: "Выберите область",
-    en: "Select region",
-  },
-  "Tumanni tanlang (ixtiyoriy)": {
-    uz_kirill: "Туманни танланг (ихтиёрий)",
-    qq_lotin: "Rayondı tańlań (ixtiyariy)",
-    qq_kirill: "Районды таңлаң (иҳтиярий)",
-    ru: "Выберите район (необязательно)",
-    en: "Select district (optional)",
-  },
-  "Viloyat / Qoraqalpogʻiston": {
-    uz_kirill: "Вилоят / Қорақалпоғистон",
-    qq_lotin: "Wálayat / Qaraqalpaqstan",
-    qq_kirill: "Ўалят / Қарақалпақстан",
-    ru: "Область / Каракалпакстан",
-    en: "Region / Karakalpakstan",
-  },
-  "Tuman (ixtiyoriy)": {
-    uz_kirill: "Туман (ихтиёрий)",
-    qq_lotin: "Rayon (ixtiyariy)",
-    qq_kirill: "Район (иҳтиярий)",
-    ru: "Район (необязательно)",
-    en: "District (optional)",
-  },
-  "Tuman": {
-    uz_kirill: "Туман",
-    qq_lotin: "Rayon",
-    qq_kirill: "Район",
-    ru: "Район",
-    en: "District",
-  },
-  "Manzil": {
-    uz_kirill: "Манзил",
-    qq_lotin: "Mánzil",
-    qq_kirill: "Мәнзил",
-    ru: "Адрес",
-    en: "Address",
-  },
-  "Manzil kerak": {
-    uz_kirill: "Манзил керак",
-    qq_lotin: "Mánzil kerek",
-    qq_kirill: "Мәнзил керек",
-    ru: "Адрес обязателен",
-    en: "Address is required",
-  },
-  "Manzilni yozing": {
-    uz_kirill: "Манзилни ёзинг",
-    qq_lotin: "Mánzildi jazıń",
-    qq_kirill: "Мәнзилди жазың",
-    ru: "Введите адрес",
-    en: "Enter the address",
-  },
-  "Buyurtma": {
-    uz_kirill: "Буюртма",
-    qq_lotin: "Buyırtpa",
-    qq_kirill: "Буйыртпа",
-    ru: "Заказ",
-    en: "Order",
-  },
-  "Qidirishni to‘xtatish": {
-    uz_kirill: "Қидиришни тўхтатиш",
-    qq_lotin: "Izlewdi toqtatıw",
-    qq_kirill: "Излеўди тоқтатыў",
-    ru: "Остановить поиск",
-    en: "Stop searching",
-  },
-  "Haydovchi qidirish": {
-    uz_kirill: "Ҳайдовчи қидириш",
-    qq_lotin: "Aydawshı izlew",
-    qq_kirill: "Айдаўшы излеў",
-    ru: "Искать водителя",
-    en: "Find a driver",
-  },
-  "Buyurtma berish": {
-    uz_kirill: "Буюртма бериш",
-    qq_lotin: "Buyırtpa beriw",
-    qq_kirill: "Буйыртпа бериў",
-    ru: "Заказать",
-    en: "Place order",
-  },
-  "Hozircha safarlar yo'q": {
-    uz_kirill: "Ҳозирча сафарлар йўқ",
-    qq_lotin: "Házirge saparlar joq",
-    qq_kirill: "Ҳәзирге сапарлар жоқ",
-    ru: "Пока поездок нет",
-    en: "No trips yet",
-  },
-  "Yakunlandi": {
-    uz_kirill: "Якунланди",
-    qq_lotin: "Juwmaqlandı",
-    qq_kirill: "Жуўмақланды",
-    ru: "Завершён",
-    en: "Completed",
-  },
-  "Bekor qilingan": {
-    uz_kirill: "Бекор қилинган",
-    qq_lotin: "Biykar qılınǵan",
-    qq_kirill: "Бийкар қылынған",
-    ru: "Отменён",
-    en: "Cancelled",
-  },
-  "Boshlang'ich nuqta": {
-    uz_kirill: "Бошланғич нуқта",
-    qq_lotin: "Baslanǵısh noqta",
-    qq_kirill: "Басланғыш ноқта",
-    ru: "Точка отправления",
-    en: "Pickup point",
-  },
-  "Manzilga yetib borildi": {
-    uz_kirill: "Манзилга етиб борилди",
-    qq_lotin: "Mánzilge jetip barıldı",
-    qq_kirill: "Мәнзилге жетип барылды",
-    ru: "Прибытие в пункт назначения",
-    en: "Arrived at destination",
-  },
-  "Safar qanday o'tdi?": {
-    uz_kirill: "Сафар қандай ўтди?",
-    qq_lotin: "Sapar qalay ótti?",
-    qq_kirill: "Сапар қалай өтти?",
-    ru: "Как прошла поездка?",
-    en: "How was the trip?",
-  },
-  "Haydovchining xizmatini baholang": {
-    uz_kirill: "Ҳайдовчининг хизматини баҳоланг",
-    qq_lotin: "Aydawshı xızmetin bahalań",
-    qq_kirill: "Айдаўшы хызметин баҳалаң",
-    ru: "Оцените обслуживание водителя",
-    en: "Rate the driver's service",
-  },
-  "O'tkazib yuborish": {
-    uz_kirill: "Ўтказиб юбориш",
-    qq_lotin: "Ótkerip jiberiw",
-    qq_kirill: "Өткерип жибериў",
-    ru: "Пропустить",
-    en: "Skip",
-  },
-  "Haydovchi bilan chat": {
-    uz_kirill: "Ҳайдовчи билан чат",
-    qq_lotin: "Aydawshı menen chat",
-    qq_kirill: "Айдаўшы менен чат",
-    ru: "Чат с водителем",
-    en: "Chat with driver",
-  },
-  "Chiqyapman": {
-    uz_kirill: "Чиқяпман",
-    qq_lotin: "Shıǵıp atırman",
-    qq_kirill: "Шығып атырман",
-    ru: "Уже выхожу",
-    en: "I'm coming out",
-  },
-  "Qayerdasiz?": {
-    uz_kirill: "Қаердасиз?",
-    qq_lotin: "Qayerdesiz?",
-    qq_kirill: "Қайердесиз?",
-    ru: "Где вы?",
-    en: "Where are you?",
-  },
-  "Kirish oldidaman": {
-    uz_kirill: "Кириш олдидаман",
-    qq_lotin: "Kiriw aldındaman",
-    qq_kirill: "Кириў алдындаман",
-    ru: "Я у входа",
-    en: "I'm at the entrance",
-  },
-  "Hozir yetib boraman": {
-    uz_kirill: "Ҳозир етиб бораман",
-    qq_lotin: "Házir jetip baraman",
-    qq_kirill: "Ҳәзир жетип бараман",
-    ru: "Сейчас подъеду",
-    en: "I'll arrive shortly",
-  },
-  "Shahar ichida Taksi": {
-    uz_kirill: "Шаҳар ичида Такси",
-    qq_lotin: "Qala ishinde Taksi",
-    qq_kirill: "Қала ишинде Такси",
-    ru: "Городское такси",
-    en: "City taxi",
-  },
-  "Viloyatlar aro": {
-    uz_kirill: "Вилоятлар аро",
-    qq_lotin: "Wálayatlar ara",
-    qq_kirill: "Ўалятлар ара",
-    ru: "Межобластные поездки",
-    en: "Inter-regional",
-  },
-  "Tumanlar aro": {
-    uz_kirill: "Туманлар аро",
-    qq_lotin: "Rayonlar ara",
-    qq_kirill: "Районлар ара",
-    ru: "Межрайонные поездки",
-    en: "Inter-district",
-  },
-  "Yuk tashish": {
-    uz_kirill: "Юк ташиш",
-    qq_lotin: "Júk tasıw",
-    qq_kirill: "Жүк тасыў",
-    ru: "Грузоперевозки",
-    en: "Freight",
-  },
-  "Eltish xizmati": {
-    uz_kirill: "Элтиш хизмати",
-    qq_lotin: "Jetkerip beriw",
-    qq_kirill: "Жеткерип бериў",
-    ru: "Доставка",
-    en: "Delivery",
-  },
-  "Avto Savdo": {
-    uz_kirill: "Авто Савдо",
-    qq_lotin: "Avto Sawdo",
-    qq_kirill: "Авто Савдо",
-    ru: "Авто рынок",
-    en: "Auto market",
-  },
-  "Yangi qo'shilgan mashinalar": {
-    uz_kirill: "Янги қўшилган машиналар",
-    qq_lotin: "Jańa qosılǵan mashinalar",
-    qq_kirill: "Жаңа қосылған машиналар",
-    ru: "Недавно добавленные автомобили",
-    en: "Newly added cars",
-  },
-  "Barchasi": {
-    uz_kirill: "Барчаси",
-    qq_lotin: "Bárshesi",
-    qq_kirill: "Баршасы",
-    ru: "Все",
-    en: "View all",
-  },
-  "Yo'lovchi sahifasi": {
-    uz_kirill: "Йўловчи саҳифаси",
-    qq_lotin: "Jolawshı beti",
-    qq_kirill: "Жолаўшы бети",
-    ru: "Страница пассажира",
-    en: "Passenger page",
-  },
-  "Insights": {
-    uz_kirill: "Инсайтс",
-    qq_lotin: "Statistika",
-    qq_kirill: "Статистика",
-    ru: "Аналитика",
-    en: "Insights",
-  },
-  "Close": {
-    uz_kirill: "Ёпиш",
-    qq_lotin: "Jabıw",
-    qq_kirill: "Жабыў",
-    ru: "Закрыть",
-    en: "Close",
-  },
+  'Pickup': { uz_kirill: 'Олиш', qq_lotin: 'Alıw', qq_kirill: 'Алыў', ru: 'Посадка', en: 'Pickup' },
+  'Destination': { uz_kirill: 'Манзил', qq_lotin: 'Mánzil', qq_kirill: 'Мәнзил', ru: 'Пункт назначения', en: 'Destination' },
 };
 
-function normalizeSpaces(text) {
-  return String(text || '')
-    .replace(/[‘’ʻʼ`´]/g, "'")
-    .replace(/[“”]/g, '"')
-    .replace(/[—–]/g, '-')
+function normalizeText(value) {
+  return String(value || '')
+    .replace(/[\u2018\u2019\u201A\u201B\u2032\u02BC`´]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u00A0\u2007\u202F]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
-function normalizeLookup(text) {
-  return normalizeSpaces(text)
-    .toLowerCase()
-    .replace(/[.!?,;:()[\]{}]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function flattenEntries(obj, prefix = '', out = []) {
-  if (!obj || typeof obj !== 'object') return out;
-  for (const [key, value] of Object.entries(obj)) {
-    const nextKey = prefix ? `${prefix}.${key}` : key;
-    if (typeof value === 'string') out.push([nextKey, value]);
-    else if (value && typeof value === 'object') flattenEntries(value, nextKey, out);
-  }
+function toUzCyr(text = '') {
+  return String(text)
+    .replace(/oʻ|o‘|o'/gi, (m) => (m[0] === 'O' ? 'Ў' : 'ў'))
+    .replace(/gʻ|g‘|g'/gi, (m) => (m[0] === 'G' ? 'Ғ' : 'ғ'))
+    .replace(/sh/gi, (m) => (m[0] === 'S' ? 'Ш' : 'ш'))
+    .replace(/ch/gi, (m) => (m[0] === 'C' ? 'Ч' : 'ч'))
+    .replace(/yo/gi, (m) => (m[0] === 'Y' ? 'Ё' : 'ё'))
+    .replace(/yu/gi, (m) => (m[0] === 'Y' ? 'Ю' : 'ю'))
+    .replace(/ya/gi, (m) => (m[0] === 'Y' ? 'Я' : 'я'))
+    .replace(/ts/gi, (m) => (m[0] === 'T' ? 'Ц' : 'ц'))
+    .replace(/a/g, 'а').replace(/A/g, 'А').replace(/b/g, 'б').replace(/B/g, 'Б')
+    .replace(/d/g, 'д').replace(/D/g, 'Д').replace(/e/g, 'е').replace(/E/g, 'Е')
+    .replace(/f/g, 'ф').replace(/F/g, 'Ф').replace(/g/g, 'г').replace(/G/g, 'Г')
+    .replace(/h/g, 'ҳ').replace(/H/g, 'Ҳ').replace(/i/g, 'и').replace(/I/g, 'И')
+    .replace(/j/g, 'ж').replace(/J/g, 'Ж').replace(/k/g, 'к').replace(/K/g, 'К')
+    .replace(/l/g, 'л').replace(/L/g, 'Л').replace(/m/g, 'м').replace(/M/g, 'М')
+    .replace(/n/g, 'н').replace(/N/g, 'Н').replace(/o/g, 'о').replace(/O/g, 'О')
+    .replace(/p/g, 'п').replace(/P/g, 'П').replace(/q/g, 'қ').replace(/Q/g, 'Қ')
+    .replace(/r/g, 'р').replace(/R/g, 'Р').replace(/s/g, 'с').replace(/S/g, 'С')
+    .replace(/t/g, 'т').replace(/T/g, 'Т').replace(/u/g, 'у').replace(/U/g, 'У')
+    .replace(/v/g, 'в').replace(/V/g, 'В').replace(/x/g, 'х').replace(/X/g, 'Х')
+    .replace(/y/g, 'й').replace(/Y/g, 'Й').replace(/z/g, 'з').replace(/Z/g, 'З');
+}
+
+function qqWordReplacements(text = '') {
+  const rules = [
+    [/\bQayerga\b/gi, 'Qayda'],
+    [/\bQayerdan\b/gi, 'Qayerdan'],
+    [/\bborasiz\b/gi, 'barasız'],
+    [/\bsaqlangan\b/gi, 'saqlanǵan'],
+    [/\bmanzillar\b/gi, 'mánziller'],
+    [/\byo'q\b|\byo‘q\b|\byoq\b/gi, 'joq'],
+    [/\bBuyurtma\b/gi, 'Buyırtpa'],
+    [/\byuborilmoqda\b/gi, 'jiberilmekte'],
+    [/\bHaydovchi\b/gi, 'Aydawshı'],
+    [/\bqidirilmoqda\b/gi, 'izlenbekte'],
+    [/\bYo'lovchi\b|\bYo‘lovchi\b/gi, 'Jolawshı'],
+    [/\bolish\b/gi, 'alıw'],
+    [/\bnuqtasi\b/gi, 'noqatı'],
+    [/\bYakuniy\b/gi, 'Aqırǵı'],
+    [/\bXarita\b/gi, 'Xárite'],
+    [/\bShahar\b/gi, 'Qala'],
+    [/\bViloyatlar\b/gi, 'Walayatlar'],
+    [/\bTumanlar\b/gi, 'Rayonlar'],
+    [/\bYuk tashish\b/gi, 'Júk tasıw'],
+    [/\bEltish xizmati\b/gi, 'Jetkiziw xızmeti'],
+    [/\bMening\b/gi, 'Meniń'],
+    [/\bNatijalar\b/gi, 'Nátiyjeler'],
+    [/\bTayyor\b/gi, 'Tayár'],
+  ];
+  let out = String(text);
+  for (const [rx, to] of rules) out = out.replace(rx, to);
   return out;
 }
 
-const TOKEN_MAPS = {
-  ru: {
-    "sozlamalar": "настройки", "sozlama": "настройка", "til": "язык", "tanlang": "выберите", "tanlash": "выбрать",
-    "buyurtma": "заказ", "buyurtmalar": "заказы", "buyurtmalarim": "мои заказы", "safari": "поездка", "safar": "поездка", "safarlar": "поездки",
-    "tarixi": "история", "yordam": "помощь", "wallet": "кошелек", "hamyon": "кошелек", "balans": "баланс", "analitika": "аналитика",
-    "kunlik": "ежедневные", "missiyalar": "миссии", "qollab-quvvatlash": "поддержка", "support": "поддержка", "online": "онлайн", "offline": "офлайн",
-    "yoqish": "включить", "ochirish": "удалить", "ochirildi": "удалено", "saqlash": "сохранить", "saqlandi": "сохранено", "bekor": "отмена", "qilish": "сделать",
-    "davom": "продолжить", "orqaga": "назад", "ortga": "назад", "qaytish": "вернуться", "xaritadan": "с карты", "xarita": "карта",
-    "manzil": "адрес", "manzillar": "адреса", "izoh": "комментарий", "vaqt": "время", "sana": "дата", "ayollar": "женщины", "uchun": "для",
-    "qayerdan": "откуда", "qayerga": "куда", "qayerge": "куда", "qayerden": "откуда", "narx": "цена", "summa": "сумма", "summasi": "сумма", "so'm": "сум", "som": "сум",
-    "shahar": "город", "viloyatlar": "области", "viloyatlararo": "межобластной", "viloyatlar": "области", "tumanlar": "районы", "tumanlararo": "межрайонный",
-    "yuk": "груз", "tashish": "перевозка", "eltish": "доставка", "xizmati": "сервис", "haydovchi": "водитель", "yolovchi": "пассажир", "yo'lovchi": "пассажир",
-    "kelgan": "входящие", "rejim": "режим", "faol": "активный", "faollashdi": "активировано", "tanlandi": "выбрано", "qoshish": "добавить", "tolov": "оплата", "turi": "тип",
-    "promokod": "промокод", "mening": "мои", "mening": "мои", "profil": "профиль", "ma'lumotlari": "данные", "malumotlari": "данные", "chiqish": "выход",
-    "qabul": "принять", "qabul qilish": "принять", "kelmoqda": "едет", "topildi": "найден", "qidirilmoqda": "поиск", "kutish": "ожидание", "yakunlash": "завершить"
-  },
-  en: {
-    "sozlamalar": "settings", "sozlama": "setting", "til": "language", "tanlang": "select", "tanlash": "select",
-    "buyurtma": "order", "buyurtmalar": "orders", "buyurtmalarim": "my orders", "safar": "trip", "safari": "trip", "safarlar": "trips",
-    "tarixi": "history", "yordam": "help", "wallet": "wallet", "hamyon": "wallet", "balans": "balance", "analitika": "analytics",
-    "kunlik": "daily", "missiyalar": "missions", "qollab-quvvatlash": "support", "support": "support", "online": "online", "offline": "offline",
-    "yoqish": "enable", "ochirish": "delete", "ochirildi": "deleted", "saqlash": "save", "saqlandi": "saved", "bekor": "cancel",
-    "davom": "continue", "orqaga": "back", "ortga": "back", "qaytish": "return", "xaritadan": "from map", "xarita": "map",
-    "manzil": "address", "manzillar": "addresses", "izoh": "comment", "vaqt": "time", "sana": "date", "ayollar": "women", "uchun": "for",
-    "qayerdan": "from", "qayerga": "to", "qayerge": "to", "qayerden": "from", "narx": "price", "summa": "amount", "summasi": "amount", "so'm": "sum", "som": "sum",
-    "shahar": "city", "viloyatlar": "regions", "viloyatlararo": "inter-regional", "tumanlar": "districts", "tumanlararo": "inter-district",
-    "yuk": "cargo", "tashish": "transport", "eltish": "delivery", "xizmati": "service", "haydovchi": "driver", "yolovchi": "passenger", "yo'lovchi": "passenger",
-    "kelgan": "incoming", "rejim": "mode", "faol": "active", "faollashdi": "activated", "tanlandi": "selected", "qoshish": "add", "tolov": "payment", "turi": "type",
-    "promokod": "promo code", "mening": "my", "profil": "profile", "ma'lumotlari": "details", "malumotlari": "details", "chiqish": "logout",
-    "qabul": "accept", "qabul qilish": "accept", "kelmoqda": "arriving", "topildi": "found", "qidirilmoqda": "searching", "kutish": "waiting", "yakunlash": "finish"
-  },
-};
-
-const DIRECT_PHRASE_HINTS = {
-  "Mening manzillarim": { ru: "Мои адреса", en: "My addresses" },
-  "Sayohatlar tarixi": { ru: "История поездок", en: "Trip history" },
-  "To'lov turi": { ru: "Способ оплаты", en: "Payment type" },
-  "Promokodi": { ru: "Промокод", en: "Promo code" },
-  "Yordam": { ru: "Помощь", en: "Help" },
-  "Xaritadan belgilash": { ru: "Указать на карте", en: "Pick on map" },
-  "Ayollar uchun": { ru: "Для женщин", en: "For women" },
-  "Sana va vaqt": { ru: "Дата и время", en: "Date and time" },
-  "Izoh yozish": { ru: "Комментарий", en: "Write a comment" },
-  "Buyurtma berish": { ru: "Сделать заказ", en: "Place order" },
-  "E'lon yaratish": { ru: "Создать объявление", en: "Create ad" },
-  "Tugmani bosing": { ru: "Нажмите кнопку", en: "Press the button" },
-  "Kunlik missiyalar": { ru: "Ежедневные миссии", en: "Daily missions" },
-  "Haydovchi ma'lumotlari": { ru: "Данные водителя", en: "Driver details" },
-  "Buyurtmalar tarixi": { ru: "История заказов", en: "Order history" },
-  "Viloyatlar aro": { ru: "Межобластные", en: "Inter-regional" },
-  "Tumanlar aro": { ru: "Межрайонные", en: "Inter-district" },
-  "Yuk tashish": { ru: "Грузоперевозки", en: "Freight" },
-  "Eltish xizmati": { ru: "Доставка", en: "Delivery service" },
-  "Shahar ichida taksi": { ru: "Городское такси", en: "City taxi" },
-  "Avto Savdo": { ru: "Авто-рынок", en: "Auto market" },
-};
-
-const PHRASE_KEYS = Object.keys(PHRASES).sort((a, b) => b.length - a.length);
-const TRANSLATION_KEYS = new Map();
-
-for (const [lang, dict] of Object.entries(translations || {})) {
-  for (const [key, value] of flattenEntries(dict)) {
-    if (typeof value !== 'string') continue;
-    const normalized = normalizeLookup(value);
-    if (!normalized) continue;
-    if (!TRANSLATION_KEYS.has(normalized)) TRANSLATION_KEYS.set(normalized, key);
-  }
+function toQqLatin(text = '') {
+  return qqWordReplacements(String(text))
+    .replace(/oʻ|o‘|o'/gi, (m) => (m[0] === 'O' ? 'Ó' : 'ó'))
+    .replace(/gʻ|g‘|g'/gi, (m) => (m[0] === 'G' ? 'Ǵ' : 'ǵ'))
+    .replace(/ng/gi, (m) => (m[0] === 'N' ? 'Ń' : 'ń'))
+    .replace(/ya/gi, (m) => (m[0] === 'Y' ? 'Ya' : 'ya'))
+    .replace(/yu/gi, (m) => (m[0] === 'Y' ? 'Yu' : 'yu'))
+    .replace(/yo/gi, (m) => (m[0] === 'Y' ? 'Yo' : 'yo'));
 }
 
-for (const [source, targets] of Object.entries(DIRECT_PHRASE_HINTS)) {
-  for (const [lang, value] of Object.entries(targets)) {
-    const key = `__hint__.${source}`;
-    if (!translations[lang]) continue;
-    translations[lang][key] = value;
-    translations.uz_lotin[key] = source;
-    TRANSLATION_KEYS.set(normalizeLookup(source), key);
-  }
-}
-
-function translateByTranslationKey(language, source) {
-  const normalized = normalizeLookup(source);
-  const key = TRANSLATION_KEYS.get(normalized);
-  if (!key) return '';
-  return translations?.[language]?.[key] || translations?.uz_lotin?.[key] || '';
-}
-
-function replaceWholePhrase(out, phrase, translated) {
-  if (!translated || !phrase || phrase === translated) return out;
-  if (out.includes(phrase)) return out.split(phrase).join(translated);
-  return out;
-}
-
-
-function containsCyrillic(text) {
-  return /[Ѐ-ӿ]/.test(String(text || ''));
-}
-
-function looksUnsafeForAutoTranslate(text) {
-  const raw = String(text || '').trim();
-  if (!raw) return true;
-  if (/^[a-z0-9_]{2,32}$/i.test(raw) && !/\s/.test(raw)) return true;
-  if (/[A-Z][a-z]+[A-Z]/.test(raw)) return true;
-  if (/__|::|=>|<\/?[A-Za-z]|\{\{?|\}\}?/.test(raw)) return true;
-  if (/^[\w.-]+\.[A-Za-z]{2,}$/.test(raw)) return true;
-  return false;
-}
-
-function canTransliterate(text) {
-  const raw = String(text || '').trim();
-  if (!raw || containsCyrillic(raw)) return false;
-  if (looksUnsafeForAutoTranslate(raw)) return false;
-  return /^[\p{L}\p{M}\s0-9'ʻʼ‘’()\-–—.,:;!?/]+$/u.test(raw);
-}
-
-function translitUzToCyrl(text) {
-  return String(text || '')
-    .replace(/O‘|O'|Oʻ/g, 'Ў').replace(/o‘|o'|oʻ/g, 'ў')
-    .replace(/G‘|G'|Gʻ/g, 'Ғ').replace(/g‘|g'|gʻ/g, 'ғ')
+function toQqCyr(text = '') {
+  return toQqLatin(text)
     .replace(/Sh/g, 'Ш').replace(/sh/g, 'ш')
     .replace(/Ch/g, 'Ч').replace(/ch/g, 'ч')
-    .replace(/Yo/g, 'Ё').replace(/yo/g, 'ё')
-    .replace(/Yu/g, 'Ю').replace(/yu/g, 'ю')
     .replace(/Ya/g, 'Я').replace(/ya/g, 'я')
-    .replace(/A/g, 'А').replace(/a/g, 'а').replace(/B/g, 'Б').replace(/b/g, 'б')
-    .replace(/D/g, 'Д').replace(/d/g, 'д').replace(/E/g, 'Е').replace(/e/g, 'е')
-    .replace(/F/g, 'Ф').replace(/f/g, 'ф').replace(/H/g, 'Ҳ').replace(/h/g, 'ҳ')
-    .replace(/I/g, 'И').replace(/i/g, 'и').replace(/J/g, 'Ж').replace(/j/g, 'ж')
-    .replace(/K/g, 'К').replace(/k/g, 'к').replace(/L/g, 'Л').replace(/l/g, 'л')
-    .replace(/M/g, 'М').replace(/m/g, 'м').replace(/N/g, 'Н').replace(/n/g, 'н')
-    .replace(/O/g, 'О').replace(/o/g, 'о').replace(/P/g, 'П').replace(/p/g, 'п')
-    .replace(/Q/g, 'Қ').replace(/q/g, 'қ').replace(/R/g, 'Р').replace(/r/g, 'р')
+    .replace(/Yu/g, 'Ю').replace(/yu/g, 'ю')
+    .replace(/Yo/g, 'Ё').replace(/yo/g, 'ё')
+    .replace(/A/g, 'А').replace(/a/g, 'а').replace(/Á/g,'Ә').replace(/á/g,'ә')
+    .replace(/B/g, 'Б').replace(/b/g, 'б').replace(/D/g, 'Д').replace(/d/g, 'д')
+    .replace(/E/g, 'Е').replace(/e/g, 'е').replace(/F/g, 'Ф').replace(/f/g, 'ф')
+    .replace(/G/g, 'Г').replace(/g/g, 'г').replace(/Ǵ/g,'Ғ').replace(/ǵ/g,'ғ')
+    .replace(/H/g, 'Х').replace(/h/g, 'х').replace(/I/g, 'И').replace(/i/g, 'и')
+    .replace(/Í/g,'И').replace(/í/g,'и').replace(/J/g, 'Ж').replace(/j/g, 'ж')
+    .replace(/K/g, 'К').replace(/k/g, 'к').replace(/Q/g, 'Қ').replace(/q,? /g, 'қ ')
+    .replace(/q/g,'қ').replace(/L/g, 'Л').replace(/l/g, 'л').replace(/M/g, 'М').replace(/m/g, 'м')
+    .replace(/N/g, 'Н').replace(/n/g, 'н').replace(/Ń/g,'Ң').replace(/ń/g,'ң')
+    .replace(/O/g, 'О').replace(/o/g, 'о').replace(/Ó/g,'Ө').replace(/ó/g,'ө')
+    .replace(/P/g, 'П').replace(/p/g, 'п').replace(/R/g, 'Р').replace(/r/g, 'р')
     .replace(/S/g, 'С').replace(/s/g, 'с').replace(/T/g, 'Т').replace(/t/g, 'т')
-    .replace(/U/g, 'У').replace(/u/g, 'у').replace(/V/g, 'В').replace(/v/g, 'в')
+    .replace(/U/g, 'У').replace(/u/g, 'у').replace(/Ú/g,'Ү').replace(/ú/g,'ү')
+    .replace(/V/g, 'В').replace(/v/g, 'в').replace(/W/g, 'Ў').replace(/w/g, 'ў')
     .replace(/X/g, 'Х').replace(/x/g, 'х').replace(/Y/g, 'Й').replace(/y/g, 'й')
     .replace(/Z/g, 'З').replace(/z/g, 'з');
 }
 
-function escapeRegex(text) {
-  return String(text || '').replace(/[.*+?^${}()|[\]\\]/g, '\$&');
+function getHeuristicTranslation(language, text) {
+  const normalized = normalizeText(text);
+  if (!normalized) return text;
+  if (language === 'uz_kirill') return toUzCyr(normalized);
+  if (language === 'qq_lotin') return toQqLatin(normalized);
+  if (language === 'qq_kirill') return toQqCyr(normalized);
+  return normalized;
 }
 
-function translateTokens(language, input) {
-  let out = String(input || '');
-  if (!out) return out;
+function buildPhraseIndex() {
+  const index = new Map();
+  const localeKeys = Object.keys(translations || {});
 
-  const tokenMap = TOKEN_MAPS[language];
-  if (tokenMap) {
-    const multiWord = Object.keys(tokenMap).sort((a, b) => b.length - a.length);
-    for (const source of multiWord) {
-      const target = tokenMap[source];
-      const re = new RegExp(`(^|[^\p{L}])(${escapeRegex(source)})(?=$|[^\p{L}])`, 'giu');
-      out = out.replace(re, (m, lead) => `${lead || ''}${target}`);
+  const addEntry = (source, targets) => {
+    const norm = normalizeText(source);
+    if (!norm) return;
+    index.set(norm, { ...(index.get(norm) || {}), ...targets });
+  };
+
+  Object.entries(MANUAL_PHRASES).forEach(([source, targetMap]) => addEntry(source, targetMap));
+
+  const allKeys = new Set();
+  localeKeys.forEach((lang) => Object.keys(translations[lang] || {}).forEach((k) => allKeys.add(k)));
+
+  allKeys.forEach((key) => {
+    const variants = {};
+    for (const lang of localeKeys) {
+      const value = translations[lang]?.[key];
+      if (typeof value === 'string' && normalizeText(value)) variants[lang] = value;
+    }
+    const targets = {};
+    for (const lang of localeKeys) {
+      if (variants[lang]) targets[lang] = variants[lang];
+    }
+    Object.values(variants).forEach((sourceValue) => addEntry(sourceValue, targets));
+  });
+
+  return index;
+}
+
+const PHRASE_INDEX = buildPhraseIndex();
+
+export function translatePhrase(language, text) {
+  const lang = normalizeLanguageKey(language || DEFAULT_LANGUAGE);
+  const original = String(text ?? '');
+  const normalized = normalizeText(original);
+  if (!normalized || lang === DEFAULT_LANGUAGE) return original;
+
+  const direct = PHRASE_INDEX.get(normalized)?.[lang];
+  if (direct) return original.replace(normalized, direct);
+
+  for (const [source, targets] of PHRASE_INDEX.entries()) {
+    if (!targets?.[lang]) continue;
+    if (normalized.toLowerCase() === source.toLowerCase()) return targets[lang];
+    if (normalized.toLowerCase().includes(source.toLowerCase())) {
+      const rx = new RegExp(escapeRegExp(source), 'gi');
+      const replaced = normalized.replace(rx, targets[lang]);
+      if (replaced !== normalized) return replaced;
     }
   }
 
-  if ((language === 'uz_kirill' || language === 'qq_kirill') && /[A-Za-zʻʼ‘’]/.test(out) && canTransliterate(out)) {
-    out = translitUzToCyrl(out);
-  }
-
-  return out;
-}
-
-export function translatePhrase(language, input) {
-  const text = String(input ?? '');
-  if (!text || !language || language === 'uz_lotin') return text;
-  if (looksUnsafeForAutoTranslate(text)) return text;
-
-  const normalizedText = normalizeSpaces(text);
-
-  const exact = PHRASES[normalizedText]?.[language];
-  if (exact) return exact;
-
-  const exactByKey = translateByTranslationKey(language, normalizedText);
-  if (exactByKey) return exactByKey;
-
-  let out = text;
-
-  for (const phrase of PHRASE_KEYS) {
-    const translated = PHRASES[phrase]?.[language];
-    out = replaceWholePhrase(out, phrase, translated);
-  }
-
-  const translationPairs = Array.from(TRANSLATION_KEYS.entries()).sort((a, b) => b[0].length - a[0].length);
-  for (const [sourceText, key] of translationPairs) {
-    if (!sourceText || sourceText.length < 3) continue;
-    const translated = translations?.[language]?.[key] || translations?.uz_lotin?.[key];
-    if (!translated || normalizeLookup(translated) === sourceText) continue;
-    const normalizedOut = normalizeLookup(out);
-    if (normalizedOut === sourceText) return translated;
-  }
-
-  out = translateTokens(language, out);
-  return out;
+  return getHeuristicTranslation(lang, original);
 }
