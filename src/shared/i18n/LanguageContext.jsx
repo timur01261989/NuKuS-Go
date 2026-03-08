@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useEffect, useMemo, useState } from 'react';
-import { translations } from '@i18n/translations';
+import { translations } from '../../i18n/translations';
 import { createTranslator } from './createTranslator';
 import { AVAILABLE_LANGUAGES, DEFAULT_LANGUAGE, normalizeLanguageKey, getLanguageMeta, getLocalizedLanguages } from './languages';
 
