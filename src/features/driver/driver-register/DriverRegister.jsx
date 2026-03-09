@@ -1,92 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Alert,
-  Button,
-  Card,
-  Form,
-  Spin,
-  Steps,
-  Typography,
-  message,
-} from "antd";
+import { Alert, Button, Card, Form, Space, Spin, Steps, Typography, message } from "antd";
 import { supabase } from "@/lib/supabase";
-import StepPersonal, {
-  PERSONAL_STEP_FIELDS,
-  PERSONAL_STEP_TITLE,
-} from "./StepPersonal";
-import StepVehicle, {
-  VEHICLE_STEP_FIELDS,
-  VEHICLE_STEP_TITLE,
-} from "./StepVehicle";
-import StepDocuments, {
-  DOCUMENT_STEP_FIELDS,
-  DOCUMENT_STEP_TITLE,
-  validateDocumentsStep,
-} from "./StepDocuments";
+import StepPersonal from "./StepPersonal";
+import StepVehicle from "./StepVehicle";
+import StepDocuments from "./StepDocuments";
+import { initialFormValues } from "./initialState";
+import { PHONE_PREFIX, normalizePhone, splitPhoneLocal, toNullableNumber, uploadToStorage } from "./helpers";
+import { STEP_FIELD_MAP, validateDocumentsStep } from "./validation";
+import { TRANSPORT_OPTIONS, UPLOAD_FIELD_MAP } from "./uploadConfig";
 
 const { Title, Text } = Typography;
-const PHONE_PREFIX = "+998";
-
-function sanitizeFilename(originalName) {
-  const name = String(originalName || "file")
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, "_")
-    .replace(/[^a-zA-Z0-9._-]/g, "")
-    .replace(/^\.+/, "");
-  return name.length ? name.slice(0, 120) : `file_${Date.now()}`;
-}
-
-function buildStoragePath(userId, file) {
-  const safeName = sanitizeFilename(file?.name);
-  const rand = Math.random().toString(36).slice(2, 10);
-  return `driver_applications/${userId}/${Date.now()}_${rand}_${safeName}`;
-}
-
-async function uploadToStorage(userId, file, bucket = "driver-docs") {
-  if (!file) return null;
-  const filePath = buildStoragePath(userId, file);
-  const { error } = await supabase.storage.from(bucket).upload(filePath, file, {
-    cacheControl: "3600",
-    upsert: true,
-  });
-  if (error) throw error;
-  return filePath;
-}
-
-function normalizePhone(value) {
-  const digits = String(value || "").replace(/\D/g, "").slice(0, 9);
-  if (!digits) return null;
-  return `${PHONE_PREFIX}${digits}`;
-}
-
-function splitPhoneLocal(value) {
-  const digits = String(value || "").replace(/\D/g, "");
-  if (digits.startsWith("998")) return digits.slice(3, 12);
-  return digits.slice(0, 9);
-}
-
-function toNullableNumber(value) {
-  if (value === "" || value === null || value === undefined) return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-}
-
-const STEP_CONFIG = [
-  {
-    title: PERSONAL_STEP_TITLE,
-    fields: PERSONAL_STEP_FIELDS,
-  },
-  {
-    title: VEHICLE_STEP_TITLE,
-    fields: VEHICLE_STEP_FIELDS,
-  },
-  {
-    title: DOCUMENT_STEP_TITLE,
-    fields: DOCUMENT_STEP_FIELDS,
-  },
-];
 
 export default function DriverRegister() {
   const navigate = useNavigate();
@@ -101,6 +25,12 @@ export default function DriverRegister() {
   const [driverApplication, setDriverApplication] = useState(null);
   const [driverRow, setDriverRow] = useState(null);
   const currentYear = useMemo(() => new Date().getFullYear(), []);
+
+  const steps = [
+    { title: "Shaxsiy ma'lumot" },
+    { title: "Transport turi" },
+    { title: "Hujjatlar" },
+  ];
 
   const isApprovedDriver = !!(
     driverRow && (driverRow.is_verified === true || driverRow.approved === true)
@@ -178,17 +108,18 @@ export default function DriverRegister() {
           first_name: profileRow?.first_name || parts[0] || "",
           last_name: profileRow?.last_name || parts.slice(1).join(" ") || "",
           phone: splitPhoneLocal(profileRow?.phone || user?.phone || ""),
-          transport_type: appRow?.transport_type || "light_car",
+          transport_type: appRow?.transport_type || initialFormValues.transport_type,
           vehicle_brand: appRow?.vehicle_brand || "",
           vehicle_model: appRow?.vehicle_model || "",
           vehicle_year: appRow?.vehicle_year ?? null,
           vehicle_plate: appRow?.vehicle_plate || "",
           vehicle_color: appRow?.vehicle_color || "",
-          seat_count: appRow?.seat_count ?? 4,
+          seat_count: appRow?.seat_count ?? initialFormValues.seat_count,
           requested_max_freight_weight_kg:
-            appRow?.requested_max_freight_weight_kg ?? 100,
+            appRow?.requested_max_freight_weight_kg ??
+            initialFormValues.requested_max_freight_weight_kg,
           requested_payload_volume_m3:
-            appRow?.requested_payload_volume_m3 ?? null,
+            appRow?.requested_payload_volume_m3 ?? initialFormValues.requested_payload_volume_m3,
           passport_number: appRow?.passport_number || "",
           driver_license_number: appRow?.driver_license_number || "",
           tech_passport_number: appRow?.tech_passport_number || "",
@@ -223,13 +154,17 @@ export default function DriverRegister() {
   });
 
   const next = async () => {
-    await form.validateFields(STEP_CONFIG[step].fields);
+    await form.validateFields(STEP_FIELD_MAP[step]);
 
     if (step === 2) {
-      validateDocumentsStep(files);
+      const docsError = validateDocumentsStep(files);
+      if (docsError) {
+        message.error(docsError);
+        return;
+      }
     }
 
-    setStep((s) => Math.min(STEP_CONFIG.length - 1, s + 1));
+    setStep((s) => Math.min(steps.length - 1, s + 1));
   };
 
   const prev = () => {
@@ -244,8 +179,6 @@ export default function DriverRegister() {
     try {
       setSubmitting(true);
 
-      validateDocumentsStep(files);
-
       const {
         data: { user },
         error: userError,
@@ -254,9 +187,7 @@ export default function DriverRegister() {
       if (userError) throw userError;
       if (!user?.id) throw new Error("Foydalanuvchi topilmadi");
 
-      const phone = normalizePhone(
-        values.phone || profile?.phone || sessionUser?.phone
-      );
+      const phone = normalizePhone(values.phone || profile?.phone || sessionUser?.phone);
       if (!phone) throw new Error("Telefon raqam noto'g'ri");
 
       const fullName = `${values.first_name || ""} ${values.last_name || ""}`.trim();
@@ -272,11 +203,9 @@ export default function DriverRegister() {
         updated_at: new Date().toISOString(),
       };
 
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .upsert(profilePayload, {
-          onConflict: "id",
-        });
+      const { error: profileError } = await supabase.from("profiles").upsert(profilePayload, {
+        onConflict: "id",
+      });
 
       if (profileError) throw profileError;
 
@@ -297,30 +226,14 @@ export default function DriverRegister() {
         vehicle_plate: values.vehicle_plate || null,
         vehicle_color: values.vehicle_color || null,
         seat_count: toNullableNumber(values.seat_count),
-        requested_max_freight_weight_kg: toNullableNumber(
-          values.requested_max_freight_weight_kg
-        ),
-        requested_payload_volume_m3: toNullableNumber(
-          values.requested_payload_volume_m3
-        ),
+        requested_max_freight_weight_kg: toNullableNumber(values.requested_max_freight_weight_kg),
+        requested_payload_volume_m3: toNullableNumber(values.requested_payload_volume_m3),
         can_luggage: !!values.can_luggage,
         submitted_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
 
-      for (const [field, key] of [
-        ["selfie_url", "selfie"],
-        ["passport_front_url", "passport_front"],
-        ["passport_back_url", "passport_back"],
-        ["tech_passport_front_url", "tech_front"],
-        ["tech_passport_back_url", "tech_back"],
-        ["driver_license_front_url", "license_front"],
-        ["driver_license_back_url", "license_back"],
-        ["car_photo_1", "car_1"],
-        ["car_photo_2", "car_2"],
-        ["car_photo_3", "car_3"],
-        ["car_photo_4", "car_4"],
-      ]) {
+      for (const [field, key] of UPLOAD_FIELD_MAP) {
         payload[field] = await uploadToStorage(user.id, files[key]);
       }
 
@@ -334,9 +247,7 @@ export default function DriverRegister() {
 
       if (error) throw error;
 
-      message.success(
-        "Ariza yuborildi. Admin tekshiruvdan keyin driver rejimi ochiladi."
-      );
+      message.success("Ariza yuborildi. Admin tekshiruvdan keyin driver rejimi ochiladi.");
       navigate("/app/driver/pending", { replace: true });
     } catch (error) {
       console.error("Driver register error:", error);
@@ -365,15 +276,14 @@ export default function DriverRegister() {
     return (
       <div style={{ maxWidth: 720, margin: "40px auto", padding: 20 }}>
         <Card bordered={false} style={{ borderRadius: 20 }}>
-          <Title level={3} style={{ margin: 0 }}>
-            Siz allaqachon tasdiqlangansiz
-          </Title>
-          <Button
-            type="primary"
-            onClick={() => navigate("/app/driver/dashboard", { replace: true })}
-          >
-            Driver dashboard ga o'tish
-          </Button>
+          <Space direction="vertical" size={16} style={{ width: "100%" }}>
+            <Title level={3} style={{ margin: 0 }}>
+              Siz allaqachon tasdiqlangansiz
+            </Title>
+            <Button type="primary" onClick={() => navigate("/app/driver/dashboard", { replace: true })}>
+              Driver dashboard ga o'tish
+            </Button>
+          </Space>
         </Card>
       </div>
     );
@@ -386,8 +296,7 @@ export default function DriverRegister() {
           Haydovchi bo'lish uchun ariza
         </Title>
         <Text type="secondary">
-          Bitta foydalanuvchi ID barcha modullar uchun ishlatiladi. Driver rejimi
-          faqat admin tasdiqlagandan keyin ochiladi.
+          Bitta foydalanuvchi ID barcha modullar uchun ishlatiladi. Driver rejimi faqat admin tasdiqlagandan keyin ochiladi.
         </Text>
 
         {applicationStatus === "rejected" ? (
@@ -401,30 +310,19 @@ export default function DriverRegister() {
         ) : null}
 
         <div style={{ marginTop: 20, marginBottom: 24 }}>
-          <Steps current={step} items={STEP_CONFIG.map((item) => ({ title: item.title }))} />
+          <Steps current={step} items={steps} />
         </div>
 
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={submit}
-          initialValues={{
-            transport_type: "light_car",
-            seat_count: 4,
-            requested_max_freight_weight_kg: 100,
-          }}
-        >
+        <Form form={form} layout="vertical" onFinish={submit} initialValues={initialFormValues}>
           {step === 0 ? <StepPersonal phonePrefix={PHONE_PREFIX} /> : null}
+          {step === 1 ? (
+            <StepVehicle currentYear={currentYear} transportOptions={TRANSPORT_OPTIONS} />
+          ) : null}
+          {step === 2 ? <StepDocuments uploaderProps={uploaderProps} /> : null}
 
-          {step === 1 ? <StepVehicle currentYear={currentYear} /> : null}
-
-          {step === 2 ? <StepDocuments uploaderProps={uploaderProps} files={files} /> : null}
-
-          <div
-            style={{ display: "flex", justifyContent: "space-between", marginTop: 12 }}
-          >
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 12 }}>
             <Button onClick={prev}>Ortga</Button>
-            {step < STEP_CONFIG.length - 1 ? (
+            {step < steps.length - 1 ? (
               <Button type="primary" onClick={next}>
                 Keyingi
               </Button>

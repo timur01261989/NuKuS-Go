@@ -3,21 +3,7 @@ import { Col, Form, Input, InputNumber, Row, Select, Typography } from "antd";
 
 const { Text } = Typography;
 
-export const VEHICLE_STEP_TITLE = "Transport turi";
-export const VEHICLE_STEP_FIELDS = [
-  "transport_type",
-  "vehicle_brand",
-  "vehicle_model",
-  "vehicle_plate",
-];
-
-const TRANSPORT_OPTIONS = [
-  { value: "light_car", label: "Engil mashina" },
-  { value: "bus_gazel", label: "Avtobus / Gazel" },
-  { value: "truck", label: "Yuk tashish mashinasi" },
-];
-
-export default function StepVehicle({ currentYear }) {
+export default function StepVehicle({ currentYear, transportOptions }) {
   return (
     <Row gutter={16}>
       <Col xs={24} md={12}>
@@ -26,7 +12,7 @@ export default function StepVehicle({ currentYear }) {
           label="Transport turi"
           rules={[{ required: true, message: "Transport turini tanlang" }]}
         >
-          <Select options={TRANSPORT_OPTIONS} />
+          <Select options={transportOptions} />
         </Form.Item>
       </Col>
       <Col xs={24} md={12}>
@@ -83,8 +69,7 @@ export default function StepVehicle({ currentYear }) {
       </Col>
       <Col xs={24}>
         <Text type="secondary">
-          Engil mashinaga barcha xizmatlar ruxsat qilinadi, lekin freight dispatch
-          faqat belgilangan kg limit ichida ko'rsatiladi.
+          Engil mashinaga barcha xizmatlar ruxsat qilinadi, lekin freight dispatch faqat belgilangan kg limit ichida ko'rsatiladi.
         </Text>
       </Col>
     </Row>
