@@ -1,162 +1,124 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { Spin } from "antd";
 import { useAppMode } from "@/providers/AppModeProvider";
 import { useSessionProfile } from "@/shared/auth/useSessionProfile";
 
-const AUTH_LOADING_TIMEOUT_MS = 8000;
-
-function clearStaleSupabaseStorage() {
-  if (typeof window === "undefined") return;
-
-  const clearStore = (store) => {
-    try {
-      const keys = [];
-      for (let i = 0; i < store.length; i += 1) {
-        const key = store.key(i);
-        if (key) keys.push(key);
-      }
-
-      keys.forEach((key) => {
-        const normalized = String(key || "").toLowerCase();
-        if (
-          normalized.includes("supabase") ||
-          normalized.startsWith("sb-") ||
-          normalized.includes("auth-token") ||
-          normalized.includes("refresh-token")
-        ) {
-          store.removeItem(key);
-        }
-      });
-    } catch (error) {
-      console.warn("[RoleGate] storage cleanup skipped:", error);
-    }
-  };
-
-  clearStore(window.localStorage);
-  clearStore(window.sessionStorage);
-}
-
 export function pickHomeForRole({ role, driverRow, driverApplication, appMode = "client" }) {
-  const mode = String(appMode || "client").toLowerCase();
   const normalizedRole = String(role || "client").toLowerCase();
+  const normalizedMode = String(appMode || "client").toLowerCase();
   const appStatus = String(driverApplication?.status || "").toLowerCase();
-  const driverApproved = !!driverRow?.is_verified;
+
+  const approved = !!driverRow && (
+    driverRow.approved === true ||
+    driverRow.is_approved === true ||
+    ["approved", "active", "verified", "enabled", "ok"].includes(String(driverRow.status || "").toLowerCase())
+  );
 
   if (normalizedRole === "admin") return "/admin";
-  
-  // Agar foydalanuvchi Driver rejimiga o'tmoqchi bo'lsa
-  if (mode === "driver") {
-    if (driverApproved || appStatus === "approved") return "/driver/dashboard";
-    if (appStatus === "pending") return "/driver/pending";
-    return "/driver/register"; // Ariza yo'q yoki rad etilgan bo'lsa
+  if (normalizedMode !== "driver") return "/client/home";
+
+  if (normalizedRole !== "driver") {
+    if (driverApplication || driverRow) return "/driver/register";
+    return "/client/home";
   }
 
-  // Qolgan barcha holatlarda (mijoz rejimi)
-  return "/client/home";
+  if (approved || appStatus === "approved") return "/driver/dashboard";
+  if (appStatus === "rejected") return "/driver/register";
+  return "/driver/pending";
+}
+
+function Loader() {
+  return (
+    <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <Spin size="large" tip="Yuklanmoqda..." />
+    </div>
+  );
 }
 
 export default function RoleGate({ children, allow, redirectTo = "/login" }) {
   const location = useLocation();
   const { appMode, isLoading: appModeLoading } = useAppMode();
-  const { loading, session, role, driverRow, application } = useSessionProfile({
-    includeDriver: true,
-    includeApplication: true,
-  });
+  const {
+    loading,
+    authReady,
+    session,
+    role,
+    driver,
+    driverApproved,
+    driverApp,
+  } = useSessionProfile({ includeDriver: true, includeApplication: true });
 
-  const [authTimedOut, setAuthTimedOut] = useState(false);
-
-  useEffect(() => {
-    if (!loading && !appModeLoading) {
-      setAuthTimedOut(false);
-      return undefined;
-    }
-
-    const timer = window.setTimeout(() => {
-      console.error("[RoleGate] auth bootstrap timed out; forcing safe logout.");
-      clearStaleSupabaseStorage();
-      setAuthTimedOut(true);
-    }, AUTH_LOADING_TIMEOUT_MS);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [appModeLoading, loading]);
-
-  const target = useMemo(() => {
+  const decision = useMemo(() => {
     const rules = allow || {};
-    const effectiveRole = String(role || "client").toLowerCase();
-    const driverApproved = !!driverRow?.is_verified;
-    const applicationStatus = String(application?.status || "").toLowerCase();
 
-    if (authTimedOut) {
-      return { ok: false, to: redirectTo };
+    if (appModeLoading || loading || !authReady) {
+      return { kind: "loading" };
     }
 
-    if (!session) {
-      return { ok: false, to: redirectTo };
+    if (!session?.user) {
+      return { kind: "redirect", to: redirectTo, state: { from: location } };
     }
 
-    if (rules.admin) {
-      if (effectiveRole === "admin") return { ok: true };
-      return {
-        ok: false,
-        to: pickHomeForRole({ role, driverRow, driverApplication: application, appMode }),
-      };
+    const currentRole = String(role || "client").toLowerCase();
+    const appStatus = String(driverApp?.status || "").toLowerCase();
+    const allowClient = !!rules.client;
+    const allowDriver = !!rules.driver;
+    const requireDriverApproved = !!rules.requireDriverApproved;
+    const allowPending = !!rules.allowPending;
+
+    if (currentRole === "admin") {
+      return { kind: "allow" };
     }
 
-    if (Array.isArray(rules.roles) && rules.roles.length > 0) {
-      const normalizedRoles = rules.roles.map((item) => String(item || "").toLowerCase());
-      if (normalizedRoles.includes(effectiveRole)) return { ok: true };
-      return {
-        ok: false,
-        to: pickHomeForRole({ role, driverRow, driverApplication: application, appMode }),
-      };
+    if (allowClient && currentRole === "client") {
+      return { kind: "allow" };
     }
 
-    // QAT'IY HAYDOVCHI TEKSHIRUVI (Darvozabon mantiqi)
-    if (rules.driver) {
-      // 1. Agar admin tasdiqlagan bo'lsa - KIRA OLADI
-      if (driverApproved || applicationStatus === "approved") {
-        return { ok: true };
+    if (allowClient && currentRole === "driver" && String(appMode || "client") !== "driver") {
+      return { kind: "allow" };
+    }
+
+    if (allowDriver && currentRole === "driver") {
+      if (!requireDriverApproved) {
+        if (allowPending) return { kind: "allow" };
+        return { kind: "allow" };
       }
 
-      // 2. Agar ariza kutyotgan bo'lsa - KUTISH ZALIGA YUBORILADI
-      if (applicationStatus === "pending") {
-        return { ok: false, to: "/driver/pending" };
+      if (driverApproved) {
+        return { kind: "allow" };
       }
 
-      // 3. Qolgan barcha holatlarda (ariza yo'q yoki rad etilgan) - RO'YXATDAN O'TISHGA YUBORILADI
-      return { ok: false, to: "/driver/register" };
+      if (allowPending && ["pending", "submitted", "review", "approved", "rejected", ""].includes(appStatus)) {
+        return { kind: "allow" };
+      }
+
+      return { kind: "redirect", to: "/driver/pending", state: { from: location } };
     }
 
-    if (rules.client) {
-      return { ok: true };
+    if (allowDriver && currentRole !== "driver") {
+      if (driver || driverApp) {
+        if (!requireDriverApproved || allowPending) {
+          return { kind: "redirect", to: "/driver/register", state: { from: location } };
+        }
+        return { kind: "redirect", to: "/driver/pending", state: { from: location } };
+      }
+      return { kind: "redirect", to: "/driver/register", state: { from: location } };
     }
 
-    return {
-      ok: false,
-      to: pickHomeForRole({ role, driverRow, driverApplication: application, appMode }),
-    };
-  }, [allow, appMode, application, authTimedOut, driverRow, redirectTo, role, session]);
+    if (allowClient) {
+      return { kind: "redirect", to: "/client/home", state: { from: location } };
+    }
 
-  if ((loading || appModeLoading) && !authTimedOut) {
-    return (
-      <div
-        style={{
-          minHeight: "50vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Spin size="large" />
-      </div>
-    );
+    return { kind: "redirect", to: pickHomeForRole({ role: currentRole, driverRow: driver, driverApplication: driverApp, appMode }), state: { from: location } };
+  }, [allow, appMode, appModeLoading, authReady, driver, driverApp, driverApproved, loading, location, redirectTo, role, session]);
+
+  if (decision.kind === "loading") {
+    return <Loader />;
   }
 
-  if (!target.ok) {
-    return <Navigate to={target.to} replace state={{ from: location.pathname, appMode }} />;
+  if (decision.kind === "redirect") {
+    return <Navigate to={decision.to} replace state={decision.state} />;
   }
 
   return children;
