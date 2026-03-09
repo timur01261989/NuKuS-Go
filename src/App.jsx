@@ -59,7 +59,7 @@ const DriverInsights = lazy(() => import("@features/driver/pages/DriverInsights"
 const SupportChatPage = lazy(() => import("./features/support/SupportChatPage"));
 const DriverWalletPage = lazy(() => import("@features/driver/pages/DriverWalletPage"));
 const DriverProfilePage = lazy(() => import("@features/driver/pages/DriverProfilePage"));
-const DriverRegister = lazy(() => import("@features/driver/driver-register/DriverRegister"));
+const DriverRegister = lazy(() => import("@features/driver/DriverRegistration/DriverRegister"));
 const DriverModeRedirect = lazy(() => import("@shared/routes/DriverModeRedirect")); // YANGI
 
 // --- SETTINGS ---
