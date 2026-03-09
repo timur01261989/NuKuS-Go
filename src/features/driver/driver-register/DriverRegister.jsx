@@ -11,9 +11,19 @@ import {
   message,
 } from "antd";
 import { supabase } from "@/lib/supabase";
-import StepPersonal from "./StepPersonal";
-import StepVehicle from "./StepVehicle";
-import StepDocuments from "./StepDocuments";
+import StepPersonal, {
+  PERSONAL_STEP_FIELDS,
+  PERSONAL_STEP_TITLE,
+} from "./StepPersonal";
+import StepVehicle, {
+  VEHICLE_STEP_FIELDS,
+  VEHICLE_STEP_TITLE,
+} from "./StepVehicle";
+import StepDocuments, {
+  DOCUMENT_STEP_FIELDS,
+  DOCUMENT_STEP_TITLE,
+  validateDocumentsStep,
+} from "./StepDocuments";
 
 const { Title, Text } = Typography;
 const PHONE_PREFIX = "+998";
@@ -63,16 +73,19 @@ function toNullableNumber(value) {
   return Number.isFinite(n) ? n : null;
 }
 
-const STEPS = [
-  { title: "Shaxsiy ma'lumot" },
-  { title: "Transport turi" },
-  { title: "Hujjatlar" },
-];
-
-const STEP_FIELDS = [
-  ["last_name", "first_name", "phone", "passport_number"],
-  ["transport_type", "vehicle_brand", "vehicle_model", "vehicle_plate"],
-  ["driver_license_number"],
+const STEP_CONFIG = [
+  {
+    title: PERSONAL_STEP_TITLE,
+    fields: PERSONAL_STEP_FIELDS,
+  },
+  {
+    title: VEHICLE_STEP_TITLE,
+    fields: VEHICLE_STEP_FIELDS,
+  },
+  {
+    title: DOCUMENT_STEP_TITLE,
+    fields: DOCUMENT_STEP_FIELDS,
+  },
 ];
 
 export default function DriverRegister() {
@@ -210,21 +223,13 @@ export default function DriverRegister() {
   });
 
   const next = async () => {
-    await form.validateFields(STEP_FIELDS[step]);
+    await form.validateFields(STEP_CONFIG[step].fields);
 
-    if (
-      step === 2 &&
-      (!files.selfie ||
-        !files.passport_front ||
-        !files.passport_back ||
-        !files.license_front ||
-        !files.license_back)
-    ) {
-      message.error("Majburiy hujjat rasmlarini yuklang");
-      return;
+    if (step === 2) {
+      validateDocumentsStep(files);
     }
 
-    setStep((s) => Math.min(STEPS.length - 1, s + 1));
+    setStep((s) => Math.min(STEP_CONFIG.length - 1, s + 1));
   };
 
   const prev = () => {
@@ -238,6 +243,8 @@ export default function DriverRegister() {
   const submit = async (values) => {
     try {
       setSubmitting(true);
+
+      validateDocumentsStep(files);
 
       const {
         data: { user },
@@ -394,7 +401,7 @@ export default function DriverRegister() {
         ) : null}
 
         <div style={{ marginTop: 20, marginBottom: 24 }}>
-          <Steps current={step} items={STEPS} />
+          <Steps current={step} items={STEP_CONFIG.map((item) => ({ title: item.title }))} />
         </div>
 
         <Form
@@ -407,21 +414,17 @@ export default function DriverRegister() {
             requested_max_freight_weight_kg: 100,
           }}
         >
-          {step === 0 ? <StepPersonal form={form} phonePrefix={PHONE_PREFIX} /> : null}
+          {step === 0 ? <StepPersonal phonePrefix={PHONE_PREFIX} /> : null}
 
-          {step === 1 ? (
-            <StepVehicle form={form} currentYear={currentYear} />
-          ) : null}
+          {step === 1 ? <StepVehicle currentYear={currentYear} /> : null}
 
-          {step === 2 ? (
-            <StepDocuments form={form} uploaderProps={uploaderProps} />
-          ) : null}
+          {step === 2 ? <StepDocuments uploaderProps={uploaderProps} files={files} /> : null}
 
           <div
             style={{ display: "flex", justifyContent: "space-between", marginTop: 12 }}
           >
             <Button onClick={prev}>Ortga</Button>
-            {step < STEPS.length - 1 ? (
+            {step < STEP_CONFIG.length - 1 ? (
               <Button type="primary" onClick={next}>
                 Keyingi
               </Button>

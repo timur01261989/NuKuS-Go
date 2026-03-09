@@ -1,6 +1,34 @@
 import React from "react";
-import { Button, Col, Form, Input, Row, Upload } from "antd";
+import { Button, Col, Form, Input, Row, Upload, message } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
+
+export const DOCUMENT_STEP_TITLE = "Hujjatlar";
+export const DOCUMENT_STEP_FIELDS = ["driver_license_number"];
+export const REQUIRED_DOCUMENT_KEYS = [
+  "selfie",
+  "passport_front",
+  "passport_back",
+  "license_front",
+  "license_back",
+];
+
+export function validateDocumentsStep(files) {
+  const missing = REQUIRED_DOCUMENT_KEYS.filter((key) => !files?.[key]);
+  if (missing.length) {
+    message.error("Majburiy hujjat rasmlarini yuklang");
+    throw new Error("Majburiy hujjat rasmlarini yuklang");
+  }
+}
+
+function UploadField({ label, uploaderProps }) {
+  return (
+    <Form.Item label={label} required>
+      <Upload {...uploaderProps}>
+        <Button icon={<UploadOutlined />}>Yuklash</Button>
+      </Upload>
+    </Form.Item>
+  );
+}
 
 export default function StepDocuments({ uploaderProps }) {
   return (
@@ -19,82 +47,71 @@ export default function StepDocuments({ uploaderProps }) {
           <Input />
         </Form.Item>
       </Col>
+
       <Col xs={24} md={8}>
-        <Form.Item label="Selfie" required>
-          <Upload {...uploaderProps("selfie")}>
-            <Button icon={<UploadOutlined />}>Yuklash</Button>
-          </Upload>
-        </Form.Item>
+        <UploadField label="Selfie" uploaderProps={uploaderProps("selfie")} />
       </Col>
       <Col xs={24} md={8}>
-        <Form.Item label="Pasport oldi" required>
-          <Upload {...uploaderProps("passport_front")}>
-            <Button icon={<UploadOutlined />}>Yuklash</Button>
-          </Upload>
-        </Form.Item>
+        <UploadField
+          label="Pasport oldi"
+          uploaderProps={uploaderProps("passport_front")}
+        />
       </Col>
       <Col xs={24} md={8}>
-        <Form.Item label="Pasport orqasi" required>
-          <Upload {...uploaderProps("passport_back")}>
-            <Button icon={<UploadOutlined />}>Yuklash</Button>
-          </Upload>
-        </Form.Item>
+        <UploadField
+          label="Pasport orqasi"
+          uploaderProps={uploaderProps("passport_back")}
+        />
+      </Col>
+
+      <Col xs={24} md={6}>
+        <UploadField
+          label="Tex pasport oldi"
+          uploaderProps={uploaderProps("tech_front")}
+        />
       </Col>
       <Col xs={24} md={6}>
-        <Form.Item label="Tex pasport oldi">
-          <Upload {...uploaderProps("tech_front")}>
-            <Button icon={<UploadOutlined />}>Yuklash</Button>
-          </Upload>
-        </Form.Item>
+        <UploadField
+          label="Tex pasport orqasi"
+          uploaderProps={uploaderProps("tech_back")}
+        />
       </Col>
       <Col xs={24} md={6}>
-        <Form.Item label="Tex pasport orqasi">
-          <Upload {...uploaderProps("tech_back")}>
-            <Button icon={<UploadOutlined />}>Yuklash</Button>
-          </Upload>
-        </Form.Item>
+        <UploadField
+          label="Prava oldi"
+          uploaderProps={uploaderProps("license_front")}
+        />
       </Col>
       <Col xs={24} md={6}>
-        <Form.Item label="Prava oldi" required>
-          <Upload {...uploaderProps("license_front")}>
-            <Button icon={<UploadOutlined />}>Yuklash</Button>
-          </Upload>
-        </Form.Item>
+        <UploadField
+          label="Prava orqasi"
+          uploaderProps={uploaderProps("license_back")}
+        />
+      </Col>
+
+      <Col xs={24} md={6}>
+        <UploadField
+          label="Mashina rasmi 1"
+          uploaderProps={uploaderProps("car_1")}
+        />
       </Col>
       <Col xs={24} md={6}>
-        <Form.Item label="Prava orqasi" required>
-          <Upload {...uploaderProps("license_back")}>
-            <Button icon={<UploadOutlined />}>Yuklash</Button>
-          </Upload>
-        </Form.Item>
+        <UploadField
+          label="Mashina rasmi 2"
+          uploaderProps={uploaderProps("car_2")}
+        />
       </Col>
       <Col xs={24} md={6}>
-        <Form.Item label="Mashina rasmi 1">
-          <Upload {...uploaderProps("car_1")}>
-            <Button icon={<UploadOutlined />}>Yuklash</Button>
-          </Upload>
-        </Form.Item>
+        <UploadField
+          label="Mashina rasmi 3"
+          uploaderProps={uploaderProps("car_3")}
+        />
       </Col>
       <Col xs={24} md={6}>
-        <Form.Item label="Mashina rasmi 2">
-          <Upload {...uploaderProps("car_2")}>
-            <Button icon={<UploadOutlined />}>Yuklash</Button>
-          </Upload>
-        </Form.Item>
-      </Col>
-      <Col xs={24} md={6}>
-        <Form.Item label="Mashina rasmi 3">
-          <Upload {...uploaderProps("car_3")}>
-            <Button icon={<UploadOutlined />}>Yuklash</Button>
-          </Upload>
-        </Form.Item>
-      </Col>
-      <Col xs={24} md={6}>
-        <Form.Item label="Mashina rasmi 4">
-          <Upload {...uploaderProps("car_4")}>
-            <Button icon={<UploadOutlined />}>Yuklash</Button>
-          </Upload>
-        </Form.Item>
+        <UploadField
+          label="Mashina rasmi 4"
+          uploaderProps={uploaderProps("car_4")}
+        />
       </Col>
     </Row>
   );

@@ -3,6 +3,14 @@ import { Col, Form, Input, InputNumber, Row, Select, Typography } from "antd";
 
 const { Text } = Typography;
 
+export const VEHICLE_STEP_TITLE = "Transport turi";
+export const VEHICLE_STEP_FIELDS = [
+  "transport_type",
+  "vehicle_brand",
+  "vehicle_model",
+  "vehicle_plate",
+];
+
 const TRANSPORT_OPTIONS = [
   { value: "light_car", label: "Engil mashina" },
   { value: "bus_gazel", label: "Avtobus / Gazel" },
