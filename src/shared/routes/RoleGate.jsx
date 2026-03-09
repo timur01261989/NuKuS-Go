@@ -55,19 +55,14 @@ export function pickHomeForRole({ role, driverRow, driverApplication, appMode = 
 export default function RoleGate({ children, allow, redirectTo = "/login" }) {
   const location = useLocation();
   const { appMode, isLoading: appModeLoading } = useAppMode();
-  const {
-    loading,
-    session,
-    role,
-    driverRow,
-    application,
-  } = useSessionProfile({ includeDriver: true, includeApplication: true });
+  const { loading, session, role, driverRow, application } = useSessionProfile({
+    includeDriver: true,
+    includeApplication: true,
+  });
 
   const [authTimedOut, setAuthTimedOut] = useState(false);
 
   useEffect(() => {
-    if (typeof window === "undefined") return undefined;
-
     if (!loading && !appModeLoading) {
       setAuthTimedOut(false);
       return undefined;
@@ -85,10 +80,10 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
   }, [appModeLoading, loading]);
 
   const target = useMemo(() => {
-    const a = allow || {};
+    const rules = allow || {};
+    const effectiveRole = String(role || "client").toLowerCase();
     const driverApproved = !!driverRow?.is_verified;
     const applicationStatus = String(application?.status || "").toLowerCase();
-    const effectiveRole = String(role || "client").toLowerCase();
 
     if (authTimedOut) {
       return { ok: false, to: redirectTo };
@@ -98,7 +93,7 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
       return { ok: false, to: redirectTo };
     }
 
-    if (a.admin) {
+    if (rules.admin) {
       if (effectiveRole === "admin") return { ok: true };
       return {
         ok: false,
@@ -106,19 +101,19 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
       };
     }
 
-    if (Array.isArray(a.roles) && a.roles.length > 0) {
-      const allowedRoles = a.roles.map((item) => String(item || "").toLowerCase());
-      if (allowedRoles.includes(effectiveRole)) return { ok: true };
+    if (Array.isArray(rules.roles) && rules.roles.length > 0) {
+      const normalizedRoles = rules.roles.map((item) => String(item || "").toLowerCase());
+      if (normalizedRoles.includes(effectiveRole)) return { ok: true };
       return {
         ok: false,
         to: pickHomeForRole({ role, driverRow, driverApplication: application, appMode }),
       };
     }
 
-    if (a.driver) {
+    if (rules.driver) {
       if (driverApproved) return { ok: true };
 
-      if (a.requireDriverApproved) {
+      if (rules.requireDriverApproved) {
         if (!application) return { ok: false, to: "/driver/register" };
         if (applicationStatus === "approved") return { ok: true };
         return { ok: false, to: "/driver/pending" };
@@ -128,7 +123,7 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
       return { ok: false, to: "/driver/register" };
     }
 
-    if (a.client) {
+    if (rules.client) {
       return { ok: true };
     }
 
