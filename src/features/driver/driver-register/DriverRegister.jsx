@@ -4,30 +4,19 @@ import {
   Alert,
   Button,
   Card,
-  Col,
   Form,
-  Input,
-  InputNumber,
-  Row,
-  Select,
-  Space,
   Spin,
   Steps,
   Typography,
-  Upload,
   message,
 } from "antd";
-import { UploadOutlined } from "@ant-design/icons";
 import { supabase } from "@/lib/supabase";
+import StepPersonal from "./StepPersonal";
+import StepVehicle from "./StepVehicle";
+import StepDocuments from "./StepDocuments";
 
 const { Title, Text } = Typography;
 const PHONE_PREFIX = "+998";
-
-const TRANSPORT_OPTIONS = [
-  { value: "light_car", label: "Engil mashina" },
-  { value: "bus_gazel", label: "Avtobus / Gazel" },
-  { value: "truck", label: "Yuk tashish mashinasi" },
-];
 
 function sanitizeFilename(originalName) {
   const name = String(originalName || "file")
@@ -74,6 +63,18 @@ function toNullableNumber(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+const STEPS = [
+  { title: "Shaxsiy ma'lumot" },
+  { title: "Transport turi" },
+  { title: "Hujjatlar" },
+];
+
+const STEP_FIELDS = [
+  ["last_name", "first_name", "phone", "passport_number"],
+  ["transport_type", "vehicle_brand", "vehicle_model", "vehicle_plate"],
+  ["driver_license_number"],
+];
+
 export default function DriverRegister() {
   const navigate = useNavigate();
   const [form] = Form.useForm();
@@ -87,12 +88,6 @@ export default function DriverRegister() {
   const [driverApplication, setDriverApplication] = useState(null);
   const [driverRow, setDriverRow] = useState(null);
   const currentYear = useMemo(() => new Date().getFullYear(), []);
-
-  const steps = [
-    { title: "Shaxsiy ma'lumot" },
-    { title: "Transport turi" },
-    { title: "Hujjatlar" },
-  ];
 
   const isApprovedDriver = !!(
     driverRow && (driverRow.is_verified === true || driverRow.approved === true)
@@ -215,13 +210,7 @@ export default function DriverRegister() {
   });
 
   const next = async () => {
-    const fieldMap = [
-      ["last_name", "first_name", "phone", "passport_number"],
-      ["transport_type", "vehicle_brand", "vehicle_model", "vehicle_plate"],
-      ["driver_license_number"],
-    ];
-
-    await form.validateFields(fieldMap[step]);
+    await form.validateFields(STEP_FIELDS[step]);
 
     if (
       step === 2 &&
@@ -235,7 +224,15 @@ export default function DriverRegister() {
       return;
     }
 
-    setStep((s) => Math.min(steps.length - 1, s + 1));
+    setStep((s) => Math.min(STEPS.length - 1, s + 1));
+  };
+
+  const prev = () => {
+    if (step === 0) {
+      navigate("/app/client/home");
+      return;
+    }
+    setStep((s) => Math.max(0, s - 1));
   };
 
   const submit = async (values) => {
@@ -324,11 +321,9 @@ export default function DriverRegister() {
         payload.id = driverApplication.id;
       }
 
-      const { error } = await supabase
-        .from("driver_applications")
-        .upsert(payload, {
-          onConflict: driverApplication?.id ? "id" : "user_id",
-        });
+      const { error } = await supabase.from("driver_applications").upsert(payload, {
+        onConflict: driverApplication?.id ? "id" : "user_id",
+      });
 
       if (error) throw error;
 
@@ -363,17 +358,15 @@ export default function DriverRegister() {
     return (
       <div style={{ maxWidth: 720, margin: "40px auto", padding: 20 }}>
         <Card bordered={false} style={{ borderRadius: 20 }}>
-          <Space direction="vertical" size={16} style={{ width: "100%" }}>
-            <Title level={3} style={{ margin: 0 }}>
-              Siz allaqachon tasdiqlangansiz
-            </Title>
-            <Button
-              type="primary"
-              onClick={() => navigate("/app/driver/dashboard", { replace: true })}
-            >
-              Driver dashboard ga o'tish
-            </Button>
-          </Space>
+          <Title level={3} style={{ margin: 0 }}>
+            Siz allaqachon tasdiqlangansiz
+          </Title>
+          <Button
+            type="primary"
+            onClick={() => navigate("/app/driver/dashboard", { replace: true })}
+          >
+            Driver dashboard ga o'tish
+          </Button>
         </Card>
       </div>
     );
@@ -401,7 +394,7 @@ export default function DriverRegister() {
         ) : null}
 
         <div style={{ marginTop: 20, marginBottom: 24 }}>
-          <Steps current={step} items={steps} />
+          <Steps current={step} items={STEPS} />
         </div>
 
         <Form
@@ -414,247 +407,21 @@ export default function DriverRegister() {
             requested_max_freight_weight_kg: 100,
           }}
         >
-          {step === 0 ? (
-            <Row gutter={16}>
-              <Col xs={24} md={8}>
-                <Form.Item
-                  name="last_name"
-                  label="Familiya"
-                  rules={[{ required: true, message: "Familiya kiriting" }]}
-                >
-                  <Input />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={8}>
-                <Form.Item
-                  name="first_name"
-                  label="Ism"
-                  rules={[{ required: true, message: "Ism kiriting" }]}
-                >
-                  <Input />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={8}>
-                <Form.Item name="father_name" label="Otasining ismi">
-                  <Input />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={12}>
-                <Form.Item
-                  name="phone"
-                  label="Telefon (9 ta raqam)"
-                  rules={[{ required: true, message: "Telefon kiriting" }]}
-                >
-                  <Input addonBefore={PHONE_PREFIX} maxLength={9} />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={12}>
-                <Form.Item
-                  name="passport_number"
-                  label="Pasport seriya raqami"
-                  rules={[
-                    { required: true, message: "Pasport raqamini kiriting" },
-                  ]}
-                >
-                  <Input placeholder="AA1234567" />
-                </Form.Item>
-              </Col>
-            </Row>
-          ) : null}
+          {step === 0 ? <StepPersonal form={form} phonePrefix={PHONE_PREFIX} /> : null}
 
           {step === 1 ? (
-            <Row gutter={16}>
-              <Col xs={24} md={12}>
-                <Form.Item
-                  name="transport_type"
-                  label="Transport turi"
-                  rules={[{ required: true, message: "Transport turini tanlang" }]}
-                >
-                  <Select options={TRANSPORT_OPTIONS} />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={12}>
-                <Form.Item
-                  name="vehicle_brand"
-                  label="Mashina markasi"
-                  rules={[{ required: true, message: "Markani kiriting" }]}
-                >
-                  <Input />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={12}>
-                <Form.Item
-                  name="vehicle_model"
-                  label="Model"
-                  rules={[{ required: true, message: "Modelni kiriting" }]}
-                >
-                  <Input />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={12}>
-                <Form.Item
-                  name="vehicle_plate"
-                  label="Davlat raqami"
-                  rules={[
-                    { required: true, message: "Davlat raqamini kiriting" },
-                  ]}
-                >
-                  <Input />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={8}>
-                <Form.Item name="vehicle_year" label="Yili">
-                  <InputNumber
-                    style={{ width: "100%" }}
-                    min={1970}
-                    max={currentYear + 1}
-                  />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={8}>
-                <Form.Item name="vehicle_color" label="Rangi">
-                  <Input />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={8}>
-                <Form.Item name="seat_count" label="O'rindiqlar soni">
-                  <InputNumber style={{ width: "100%" }} min={0} max={60} />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={12}>
-                <Form.Item
-                  name="requested_max_freight_weight_kg"
-                  label="Yuk limiti (kg)"
-                >
-                  <InputNumber style={{ width: "100%" }} min={0} max={50000} />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={12}>
-                <Form.Item name="requested_payload_volume_m3" label="Hajm (m³)">
-                  <InputNumber
-                    style={{ width: "100%" }}
-                    min={0}
-                    max={200}
-                    step={0.1}
-                  />
-                </Form.Item>
-              </Col>
-              <Col xs={24}>
-                <Text type="secondary">
-                  Engil mashinaga barcha xizmatlar ruxsat qilinadi, lekin freight
-                  dispatch faqat belgilangan kg limit ichida ko'rsatiladi.
-                </Text>
-              </Col>
-            </Row>
+            <StepVehicle form={form} currentYear={currentYear} />
           ) : null}
 
           {step === 2 ? (
-            <Row gutter={16}>
-              <Col xs={24} md={12}>
-                <Form.Item
-                  name="driver_license_number"
-                  label="Haydovchilik guvohnomasi raqami"
-                  rules={[{ required: true, message: "Prava raqamini kiriting" }]}
-                >
-                  <Input />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={12}>
-                <Form.Item name="tech_passport_number" label="Tex pasport raqami">
-                  <Input />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={8}>
-                <Form.Item label="Selfie" required>
-                  <Upload {...uploaderProps("selfie")}>
-                    <Button icon={<UploadOutlined />}>Yuklash</Button>
-                  </Upload>
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={8}>
-                <Form.Item label="Pasport oldi" required>
-                  <Upload {...uploaderProps("passport_front")}>
-                    <Button icon={<UploadOutlined />}>Yuklash</Button>
-                  </Upload>
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={8}>
-                <Form.Item label="Pasport orqasi" required>
-                  <Upload {...uploaderProps("passport_back")}>
-                    <Button icon={<UploadOutlined />}>Yuklash</Button>
-                  </Upload>
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={6}>
-                <Form.Item label="Tex pasport oldi">
-                  <Upload {...uploaderProps("tech_front")}>
-                    <Button icon={<UploadOutlined />}>Yuklash</Button>
-                  </Upload>
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={6}>
-                <Form.Item label="Tex pasport orqasi">
-                  <Upload {...uploaderProps("tech_back")}>
-                    <Button icon={<UploadOutlined />}>Yuklash</Button>
-                  </Upload>
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={6}>
-                <Form.Item label="Prava oldi" required>
-                  <Upload {...uploaderProps("license_front")}>
-                    <Button icon={<UploadOutlined />}>Yuklash</Button>
-                  </Upload>
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={6}>
-                <Form.Item label="Prava orqasi" required>
-                  <Upload {...uploaderProps("license_back")}>
-                    <Button icon={<UploadOutlined />}>Yuklash</Button>
-                  </Upload>
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={6}>
-                <Form.Item label="Mashina rasmi 1">
-                  <Upload {...uploaderProps("car_1")}>
-                    <Button icon={<UploadOutlined />}>Yuklash</Button>
-                  </Upload>
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={6}>
-                <Form.Item label="Mashina rasmi 2">
-                  <Upload {...uploaderProps("car_2")}>
-                    <Button icon={<UploadOutlined />}>Yuklash</Button>
-                  </Upload>
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={6}>
-                <Form.Item label="Mashina rasmi 3">
-                  <Upload {...uploaderProps("car_3")}>
-                    <Button icon={<UploadOutlined />}>Yuklash</Button>
-                  </Upload>
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={6}>
-                <Form.Item label="Mashina rasmi 4">
-                  <Upload {...uploaderProps("car_4")}>
-                    <Button icon={<UploadOutlined />}>Yuklash</Button>
-                  </Upload>
-                </Form.Item>
-              </Col>
-            </Row>
+            <StepDocuments form={form} uploaderProps={uploaderProps} />
           ) : null}
 
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 12 }}>
-            <Button
-              onClick={() =>
-                step === 0
-                  ? navigate("/app/client/home")
-                  : setStep((s) => Math.max(0, s - 1))
-              }
-            >
-              Ortga
-            </Button>
-            {step < steps.length - 1 ? (
+          <div
+            style={{ display: "flex", justifyContent: "space-between", marginTop: 12 }}
+          >
+            <Button onClick={prev}>Ortga</Button>
+            {step < STEPS.length - 1 ? (
               <Button type="primary" onClick={next}>
                 Keyingi
               </Button>
