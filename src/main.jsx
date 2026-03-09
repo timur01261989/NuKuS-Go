@@ -2,16 +2,13 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
+import QueryProvider from "./providers/QueryProvider.jsx";
 import { AuthProvider } from "@/shared/auth/AuthProvider";
+import AppErrorBoundary from "@/shared/debug/AppErrorBoundary";
+import { installGlobalDebugRuntime } from "@/shared/debug/debugRuntime";
 import api from "@/utils/apiHelper";
 import { setupNotifications } from "@/services/notifications";
 import { supabase } from "@/lib/supabase";
-mport React from "react";
-import ReactDOM from "react-dom/client";
-import App from "./App";
-import AppErrorBoundary from "@/shared/debug/AppErrorBoundary";
-import { installGlobalDebugRuntime } from "@/shared/debug/debugRuntime";
-
 
 // ✅ Ant Design reset
 import "antd/dist/reset.css";
@@ -25,21 +22,27 @@ import "./index.css";
 
 // ✅ Leaflet
 import "leaflet/dist/leaflet.css";
-import QueryProvider from "./providers/QueryProvider.jsx";
 
 /**
- * Supabase access token'ni localStorage'dagi sb-...-auth-token dan olish
- * (Vercel deploy'dan keyin "token" bo'sh bo'lib qolsa ham ishlaydi)
+ * Supabase access token'ni localStorage'dagi sb-...-auth-token dan olish.
+ * Vercel deploy'dan keyin eski custom token bo'sh bo'lib qolsa ham ishlaydi.
  */
 function getSupabaseAccessToken() {
   if (typeof window === "undefined") return "";
+
   try {
     const keys = Object.keys(window.localStorage || {});
-    const k = keys.find((x) => x.startsWith("sb-") && x.endsWith("-auth-token"));
-    if (!k) return "";
-    const raw = window.localStorage.getItem(k);
+    const authKey = keys.find(
+      (key) => key.startsWith("sb-") && key.endsWith("-auth-token")
+    );
+
+    if (!authKey) return "";
+
+    const raw = window.localStorage.getItem(authKey);
     if (!raw) return "";
+
     const parsed = JSON.parse(raw);
+
     return (
       parsed?.access_token ||
       parsed?.currentSession?.access_token ||
@@ -52,21 +55,26 @@ function getSupabaseAccessToken() {
 }
 
 /* ============================
+   GLOBAL DEBUG RUNTIME
+============================ */
+installGlobalDebugRuntime();
+
+/* ============================
    API HELPER CONFIG
 ============================ */
 api.configure({
-  // 1) avval Supabase token, 2) keyin eski "token" (agar sizda custom auth bo'lsa)
   getAccessToken: () => {
-    const sb = getSupabaseAccessToken();
-    if (sb) return sb;
+    const supabaseToken = getSupabaseAccessToken();
+    if (supabaseToken) return supabaseToken;
+
     return typeof window !== "undefined"
       ? window.localStorage.getItem("token") || ""
       : "";
   },
 
-  setAccessToken: (t) => {
+  setAccessToken: (token) => {
     if (typeof window !== "undefined") {
-      window.localStorage.setItem("token", t || "");
+      window.localStorage.setItem("token", token || "");
     }
   },
 
@@ -75,9 +83,9 @@ api.configure({
       ? window.localStorage.getItem("refresh_token") || ""
       : "",
 
-  setRefreshToken: (t) => {
+  setRefreshToken: (token) => {
     if (typeof window !== "undefined") {
-      window.localStorage.setItem("refresh_token", t || "");
+      window.localStorage.setItem("refresh_token", token || "");
     }
   },
 
@@ -88,13 +96,14 @@ api.configure({
       window.localStorage.removeItem("token");
       window.localStorage.removeItem("refresh_token");
 
-      // Supabase auth token'larini ham tozalab yuboramiz (ixtiyoriy, lekin foydali)
       try {
         const keys = Object.keys(window.localStorage || {});
         keys
-          .filter((x) => x.startsWith("sb-") && x.endsWith("-auth-token"))
-          .forEach((x) => window.localStorage.removeItem(x));
-      } catch {}
+          .filter((key) => key.startsWith("sb-") && key.endsWith("-auth-token"))
+          .forEach((key) => window.localStorage.removeItem(key));
+      } catch {
+        // localStorage cleanup xatosi ilovani to'xtatmasin
+      }
 
       if (window.location.pathname !== "/login") {
         window.location.href = "/login";
@@ -111,7 +120,9 @@ if (typeof window !== "undefined" && "serviceWorker" in navigator) {
     try {
       const registration = await navigator.serviceWorker.register("/sw.js");
 
-      registration.update?.();
+      if (typeof registration.update === "function") {
+        registration.update();
+      }
 
       registration.addEventListener("updatefound", () => {
         const installing = registration.installing;
@@ -122,9 +133,7 @@ if (typeof window !== "undefined" && "serviceWorker" in navigator) {
             installing.state === "installed" &&
             navigator.serviceWorker.controller
           ) {
-            registration.waiting?.postMessage({
-              type: "SKIP_WAITING",
-            });
+            registration.waiting?.postMessage({ type: "SKIP_WAITING" });
           }
         });
       });
@@ -133,38 +142,38 @@ if (typeof window !== "undefined" && "serviceWorker" in navigator) {
         window.location.reload();
       });
 
-      // SW muvaffaqiyatli ro'yxatdan o'tdi
-      // Push notifications ni yoqish (userId bilan saqlash uchun)
       try {
         const { data: authData } = await supabase.auth.getUser();
         const userId = authData?.user?.id || null;
         await setupNotifications(userId);
       } catch {
-        // push setup ilovaga ta'sir qilmaydi
+        // push setup xatosi asosiy ilovani sindirmasin
       }
-    } catch (e) {
-      // SW xatosi — ilovaga ta'sir qilmaydi, jimgina o'tib ketadi
+    } catch {
+      // service worker xatosi asosiy ilovani sindirmasin
     }
   });
 }
-installGlobalDebugRuntime();
 
-ReactDOM.createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <AppErrorBoundary>
-      <App />
-    </AppErrorBoundary>
-  </React.StrictMode>
-);
 /* ============================
    RENDER
 ============================ */
-ReactDOM.createRoot(document.getElementById("root")).render(
+const rootElement = document.getElementById("root");
+
+if (!rootElement) {
+  throw new Error("Root element with id 'root' not found");
+}
+
+ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
-    <AuthProvider>
-      <QueryProvider>
-        <ErrorBoundary><App /></ErrorBoundary>
-      </QueryProvider>
-    </AuthProvider>
+    <AppErrorBoundary>
+      <AuthProvider>
+        <QueryProvider>
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
+        </QueryProvider>
+      </AuthProvider>
+    </AppErrorBoundary>
   </React.StrictMode>
 );
