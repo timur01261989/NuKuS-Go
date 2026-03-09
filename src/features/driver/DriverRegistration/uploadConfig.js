@@ -37,16 +37,26 @@ export const vehicleTypeOptions = [
   { value: "gazel", label: "Gazel" },
 ];
 
+export const VEHICLE_DEFAULTS = {
+  passenger: { seats: "4", cargoKg: "100", cargoM3: "0.5" },
+  suv: { seats: "5", cargoKg: "200", cargoM3: "0.8" },
+  minivan: { seats: "7", cargoKg: "400", cargoM3: "1.5" },
+  van: { seats: "2", cargoKg: "1000", cargoM3: "6" },
+  truck_small: { seats: "2", cargoKg: "1500", cargoM3: "10" },
+  truck_medium: { seats: "3", cargoKg: "5000", cargoM3: "25" },
+  truck_large: { seats: "2", cargoKg: "20000", cargoM3: "80" },
+  bus: { seats: "45", cargoKg: "500", cargoM3: "5" },
+  gazel: { seats: "2", cargoKg: "1500", cargoM3: "12" },
+};
+
 export const storageFolderMap = {
-  passportFront: "passport-front",
-  passportBack: "passport-back",
-  driverLicenseFront: "driver-license-front",
-  driverLicenseBack: "driver-license-back",
-  techPassportFront: "tech-passport-front",
-  techPassportBack: "tech-passport-back",
-  selfieWithPassport: "selfie-with-passport",
-  carPhoto1: "car-photo-1",
-  carPhoto2: "car-photo-2",
-  carPhoto3: "car-photo-3",
-  carPhoto4: "car-photo-4",
+  passportFront: "passports",
+  passportBack: "passports",
+  driverLicenseFront: "licenses",
+  driverLicenseBack: "licenses",
+  techPassportFront: "tech_passports",
+  techPassportBack: "tech_passports",
+  selfieWithPassport: "selfies",
+  carPhoto1: "cars",
+  carPhoto2: "cars",
 };
