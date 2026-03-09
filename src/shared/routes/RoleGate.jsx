@@ -4,52 +4,37 @@ import { Spin } from "antd";
 import { useAppMode } from "@/providers/AppModeProvider";
 import { useSessionProfile } from "@/shared/auth/useSessionProfile";
 
-const AUTH_LOADING_TIMEOUT_MS = 7000;
+const AUTH_LOADING_TIMEOUT_MS = 8000;
 
 function clearStaleSupabaseStorage() {
   if (typeof window === "undefined") return;
 
-  try {
-    const localKeys = [];
-    for (let i = 0; i < window.localStorage.length; i += 1) {
-      const key = window.localStorage.key(i);
-      if (key) localKeys.push(key);
-    }
-
-    localKeys.forEach((key) => {
-      const normalized = String(key || "").toLowerCase();
-      if (
-        normalized.includes("supabase") ||
-        normalized.startsWith("sb-") ||
-        normalized.includes("auth-token")
-      ) {
-        window.localStorage.removeItem(key);
+  const clearStore = (store) => {
+    try {
+      const keys = [];
+      for (let i = 0; i < store.length; i += 1) {
+        const key = store.key(i);
+        if (key) keys.push(key);
       }
-    });
-  } catch (error) {
-    console.warn("[RoleGate] localStorage cleanup skipped:", error);
-  }
 
-  try {
-    const sessionKeys = [];
-    for (let i = 0; i < window.sessionStorage.length; i += 1) {
-      const key = window.sessionStorage.key(i);
-      if (key) sessionKeys.push(key);
+      keys.forEach((key) => {
+        const normalized = String(key || "").toLowerCase();
+        if (
+          normalized.includes("supabase") ||
+          normalized.startsWith("sb-") ||
+          normalized.includes("auth-token") ||
+          normalized.includes("refresh-token")
+        ) {
+          store.removeItem(key);
+        }
+      });
+    } catch (error) {
+      console.warn("[RoleGate] storage cleanup skipped:", error);
     }
+  };
 
-    sessionKeys.forEach((key) => {
-      const normalized = String(key || "").toLowerCase();
-      if (
-        normalized.includes("supabase") ||
-        normalized.startsWith("sb-") ||
-        normalized.includes("auth-token")
-      ) {
-        window.sessionStorage.removeItem(key);
-      }
-    });
-  } catch (error) {
-    console.warn("[RoleGate] sessionStorage cleanup skipped:", error);
-  }
+  clearStore(window.localStorage);
+  clearStore(window.sessionStorage);
 }
 
 export function pickHomeForRole({ role, driverRow, driverApplication, appMode = "client" }) {
@@ -81,13 +66,15 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
   const [authTimedOut, setAuthTimedOut] = useState(false);
 
   useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
     if (!loading && !appModeLoading) {
       setAuthTimedOut(false);
       return undefined;
     }
 
     const timer = window.setTimeout(() => {
-      console.error("[RoleGate] Auth bootstrap timed out. Redirecting to login.");
+      console.error("[RoleGate] auth bootstrap timed out; forcing safe logout.");
       clearStaleSupabaseStorage();
       setAuthTimedOut(true);
     }, AUTH_LOADING_TIMEOUT_MS);
@@ -103,38 +90,64 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
     const applicationStatus = String(application?.status || "").toLowerCase();
     const effectiveRole = String(role || "client").toLowerCase();
 
-    if (authTimedOut) return { ok: false, to: redirectTo };
-    if (!session) return { ok: false, to: redirectTo };
+    if (authTimedOut) {
+      return { ok: false, to: redirectTo };
+    }
+
+    if (!session) {
+      return { ok: false, to: redirectTo };
+    }
 
     if (a.admin) {
       if (effectiveRole === "admin") return { ok: true };
-      return { ok: false, to: pickHomeForRole({ role, driverRow, driverApplication: application, appMode }) };
+      return {
+        ok: false,
+        to: pickHomeForRole({ role, driverRow, driverApplication: application, appMode }),
+      };
     }
 
     if (Array.isArray(a.roles) && a.roles.length > 0) {
       const allowedRoles = a.roles.map((item) => String(item || "").toLowerCase());
       if (allowedRoles.includes(effectiveRole)) return { ok: true };
-      return { ok: false, to: pickHomeForRole({ role, driverRow, driverApplication: application, appMode }) };
+      return {
+        ok: false,
+        to: pickHomeForRole({ role, driverRow, driverApplication: application, appMode }),
+      };
     }
 
     if (a.driver) {
       if (driverApproved) return { ok: true };
+
       if (a.requireDriverApproved) {
         if (!application) return { ok: false, to: "/driver/register" };
         if (applicationStatus === "approved") return { ok: true };
         return { ok: false, to: "/driver/pending" };
       }
+
       if (application || effectiveRole === "driver") return { ok: true };
       return { ok: false, to: "/driver/register" };
     }
 
-    if (a.client) return { ok: true };
-    return { ok: false, to: "/client/home" };
+    if (a.client) {
+      return { ok: true };
+    }
+
+    return {
+      ok: false,
+      to: pickHomeForRole({ role, driverRow, driverApplication: application, appMode }),
+    };
   }, [allow, appMode, application, authTimedOut, driverRow, redirectTo, role, session]);
 
   if ((loading || appModeLoading) && !authTimedOut) {
     return (
-      <div style={{ minHeight: "50vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div
+        style={{
+          minHeight: "50vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
         <Spin size="large" />
       </div>
     );
