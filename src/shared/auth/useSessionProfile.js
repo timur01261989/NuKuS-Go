@@ -1,10 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
+/**
+ * ============================================================================
+ * KONSTANTALAR VA SOZLAMALAR
+ * ============================================================================
+ */
 const SESSION_TIMEOUT_MS = 7000;
 const QUERY_TIMEOUT_MS = 7000;
 const AUTH_EVENT_DEBOUNCE_MS = 200;
 
+/**
+ * withTimeout
+ * Berilgan promisni ma'lum vaqt ichida bajarilishini tekshiradi.
+ * Agar vaqt o'tib ketsa, error qaytaradi.
+ */
 function withTimeout(promise, ms, label) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -23,6 +33,11 @@ function withTimeout(promise, ms, label) {
   });
 }
 
+/**
+ * clearSupabaseBrowserStorage
+ * Brauzer xotirasidagi barcha Supabase bilan bog'liq eski tokenlarni tozalaydi.
+ * Bu tizimdan chiqishda yoki session buzilganda xavfsizlikni ta'minlaydi.
+ */
 function clearSupabaseBrowserStorage() {
   if (typeof window === "undefined") return;
 
@@ -46,7 +61,7 @@ function clearSupabaseBrowserStorage() {
         }
       });
     } catch (error) {
-      console.warn("[useSessionProfile] storage cleanup skipped:", error);
+      console.warn("[SessionProfile] storage cleanup skipped:", error);
     }
   };
 
@@ -54,422 +69,239 @@ function clearSupabaseBrowserStorage() {
   clearStore(window.sessionStorage);
 }
 
-function normalizeProfile(row) {
-  if (!row) return null;
-  const role = row.role || row.current_role || "client";
-  return {
-    ...row,
-    role,
-    current_role: row.current_role || role,
-    is_admin: row.is_admin === true || role === "admin",
-  };
-}
-
-function normalizeApplication(row) {
-  if (!row) return null;
-  return {
-    ...row,
-    status: String(row.status || "pending").toLowerCase(),
-  };
-}
-
-function normalizeDriver(row) {
-  if (!row) return null;
-  const verified = row.is_verified === true || row.approved === true;
-  return {
-    ...row,
-    approved: verified,
-    is_verified: verified,
-    allowed_services: Array.isArray(row.allowed_services) ? row.allowed_services : [],
-  };
-}
-
-function getSessionIdentity(session) {
-  return session?.user?.id || null;
-}
-
-function isSameLogicalSession(a, b) {
-  return getSessionIdentity(a) === getSessionIdentity(b);
-}
-
+/**
+ * ============================================================================
+ * MAIN HOOK: useSessionProfile
+ * ============================================================================
+ */
 export function useSessionProfile(options = {}) {
-  const { includeDriver = true, includeApplication = true } = options;
+  const { includeDriver = false, includeApplication = false } = options;
 
-  const mountedRef = useRef(false);
-  const lastSessionRef = useRef(null);
-  const lastFetchedUserIdRef = useRef(undefined);
-  const inFlightRef = useRef(false);
-  const queuedSessionRef = useRef(undefined);
-  const requestIdRef = useRef(0);
-  const authEventTimerRef = useRef(null);
-  const unsubRef = useRef(null);
-  const renderCountRef = useRef(0);
-
+  // --- STATE MANAGEMENT ---
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [driverRow, setDriverRow] = useState(null);
   const [application, setApplication] = useState(null);
 
-  renderCountRef.current += 1;
-  console.log("[useSessionProfile] render", {
-    renderCount: renderCountRef.current,
-    includeDriver,
-    includeApplication,
-    loading,
-    sessionUserId: session?.user?.id || null,
-    profileId: profile?.id || null,
-    driverId: driverRow?.id || null,
-    applicationId: application?.id || null,
-  });
+  // --- REFS (Mantiqiy nazorat uchun) ---
+  const mountedRef = useRef(true);
+  const lastFetchedUserIdRef = useRef(undefined);
+  const lastSessionRef = useRef(null);
+  const authEventTimerRef = useRef(null);
+  const unsubRef = useRef(null);
 
-  const commitState = useCallback((next, reason = "commitState") => {
+  /**
+   * commitEmptyState
+   * Barcha ma'lumotlarni null holatiga qaytaradi.
+   */
+  const commitEmptyState = useCallback(() => {
     if (!mountedRef.current) return;
-    console.log("[useSessionProfile] commitState", {
-      reason,
-      loading: next.loading ?? false,
-      sessionUserId: next.session?.user?.id || null,
-      profileId: next.profile?.id || null,
-      driverId: next.driverRow?.id || null,
-      applicationId: next.application?.id || null,
-    });
-    setSession(next.session ?? null);
-    setProfile(next.profile ?? null);
-    setDriverRow(next.driverRow ?? null);
-    setApplication(next.application ?? null);
-    setLoading(next.loading ?? false);
+    console.log("[useSessionProfile] Committing empty state.");
+    setSession(null);
+    setProfile(null);
+    setDriverRow(null);
+    setApplication(null);
+    setLoading(false);
   }, []);
 
-  const commitEmptyState = useCallback(
-    (nextSession = null, reason = "commitEmptyState") => {
-      lastSessionRef.current = nextSession ?? null;
-      lastFetchedUserIdRef.current = getSessionIdentity(nextSession);
-      commitState(
-        {
-          session: nextSession ?? null,
-          profile: null,
-          driverRow: null,
-          application: null,
-          loading: false,
-        },
-        reason
-      );
-    },
-    [commitState]
-  );
-
+  /**
+   * fetchSessionData
+   * Asosiy ma'lumotlarni yuklash funksiyasi.
+   * Yagona ID tizimi bo'yicha 'user_id' ustunidan foydalanadi.
+   */
   const fetchSessionData = useCallback(
-    async (nextSession, reason = "manual") => {
-      const normalizedSession = nextSession ?? null;
-      const userId = getSessionIdentity(normalizedSession);
+    async (currentSession, triggerSource = "unknown") => {
+      if (!mountedRef.current) return;
 
-      console.log("[useSessionProfile] fetchSessionData:start", {
-        reason,
-        userId,
-        inFlight: inFlightRef.current,
-        lastFetchedUserId: lastFetchedUserIdRef.current,
-        lastSessionUserId: getSessionIdentity(lastSessionRef.current),
-      });
+      console.log(`[useSessionProfile] Fetching data. Source: ${triggerSource}`);
 
-      if (inFlightRef.current) {
-        console.warn("[useSessionProfile] fetch queued because request already in flight", {
-          reason,
-          userId,
-        });
-        queuedSessionRef.current = { session: normalizedSession, reason };
+      if (!currentSession?.user?.id) {
+        lastFetchedUserIdRef.current = undefined;
+        commitEmptyState();
         return;
       }
 
-      if (
-        lastFetchedUserIdRef.current === userId &&
-        isSameLogicalSession(lastSessionRef.current, normalizedSession)
-      ) {
-        console.log("[useSessionProfile] skip duplicate fetch for same logical session", {
-          reason,
-          userId,
-        });
+      const uid = currentSession.user.id;
+
+      // Agar ID o'zgarmagan bo'lsa va allaqachon yuklangan bo'lsa, qayta yuklamaslik
+      if (uid === lastFetchedUserIdRef.current && !loading) {
+        console.log("[useSessionProfile] UID unchanged, skipping fetch.");
+        return;
+      }
+
+      try {
+        setLoading(true);
+
+        // 1. PROFILES (Primary Key: id)
+        const profilePromise = supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", uid)
+          .maybeSingle();
+
+        const profileRes = await withTimeout(profilePromise, QUERY_TIMEOUT_MS, "profile fetch");
+        const profileData = profileRes?.data || null;
+
+        // 2. DRIVERS (Yagona ID: user_id)
+        let driverData = null;
+        if (includeDriver && uid) {
+          const driverPromise = supabase
+            .from("drivers")
+            .select("*")
+            .eq("user_id", uid)
+            .maybeSingle();
+          const driverRes = await withTimeout(driverPromise, QUERY_TIMEOUT_MS, "driver fetch");
+          driverData = driverRes?.data || null;
+        }
+
+        // 3. DRIVER APPLICATIONS (Yagona ID: user_id)
+        let appData = null;
+        if (includeApplication && uid) {
+          const appPromise = supabase
+            .from("driver_applications")
+            .select("*")
+            .eq("user_id", uid)
+            .maybeSingle();
+          const appRes = await withTimeout(appPromise, QUERY_TIMEOUT_MS, "application fetch");
+          appData = appRes?.data || null;
+        }
+
+        if (!mountedRef.current) return;
+
+        // Ma'lumotlarni saqlash
+        setSession(currentSession);
+        setProfile(profileData);
+        setDriverRow(driverData);
+        setApplication(appData);
+
+        lastFetchedUserIdRef.current = uid;
+        lastSessionRef.current = currentSession;
+
+        console.log("[useSessionProfile] Data fetch success for UID:", uid);
+      } catch (err) {
+        console.error(`[useSessionProfile] Critical error in fetchSessionData (${triggerSource}):`, err);
+        if (mountedRef.current) {
+          setProfile(null);
+          setDriverRow(null);
+          setApplication(null);
+        }
+      } finally {
         if (mountedRef.current) {
           setLoading(false);
         }
-        return;
-      }
-
-      inFlightRef.current = true;
-      queuedSessionRef.current = undefined;
-      requestIdRef.current += 1;
-      const requestId = requestIdRef.current;
-
-      if (mountedRef.current) {
-        setLoading(true);
-      }
-
-      if (!userId) {
-        console.warn("[useSessionProfile] no userId, committing empty state", { reason });
-        commitEmptyState(null, `empty:${reason}`);
-        inFlightRef.current = false;
-        if (queuedSessionRef.current) {
-          const queued = queuedSessionRef.current;
-          queuedSessionRef.current = undefined;
-          fetchSessionData(queued.session, queued.reason);
-        }
-        return;
-      }
-
-      try {
-        console.log("[useSessionProfile] before profile query", { userId, requestId });
-        const profilePromise = withTimeout(
-          supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
-          QUERY_TIMEOUT_MS,
-          "profiles query"
-        );
-
-        const driverPromise = includeDriver
-          ? withTimeout(
-              supabase.from("drivers").select("*").eq("user_id", userId).maybeSingle(),
-              QUERY_TIMEOUT_MS,
-              "drivers query"
-            )
-          : Promise.resolve({ data: null, error: null });
-
-        const applicationPromise = includeApplication
-          ? withTimeout(
-              supabase
-                .from("driver_applications")
-                .select("*")
-                .eq("user_id", userId)
-                .order("submitted_at", { ascending: false })
-                .limit(1)
-                .maybeSingle(),
-              QUERY_TIMEOUT_MS,
-              "driver_applications query"
-            )
-          : Promise.resolve({ data: null, error: null });
-
-        const [profileRes, driverRes, applicationRes] = await Promise.all([
-          profilePromise,
-          driverPromise,
-          applicationPromise,
-        ]);
-
-        console.log("[useSessionProfile] query results", {
-          requestId,
-          profileError: profileRes?.error || null,
-          profileId: profileRes?.data?.id || null,
-          driverError: driverRes?.error || null,
-          driverId: driverRes?.data?.id || null,
-          applicationError: applicationRes?.error || null,
-          applicationId: applicationRes?.data?.id || null,
-          applicationStatus: applicationRes?.data?.status || null,
-        });
-
-        if (!mountedRef.current || requestId !== requestIdRef.current) {
-          inFlightRef.current = false;
-          console.warn("[useSessionProfile] stale request ignored", { requestId, currentRequestId: requestIdRef.current });
-          return;
-        }
-
-        if (profileRes?.error) throw profileRes.error;
-        if (driverRes?.error) throw driverRes.error;
-        if (applicationRes?.error) throw applicationRes.error;
-
-        lastSessionRef.current = normalizedSession;
-        lastFetchedUserIdRef.current = userId;
-
-        commitState(
-          {
-            session: normalizedSession,
-            profile: normalizeProfile(profileRes?.data || null),
-            driverRow: normalizeDriver(driverRes?.data || null),
-            application: normalizeApplication(applicationRes?.data || null),
-            loading: false,
-          },
-          `success:${reason}`
-        );
-      } catch (error) {
-        console.error(`[useSessionProfile] ${reason} failed:`, error);
-
-        if (!mountedRef.current || requestId !== requestIdRef.current) {
-          inFlightRef.current = false;
-          console.warn("[useSessionProfile] error from stale request ignored", { requestId, currentRequestId: requestIdRef.current });
-          return;
-        }
-
-        const message = String(error?.message || "").toLowerCase();
-        const isAuthFailure =
-          message.includes("refresh token") ||
-          message.includes("invalid refresh token") ||
-          message.includes("jwt") ||
-          message.includes("auth") ||
-          message.includes("session") ||
-          message.includes("token") ||
-          message.includes("401") ||
-          message.includes("403");
-
-        if (isAuthFailure) {
-          console.error("[useSessionProfile] auth failure detected, clearing local auth state", {
-            reason,
-            message,
-          });
-          try {
-            clearSupabaseBrowserStorage();
-            await supabase.auth.signOut({ scope: "local" });
-          } catch (signOutError) {
-            console.warn("[useSessionProfile] local signOut skipped:", signOutError);
-          }
-          lastSessionRef.current = null;
-          lastFetchedUserIdRef.current = null;
-          commitEmptyState(null, `authFailure:${reason}`);
-        } else {
-          lastSessionRef.current = normalizedSession;
-          lastFetchedUserIdRef.current = userId;
-          commitState(
-            {
-              session: normalizedSession,
-              profile: null,
-              driverRow: null,
-              application: null,
-              loading: false,
-            },
-            `nonAuthError:${reason}`
-          );
-        }
-      } finally {
-        inFlightRef.current = false;
-        if (queuedSessionRef.current) {
-          const queued = queuedSessionRef.current;
-          queuedSessionRef.current = undefined;
-
-          const queuedUserId = getSessionIdentity(queued.session);
-          const currentUserId = getSessionIdentity(lastSessionRef.current);
-          if (queuedUserId !== currentUserId) {
-            console.warn("[useSessionProfile] processing queued session", {
-              queuedUserId,
-              currentUserId,
-              reason: queued.reason,
-            });
-            fetchSessionData(queued.session, queued.reason);
-          }
-        }
       }
     },
-    [commitEmptyState, commitState, includeApplication, includeDriver]
+    [includeDriver, includeApplication, commitEmptyState, loading]
   );
 
+  /**
+   * INITIALIZATION & AUTH LISTENERS
+   */
   useEffect(() => {
     mountedRef.current = true;
-    console.log("[useSessionProfile] effect mounted");
 
-    async function bootstrap() {
+    const initAuth = async () => {
       try {
-        console.log("[useSessionProfile] before getSession");
+        console.log("[useSessionProfile] Initializing auth session...");
         const { data, error } = await withTimeout(
           supabase.auth.getSession(),
           SESSION_TIMEOUT_MS,
           "getSession"
         );
-
-        console.log("[useSessionProfile] getSession result", {
-          hasSession: !!data?.session,
-          sessionUserId: data?.session?.user?.id || null,
-          error: error || null,
-        });
-
-        if (!mountedRef.current) return;
-
-        if (error) {
-          console.error("[useSessionProfile] getSession error:", error);
-          commitEmptyState(null, "getSessionError");
-          return;
-        }
-
-        await fetchSessionData(data?.session ?? null, "bootstrap");
-      } catch (error) {
-        console.error("[useSessionProfile] bootstrap failed:", error);
-        if (!mountedRef.current) return;
-        commitEmptyState(null, "bootstrapCatch");
+        if (error) throw error;
+        await fetchSessionData(data?.session, "init_auth");
+      } catch (err) {
+        console.error("[useSessionProfile] initAuth failed or timed out:", err);
+        clearSupabaseBrowserStorage();
+        commitEmptyState();
       }
-    }
+    };
 
-    bootstrap();
+    initAuth();
 
+    // Supabase Auth holati o'zgarishini kuzatish
     const { data: sub } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!mountedRef.current) return;
 
-      console.log("[useSessionProfile] onAuthStateChange raw", {
-        event,
-        nextSessionUserId: nextSession?.user?.id || null,
-      });
+      console.log(`[useSessionProfile] Auth Event: ${event}`);
 
-      if (authEventTimerRef.current) {
-        clearTimeout(authEventTimerRef.current);
+      if (event === "SIGNED_OUT") {
+        lastFetchedUserIdRef.current = undefined;
+        lastSessionRef.current = null;
+        clearSupabaseBrowserStorage();
+        commitEmptyState();
+        return;
       }
 
-      authEventTimerRef.current = setTimeout(() => {
-        if (!mountedRef.current) return;
-
-        console.log("[useSessionProfile] onAuthStateChange debounced", {
-          event,
-          nextSessionUserId: nextSession?.user?.id || null,
-          lastSessionUserId: getSessionIdentity(lastSessionRef.current),
-          lastFetchedUserId: lastFetchedUserIdRef.current,
-        });
-
-        if (event === "SIGNED_OUT") {
-          lastSessionRef.current = null;
-          lastFetchedUserIdRef.current = null;
-          commitEmptyState(null, "signedOut");
-          return;
+      if (event === "TOKEN_REFRESHED" || event === "SIGNED_IN" || event === "USER_UPDATED") {
+        if (authEventTimerRef.current) {
+          clearTimeout(authEventTimerRef.current);
         }
 
-        const currentUserId = getSessionIdentity(lastSessionRef.current);
-        const nextUserId = getSessionIdentity(nextSession);
-
-        if (currentUserId === nextUserId && lastFetchedUserIdRef.current === nextUserId) {
-          console.log("[useSessionProfile] auth event ignored because same user already fetched", {
-            event,
-            nextUserId,
-          });
-          setLoading(false);
-          return;
-        }
-
-        fetchSessionData(nextSession ?? null, `auth:${event || "UNKNOWN"}`);
-      }, AUTH_EVENT_DEBOUNCE_MS);
+        authEventTimerRef.current = setTimeout(() => {
+          fetchSessionData(nextSession ?? null, `auth_event_${event}`);
+        }, AUTH_EVENT_DEBOUNCE_MS);
+      }
     });
 
     unsubRef.current = sub?.subscription ?? null;
 
     return () => {
       mountedRef.current = false;
-      console.log("[useSessionProfile] effect cleanup");
       if (authEventTimerRef.current) {
         clearTimeout(authEventTimerRef.current);
         authEventTimerRef.current = null;
       }
-      unsubRef.current?.unsubscribe?.();
-      unsubRef.current = null;
+      if (unsubRef.current) {
+        unsubRef.current.unsubscribe();
+        unsubRef.current = null;
+      }
+      console.log("[useSessionProfile] Hook unmounted.");
     };
   }, [commitEmptyState, fetchSessionData]);
 
+  /**
+   * refetch
+   * Ma'lumotlarni qo'lda yangilash imkoniyati.
+   */
   const refetch = useCallback(() => {
-    console.log("[useSessionProfile] manual refetch");
+    console.log("[useSessionProfile] Manual refetch triggered.");
     lastFetchedUserIdRef.current = undefined;
-    fetchSessionData(lastSessionRef.current, "refetch");
+    fetchSessionData(lastSessionRef.current, "manual_refetch");
   }, [fetchSessionData]);
 
+  /**
+   * ============================================================================
+   * DERIVED VALUES (Frontend qulayligi uchun)
+   * ============================================================================
+   */
   const user = session?.user ?? null;
   const userId = user?.id ?? null;
-  const role = profile?.role ?? "client";
-  const isAdmin = !!profile?.is_admin;
+  
+  // Rolni aniqlash
+  const role = profile?.current_role ?? profile?.role ?? "client";
+  const isAdmin = role === "admin" || !!profile?.is_admin;
+  
+  // Haydovchi holati
   const driverExists = !!driverRow;
   const driverApproved = !!driverRow?.is_verified;
   const applicationStatus = application?.status ?? null;
+  
+  // Texnik parametrlar
   const transportType = driverRow?.transport_type || application?.transport_type || null;
-  const allowedServices = useMemo(
-    () => (Array.isArray(driverRow?.allowed_services) ? driverRow.allowed_services : []),
-    [driverRow]
-  );
+  
+  const allowedServices = useMemo(() => {
+    if (Array.isArray(driverRow?.allowed_services)) {
+      return driverRow.allowed_services;
+    }
+    return [];
+  }, [driverRow]);
 
+  /**
+   * RETURN STATEMENT
+   * Barcha state va helperlarni qaytaramiz.
+   */
   return {
     loading,
     session,
@@ -483,12 +315,12 @@ export function useSessionProfile(options = {}) {
     driverExists,
     driverApproved,
     application,
-    driverApp: application,
     applicationStatus,
     transportType,
     allowedServices,
     refetch,
+    // Debug uchun qo'shimcha flaglar
+    isAuthReady: !loading,
+    hasSession: !!session
   };
 }
-
-export default useSessionProfile;
