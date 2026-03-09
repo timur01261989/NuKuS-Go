@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 function normalizeProfile(row) {
@@ -6,6 +6,7 @@ function normalizeProfile(row) {
   return {
     ...row,
     role: row.role || row.current_role || "client",
+    current_role: row.current_role || row.role || "client",
     is_admin: row.is_admin === true || (row.role || row.current_role) === "admin",
   };
 }
@@ -20,10 +21,11 @@ function normalizeApplication(row) {
 
 function normalizeDriver(row) {
   if (!row) return null;
+  const verified = row.is_verified === true || row.approved === true;
   return {
     ...row,
-    approved: row.is_verified === true || row.approved === true,
-    is_verified: row.is_verified === true || row.approved === true,
+    approved: verified,
+    is_verified: verified,
     allowed_services: Array.isArray(row.allowed_services) ? row.allowed_services : [],
   };
 }
@@ -38,77 +40,81 @@ export function useSessionProfile(options = {}) {
   const [driverRow, setDriverRow] = useState(null);
   const [application, setApplication] = useState(null);
 
-  const setSafe = (fn) => {
-    if (mounted.current) fn();
-  };
+  const fetchAll = useCallback(
+    async (nextSession) => {
+      if (mounted.current) setLoading(true);
+      const uid = nextSession?.user?.id ?? null;
 
-  const fetchAll = useCallback(async (nextSession) => {
-    setSafe(() => setLoading(true));
-    const uid = nextSession?.user?.id ?? null;
+      if (!uid) {
+        if (mounted.current) {
+          setSession(nextSession ?? null);
+          setProfile(null);
+          setDriverRow(null);
+          setApplication(null);
+          setLoading(false);
+        }
+        return;
+      }
 
-    if (!uid || !supabase) {
-      setSafe(() => {
-        setSession(nextSession ?? null);
-        setProfile(null);
-        setDriverRow(null);
-        setApplication(null);
-        setLoading(false);
-      });
-      return;
-    }
+      try {
+        const profilePromise = supabase.from("profiles").select("*").eq("id", uid).maybeSingle();
 
-    try {
-      const profilePromise = supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", uid)
-        .maybeSingle();
+        const driverPromise = includeDriver
+          ? supabase.from("drivers").select("*").eq("user_id", uid).maybeSingle()
+          : Promise.resolve({ data: null, error: null });
 
-      const driverPromise = includeDriver
-        ? supabase.from("drivers").select("*").eq("user_id", uid).maybeSingle()
-        : Promise.resolve({ data: null, error: null });
+        const appPromise = includeApplication
+          ? supabase
+              .from("driver_applications")
+              .select("*")
+              .eq("user_id", uid)
+              .order("submitted_at", { ascending: false })
+              .limit(1)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null });
 
-      const appPromise = includeApplication
-        ? supabase
-            .from("driver_applications")
-            .select("*")
-            .eq("user_id", uid)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle()
-        : Promise.resolve({ data: null, error: null });
+        const [profileRes, driverRes, appRes] = await Promise.all([
+          profilePromise,
+          driverPromise,
+          appPromise,
+        ]);
 
-      const [profileRes, driverRes, appRes] = await Promise.all([profilePromise, driverPromise, appPromise]);
+        if (profileRes.error) throw profileRes.error;
+        if (driverRes.error) throw driverRes.error;
+        if (appRes.error) throw appRes.error;
 
-      setSafe(() => {
-        setSession(nextSession ?? null);
-        setProfile(normalizeProfile(profileRes?.data ?? null));
-        setDriverRow(normalizeDriver(driverRes?.data ?? null));
-        setApplication(normalizeApplication(appRes?.data ?? null));
-        setLoading(false);
-      });
-    } catch (error) {
-      console.error("useSessionProfile error:", error);
-      setSafe(() => {
-        setSession(nextSession ?? null);
-        setProfile(null);
-        setDriverRow(null);
-        setApplication(null);
-        setLoading(false);
-      });
-    }
-  }, [includeApplication, includeDriver]);
+        if (mounted.current) {
+          setSession(nextSession ?? null);
+          setProfile(normalizeProfile(profileRes.data || null));
+          setDriverRow(normalizeDriver(driverRes.data || null));
+          setApplication(normalizeApplication(appRes.data || null));
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error("useSessionProfile error:", error);
+        if (mounted.current) {
+          setSession(nextSession ?? null);
+          setProfile(null);
+          setDriverRow(null);
+          setApplication(null);
+          setLoading(false);
+        }
+      }
+    },
+    [includeApplication, includeDriver]
+  );
 
   useEffect(() => {
     mounted.current = true;
-    if (!supabase) {
-      setLoading(false);
-      return () => {
-        mounted.current = false;
-      };
-    }
 
-    supabase.auth.getSession().then(({ data }) => fetchAll(data?.session ?? null));
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (error) {
+        console.error("useSessionProfile getSession error:", error);
+        fetchAll(null);
+        return;
+      }
+      fetchAll(data?.session ?? null);
+    });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       fetchAll(nextSession ?? null);
@@ -150,3 +156,5 @@ export function useSessionProfile(options = {}) {
     refetch: () => fetchAll(session),
   };
 }
+
+export default useSessionProfile;
