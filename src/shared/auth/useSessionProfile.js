@@ -103,6 +103,7 @@ export function useSessionProfile(options = {}) {
   const requestIdRef = useRef(0);
   const authEventTimerRef = useRef(null);
   const unsubRef = useRef(null);
+  const renderCountRef = useRef(0);
 
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState(null);
@@ -110,8 +111,28 @@ export function useSessionProfile(options = {}) {
   const [driverRow, setDriverRow] = useState(null);
   const [application, setApplication] = useState(null);
 
-  const commitState = useCallback((next) => {
+  renderCountRef.current += 1;
+  console.log("[useSessionProfile] render", {
+    renderCount: renderCountRef.current,
+    includeDriver,
+    includeApplication,
+    loading,
+    sessionUserId: session?.user?.id || null,
+    profileId: profile?.id || null,
+    driverId: driverRow?.id || null,
+    applicationId: application?.id || null,
+  });
+
+  const commitState = useCallback((next, reason = "commitState") => {
     if (!mountedRef.current) return;
+    console.log("[useSessionProfile] commitState", {
+      reason,
+      loading: next.loading ?? false,
+      sessionUserId: next.session?.user?.id || null,
+      profileId: next.profile?.id || null,
+      driverId: next.driverRow?.id || null,
+      applicationId: next.application?.id || null,
+    });
     setSession(next.session ?? null);
     setProfile(next.profile ?? null);
     setDriverRow(next.driverRow ?? null);
@@ -120,16 +141,19 @@ export function useSessionProfile(options = {}) {
   }, []);
 
   const commitEmptyState = useCallback(
-    (nextSession = null) => {
+    (nextSession = null, reason = "commitEmptyState") => {
       lastSessionRef.current = nextSession ?? null;
       lastFetchedUserIdRef.current = getSessionIdentity(nextSession);
-      commitState({
-        session: nextSession ?? null,
-        profile: null,
-        driverRow: null,
-        application: null,
-        loading: false,
-      });
+      commitState(
+        {
+          session: nextSession ?? null,
+          profile: null,
+          driverRow: null,
+          application: null,
+          loading: false,
+        },
+        reason
+      );
     },
     [commitState]
   );
@@ -139,7 +163,19 @@ export function useSessionProfile(options = {}) {
       const normalizedSession = nextSession ?? null;
       const userId = getSessionIdentity(normalizedSession);
 
+      console.log("[useSessionProfile] fetchSessionData:start", {
+        reason,
+        userId,
+        inFlight: inFlightRef.current,
+        lastFetchedUserId: lastFetchedUserIdRef.current,
+        lastSessionUserId: getSessionIdentity(lastSessionRef.current),
+      });
+
       if (inFlightRef.current) {
+        console.warn("[useSessionProfile] fetch queued because request already in flight", {
+          reason,
+          userId,
+        });
         queuedSessionRef.current = { session: normalizedSession, reason };
         return;
       }
@@ -148,6 +184,10 @@ export function useSessionProfile(options = {}) {
         lastFetchedUserIdRef.current === userId &&
         isSameLogicalSession(lastSessionRef.current, normalizedSession)
       ) {
+        console.log("[useSessionProfile] skip duplicate fetch for same logical session", {
+          reason,
+          userId,
+        });
         if (mountedRef.current) {
           setLoading(false);
         }
@@ -164,7 +204,8 @@ export function useSessionProfile(options = {}) {
       }
 
       if (!userId) {
-        commitEmptyState(null);
+        console.warn("[useSessionProfile] no userId, committing empty state", { reason });
+        commitEmptyState(null, `empty:${reason}`);
         inFlightRef.current = false;
         if (queuedSessionRef.current) {
           const queued = queuedSessionRef.current;
@@ -175,6 +216,7 @@ export function useSessionProfile(options = {}) {
       }
 
       try {
+        console.log("[useSessionProfile] before profile query", { userId, requestId });
         const profilePromise = withTimeout(
           supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
           QUERY_TIMEOUT_MS,
@@ -209,8 +251,20 @@ export function useSessionProfile(options = {}) {
           applicationPromise,
         ]);
 
+        console.log("[useSessionProfile] query results", {
+          requestId,
+          profileError: profileRes?.error || null,
+          profileId: profileRes?.data?.id || null,
+          driverError: driverRes?.error || null,
+          driverId: driverRes?.data?.id || null,
+          applicationError: applicationRes?.error || null,
+          applicationId: applicationRes?.data?.id || null,
+          applicationStatus: applicationRes?.data?.status || null,
+        });
+
         if (!mountedRef.current || requestId !== requestIdRef.current) {
           inFlightRef.current = false;
+          console.warn("[useSessionProfile] stale request ignored", { requestId, currentRequestId: requestIdRef.current });
           return;
         }
 
@@ -221,18 +275,22 @@ export function useSessionProfile(options = {}) {
         lastSessionRef.current = normalizedSession;
         lastFetchedUserIdRef.current = userId;
 
-        commitState({
-          session: normalizedSession,
-          profile: normalizeProfile(profileRes?.data || null),
-          driverRow: normalizeDriver(driverRes?.data || null),
-          application: normalizeApplication(applicationRes?.data || null),
-          loading: false,
-        });
+        commitState(
+          {
+            session: normalizedSession,
+            profile: normalizeProfile(profileRes?.data || null),
+            driverRow: normalizeDriver(driverRes?.data || null),
+            application: normalizeApplication(applicationRes?.data || null),
+            loading: false,
+          },
+          `success:${reason}`
+        );
       } catch (error) {
         console.error(`[useSessionProfile] ${reason} failed:`, error);
 
         if (!mountedRef.current || requestId !== requestIdRef.current) {
           inFlightRef.current = false;
+          console.warn("[useSessionProfile] error from stale request ignored", { requestId, currentRequestId: requestIdRef.current });
           return;
         }
 
@@ -248,6 +306,10 @@ export function useSessionProfile(options = {}) {
           message.includes("403");
 
         if (isAuthFailure) {
+          console.error("[useSessionProfile] auth failure detected, clearing local auth state", {
+            reason,
+            message,
+          });
           try {
             clearSupabaseBrowserStorage();
             await supabase.auth.signOut({ scope: "local" });
@@ -256,17 +318,20 @@ export function useSessionProfile(options = {}) {
           }
           lastSessionRef.current = null;
           lastFetchedUserIdRef.current = null;
-          commitEmptyState(null);
+          commitEmptyState(null, `authFailure:${reason}`);
         } else {
           lastSessionRef.current = normalizedSession;
           lastFetchedUserIdRef.current = userId;
-          commitState({
-            session: normalizedSession,
-            profile: null,
-            driverRow: null,
-            application: null,
-            loading: false,
-          });
+          commitState(
+            {
+              session: normalizedSession,
+              profile: null,
+              driverRow: null,
+              application: null,
+              loading: false,
+            },
+            `nonAuthError:${reason}`
+          );
         }
       } finally {
         inFlightRef.current = false;
@@ -277,6 +342,11 @@ export function useSessionProfile(options = {}) {
           const queuedUserId = getSessionIdentity(queued.session);
           const currentUserId = getSessionIdentity(lastSessionRef.current);
           if (queuedUserId !== currentUserId) {
+            console.warn("[useSessionProfile] processing queued session", {
+              queuedUserId,
+              currentUserId,
+              reason: queued.reason,
+            });
             fetchSessionData(queued.session, queued.reason);
           }
         }
@@ -287,20 +357,28 @@ export function useSessionProfile(options = {}) {
 
   useEffect(() => {
     mountedRef.current = true;
+    console.log("[useSessionProfile] effect mounted");
 
     async function bootstrap() {
       try {
+        console.log("[useSessionProfile] before getSession");
         const { data, error } = await withTimeout(
           supabase.auth.getSession(),
           SESSION_TIMEOUT_MS,
           "getSession"
         );
 
+        console.log("[useSessionProfile] getSession result", {
+          hasSession: !!data?.session,
+          sessionUserId: data?.session?.user?.id || null,
+          error: error || null,
+        });
+
         if (!mountedRef.current) return;
 
         if (error) {
           console.error("[useSessionProfile] getSession error:", error);
-          commitEmptyState(null);
+          commitEmptyState(null, "getSessionError");
           return;
         }
 
@@ -308,7 +386,7 @@ export function useSessionProfile(options = {}) {
       } catch (error) {
         console.error("[useSessionProfile] bootstrap failed:", error);
         if (!mountedRef.current) return;
-        commitEmptyState(null);
+        commitEmptyState(null, "bootstrapCatch");
       }
     }
 
@@ -317,6 +395,11 @@ export function useSessionProfile(options = {}) {
     const { data: sub } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!mountedRef.current) return;
 
+      console.log("[useSessionProfile] onAuthStateChange raw", {
+        event,
+        nextSessionUserId: nextSession?.user?.id || null,
+      });
+
       if (authEventTimerRef.current) {
         clearTimeout(authEventTimerRef.current);
       }
@@ -324,10 +407,17 @@ export function useSessionProfile(options = {}) {
       authEventTimerRef.current = setTimeout(() => {
         if (!mountedRef.current) return;
 
+        console.log("[useSessionProfile] onAuthStateChange debounced", {
+          event,
+          nextSessionUserId: nextSession?.user?.id || null,
+          lastSessionUserId: getSessionIdentity(lastSessionRef.current),
+          lastFetchedUserId: lastFetchedUserIdRef.current,
+        });
+
         if (event === "SIGNED_OUT") {
           lastSessionRef.current = null;
           lastFetchedUserIdRef.current = null;
-          commitEmptyState(null);
+          commitEmptyState(null, "signedOut");
           return;
         }
 
@@ -335,6 +425,10 @@ export function useSessionProfile(options = {}) {
         const nextUserId = getSessionIdentity(nextSession);
 
         if (currentUserId === nextUserId && lastFetchedUserIdRef.current === nextUserId) {
+          console.log("[useSessionProfile] auth event ignored because same user already fetched", {
+            event,
+            nextUserId,
+          });
           setLoading(false);
           return;
         }
@@ -347,6 +441,7 @@ export function useSessionProfile(options = {}) {
 
     return () => {
       mountedRef.current = false;
+      console.log("[useSessionProfile] effect cleanup");
       if (authEventTimerRef.current) {
         clearTimeout(authEventTimerRef.current);
         authEventTimerRef.current = null;
@@ -357,6 +452,7 @@ export function useSessionProfile(options = {}) {
   }, [commitEmptyState, fetchSessionData]);
 
   const refetch = useCallback(() => {
+    console.log("[useSessionProfile] manual refetch");
     lastFetchedUserIdRef.current = undefined;
     fetchSessionData(lastSessionRef.current, "refetch");
   }, [fetchSessionData]);

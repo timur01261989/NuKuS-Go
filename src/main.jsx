@@ -6,6 +6,12 @@ import { AuthProvider } from "@/shared/auth/AuthProvider";
 import api from "@/utils/apiHelper";
 import { setupNotifications } from "@/services/notifications";
 import { supabase } from "@/lib/supabase";
+mport React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App";
+import AppErrorBoundary from "@/shared/debug/AppErrorBoundary";
+import { installGlobalDebugRuntime } from "@/shared/debug/debugRuntime";
+
 
 // ✅ Ant Design reset
 import "antd/dist/reset.css";
@@ -141,7 +147,15 @@ if (typeof window !== "undefined" && "serviceWorker" in navigator) {
     }
   });
 }
+installGlobalDebugRuntime();
 
+ReactDOM.createRoot(document.getElementById("root")).render(
+  <React.StrictMode>
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>
+  </React.StrictMode>
+);
 /* ============================
    RENDER
 ============================ */

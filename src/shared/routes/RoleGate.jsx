@@ -63,13 +63,34 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
   const [authTimedOut, setAuthTimedOut] = useState(false);
 
   useEffect(() => {
+    console.log("[RoleGate] render state", {
+      pathname: location.pathname,
+      appMode,
+      appModeLoading,
+      loading,
+      hasSession: !!session,
+      role,
+      hasDriver: !!driverRow,
+      hasApplication: !!application,
+      authTimedOut,
+      allow,
+    });
+  }, [allow, appMode, appModeLoading, application, authTimedOut, driverRow, loading, location.pathname, role, session]);
+
+  useEffect(() => {
     if (!loading && !appModeLoading) {
       setAuthTimedOut(false);
       return undefined;
     }
 
     const timer = window.setTimeout(() => {
-      console.error("[RoleGate] auth bootstrap timed out; forcing safe logout.");
+      console.error("[RoleGate] auth bootstrap timed out; forcing safe logout.", {
+        pathname: location.pathname,
+        appMode,
+        appModeLoading,
+        loading,
+        hasSession: !!session,
+      });
       clearStaleSupabaseStorage();
       setAuthTimedOut(true);
     }, AUTH_LOADING_TIMEOUT_MS);
@@ -77,7 +98,7 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [appModeLoading, loading]);
+  }, [appMode, appModeLoading, loading, location.pathname, session]);
 
   const target = useMemo(() => {
     const rules = allow || {};
@@ -86,52 +107,62 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
     const applicationStatus = String(application?.status || "").toLowerCase();
 
     if (authTimedOut) {
-      return { ok: false, to: redirectTo };
+      return { ok: false, to: redirectTo, reason: "auth-timeout" };
     }
 
     if (!session) {
-      return { ok: false, to: redirectTo };
+      return { ok: false, to: redirectTo, reason: "no-session" };
     }
 
     if (rules.admin) {
-      if (effectiveRole === "admin") return { ok: true };
+      if (effectiveRole === "admin") return { ok: true, reason: "admin-allowed" };
       return {
         ok: false,
         to: pickHomeForRole({ role, driverRow, driverApplication: application, appMode }),
+        reason: "admin-denied",
       };
     }
 
     if (Array.isArray(rules.roles) && rules.roles.length > 0) {
       const normalizedRoles = rules.roles.map((item) => String(item || "").toLowerCase());
-      if (normalizedRoles.includes(effectiveRole)) return { ok: true };
+      if (normalizedRoles.includes(effectiveRole)) return { ok: true, reason: "role-allowed" };
       return {
         ok: false,
         to: pickHomeForRole({ role, driverRow, driverApplication: application, appMode }),
+        reason: "role-denied",
       };
     }
 
     if (rules.driver) {
-      if (driverApproved) return { ok: true };
+      if (driverApproved) return { ok: true, reason: "driver-approved" };
 
       if (rules.requireDriverApproved) {
-        if (!application) return { ok: false, to: "/driver/register" };
-        if (applicationStatus === "approved") return { ok: true };
-        return { ok: false, to: "/driver/pending" };
+        if (!application) return { ok: false, to: "/driver/register", reason: "driver-no-application" };
+        if (applicationStatus === "approved") return { ok: true, reason: "application-approved" };
+        return { ok: false, to: "/driver/pending", reason: `application-${applicationStatus || "pending"}` };
       }
 
-      if (application || effectiveRole === "driver") return { ok: true };
-      return { ok: false, to: "/driver/register" };
+      if (application || effectiveRole === "driver") return { ok: true, reason: "driver-basic-allowed" };
+      return { ok: false, to: "/driver/register", reason: "driver-basic-denied" };
     }
 
     if (rules.client) {
-      return { ok: true };
+      return { ok: true, reason: "client-allowed" };
     }
 
     return {
       ok: false,
       to: pickHomeForRole({ role, driverRow, driverApplication: application, appMode }),
+      reason: "fallback-redirect",
     };
   }, [allow, appMode, application, authTimedOut, driverRow, redirectTo, role, session]);
+
+  useEffect(() => {
+    console.log("[RoleGate] target resolved", {
+      pathname: location.pathname,
+      target,
+    });
+  }, [location.pathname, target]);
 
   if ((loading || appModeLoading) && !authTimedOut) {
     return (
