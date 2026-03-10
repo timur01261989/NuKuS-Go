@@ -28,6 +28,9 @@ import "leaflet/dist/leaflet.css";
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
+// Mahalliy lokalizatsiya hookini import qilish
+import { usePageI18n } from "./pageI18n";
+
 let DefaultIcon = L.icon({
     iconUrl: icon,
     shadowUrl: iconShadow,
@@ -142,6 +145,8 @@ const MapPickerModal = memo(({ visible, onClose, onSelect }) => {
   );
 });
 
+MapPickerModal.displayName = "MapPickerModal";
+
 // --- Saqlangan manzillar ro'yxati elementi ---
 const AddressItem = memo(({ item, onRemove }) => (
   <Card 
@@ -178,9 +183,11 @@ const AddressItem = memo(({ item, onRemove }) => (
   </Card>
 ));
 
+AddressItem.displayName = "AddressItem";
+
 // --- ASOSIY KOMPONENT ---
 const MyAddresses = () => {
-  const { t, tx } = usePageI18n();
+  const { t } = usePageI18n();
   const [form] = Form.useForm();
   const [items, setItems] = useState(() => AddressRepository.get());
   const [isMapOpen, setIsMapOpen] = useState(false);
@@ -229,7 +236,7 @@ const MyAddresses = () => {
     }}>
       <header style={{ marginBottom: 35 }}>
         <Title level={2} style={{ fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1 }}>
-          {t.myAddressesTitle || "Mening manzillarim"}
+          {t?.myAddressesTitle || "Mening manzillarim"}
         </Title>
         <Text type="secondary" style={{ fontSize: 14 }}>
           TEZ-TEZ TASHRIF BUYURADIGAN MANZILLARINGIZNI BOSHQARING
