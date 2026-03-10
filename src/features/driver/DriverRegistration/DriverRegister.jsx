@@ -22,6 +22,7 @@ import {
 import StepPersonal from "./StepPersonal";
 import StepVehicle from "./StepVehicle";
 import StepDocuments from "./StepDocuments";
+import DriverPending from "./DriverPending";
 import {
   initialFilesState,
   initialFormState,
@@ -104,6 +105,8 @@ export default function DriverRegister() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [applicationStatus, setApplicationStatus] = useState("");
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [adminNote, setAdminNote] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -121,9 +124,15 @@ export default function DriverRegister() {
             phone: normalizePhone(nextValues?.phone || ""),
             vehicleType: nextValues?.vehicleType || initialFormState.vehicleType,
           });
+
           setApplicationStatus(result.application.status || "");
+          setRejectionReason(result.application.rejection_reason || "");
+          setAdminNote(result.application.admin_note || "");
         } else {
           form.setFieldsValue(initialFormState);
+          setApplicationStatus("");
+          setRejectionReason("");
+          setAdminNote("");
         }
 
         const nextPreviews = docRowsToPreviewMap(
@@ -180,7 +189,7 @@ export default function DriverRegister() {
 
       setCurrent((prev) => Math.min(prev + 1, 2));
     } catch (_error) {
-      // Ant Form own validation messages already shown
+      // Ant Design validation handles UI error display
     }
   };
 
@@ -248,6 +257,8 @@ export default function DriverRegister() {
 
       setExistingDocuments(docsMap);
       setApplicationStatus(result?.application?.status || "pending");
+      setRejectionReason(result?.application?.rejection_reason || "");
+      setAdminNote(result?.application?.admin_note || "");
       message.success("Ariza muvaffaqiyatli yuborildi");
     } catch (error) {
       message.error(error?.message || "Arizani yuborishda xato");
@@ -257,19 +268,22 @@ export default function DriverRegister() {
   };
 
   const headerExtra = useMemo(() => {
-    if (!applicationStatus) return null;
-    const type =
-      applicationStatus === "approved"
-        ? "success"
-        : applicationStatus === "rejected"
-        ? "error"
-        : "info";
+    if (!applicationStatus || applicationStatus === "pending" || applicationStatus === "approved") {
+      return null;
+    }
+
+    const type = applicationStatus === "rejected" ? "error" : "info";
 
     return (
       <Alert
         type={type}
         showIcon
         message={`Joriy holat: ${applicationStatus}`}
+        description={
+          rejectionReason || adminNote
+            ? `${rejectionReason ? `Sabab: ${rejectionReason}. ` : ""}${adminNote ? `Izoh: ${adminNote}` : ""}`
+            : undefined
+        }
         style={{
           borderRadius: 16,
           border: "1px solid rgba(255,255,255,0.14)",
@@ -277,7 +291,17 @@ export default function DriverRegister() {
         }}
       />
     );
-  }, [applicationStatus]);
+  }, [applicationStatus, rejectionReason, adminNote]);
+
+  if (!initialLoading && (applicationStatus === "pending" || applicationStatus === "approved")) {
+    return (
+      <DriverPending
+        status={applicationStatus}
+        rejectionReason={rejectionReason}
+        adminNote={adminNote}
+      />
+    );
+  }
 
   return (
     <ConfigProvider
