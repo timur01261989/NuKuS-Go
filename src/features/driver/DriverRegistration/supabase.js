@@ -3,34 +3,46 @@ import { DRIVER_DOCUMENT_FIELDS, DRIVER_DOCUMENT_FIELD_MAP } from "./uploadConfi
 
 const DOCUMENT_BUCKET = "driver-documents";
 
+/**
+ * Storage uchun xavfsiz papka nomlarini yaratish
+ */
 function sanitizeSegment(value) {
   return String(value || "")
     .trim()
     .replace(/[^a-zA-Z0-9_-]/g, "_");
 }
 
+/**
+ * Fayl kengaytmasini aniqlash (fallback bilan)
+ */
 function getFileExtension(file) {
-  const name = String(file?.name || "");
+  if (!file) return "jpg";
+  const name = String(file.name || "");
   if (name.includes(".")) {
     const ext = String(name.split(".").pop() || "").toLowerCase();
     if (ext) return ext;
   }
-
-  const type = String(file?.type || "").toLowerCase();
+  const type = String(file.type || "").toLowerCase();
   if (type.includes("png")) return "png";
   if (type.includes("webp")) return "webp";
   return "jpg";
 }
 
+/**
+ * Hujjatlar massivini doc_type bo'yicha Map ko'rinishiga o'tkazish
+ */
 function buildDocumentRowMap(rows = []) {
-  return rows.reduce((acc, row) => {
-    if (row?.doc_type) {
+  return (rows || []).reduce((acc, row) => {
+    if (row && row.doc_type) {
       acc[row.doc_type] = row;
     }
     return acc;
   }, {});
 }
 
+/**
+ * Joriy autentifikatsiyadan o'tgan foydalanuvchini olish
+ */
 export async function getAuthenticatedUser() {
   const {
     data: { user },
@@ -38,166 +50,153 @@ export async function getAuthenticatedUser() {
   } = await supabase.auth.getUser();
 
   if (error) {
-    throw new Error(error.message || "Foydalanuvchini olishda xato");
+    throw new Error(`Avtorizatsiya xatosi: ${error.message}`);
   }
 
   if (!user) {
-    throw new Error("Login qilinmagan");
+    throw new Error("Tizimga kirilmagan. Iltimos, qayta kiring.");
   }
 
   return user;
 }
 
+/**
+ * Haydovchining arizasi va barcha hujjatlarini birgalikda olish
+ */
 export async function getMyDriverApplicationWithDocuments() {
   const user = await getAuthenticatedUser();
 
-  const { data: application, error: applicationError } = await supabase
+  // 1. Arizani olish
+  const { data: application, error: appError } = await supabase
     .from("driver_applications")
     .select("*")
     .eq("user_id", user.id)
     .maybeSingle();
 
-  if (applicationError) {
-    throw new Error(applicationError.message || "Arizani olishda xato");
+  if (appError) {
+    console.error("Ariza yuklashda xato:", appError);
+    throw new Error(appError.message);
   }
 
   if (!application) {
-    return {
-      application: null,
-      documents: [],
-    };
+    return { application: null, documents: [] };
   }
 
-  const { data: documents, error: documentsError } = await supabase
+  // 2. Hujjatlarni olish
+  const { data: documents, error: docsError } = await supabase
     .from("driver_documents")
     .select("*")
     .eq("application_id", application.id)
     .order("created_at", { ascending: true });
 
-  if (documentsError) {
-    throw new Error(documentsError.message || "Hujjatlarni olishda xato");
+  if (docsError) {
+    console.error("Hujjatlarni yuklashda xato:", docsError);
+    throw new Error(docsError.message);
   }
 
+  return { application, documents };
+}
+
+/**
+ * Formadagi ma'lumotlarni bazaga moslab (formatting) tayyorlash
+ */
+export function buildFormDataFromApplication(formData) {
+  if (!formData) return {};
+
   return {
-    application,
-    documents: documents || [],
+    // Ism-familiya har doim KATTA HARFLARDA
+    last_name: String(formData.lastName || "").toUpperCase().trim(),
+    first_name: String(formData.firstName || "").toUpperCase().trim(),
+    middle_name: String(formData.middleName || "").toUpperCase().trim(),
+    
+    // Telefon va raqamli maydonlar faqat raqamlar
+    phone: String(formData.phone || "").replace(/\D/g, ""),
+    passport_number: String(formData.passportNumber || "").toUpperCase().replace(/[^A-Z0-9]/g, ""),
+    
+    // Avtomobil ma'lumotlari
+    vehicle_type: formData.vehicleType,
+    brand: formData.brand,
+    model: formData.model,
+    plate_number: String(formData.plateNumber || "").toUpperCase().replace(/[^A-Z0-9]/g, ""),
+    year: parseInt(formData.year) || null,
+    color: formData.color,
+    seats: parseInt(formData.seats) || 0,
+    cargo_kg: parseFloat(formData.cargoKg) || 0,
+    cargo_m3: parseFloat(formData.cargoM3) || 0,
   };
 }
 
-export function buildFormDataFromApplication(application) {
-  if (!application) {
-    return null;
-  }
-
-  return {
-    lastName: application.last_name || "",
-    firstName: application.first_name || "",
-    middleName: application.middle_name || "",
-    phone: application.phone || "",
-    passportNumber: application.passport_number || "",
-
-    vehicleType: application.transport_type || "light_car",
-    brand: application.vehicle_brand || "",
-    model: application.vehicle_model || "",
-    plateNumber: application.vehicle_plate || "",
-    year: application.vehicle_year ?? "",
-    color: application.vehicle_color || "",
-    seats: application.seat_count ?? 4,
-    cargoKg: application.requested_max_freight_weight_kg ?? "",
-    cargoM3: application.requested_payload_volume_m3 ?? "",
-
-    status: application.status || "pending",
-    rejectionReason: application.rejection_reason || "",
-    adminNote: application.admin_note || "",
-  };
-}
-
+/**
+ * Arizani yaratish yoki yangilash (Upsert)
+ */
 export async function upsertDriverApplication(formData) {
   const user = await getAuthenticatedUser();
+  const baseData = buildFormDataFromApplication(formData);
 
   const payload = {
+    ...baseData,
     user_id: user.id,
-    status: "pending",
-
-    last_name: formData.lastName || null,
-    first_name: formData.firstName || null,
-    middle_name: formData.middleName || null,
-    phone: formData.phone || null,
-    passport_number: formData.passportNumber || null,
-
-    transport_type: formData.vehicleType || null,
-
-    vehicle_brand: formData.brand || null,
-    vehicle_model: formData.model || null,
-    vehicle_year: formData.year ? Number(formData.year) : null,
-    vehicle_plate: formData.plateNumber || null,
-    vehicle_color: formData.color || null,
-
-    seat_count: formData.seats ? Number(formData.seats) : null,
-    requested_max_freight_weight_kg: formData.cargoKg
-      ? Number(formData.cargoKg)
-      : null,
-    requested_payload_volume_m3: formData.cargoM3
-      ? Number(formData.cargoM3)
-      : null,
-
-    submitted_at: new Date().toISOString(),
+    status: "pending", // Har safar yangilanganda status pendingga qaytadi
     updated_at: new Date().toISOString(),
   };
 
-  const existing = await getMyDriverApplicationWithDocuments();
+  // Oldin ariza borligini tekshirish
+  const { data: existingApp } = await supabase
+    .from("driver_applications")
+    .select("id")
+    .eq("user_id", user.id)
+    .maybeSingle();
 
-  if (existing.application?.id) {
+  if (existingApp?.id) {
     const { data, error } = await supabase
       .from("driver_applications")
       .update(payload)
-      .eq("id", existing.application.id)
-      .select("*")
+      .eq("id", existingApp.id)
+      .select()
       .single();
 
-    if (error) {
-      throw new Error(error.message || "Arizani yangilashda xato");
-    }
+    if (error) throw new Error(`Arizani yangilashda xato: ${error.message}`);
+    return data;
+  } else {
+    const { data, error } = await supabase
+      .from("driver_applications")
+      .insert({
+        ...payload,
+        created_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
 
+    if (error) throw new Error(`Arizani saqlashda xato: ${error.message}`);
     return data;
   }
-
-  const { data, error } = await supabase
-    .from("driver_applications")
-    .insert(payload)
-    .select("*")
-    .single();
-
-  if (error) {
-    throw new Error(error.message || "Arizani yaratishda xato");
-  }
-
-  return data;
 }
 
+/**
+ * Hujjatlarni Storage ga yuklash va DB dagi jadvalni sinxronlash
+ */
 export async function uploadDriverDocuments(applicationId, files = {}) {
   const user = await getAuthenticatedUser();
 
-  const { data: existingRows, error: existingRowsError } = await supabase
+  // Mavjud hujjatlarni olish (qayta yuklamaslik yoki almashtirish uchun)
+  const { data: existingDocs } = await supabase
     .from("driver_documents")
     .select("*")
     .eq("application_id", applicationId);
 
-  if (existingRowsError) {
-    throw new Error(existingRowsError.message || "Eski hujjatlarni olishda xato");
-  }
-
-  const existingMap = buildDocumentRowMap(existingRows || []);
+  const existingMap = buildDocumentRowMap(existingDocs || []);
 
   for (const field of DRIVER_DOCUMENT_FIELDS) {
     const file = files[field.key];
-    if (!file) continue;
+    if (!file) continue; // Agar rasm tanlanmagan bo'lsa, o'tkazib yuboramiz
 
     const extension = getFileExtension(file);
-    const path = `${sanitizeSegment(user.id)}/${sanitizeSegment(
-      applicationId
-    )}/${sanitizeSegment(field.docType)}_${Date.now()}.${extension}`;
+    const timestamp = Date.now();
+    
+    // TEMPLATE LITERAL (Backticks) TO'G'IRLANDI
+    const path = `${sanitizeSegment(user.id)}/${sanitizeSegment(applicationId)}/${sanitizeSegment(field.docType)}_${timestamp}.${extension}`;
 
+    // 1. Storage ga yuklash
     const { error: uploadError } = await supabase.storage
       .from(DOCUMENT_BUCKET)
       .upload(path, file, {
@@ -206,16 +205,15 @@ export async function uploadDriverDocuments(applicationId, files = {}) {
       });
 
     if (uploadError) {
-      throw new Error(
-        uploadError.message || `${field.label} ni yuklashda xato`
-      );
+      throw new Error(`${field.label} faylini yuklashda xato: ${uploadError.message}`);
     }
 
+    // 2. Public URL olish
     const { data: publicUrlData } = supabase.storage
       .from(DOCUMENT_BUCKET)
       .getPublicUrl(path);
 
-    const payload = {
+    const documentPayload = {
       application_id: applicationId,
       user_id: user.id,
       doc_type: field.docType,
@@ -227,46 +225,70 @@ export async function uploadDriverDocuments(applicationId, files = {}) {
       updated_at: new Date().toISOString(),
     };
 
-    const existing = existingMap[field.docType];
+    const existingRecord = existingMap[field.docType];
 
-    if (existing?.id) {
-      const { error } = await supabase
+    if (existingRecord?.id) {
+      // Yangilash
+      const { error: updateError } = await supabase
         .from("driver_documents")
-        .update(payload)
-        .eq("id", existing.id);
+        .update(documentPayload)
+        .eq("id", existingRecord.id);
 
-      if (error) {
-        throw new Error(error.message || `${field.label} ni yangilashda xato`);
-      }
+      if (updateError) throw new Error(`${field.label} ma'lumotini yangilashda xato: ${updateError.message}`);
     } else {
-      const { error } = await supabase.from("driver_documents").insert({
-        ...payload,
-        created_at: new Date().toISOString(),
-      });
+      // Yangi qo'shish
+      const { error: insertError } = await supabase
+        .from("driver_documents")
+        .insert({
+          ...documentPayload,
+          created_at: new Date().toISOString(),
+        });
 
-      if (error) {
-        throw new Error(error.message || `${field.label} ni saqlashda xato`);
-      }
+      if (insertError) throw new Error(`${field.label} ma'lumotini saqlashda xato: ${insertError.message}`);
     }
   }
 }
 
+/**
+ * To'liq ariza topshirish jarayoni (Asosiy funksiya)
+ */
 export async function submitDriverApplication(formData, files = {}) {
-  const application = await upsertDriverApplication(formData);
-  await uploadDriverDocuments(application.id, files);
-  return getMyDriverApplicationWithDocuments();
+  try {
+    // 1. Arizani (tekstual ma'lumotlar) saqlash
+    const application = await upsertDriverApplication(formData);
+
+    // 2. Hujjatlarni (fayllar) Storage va DB ga yuklash
+    if (Object.keys(files).length > 0) {
+      await uploadDriverDocuments(application.id, files);
+    }
+
+    // 3. Yangilangan holatni qaytarish
+    return await getMyDriverApplicationWithDocuments();
+  } catch (error) {
+    console.error("submitDriverApplication ichida xato:", error);
+    throw error;
+  }
 }
 
+/**
+ * Mavjud hujjatlarni forma uchun map qilish
+ */
 export function mapExistingDocumentsToForm(records = []) {
+  if (!records || records.length === 0) return {};
+  
   const byDocType = buildDocumentRowMap(records);
 
-  return Object.values(DRIVER_DOCUMENT_FIELD_MAP).reduce((acc, field) => {
-    const row = byDocType[field.docType];
-    if (row) {
-      acc[field.key] = row;
+  return Object.values(DRIVER_DOCUMENT_FIELD_MAP || {}).reduce((acc, field) => {
+    const record = byDocType[field.docType];
+    if (record) {
+      acc[field.key] = {
+        uid: record.id,
+        name: record.file_name,
+        status: "done",
+        url: record.file_url,
+        docType: record.doc_type,
+      };
     }
     return acc;
   }, {});
 }
-
-export { DRIVER_DOCUMENT_FIELD_MAP };
