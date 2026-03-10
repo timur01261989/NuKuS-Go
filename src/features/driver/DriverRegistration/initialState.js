@@ -4,16 +4,15 @@ export const initialFormState = {
   middleName: "",
   phone: "",
   passportNumber: "",
-
-  vehicleType: "",
+  vehicleType: "light_car",
   brand: "",
   model: "",
   plateNumber: "",
   year: "",
   color: "",
-  seats: "",
-  cargoKg: "",
-  cargoM3: "",
+  seats: 4,
+  cargoKg: 100,
+  cargoM3: null,
 };
 
 export const initialFilesState = {

@@ -1,27 +1,33 @@
 import { DRIVER_DOCUMENT_FIELDS } from "./uploadConfig";
 
 export function validatePersonalStep(data) {
-  if (!String(data.lastName || "").trim()) return "Familiya kiritilmadi";
-  if (!String(data.firstName || "").trim()) return "Ism kiritilmadi";
-  if (!String(data.phone || "").trim()) return "Telefon kiritilmadi";
-  if (!String(data.passportNumber || "").trim()) return "Pasport raqami kiritilmadi";
-  return null;
+  const errors = {};
+  if (!String(data.lastName || "").trim()) errors.lastName = "Familiya kiritilmadi";
+  if (!String(data.firstName || "").trim()) errors.firstName = "Ism kiritilmadi";
+  if (!String(data.phone || "").trim()) errors.phone = "Telefon kiritilmadi";
+  if (String(data.phone || "").trim().length !== 9) errors.phone = "Telefon 9 ta raqam bo'lishi kerak";
+  if (!String(data.passportNumber || "").trim()) errors.passportNumber = "Pasport raqami kiritilmadi";
+  return errors;
 }
 
 export function validateVehicleStep(data) {
-  if (!String(data.vehicleType || "").trim()) return "Transport turi tanlanmadi";
-  if (!String(data.brand || "").trim()) return "Mashina markasi kiritilmadi";
-  if (!String(data.model || "").trim()) return "Mashina modeli kiritilmadi";
-  if (!String(data.plateNumber || "").trim()) return "Davlat raqami kiritilmadi";
-  return null;
+  const errors = {};
+  if (!String(data.vehicleType || "").trim()) errors.vehicleType = "Transport turi tanlanmadi";
+  if (!String(data.brand || "").trim()) errors.brand = "Mashina markasi kiritilmadi";
+  if (!String(data.model || "").trim()) errors.model = "Mashina modeli kiritilmadi";
+  if (!String(data.plateNumber || "").trim()) errors.plateNumber = "Davlat raqami kiritilmadi";
+  return errors;
 }
 
 export function validateDocumentsStep(files = {}, previews = {}) {
+  const errors = {};
   for (const field of DRIVER_DOCUMENT_FIELDS) {
     if (!field.required) continue;
-    if (!files[field.key] && !previews[field.key]) {
-      return `${field.label} kerak`;
-    }
+    if (!files[field.key] && !previews[field.key]) errors[field.key] = `${field.label} kerak`;
   }
-  return null;
+  return errors;
+}
+
+export function hasStepErrors(errorMap) {
+  return Object.keys(errorMap || {}).length > 0;
 }
