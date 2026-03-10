@@ -7,7 +7,9 @@ export function validateLocation(location, { required = false, label = 'location
     if (required) return `${label} kerak`;
     return null;
   }
-  if (location.lat == null && location.lng == null) return null;
+  if (location.lat == null && location.lng == null) {
+    return required && !location.address ? `${label} kerak` : null;
+  }
   if (!isValidCoordinate(location.lat, -90, 90) || !isValidCoordinate(location.lng, -180, 180)) {
     return `${label} koordinatalari noto'g'ri`;
   }

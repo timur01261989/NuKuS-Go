@@ -6,6 +6,7 @@ import { validateCreateOrderPayload, assertOrderId } from '../_shared/orders/ord
 import { createOrderRecord, getActiveOrderByClientId, getOrderById, updateOrderStatusRecord } from '../_shared/orders/orderRepository.js';
 import { serializeOrderResponse } from '../_shared/orders/orderSerializer.js';
 import { logOrderEvent } from '../_shared/orders/orderEvents.js';
+import { buildCreateOrderIdempotencyKey } from '../_shared/orders/orderIdempotency.js';
 
 function pickEnv(...names) {
   for (const name of names) {
@@ -56,6 +57,15 @@ function getClients(req) {
     ? createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } })
     : client;
   return { client, admin };
+}
+
+function sameLocation(left, right) {
+  if (!left || !right) return false;
+  const latDiff = Math.abs(Number(left.lat ?? 0) - Number(right.lat ?? 0));
+  const lngDiff = Math.abs(Number(left.lng ?? 0) - Number(right.lng ?? 0));
+  const a = String(left.address || '').trim().toLowerCase();
+  const b = String(right.address || '').trim().toLowerCase();
+  return (latDiff < 0.0002 && lngDiff < 0.0002) || (!!a && a === b);
 }
 
 async function handleGetOrder(req, res, sb, body) {
@@ -133,6 +143,17 @@ export default async function handler(req, res) {
     const validationError = validateCreateOrderPayload(payload);
     if (validationError) return reply(req, res, 400, { ok: false, error: validationError });
 
+    const idempotencyKey = buildCreateOrderIdempotencyKey(payload);
+    const activeOrder = await getActiveOrderByClientId(admin, payload.client_id);
+    if (
+      activeOrder &&
+      activeOrder.service_type === payload.service_type &&
+      sameLocation(activeOrder.pickup, payload.pickup) &&
+      sameLocation(activeOrder.dropoff, payload.dropoff)
+    ) {
+      return reply(req, res, 200, { ...serializeOrderResponse(activeOrder), idempotency_key: idempotencyKey, reused: true });
+    }
+
     const data = await createOrderRecord(client, payload);
     await logOrderEvent(admin, {
       order_id: data.id,
@@ -140,9 +161,9 @@ export default async function handler(req, res) {
       actor_role: 'client',
       event_code: 'order.created',
       to_status: data.status,
-      payload: { service_type: data.service_type },
+      payload: { service_type: data.service_type, idempotency_key: idempotencyKey },
     });
-    return reply(req, res, 200, serializeOrderResponse(data));
+    return reply(req, res, 200, { ...serializeOrderResponse(data), idempotency_key: idempotencyKey });
   } catch (error) {
     return reply(req, res, 500, { ok: false, error: error?.message || 'Server error' });
   }

@@ -44,6 +44,20 @@ async function changeBalance(sb, userId, delta) {
   if (error) throw error;
 }
 
+function assertRolePermission(order, actorUserId, nextStatus) {
+  const normalizedStatus = String(nextStatus || '').toLowerCase();
+  const isClient = actorUserId && String(order.client_id || '') === String(actorUserId);
+  const isDriver = actorUserId && String(order.driver_id || '') === String(actorUserId);
+
+  if (normalizedStatus === 'cancelled_by_client') {
+    if (!isClient) throw new Error('Faqat client o‘z orderini bekor qila oladi');
+    return;
+  }
+  if (['accepted', 'arrived', 'in_progress', 'in_trip', 'completed', 'cancelled_by_driver'].includes(normalizedStatus)) {
+    if (!isDriver) throw new Error('Faqat biriktirilgan driver statusni yangilay oladi');
+  }
+}
+
 export default async function handler(req, res) {
   try {
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Method not allowed' });
@@ -56,6 +70,7 @@ export default async function handler(req, res) {
 
     const order = await getOrderById(sb, orderId);
     if (!order) return json(res, 404, { ok: false, error: 'Order topilmadi' });
+    assertRolePermission(order, actorUserId, nextStatus);
     assertTransition(order.status, nextStatus);
 
     const patch = { status: nextStatus, updated_at: nowIso() };

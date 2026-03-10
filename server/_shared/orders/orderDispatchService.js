@@ -12,7 +12,7 @@ export async function dispatchOrderToDrivers(sb, order) {
   }
 
   const priorOffers = await getOrderOffers(sb, order.id);
-  const exclude = priorOffers.map((row) => row.driver_id).filter(Boolean);
+  const excludeDriverIds = priorOffers.map((row) => row.driver_id).filter(Boolean);
 
   const candidates = await findEligibleDrivers(sb, {
     p_service_type: order.service_type,
@@ -21,7 +21,7 @@ export async function dispatchOrderToDrivers(sb, order) {
     p_pickup_lat: order.pickup?.lat ?? null,
     p_pickup_lng: order.pickup?.lng ?? null,
     p_limit: 10,
-    p_exclude_driver_ids: exclude,
+    p_exclude_driver_ids: excludeDriverIds,
   });
 
   const chosen = candidates.slice(0, 1);

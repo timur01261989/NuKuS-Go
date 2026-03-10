@@ -1,5 +1,6 @@
 export function serializeOrder(row) {
   if (!row) return null;
+  const routeMeta = row.route_meta && typeof row.route_meta === 'object' ? row.route_meta : {};
   const order = {
     ...row,
     order_id: row.id,
@@ -14,6 +15,15 @@ export function serializeOrder(row) {
     to_lng: row.dropoff?.lng ?? null,
     price: row.price_uzs ?? 0,
     priceUzs: row.price_uzs ?? 0,
+    distance_km: routeMeta.distance_km ?? 0,
+    duration_min: routeMeta.duration_min ?? 0,
+    tariff_id: routeMeta.tariff_id ?? null,
+    waypoints: Array.isArray(routeMeta.waypoints) ? routeMeta.waypoints : [],
+    wishes: routeMeta.wishes && typeof routeMeta.wishes === 'object' ? routeMeta.wishes : {},
+    pickup_entrance: routeMeta.pickup_entrance ?? null,
+    scheduled_time: routeMeta.scheduled_time ?? null,
+    order_for: routeMeta.order_for ?? null,
+    other_phone: routeMeta.other_phone ?? null,
   };
   return order;
 }
@@ -26,6 +36,5 @@ export function serializeOrderResponse(row) {
     orderId: order?.id ?? null,
     order,
     data: order,
-    ...order,
   };
 }
