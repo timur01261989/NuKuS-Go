@@ -10,14 +10,15 @@ import {
   Space, 
   Tag, 
   Divider,
+  Modal,
   message 
 } from "antd";
 import { 
-  HomeOutlined, 
+  HomeFilled, 
   EnvironmentOutlined, 
   DeleteOutlined, 
   PlusOutlined,
-  EnvironmentFilled
+  SendOutlined
 } from "@ant-design/icons";
 import { usePageI18n } from "./pageI18n";
 
@@ -28,6 +29,15 @@ const { Title, Text, Paragraph } = Typography;
  * @description Temporary local storage key before DB migration
  */
 const STORAGE_KEY = "unigo_addresses_v1";
+
+/**
+ * UniGo Brand Colors - Scalable for multi-tenant support
+ */
+const BRAND = {
+  blue: '#0057b7', // Dominant Blue for Driver Side theme
+  light: '#ffffff',
+  grey: '#f0f2f5'
+};
 
 /**
  * Data Access Layer - Mocking Repository Pattern
@@ -45,53 +55,90 @@ const AddressRepository = {
   save: (data) => localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
 };
 
-// --- Sub-Components (Memoized for Performance) ---
+// --- Map Picker Modal Placeholder (Scalable for Google/Yandex Maps) ---
+
+const MapPickerModal = memo(({ visible, onClose, onSelect }) => (
+  <Modal
+    title={<Space><EnvironmentOutlined /> Xaritadan manzilni belgilash</Space>}
+    open={visible}
+    onCancel={onClose}
+    onOk={() => {
+      // Mock selection - In real world, get this from Map API callback
+      onSelect({
+        address: "A. Temur ko'chasi, 22, Nukus",
+        lat: 42.4631,
+        lng: 59.6015
+      });
+      onClose();
+    }}
+    okText="Belgilash"
+    cancelText="Bekor qilish"
+    width={800}
+    style={{ top: 20 }}
+    bodyStyle={{ height: '60vh', padding: 0, backgroundColor: '#eaeaea' }}
+  >
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column' }}>
+      <Paragraph type="secondary">[ Map Engine integration goes here: Yandex/Google/Leaflet ]</Paragraph>
+      <Paragraph type="secondary" style={{ fontSize: 12 }}>Click 'Belgilash' to simulate selection.</Paragraph>
+    </div>
+  </Modal>
+));
+
+MapPickerModal.displayName = "MapPickerModal";
+
+
+// --- Saved Address Item Component (Memoized for Performance) ---
 
 const AddressItem = memo(({ item, onRemove, t }) => (
   <Card 
     hoverable 
     style={{ 
-      borderRadius: 20, 
-      border: '1px solid #f0f0f0',
+      borderRadius: 12, 
+      border: '1px solid #e0e0e0',
       transition: 'all 0.3s ease'
     }}
-    bodyStyle={{ padding: 20 }}
+    bodyStyle={{ padding: 16 }}
   >
     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
       <Space align="start">
         <div style={{ 
-          background: '#f0f2f5', 
-          padding: 10, 
-          borderRadius: 12, 
+          background: '#e6f7ff', 
+          padding: 8, 
+          borderRadius: 10, 
           display: 'flex', 
           alignItems: 'center' 
         }}>
-          <HomeOutlined style={{ fontSize: 20, color: '#1890ff' }} />
+          <HomeFilled style={{ fontSize: 18, color: BRAND.blue }} />
         </div>
         <div>
-          <Text strong style={{ fontSize: 16, display: 'block' }}>{item.label}</Text>
+          <Text strong style={{ fontSize: 15, display: 'block' }}>{item.label}</Text>
           <Paragraph 
             type="secondary" 
             ellipsis={{ rows: 2 }} 
-            style={{ margin: 0, maxWidth: 200 }}
+            style={{ margin: 0, maxWidth: 220, fontSize: 13 }}
           >
             {item.address}
           </Paragraph>
+          {/* Invisible coordinates data for taxi service usage */}
+          <Tag color="cyan" style={{ border: 'none', background: '#f0f0f0', color: '#595959', fontSize: 11, marginTop: 4, display: 'none' }}>
+            ({item.latitude}, {item.longitude})
+          </Tag>
         </div>
       </Space>
       
       <Popconfirm
-        title={t.confirmDelete || "Manzilni o'chirmoqchimisiz?"}
+        title={t.confirmDelete || "O'chirilsinmi?"}
         onConfirm={() => onRemove(item.id)}
         okText={t.yes || "Ha"}
         cancelText={t.no || "Yo'q"}
-        okButtonProps={{ danger: true }}
+        okButtonProps={{ danger: true, size: 'small' }}
+        cancelButtonProps={{ size: 'small' }}
       >
         <Button 
           type="text" 
           danger 
           icon={<DeleteOutlined />} 
-          style={{ borderRadius: 8 }}
+          style={{ borderRadius: 6 }}
         />
       </Popconfirm>
     </div>
@@ -100,7 +147,7 @@ const AddressItem = memo(({ item, onRemove, t }) => (
 
 AddressItem.displayName = "AddressItem";
 
-// --- Main Component ---
+// --- Main Page Component ---
 
 const MyAddresses = () => {
   const { t, tx } = usePageI18n();
@@ -108,16 +155,31 @@ const MyAddresses = () => {
   
   // State management optimized for high-load systems
   const [items, setItems] = useState(() => AddressRepository.get());
+  const [isMapModalVisible, setMapModalVisible] = useState(false);
+
+  /**
+   * Handle Map Selection Callback
+   */
+  const handleMapSelect = useCallback((data) => {
+    form.setFieldsValue({
+      address: data.address,
+      latitude: data.lat,
+      longitude: data.lng
+    });
+  }, [form]);
 
   /**
    * Add Address - Optimized with useCallback
-   * Scalability note: This should be an async Supabase call in production
+   * Scalability note: Data includes coordinates for taxi service usage
    */
   const handleAdd = useCallback((values) => {
     const newEntry = {
       id: window.crypto.randomUUID ? window.crypto.randomUUID() : Date.now().toString(),
       label: values.label,
       address: values.address,
+      // Defaulting to 0 if not provided by map picker placeholder
+      latitude: values.latitude || 0,
+      longitude: values.longitude || 0,
       createdAt: new Date().toISOString()
     };
 
@@ -143,27 +205,33 @@ const MyAddresses = () => {
     <Empty 
       image={Empty.PRESENTED_IMAGE_SIMPLE} 
       description={
-        <Text type="secondary">{t.noAddresses || "Sizda hali saqlangan manzillar yo'q"}</Text>
+        <Text type="secondary">{t.noAddresses || "Hali manzillar yo'q"}</Text>
       }
+      style={{ padding: '30px 0' }}
     />
   ), [t.noAddresses]);
 
   return (
-    <div className="unigo-addresses-wrapper" style={{ padding: '24px 16px', maxWidth: 900, margin: '0 auto' }}>
+    <div className="unigo-addresses-wrapper" style={{ padding: '24px 16px', maxWidth: 960, margin: '0 auto', minHeight: '100vh', backgroundColor: BRAND.grey }}>
       <header style={{ marginBottom: 32 }}>
-        <Title level={2} style={{ marginBottom: 8, fontWeight: 800 }}>
+        <Title level={2} style={{ marginBottom: 6, fontWeight: 800 }}>
           {t.myAddressesTitle || "Mening manzillarim"}
         </Title>
         <Text type="secondary">
-          Tez-tez tashrif buyuradigan manzillaringizni boshqaring
+          Taksi chaqirishda va xizmatlarda foydalanish uchun tez-tez ishlatiladigan manzillar
         </Text>
       </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 32 }}>
-        {/* Form Section */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 24 }}>
+        {/* ADD NEW Address Section - Restyled to Blue Theme */}
         <Card 
-          title={<Space><PlusOutlined /> {tx("addNew", "Yangi manzil qo'shish")}</Space>}
-          style={{ borderRadius: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: 'none' }}
+          style={{ 
+            borderRadius: 20, 
+            boxShadow: '0 8px 30px rgba(0,87,183,0.12)', 
+            border: 'none',
+            backgroundColor: BRAND.blue // Rich blue like driver side
+          }}
+          bodyStyle={{ padding: 32 }}
         >
           <Form 
             form={form} 
@@ -171,30 +239,36 @@ const MyAddresses = () => {
             onFinish={handleAdd}
             requiredMark={false}
           >
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+            {/* Hidden fields for coordinates - Crucial for Taxi Dispatch Service */}
+            <Form.Item name="latitude" noStyle><Input type="hidden" /></Form.Item>
+            <Form.Item name="longitude" noStyle><Input type="hidden" /></Form.Item>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
               <Form.Item 
                 name="label" 
-                label={<Text strong>{t.addressName || "Manzil nomi"}</Text>}
+                label={<Text strong style={{ color: BRAND.light }}>{t.addressName || "Manzil nomi"}</Text>}
                 rules={[{ required: true, message: t.nameRequired }]}
               >
                 <Input 
-                  prefix={<Tag color="blue">#</Tag>}
+                  prefix={<Tag color="blue" style={{ border: 'none', background: '#306cb6', color: BRAND.light }}>#</Tag>}
                   placeholder={tx("addressesPlaceholder", "Uy / Ish / Maktab")} 
                   size="large"
-                  style={{ borderRadius: 12 }}
+                  style={{ borderRadius: 10, color: '#333' }}
                 />
               </Form.Item>
 
               <Form.Item 
                 name="address" 
-                label={<Text strong>{t.addressField || "To'liq manzil"}</Text>}
+                label={<Text strong style={{ color: BRAND.light }}>{t.addressField || "To'liq manzil"}</Text>}
                 rules={[{ required: true, message: t.addressRequired }]}
               >
                 <Input 
-                  prefix={<EnvironmentOutlined style={{ color: '#bfbfbf' }} />}
-                  placeholder={t.writeAddress || "Ko'cha nomi, uy raqami..."} 
+                  prefix={<EnvironmentOutlined style={{ color: BRAND.blue }} />}
+                  placeholder={t.writeAddress || "Xaritadan tanlash uchun bosing..."} 
                   size="large"
-                  style={{ borderRadius: 12 }}
+                  readOnly={false}
+                  onClick={() => setMapModalVisible(true)}
+                  style={{ borderRadius: 10, color: '#333', cursor: 'pointer' }}
                 />
               </Form.Item>
             </div>
@@ -204,14 +278,15 @@ const MyAddresses = () => {
               htmlType="submit" 
               size="large" 
               block 
-              icon={<PlusOutlined />}
+              icon={<SendOutlined />}
               style={{ 
-                marginTop: 8, 
-                height: 50, 
-                borderRadius: 15, 
-                background: '#000', 
-                borderColor: '#000',
-                fontWeight: 600 
+                marginTop: 12, 
+                height: 54, 
+                borderRadius: 12, 
+                background: BRAND.light, // Contrasting button color
+                color: BRAND.blue,
+                borderColor: BRAND.light,
+                fontWeight: 700 
               }}
             >
               {t.save || "Saqlash"}
@@ -219,7 +294,8 @@ const MyAddresses = () => {
           </Form>
         </Card>
 
-        <Divider orientation="left" style={{ margin: '16px 0' }}>
+        {/* List Header Section */}
+        <Divider orientation="left" style={{ margin: '16px 0', borderColor: '#d9d9d9' }}>
           <Text strong style={{ color: '#8c8c8c' }}>SAQLANGANLAR</Text>
         </Divider>
 
@@ -227,7 +303,7 @@ const MyAddresses = () => {
         <div style={{ 
           display: "grid", 
           gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", 
-          gap: 20 
+          gap: 16 
         }}>
           {items.map((a) => (
             <AddressItem 
@@ -242,13 +318,11 @@ const MyAddresses = () => {
         {items.length === 0 && emptyView}
       </div>
 
-      <footer style={{ marginTop: 60, textAlign: 'center' }}>
-        <Space split={<Divider type="vertical" />}>
-          <Text type="secondary" style={{ fontSize: 12 }}>UniGo v1.0.4</Text>
-          <EnvironmentFilled style={{ color: '#d9d9d9' }} />
-          <Text type="secondary" style={{ fontSize: 12 }}>Nukus, Uzbekistan</Text>
-        </Space>
-      </footer>
+      <MapPickerModal
+        visible={isMapModalVisible}
+        onClose={() => setMapModalVisible(false)}
+        onSelect={handleMapSelect}
+      />
     </div>
   );
 };
