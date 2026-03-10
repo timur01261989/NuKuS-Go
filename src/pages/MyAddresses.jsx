@@ -9,158 +9,209 @@ import {
   Popconfirm, 
   Space, 
   Tag, 
-  Divider,
-  Modal,
+  Divider, 
+  Modal, 
   message 
 } from "antd";
 import { 
   HomeFilled, 
   EnvironmentOutlined, 
   DeleteOutlined, 
-  PlusOutlined,
-  SendOutlined
+  SendOutlined, 
+  SearchOutlined 
 } from "@ant-design/icons";
-import { usePageI18n } from "./pageI18n";
+import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
+import L from "leaflet";
+
+// Leaflet uchun zarur bo'lgan CSS va Ikonka sozlamalari
+import "leaflet/dist/leaflet.css";
+import icon from 'leaflet/dist/images/marker-icon.png';
+import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+
+let DefaultIcon = L.icon({
+    iconUrl: icon,
+    shadowUrl: iconShadow,
+    iconSize: [25, 41],
+    iconAnchor: [12, 41]
+});
+L.Marker.prototype.options.icon = DefaultIcon;
 
 const { Title, Text, Paragraph } = Typography;
 
-/**
- * @const STORAGE_KEY
- * @description Temporary local storage key before DB migration
- */
-const STORAGE_KEY = "unigo_addresses_v1";
-
-/**
- * UniGo Brand Colors - Scalable for multi-tenant support
+/** * @const BRAND 
+ * UniGo haydovchilar bo'limi uslubidagi ko'k ranglar palitrasi
  */
 const BRAND = {
-  blue: '#0057b7', // Dominant Blue for Driver Side theme
+  blue: '#0057b7',
   light: '#ffffff',
-  grey: '#f0f2f5'
+  grey: '#f0f2f5',
+  darkBlue: '#004494'
 };
 
-/**
- * Data Access Layer - Mocking Repository Pattern
- * Optimized for high-load: Minimal JSON parsing
+const NUKUS_CENTER = [42.4601, 59.6122];
+const STORAGE_KEY = "unigo_addresses_v1";
+
+/** * Ma'lumotlarni saqlash va yuklash (Repository Pattern)
  */
 const AddressRepository = {
   get: () => {
     try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      const data = localStorage.getItem(STORAGE_KEY);
+      return data ? JSON.parse(data) : [];
     } catch (e) {
-      console.error("Storage corruption detected", e);
+      console.error("Storage Error:", e);
       return [];
     }
   },
   save: (data) => localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
 };
 
-// --- Map Picker Modal Placeholder (Scalable for Google/Yandex Maps) ---
+// --- Xaritada klikni aniqlash uchun yordamchi komponent ---
+const MapClickHandler = ({ onSelect }) => {
+  useMapEvents({
+    click(e) {
+      onSelect(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+};
 
-const MapPickerModal = memo(({ visible, onClose, onSelect }) => (
-  <Modal
-    title={<Space><EnvironmentOutlined /> Xaritadan manzilni belgilash</Space>}
-    open={visible}
-    onCancel={onClose}
-    onOk={() => {
-      // Mock selection - In real world, get this from Map API callback
+// --- Xarita Modali (Map Picker) ---
+const MapPickerModal = memo(({ visible, onClose, onSelect }) => {
+  const [tempPos, setTempPos] = useState(NUKUS_CENTER);
+
+  const handleConfirm = useCallback(async () => {
+    try {
+      // Nominatim API orqali kordinatani manzilga aylantirish (Reverse Geocoding)
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${tempPos[0]}&lon=${tempPos[1]}`);
+      const data = await res.json();
+      
       onSelect({
-        address: "A. Temur ko'chasi, 22, Nukus",
-        lat: 42.4631,
-        lng: 59.6015
+        address: data.display_name || "Tanlangan manzil",
+        lat: tempPos[0],
+        lng: tempPos[1]
       });
       onClose();
-    }}
-    okText="Belgilash"
-    cancelText="Bekor qilish"
-    width={800}
-    style={{ top: 20 }}
-    bodyStyle={{ height: '60vh', padding: 0, backgroundColor: '#eaeaea' }}
-  >
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column' }}>
-      <Paragraph type="secondary">[ Map Engine integration goes here: Yandex/Google/Leaflet ]</Paragraph>
-      <Paragraph type="secondary" style={{ fontSize: 12 }}>Click 'Belgilash' to simulate selection.</Paragraph>
-    </div>
-  </Modal>
-));
+    } catch (err) {
+      message.error("Manzilni aniqlashda xatolik yuz berdi");
+    }
+  }, [tempPos, onSelect, onClose]);
 
-MapPickerModal.displayName = "MapPickerModal";
+  return (
+    <Modal
+      title={<Space><EnvironmentOutlined /> Xaritadan manzilni belgilash</Space>}
+      open={visible}
+      onCancel={onClose}
+      onOk={handleConfirm}
+      okText="Manzilni tasdiqlash"
+      cancelText="Bekor qilish"
+      width={1000}
+      centered
+      destroyOnClose
+      bodyStyle={{ padding: 0, height: '65vh', position: 'relative' }}
+    >
+      <div style={{ height: '100%', width: '100%' }}>
+        <MapContainer 
+          center={NUKUS_CENTER} 
+          zoom={14} 
+          style={{ height: '100%', width: '100%' }}
+        >
+          <TileLayer 
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" 
+            attribution='&copy; OpenStreetMap contributors'
+          />
+          <Marker position={tempPos} />
+          <MapClickHandler onSelect={(lat, lng) => setTempPos([lat, lng])} />
+        </MapContainer>
+        <div style={{ 
+          position: 'absolute', 
+          bottom: 20, 
+          left: 20, 
+          zIndex: 1000, 
+          background: 'white', 
+          padding: '8px 15px', 
+          borderRadius: 8,
+          boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
+        }}>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Kordinatalar: {tempPos[0].toFixed(5)}, {tempPos[1].toFixed(5)}
+          </Text>
+        </div>
+      </div>
+    </Modal>
+  );
+});
 
-
-// --- Saved Address Item Component (Memoized for Performance) ---
-
-const AddressItem = memo(({ item, onRemove, t }) => (
+// --- Saqlangan manzillar ro'yxati elementi ---
+const AddressItem = memo(({ item, onRemove }) => (
   <Card 
     hoverable 
-    style={{ 
-      borderRadius: 12, 
-      border: '1px solid #e0e0e0',
-      transition: 'all 0.3s ease'
-    }}
-    bodyStyle={{ padding: 16 }}
+    style={{ borderRadius: 15, border: '1px solid #e8e8e8' }}
+    bodyStyle={{ padding: 18 }}
   >
-    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-      <Space align="start">
-        <div style={{ 
-          background: '#e6f7ff', 
-          padding: 8, 
-          borderRadius: 10, 
-          display: 'flex', 
-          alignItems: 'center' 
-        }}>
-          <HomeFilled style={{ fontSize: 18, color: BRAND.blue }} />
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <Space align="start" size={12}>
+        <div style={{ background: '#e6f4ff', padding: 10, borderRadius: 12 }}>
+          <HomeFilled style={{ fontSize: 20, color: BRAND.blue }} />
         </div>
         <div>
-          <Text strong style={{ fontSize: 15, display: 'block' }}>{item.label}</Text>
+          <Text strong style={{ fontSize: 16, display: 'block' }}>{item.label}</Text>
           <Paragraph 
             type="secondary" 
             ellipsis={{ rows: 2 }} 
-            style={{ margin: 0, maxWidth: 220, fontSize: 13 }}
+            style={{ margin: 0, maxWidth: 240, fontSize: 13 }}
           >
             {item.address}
           </Paragraph>
-          {/* Invisible coordinates data for taxi service usage */}
-          <Tag color="cyan" style={{ border: 'none', background: '#f0f0f0', color: '#595959', fontSize: 11, marginTop: 4, display: 'none' }}>
-            ({item.latitude}, {item.longitude})
-          </Tag>
         </div>
       </Space>
-      
-      <Popconfirm
-        title={t.confirmDelete || "O'chirilsinmi?"}
-        onConfirm={() => onRemove(item.id)}
-        okText={t.yes || "Ha"}
-        cancelText={t.no || "Yo'q"}
-        okButtonProps={{ danger: true, size: 'small' }}
-        cancelButtonProps={{ size: 'small' }}
+      <Popconfirm 
+        title="Ushbu manzilni o'chirmoqchimisiz?" 
+        onConfirm={() => onRemove(item.id)} 
+        okText="Ha" 
+        cancelText="Yo'q"
+        okButtonProps={{ danger: true }}
       >
-        <Button 
-          type="text" 
-          danger 
-          icon={<DeleteOutlined />} 
-          style={{ borderRadius: 6 }}
-        />
+        <Button type="text" danger icon={<DeleteOutlined />} />
       </Popconfirm>
     </div>
   </Card>
 ));
 
-AddressItem.displayName = "AddressItem";
-
-// --- Main Page Component ---
-
+// --- ASOSIY KOMPONENT ---
 const MyAddresses = () => {
   const { t, tx } = usePageI18n();
   const [form] = Form.useForm();
-  
-  // State management optimized for high-load systems
   const [items, setItems] = useState(() => AddressRepository.get());
-  const [isMapModalVisible, setMapModalVisible] = useState(false);
+  const [isMapOpen, setIsMapOpen] = useState(false);
 
-  /**
-   * Handle Map Selection Callback
-   */
-  const handleMapSelect = useCallback((data) => {
+  // Manzil qo'shish logikasi (Taksi va boshqa xizmatlar uchun kordinatalari bilan)
+  const onFinish = useCallback((values) => {
+    const newEntry = {
+      id: window.crypto.randomUUID ? window.crypto.randomUUID() : Date.now().toString(),
+      label: values.label,
+      address: values.address,
+      latitude: values.latitude,
+      longitude: values.longitude,
+      createdAt: new Date().toISOString()
+    };
+    
+    const updated = [newEntry, ...items];
+    setItems(updated);
+    AddressRepository.save(updated);
+    form.resetFields();
+    message.success("Manzil muvaffaqiyatli saqlandi");
+  }, [items, form]);
+
+  const removeAddress = useCallback((id) => {
+    const updated = items.filter(x => x.id !== id);
+    setItems(updated);
+    AddressRepository.save(updated);
+    message.info("Manzil o'chirildi");
+  }, [items]);
+
+  // Xaritadan tanlangan ma'lumotlarni formaga o'tkazish
+  const handleMapSelection = useCallback((data) => {
     form.setFieldsValue({
       address: data.address,
       latitude: data.lat,
@@ -168,161 +219,131 @@ const MyAddresses = () => {
     });
   }, [form]);
 
-  /**
-   * Add Address - Optimized with useCallback
-   * Scalability note: Data includes coordinates for taxi service usage
-   */
-  const handleAdd = useCallback((values) => {
-    const newEntry = {
-      id: window.crypto.randomUUID ? window.crypto.randomUUID() : Date.now().toString(),
-      label: values.label,
-      address: values.address,
-      // Defaulting to 0 if not provided by map picker placeholder
-      latitude: values.latitude || 0,
-      longitude: values.longitude || 0,
-      createdAt: new Date().toISOString()
-    };
-
-    const updatedList = [newEntry, ...items];
-    setItems(updatedList);
-    AddressRepository.save(updatedList);
-    form.resetFields();
-    message.success(tx("addressAdded", "Manzil muvaffaqiyatli saqlandi"));
-  }, [items, form, tx]);
-
-  /**
-   * Remove Address - Atomic operation
-   */
-  const handleRemove = useCallback((id) => {
-    const updatedList = items.filter(x => x.id !== id);
-    setItems(updatedList);
-    AddressRepository.save(updatedList);
-    message.info(tx("addressRemoved", "Manzil o'chirildi"));
-  }, [items, tx]);
-
-  // Memoized empty state component
-  const emptyView = useMemo(() => (
-    <Empty 
-      image={Empty.PRESENTED_IMAGE_SIMPLE} 
-      description={
-        <Text type="secondary">{t.noAddresses || "Hali manzillar yo'q"}</Text>
-      }
-      style={{ padding: '30px 0' }}
-    />
-  ), [t.noAddresses]);
-
   return (
-    <div className="unigo-addresses-wrapper" style={{ padding: '24px 16px', maxWidth: 960, margin: '0 auto', minHeight: '100vh', backgroundColor: BRAND.grey }}>
-      <header style={{ marginBottom: 32 }}>
-        <Title level={2} style={{ marginBottom: 6, fontWeight: 800 }}>
+    <div style={{ 
+      padding: '30px 20px', 
+      maxWidth: 1000, 
+      margin: '0 auto', 
+      backgroundColor: BRAND.grey, 
+      minHeight: '100vh' 
+    }}>
+      <header style={{ marginBottom: 35 }}>
+        <Title level={2} style={{ fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1 }}>
           {t.myAddressesTitle || "Mening manzillarim"}
         </Title>
-        <Text type="secondary">
-          Taksi chaqirishda va xizmatlarda foydalanish uchun tez-tez ishlatiladigan manzillar
+        <Text type="secondary" style={{ fontSize: 14 }}>
+          TEZ-TEZ TASHRIF BUYURADIGAN MANZILLARINGIZNI BOSHQARING
         </Text>
       </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 24 }}>
-        {/* ADD NEW Address Section - Restyled to Blue Theme */}
-        <Card 
-          style={{ 
-            borderRadius: 20, 
-            boxShadow: '0 8px 30px rgba(0,87,183,0.12)', 
-            border: 'none',
-            backgroundColor: BRAND.blue // Rich blue like driver side
-          }}
-          bodyStyle={{ padding: 32 }}
+      {/* YANGI MANZIL QO'SHISH FORMASI (KO'K DIZAYNDA) */}
+      <Card 
+        style={{ 
+          borderRadius: 25, 
+          background: BRAND.blue, 
+          border: 'none', 
+          marginBottom: 40, 
+          boxShadow: '0 12px 40px rgba(0,87,183,0.2)' 
+        }}
+        bodyStyle={{ padding: 35 }}
+      >
+        <Form 
+          form={form} 
+          layout="vertical" 
+          onFinish={onFinish}
+          requiredMark={false}
         >
-          <Form 
-            form={form} 
-            layout="vertical" 
-            onFinish={handleAdd}
-            requiredMark={false}
-          >
-            {/* Hidden fields for coordinates - Crucial for Taxi Dispatch Service */}
-            <Form.Item name="latitude" noStyle><Input type="hidden" /></Form.Item>
-            <Form.Item name="longitude" noStyle><Input type="hidden" /></Form.Item>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
-              <Form.Item 
-                name="label" 
-                label={<Text strong style={{ color: BRAND.light }}>{t.addressName || "Manzil nomi"}</Text>}
-                rules={[{ required: true, message: t.nameRequired }]}
-              >
-                <Input 
-                  prefix={<Tag color="blue" style={{ border: 'none', background: '#306cb6', color: BRAND.light }}>#</Tag>}
-                  placeholder={tx("addressesPlaceholder", "Uy / Ish / Maktab")} 
-                  size="large"
-                  style={{ borderRadius: 10, color: '#333' }}
-                />
-              </Form.Item>
-
-              <Form.Item 
-                name="address" 
-                label={<Text strong style={{ color: BRAND.light }}>{t.addressField || "To'liq manzil"}</Text>}
-                rules={[{ required: true, message: t.addressRequired }]}
-              >
-                <Input 
-                  prefix={<EnvironmentOutlined style={{ color: BRAND.blue }} />}
-                  placeholder={t.writeAddress || "Xaritadan tanlash uchun bosing..."} 
-                  size="large"
-                  readOnly={false}
-                  onClick={() => setMapModalVisible(true)}
-                  style={{ borderRadius: 10, color: '#333', cursor: 'pointer' }}
-                />
-              </Form.Item>
-            </div>
-            
-            <Button 
-              type="primary" 
-              htmlType="submit" 
-              size="large" 
-              block 
-              icon={<SendOutlined />}
-              style={{ 
-                marginTop: 12, 
-                height: 54, 
-                borderRadius: 12, 
-                background: BRAND.light, // Contrasting button color
-                color: BRAND.blue,
-                borderColor: BRAND.light,
-                fontWeight: 700 
-              }}
+          {/* Yashirin kordinatalar maydoni */}
+          <Form.Item name="latitude" noStyle><Input type="hidden" /></Form.Item>
+          <Form.Item name="longitude" noStyle><Input type="hidden" /></Form.Item>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 25 }}>
+            <Form.Item 
+              name="label" 
+              label={<Text strong style={{ color: BRAND.light, fontSize: 13 }}>MANZIL NOMI</Text>} 
+              rules={[{ required: true, message: "Nomini kiriting" }]}
             >
-              {t.save || "Saqlash"}
-            </Button>
-          </Form>
-        </Card>
+              <Input 
+                placeholder="Uy / Ish / Maktab" 
+                size="large" 
+                style={{ borderRadius: 12, height: 50, border: 'none' }} 
+              />
+            </Form.Item>
 
-        {/* List Header Section */}
-        <Divider orientation="left" style={{ margin: '16px 0', borderColor: '#d9d9d9' }}>
-          <Text strong style={{ color: '#8c8c8c' }}>SAQLANGANLAR</Text>
-        </Divider>
+            <Form.Item 
+              name="address" 
+              label={<Text strong style={{ color: BRAND.light, fontSize: 13 }}>TO'LIQ MANZIL</Text>} 
+              rules={[{ required: true, message: "Manzilni belgilang" }]}
+            >
+              <Input 
+                prefix={<SearchOutlined style={{ color: BRAND.blue }} />}
+                placeholder="Xaritadan belgilash uchun bosing..." 
+                size="large" 
+                readOnly 
+                onClick={() => setIsMapOpen(true)}
+                style={{ borderRadius: 12, height: 50, border: 'none', cursor: 'pointer' }} 
+              />
+            </Form.Item>
+          </div>
 
-        {/* List Section */}
-        <div style={{ 
-          display: "grid", 
-          gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", 
-          gap: 16 
-        }}>
-          {items.map((a) => (
-            <AddressItem 
-              key={a.id} 
-              item={a} 
-              onRemove={handleRemove} 
-              t={t} 
-            />
-          ))}
-        </div>
+          <Button 
+            type="primary" 
+            htmlType="submit" 
+            size="large" 
+            block 
+            icon={<SendOutlined />}
+            style={{ 
+              marginTop: 25, 
+              height: 55, 
+              borderRadius: 15, 
+              background: BRAND.light, 
+              color: BRAND.blue, 
+              fontWeight: 800, 
+              border: 'none',
+              fontSize: 16
+            }}
+          >
+            SAQLASH
+          </Button>
+        </Form>
+      </Card>
 
-        {items.length === 0 && emptyView}
+      <Divider orientation="left" style={{ borderColor: '#d1d1d1' }}>
+        <Text strong style={{ color: '#8c8c8c', fontSize: 12 }}>SAQLANGANLAR</Text>
+      </Divider>
+      
+      {/* SAQLANGAN MANZILLAR RO'YXATI */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', 
+        gap: 20,
+        marginTop: 20 
+      }}>
+        {items.map(item => (
+          <AddressItem 
+            key={item.id} 
+            item={item} 
+            onRemove={removeAddress} 
+          />
+        ))}
       </div>
 
-      <MapPickerModal
-        visible={isMapModalVisible}
-        onClose={() => setMapModalVisible(false)}
-        onSelect={handleMapSelect}
+      {items.length === 0 && (
+        <div style={{ textAlign: 'center', marginTop: 50 }}>
+          <Empty description="Sizda hali saqlangan manzillar yo'q" />
+        </div>
+      )}
+
+      {/* XARITA MODALI INTEGRATSIYASI */}
+      <MapPickerModal 
+        visible={isMapOpen} 
+        onClose={() => setIsMapOpen(false)} 
+        onSelect={handleMapSelection} 
       />
+
+      <footer style={{ marginTop: 60, textAlign: 'center', opacity: 0.5 }}>
+        <Text style={{ fontSize: 12 }}>UniGo v1.0.8 • Yagona Yechim • Nukus, 2026</Text>
+      </footer>
     </div>
   );
 };
