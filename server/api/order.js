@@ -1,161 +1,430 @@
-import { createClient } from '@supabase/supabase-js';
-import { getRequestLang, translatePayload } from '../_shared/serverI18n.js';
-import { getAuthedUserId } from '../_shared/supabase.js';
+const ORDER_SELECT = [
+  "id",
+  "client_id",
+  "driver_id",
+  "service_type",
+  "status",
+  "pickup",
+  "dropoff",
+  "price_uzs",
+  "surge_multiplier",
+  "distance_m",
+  "duration_s",
+  "comment",
+  "payment_method",
+  "car_type",
+  "options",
+  "created_at",
+  "updated_at",
+].join(",");
 
-function pickEnv(...names) {
-  for (const n of names) {
-    const v = process.env[n];
-    if (v && String(v).trim()) return String(v).trim();
-  }
-  return '';
-}
-
-function cors(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-}
-
-function reply(req, res, status, payload) {
+function json(res, status, payload) {
   res.statusCode = status;
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  const lang = getRequestLang(req, payload && typeof payload === 'object' ? payload : null);
-  res.end(JSON.stringify(translatePayload(payload, lang)));
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.end(JSON.stringify(payload));
 }
 
-async function readBody(req) {
-  if (req.body && typeof req.body === 'object') return req.body;
-  const chunks = [];
-  for await (const c of req) chunks.push(c);
-  const raw = Buffer.concat(chunks).toString('utf8');
-  if (!raw) return {};
-  try { return JSON.parse(raw); } catch { return {}; }
+function getMethod(req) {
+  return String(req.method || "GET").toUpperCase();
 }
 
-function getClients(req) {
-  const url = pickEnv('SUPABASE_URL', 'VITE_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL');
-  const anon = pickEnv('SUPABASE_ANON_KEY', 'VITE_SUPABASE_ANON_KEY', 'NEXT_PUBLIC_SUPABASE_ANON_KEY');
-  const service = pickEnv('SUPABASE_SERVICE_ROLE_KEY');
-  if (!url || (!anon && !service)) throw new Error('Missing Supabase env');
-  const authHeader = req.headers?.authorization || req.headers?.Authorization || '';
-  const useAnonWithAuth = authHeader && /^Bearer\s+/i.test(String(authHeader));
-  const client = createClient(url, useAnonWithAuth ? anon : (service || anon), {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-    global: useAnonWithAuth ? { headers: { Authorization: authHeader } } : undefined,
-  });
-  const admin = service ? createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }) : client;
-  return { client, admin };
+function toText(value) {
+  if (value == null) return "";
+  return String(value).trim();
 }
 
-function normalizePoint(v) {
-  if (!v) return null;
-  if (typeof v === 'string') return { address: v };
-  if (typeof v === 'object') {
-    return {
-      address: v.address || v.name || v.title || null,
-      lat: Number.isFinite(Number(v.lat)) ? Number(v.lat) : null,
-      lng: Number.isFinite(Number(v.lng)) ? Number(v.lng) : null,
-      region: v.region || null,
-      district: v.district || null,
-      raw: v,
-    };
-  }
-  return null;
+function toNumber(value) {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
 }
 
-function normalizeOrderPayload(body = {}, clientId = null) {
-  const pickup = normalizePoint(body.pickup ?? body.from_location ?? body.from ?? body.fromLocation ?? body.from_address);
-  const dropoff = normalizePoint(body.dropoff ?? body.to_location ?? body.to ?? body.toLocation ?? body.to_address);
-  const service_type = String(body.service_type ?? body.serviceType ?? body.service ?? 'taxi').toLowerCase();
-  const price_uzs = Math.max(0, Number(body.price_uzs ?? body.price ?? body.fare ?? 0) || 0);
-  const passenger_count = Math.max(1, Number(body.passenger_count ?? body.seat_count ?? 1) || 1);
-  const cargo_weight_kg = body.cargo_weight_kg ?? body.weight_kg ?? null;
-  const cargo_volume_m3 = body.cargo_volume_m3 ?? body.volume_m3 ?? null;
+function normalizeLng(raw) {
+  return raw ?? raw === 0 ? raw : null;
+}
+
+function isValidLatitude(value) {
+  return typeof value === "number" && Number.isFinite(value) && value >= -90 && value <= 90;
+}
+
+function isValidLongitude(value) {
+  return typeof value === "number" && Number.isFinite(value) && value >= -180 && value <= 180;
+}
+
+function normalizeLocationObject(input) {
+  if (!input || typeof input !== "object") return null;
+
+  const address =
+    toText(
+      input.address ??
+        input.label ??
+        input.name ??
+        input.title ??
+        input.display_name ??
+        input.location_name ??
+        input.description
+    ) || null;
+
+  const lat = toNumber(
+    input.lat ??
+      input.latitude ??
+      input.y ??
+      (Array.isArray(input.latlng) ? input.latlng[0] : null) ??
+      (Array.isArray(input.coords) ? input.coords[0] : null)
+  );
+
+  const lng = toNumber(
+    input.lng ??
+      input.lon ??
+      input.longitude ??
+      input.x ??
+      (Array.isArray(input.latlng) ? input.latlng[1] : null) ??
+      (Array.isArray(input.coords) ? input.coords[1] : null)
+  );
+
+  if (!isValidLatitude(lat) || !isValidLongitude(lng)) return null;
+
   return {
-    client_id: clientId,
-    service_type,
-    pickup,
-    dropoff,
-    status: String(body.status || 'created').toLowerCase(),
-    price_uzs,
-    route_meta: {
-      distance_km: Number(body.distance_km ?? body.distanceKm ?? 0) || 0,
-      duration_min: Number(body.duration_min ?? body.durationMin ?? 0) || 0,
-    },
-    cargo_title: body.cargo_title ?? body.cargo_name ?? null,
-    cargo_weight_kg: cargo_weight_kg == null ? null : Number(cargo_weight_kg),
-    cargo_volume_m3: cargo_volume_m3 == null ? null : Number(cargo_volume_m3),
-    passenger_count,
-    payment_method: String(body.payment_method ?? body.pay_method ?? 'cash').toLowerCase(),
-    note: body.note ?? null,
+    address,
+    lat,
+    lng,
   };
 }
 
-async function logEvent(sb, payload) {
+function normalizePickup(body) {
+  return (
+    normalizeLocationObject(body?.pickup) ||
+    normalizeLocationObject(body?.from) ||
+    normalizeLocationObject(body?.from_location) ||
+    normalizeLocationObject(body?.fromLocation) ||
+    normalizeLocationObject(body?.pickup_location) ||
+    normalizeLocationObject(body?.pickupLocation) ||
+    normalizeLocationObject({
+      address: body?.pickup_address ?? body?.from_address ?? body?.fromAddress ?? body?.pickupAddress,
+      lat: body?.pickup_lat ?? body?.from_lat ?? body?.fromLat,
+      lng: body?.pickup_lng ?? body?.pickup_lon ?? body?.pickup_long ?? body?.from_lng ?? body?.from_lon ?? body?.fromLong,
+    })
+  );
+}
+
+function normalizeDropoff(body) {
+  return (
+    normalizeLocationObject(body?.dropoff) ||
+    normalizeLocationObject(body?.to) ||
+    normalizeLocationObject(body?.to_location) ||
+    normalizeLocationObject(body?.toLocation) ||
+    normalizeLocationObject(body?.dropoff_location) ||
+    normalizeLocationObject(body?.dropoffLocation) ||
+    normalizeLocationObject({
+      address: body?.dropoff_address ?? body?.to_address ?? body?.toAddress ?? body?.dropoffAddress,
+      lat: body?.dropoff_lat ?? body?.to_lat ?? body?.toLat,
+      lng: body?.dropoff_lng ?? body?.dropoff_lon ?? body?.dropoff_long ?? body?.to_lng ?? body?.to_lon ?? body?.toLong,
+    })
+  );
+}
+
+function buildNormalizedPayload(body) {
+  const pickup = normalizePickup(body);
+  const dropoff = normalizeDropoff(body);
+
+  const paymentMethod = toText(body?.payment_method ?? body?.paymentMethod) || null;
+  const serviceType = toText(body?.service_type ?? body?.serviceType) || "city_taxi";
+  const carType = toText(body?.car_type ?? body?.carType ?? body?.tariff ?? body?.tarif) || null;
+  const comment = toText(body?.comment ?? body?.note ?? body?.notes) || null;
+
+  const surgeMultiplier = toNumber(body?.surge_multiplier ?? body?.surgeMultiplier) ?? 1;
+  const priceUzs = toNumber(body?.price_uzs ?? body?.priceUzs ?? body?.price);
+  const distanceM = toNumber(body?.distance_m ?? body?.distanceM ?? body?.distance);
+  const durationS = toNumber(body?.duration_s ?? body?.durationS ?? body?.duration);
+
+  const options = body?.options && typeof body.options === "object" ? body.options : {};
+  const meta = body?.meta && typeof body.meta === "object" ? body.meta : {};
+
+  return {
+    client_id: body?.client_id ?? body?.user_id ?? body?.userId ?? null,
+    driver_id: body?.driver_id ?? body?.driverId ?? null,
+    service_type: serviceType,
+    status: toText(body?.status) || "searching",
+    pickup,
+    dropoff: dropoff || null,
+    payment_method: paymentMethod,
+    car_type: carType,
+    comment,
+    price_uzs: priceUzs,
+    surge_multiplier: surgeMultiplier,
+    distance_m: distanceM,
+    duration_s: durationS,
+    options,
+    meta,
+  };
+}
+
+function buildResponseOrder(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    client_id: row.client_id ?? null,
+    driver_id: row.driver_id ?? null,
+    service_type: row.service_type ?? "city_taxi",
+    status: row.status ?? null,
+    pickup: row.pickup ?? null,
+    dropoff: row.dropoff ?? null,
+    payment_method: row.payment_method ?? null,
+    car_type: row.car_type ?? null,
+    comment: row.comment ?? null,
+    price_uzs: row.price_uzs ?? null,
+    surge_multiplier: row.surge_multiplier ?? 1,
+    distance_m: row.distance_m ?? null,
+    duration_s: row.duration_s ?? null,
+    options: row.options ?? {},
+    created_at: row.created_at ?? null,
+    updated_at: row.updated_at ?? null,
+  };
+}
+
+async function readBody(req) {
+  if (req.body && typeof req.body === "object") return req.body;
+
+  const chunks = [];
+  await new Promise((resolve, reject) => {
+    req.on("data", (chunk) => chunks.push(chunk));
+    req.on("end", resolve);
+    req.on("error", reject);
+  });
+
+  if (!chunks.length) return {};
+  const raw = Buffer.concat(chunks).toString("utf8");
+  if (!raw) return {};
+
   try {
-    await sb.from('order_events').insert([{ 
-      order_id: payload.order_id,
-      actor_user_id: payload.actor_user_id || null,
-      actor_role: payload.actor_role || null,
-      event_code: payload.event_code,
-      reason: payload.reason || null,
-      from_status: payload.from_status || null,
-      to_status: payload.to_status || null,
-      payload: payload.payload || {},
-    }]);
-  } catch (_) {}
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
 }
 
-async function handleGetOrder(req, res, sb, body) {
-  const orderId = String(body.order_id || '').trim();
-  if (!orderId) return reply(req, res, 400, { ok: false, error: 'order_id kerak' });
-  const { data, error } = await sb
-    .from('orders')
-    .select('*, driver:profiles!orders_driver_id_fkey(id,full_name,phone,avatar_url), client:profiles!orders_client_id_fkey(id,full_name,phone,avatar_url)')
-    .eq('id', orderId)
+async function getSupabaseAdmin() {
+  const { createClient } = await import("@supabase/supabase-js");
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRole =
+    process.env.SUPABASE_SERVICE_ROLE ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SECRET_KEY;
+
+  if (!url || !serviceRole) {
+    throw new Error("SUPABASE_URL_or_SERVICE_ROLE_missing");
+  }
+
+  return createClient(url, serviceRole, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
+
+async function handleGetById(supabase, body) {
+  const orderId = toText(body?.order_id ?? body?.orderId ?? body?.id);
+  if (!orderId) {
+    return { status: 400, payload: { ok: false, error: "order_id kerak" } };
+  }
+
+  const { data, error } = await supabase
+    .from("orders")
+    .select(ORDER_SELECT)
+    .eq("id", orderId)
+    .single();
+
+  if (error) {
+    return { status: 500, payload: { ok: false, error: error.message } };
+  }
+
+  return {
+    status: 200,
+    payload: {
+      ok: true,
+      order: buildResponseOrder(data),
+      id: data?.id ?? null,
+      orderId: data?.id ?? null,
+      data: data ? { id: data.id } : null,
+    },
+  };
+}
+
+async function handleActiveOrder(supabase, body) {
+  const clientId = toText(body?.client_id ?? body?.user_id ?? body?.clientId ?? body?.userId);
+  if (!clientId) {
+    return { status: 400, payload: { ok: false, error: "client_id kerak" } };
+  }
+
+  const activeStatuses = ["searching", "offered", "accepted", "arrived", "in_progress"];
+
+  const { data, error } = await supabase
+    .from("orders")
+    .select(ORDER_SELECT)
+    .eq("client_id", clientId)
+    .in("status", activeStatuses)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
-  if (error) return reply(req, res, 500, { ok: false, error: error.message });
-  if (!data) return reply(req, res, 404, { ok: false, error: 'Order topilmadi' });
-  return reply(req, res, 200, { ok: true, ...data });
+
+  if (error) {
+    return { status: 500, payload: { ok: false, error: error.message } };
+  }
+
+  if (!data) {
+    return {
+      status: 200,
+      payload: {
+        ok: true,
+        order: null,
+        id: null,
+        orderId: null,
+        data: null,
+      },
+    };
+  }
+
+  return {
+    status: 200,
+    payload: {
+      ok: true,
+      order: buildResponseOrder(data),
+      id: data.id,
+      orderId: data.id,
+      data: { id: data.id },
+    },
+  };
 }
 
-async function handlePhones(req, res, sb) {
-  const url = new URL(req.url, 'http://localhost');
-  const orderId = String(url.searchParams.get('order_id') || '').trim();
-  const selfUserId = await getAuthedUserId(req, sb);
-  if (!orderId || !selfUserId) return reply(req, res, 400, { ok: false, error: 'order_id va auth user kerak' });
-  const { data: order, error } = await sb.from('orders').select('id,client_id,driver_id').eq('id', orderId).maybeSingle();
-  if (error) return reply(req, res, 500, { ok: false, error: error.message });
-  if (!order) return reply(req, res, 404, { ok: false, error: 'Order topilmadi' });
-  const otherId = String(order.client_id) === selfUserId ? order.driver_id : order.client_id;
-  if (!otherId) return reply(req, res, 200, { ok: true, phone: null });
-  const { data: profile } = await sb.from('profiles').select('phone,full_name,first_name,last_name').eq('id', otherId).maybeSingle();
-  return reply(req, res, 200, { ok: true, phone: profile?.phone || null, other_user_id: otherId, profile: profile || null });
+async function handleCancel(supabase, body) {
+  const orderId = toText(body?.order_id ?? body?.orderId ?? body?.id);
+  if (!orderId) {
+    return { status: 400, payload: { ok: false, error: "order_id kerak" } };
+  }
+
+  const { data, error } = await supabase
+    .from("orders")
+    .update({
+      status: "cancelled",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", orderId)
+    .select(ORDER_SELECT)
+    .single();
+
+  if (error) {
+    return { status: 500, payload: { ok: false, error: error.message } };
+  }
+
+  return {
+    status: 200,
+    payload: {
+      ok: true,
+      order: buildResponseOrder(data),
+      id: data?.id ?? null,
+      orderId: data?.id ?? null,
+      data: data ? { id: data.id } : null,
+    },
+  };
+}
+
+async function handleCreateOrder(supabase, body) {
+  const payload = buildNormalizedPayload(body);
+
+  if (!payload.pickup) {
+    return {
+      status: 400,
+      payload: {
+        ok: false,
+        error: "pickup kerak",
+      },
+    };
+  }
+
+  const insertPayload = {
+    client_id: payload.client_id,
+    driver_id: payload.driver_id,
+    service_type: payload.service_type,
+    status: payload.status,
+    pickup: payload.pickup,
+    dropoff: payload.dropoff,
+    payment_method: payload.payment_method,
+    car_type: payload.car_type,
+    comment: payload.comment,
+    price_uzs: payload.price_uzs,
+    surge_multiplier: payload.surge_multiplier,
+    distance_m: payload.distance_m,
+    duration_s: payload.duration_s,
+    options: payload.options,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await supabase
+    .from("orders")
+    .insert(insertPayload)
+    .select(ORDER_SELECT)
+    .single();
+
+  if (error) {
+    return {
+      status: 500,
+      payload: {
+        ok: false,
+        error: error.message,
+      },
+    };
+  }
+
+  return {
+    status: 200,
+    payload: {
+      ok: true,
+      order: buildResponseOrder(data),
+      id: data?.id ?? null,
+      orderId: data?.id ?? null,
+      data: data ? { id: data.id } : null,
+    },
+  };
 }
 
 export default async function handler(req, res) {
-  cors(res);
-  if (req.method === 'OPTIONS') return reply(req, res, 204, { ok: true });
   try {
-    const isPhonesRoute = String(req.routeKey || '').includes('order-phones') || /\/order\/phones(?:\?|$)/.test(String(req.url || ''));
-    const { client, admin } = getClients(req);
-    if (isPhonesRoute) return handlePhones(req, res, admin);
-    if (req.method !== 'POST') return reply(req, res, 405, { ok: false, error: 'Method not allowed' });
+    const method = getMethod(req);
     const body = await readBody(req);
-    if (String(body.action || '').toLowerCase() === 'get') return handleGetOrder(req, res, admin, body);
-    const authedUserId = await getAuthedUserId(req, admin);
-    const clientId = authedUserId || String(body.client_id || '').trim() || null;
-    const payload = normalizeOrderPayload(body, clientId);
-    if (!payload.client_id) return reply(req, res, 401, { ok: false, error: 'Auth user kerak' });
-    if (!payload.pickup || !payload.dropoff) return reply(req, res, 400, { ok: false, error: 'pickup va dropoff kerak' });
-    if (payload.service_type === 'freight' && !(Number(payload.cargo_weight_kg) > 0)) {
-      return reply(req, res, 400, { ok: false, error: 'Freight uchun cargo_weight_kg kerak' });
+    const action = toText(body?.action).toLowerCase();
+    const supabase = await getSupabaseAdmin();
+
+    if (method === "GET") {
+      const result = await handleGetById(supabase, body);
+      return json(res, result.status, result.payload);
     }
-    const { data, error } = await client.from('orders').insert([payload]).select('*').single();
-    if (error) return reply(req, res, 500, { ok: false, error: error.message, details: error.details || null });
-    await logEvent(admin, { order_id: data.id, actor_user_id: payload.client_id, actor_role: 'client', event_code: 'order.created', to_status: data.status, payload: { service_type: data.service_type } });
-    return reply(req, res, 200, { ok: true, order: data });
-  } catch (e) {
-    return reply(req, res, 500, { ok: false, error: e?.message || 'Server error' });
+
+    if (method !== "POST") {
+      return json(res, 405, { ok: false, error: "method_not_allowed" });
+    }
+
+    if (action === "get") {
+      const result = await handleGetById(supabase, body);
+      return json(res, result.status, result.payload);
+    }
+
+    if (action === "active") {
+      const result = await handleActiveOrder(supabase, body);
+      return json(res, result.status, result.payload);
+    }
+
+    if (action === "cancel") {
+      const result = await handleCancel(supabase, body);
+      return json(res, result.status, result.payload);
+    }
+
+    const result = await handleCreateOrder(supabase, body);
+    return json(res, result.status, result.payload);
+  } catch (error) {
+    return json(res, 500, {
+      ok: false,
+      error: error?.message || "unknown_order_error",
+    });
   }
 }

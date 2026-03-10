@@ -1,85 +1,114 @@
-import { useCallback } from "react";
-import { message } from "antd";
-import api from "@/utils/apiHelper";
-import taxiApi from "../services/taxiApi";
-import { haversineKm } from "../../shared/geo/haversine";
-const MAX_KM = 50;
+import { useCallback, useMemo, useState } from "react";
+import { toCreateOrderPayload, fromOrderResponse } from "../lib/taxiOrderAdapter";
+import { extractOrder, extractOrderId, extractApiError, isApiOk } from "../../../../utils/apiResponse";
+import { postJson } from "../../../../utils/apiHelper";
 
-export function useTaxiOrderCreate(params) {
-  const { cp, pickup, dest, tariff, totalPrice, distanceKm, waypoints, orderFor, otherPhone, wishes, comment, scheduledTime, setOrderId, setOrderStatus, setStep, speak } = params;
+const ORDER_ENDPOINT = "/api/order";
 
-  return useCallback(async () => {
-    if (!pickup.latlng) {
-      message.error(cp("Yo'lovchini olish nuqtasi aniqlanmadi"));
-      return;
-    }
-
-    if (dest.latlng) {
-      const d = distanceKm || haversineKm(pickup.latlng, dest.latlng);
-      if (d > MAX_KM) {
-        message.error(`Masofa belgilangan me'yoridan ortiq (${MAX_KM} km)`);
-        return;
-      }
-    }
-
-    const hide = message.loading(cp("Buyurtma yuborilmoqda..."), 0);
-    try {
-      const payloadBase = {
-        status: "searching",
-        price: Math.round(totalPrice),
-        use_server_pricing: true,
-        service_type: "taxi",
-        tariff_id: tariff.id,
-        pickup_location: pickup.address || cp("Yo'lovchini olish nuqtasi"),
-        dropoff_location: dest.address || "",
-        from_lat: pickup.latlng[0],
-        from_lng: pickup.latlng[1],
-        to_lat: dest.latlng ? dest.latlng[0] : null,
-        to_lng: dest.latlng ? dest.latlng[1] : null,
-        distance_km: dest.latlng ? (distanceKm || haversineKm(pickup.latlng, dest.latlng)) : 0,
-        duration_min: dest.latlng ? Math.max(1, Math.round(((distanceKm || haversineKm(pickup.latlng, dest.latlng)) || 0) * 2)) : 0,
-        waypoints: waypoints.map((w) => ({
-          lat: w.latlng?.[0],
-          lng: w.latlng?.[1],
-          address: w.address || "",
-        })),
-        pickup_entrance: pickup.entrance || "",
-        order_for: orderFor,
-        other_phone: orderFor === "other" ? (otherPhone || "") : "",
-        wishes,
-        comment: comment || "",
-        scheduled_time: scheduledTime,
-      };
-
-      const actions = ["create", "create_taxi", "create_city", "new"];
-      let res = null;
-      let lastErr = null;
-      for (const action of actions) {
-        try {
-          res = await api.post("/api/order", { action, ...payloadBase });
-          if (res?.data || res?.id || res?.orderId) break;
-        } catch (e) {
-          lastErr = e;
-        }
-      }
-
-      const id = res?.order?.id || res?.data?.id || res?.id || res?.orderId;
-      if (!id) throw lastErr || new Error(cp("Serverdan ID kelmadi"));
-
-      setOrderId(String(id));
-      localStorage.setItem("activeOrderId", String(id));
-      setOrderStatus("searching");
-      setStep("searching");
-      try {
-        await taxiApi.dispatch({ order_id: String(id) });
-      } catch {}
-      speak(cp("Haydovchi qidirilmoqda"));
-      message.success(cp("Buyurtma yuborildi"));
-    } catch (e) {
-      console.error("Order error:", e);
-      message.error("Zakaz berishda xatolik: " + (e?.message || cp("Server bilan aloqa yo'q")));
-    } finally {
-      hide();
-    }
-  }, [cp, pickup, dest, tariff, totalPrice, distanceKm, waypoints, orderFor, otherPhone, wishes, comment, scheduledTime, setOrderId, setOrderStatus, setStep, speak]);
+async function createOrderRequest(payload) {
+  return postJson(ORDER_ENDPOINT, payload);
 }
+
+export function useTaxiOrderCreate(options = {}) {
+  const {
+    onCreated,
+    onError,
+  } = options;
+
+  const [isCreating, setIsCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
+
+  const createOrder = useCallback(
+    async (draft) => {
+      const payload = toCreateOrderPayload(draft);
+
+      if (!payload.pickup || payload.pickup.lat == null || payload.pickup.lng == null) {
+        const errorMessage = "Pickup tanlanishi kerak";
+        setCreateError(errorMessage);
+        if (typeof onError === "function") onError(errorMessage);
+        return {
+          ok: false,
+          error: errorMessage,
+          order: null,
+          orderId: null,
+        };
+      }
+
+      setIsCreating(true);
+      setCreateError("");
+
+      try {
+        const response = await createOrderRequest(payload);
+        const ok = isApiOk(response);
+        const errorMessage = extractApiError(response);
+
+        if (!ok && errorMessage) {
+          setCreateError(errorMessage);
+          if (typeof onError === "function") onError(errorMessage);
+          return {
+            ok: false,
+            error: errorMessage,
+            order: null,
+            orderId: null,
+          };
+        }
+
+        const rawOrder = extractOrder(response) ?? response?.order ?? null;
+        const normalizedOrder = fromOrderResponse(rawOrder);
+        const orderId = extractOrderId(response) ?? normalizedOrder?.id ?? null;
+
+        if (!orderId) {
+          const idError = "Serverdan order id qaytmadi";
+          setCreateError(idError);
+          if (typeof onError === "function") onError(idError);
+          return {
+            ok: false,
+            error: idError,
+            order: null,
+            orderId: null,
+          };
+        }
+
+        const successResult = {
+          ok: true,
+          error: "",
+          order: normalizedOrder,
+          orderId,
+          response,
+        };
+
+        if (typeof onCreated === "function") {
+          onCreated(successResult);
+        }
+
+        return successResult;
+      } catch (error) {
+        const message = error?.message || "Order yaratishda xatolik";
+        setCreateError(message);
+        if (typeof onError === "function") onError(message);
+
+        return {
+          ok: false,
+          error: message,
+          order: null,
+          orderId: null,
+        };
+      } finally {
+        setIsCreating(false);
+      }
+    },
+    [onCreated, onError]
+  );
+
+  return useMemo(
+    () => ({
+      createOrder,
+      isCreating,
+      createError,
+      setCreateError,
+    }),
+    [createOrder, isCreating, createError]
+  );
+}
+
+export default useTaxiOrderCreate;
