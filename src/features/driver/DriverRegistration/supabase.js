@@ -2,18 +2,18 @@ import { supabase } from "@/lib/supabase";
 import { DRIVER_DOCUMENT_FIELDS, DRIVER_DOCUMENT_FIELD_MAP } from "./uploadConfig";
 
 /**
- * BUCKET NAME - Supabase Storage bucket nomi
+ * Storage Bucket nomi
  */
 const DOCUMENT_BUCKET = "driver-documents";
 
 /**
- * DriverRegister.jsx ushbu ob'ektni aynan shu fayldan kutmoqda.
- * Shuning uchun uni qayta export qilamiz.
+ * DriverRegister.jsx ushbu mapni shu fayldan import qiladi.
+ * Shuning uchun uni qayta eksport qilish shart.
  */
 export { DRIVER_DOCUMENT_FIELD_MAP };
 
 /**
- * Storage uchun xavfsiz yo'l (path) segmentlarini tozalash.
+ * Fayl yo'llari uchun xavfsiz segmentlar yaratish.
  */
 function sanitizeSegment(value) {
   return String(value || "")
@@ -22,16 +22,16 @@ function sanitizeSegment(value) {
 }
 
 /**
- * Fayl kengaytmasini aniqlash (fallback mantiqi bilan).
+ * Fayl kengaytmasini aniqlash (Fallback bilan).
  */
 function getFileExtension(file) {
-  if (!file) return "jpg";
-  const name = String(file.name || "");
+  const name = String(file?.name || "");
   if (name.includes(".")) {
     const ext = String(name.split(".").pop() || "").toLowerCase();
     if (ext) return ext;
   }
-  const type = String(file.type || "").toLowerCase();
+
+  const type = String(file?.type || "").toLowerCase();
   if (type.includes("png")) return "png";
   if (type.includes("webp")) return "webp";
   return "jpg";
@@ -42,7 +42,7 @@ function getFileExtension(file) {
  */
 function buildDocumentRowMap(rows = []) {
   return (rows || []).reduce((acc, row) => {
-    if (row && row.doc_type) {
+    if (row?.doc_type) {
       acc[row.doc_type] = row;
     }
     return acc;
@@ -50,7 +50,7 @@ function buildDocumentRowMap(rows = []) {
 }
 
 /**
- * Joriy autentifikatsiyadan o'tgan foydalanuvchini olish.
+ * Autentifikatsiyadan o'tgan foydalanuvchini olish.
  */
 export async function getAuthenticatedUser() {
   const {
@@ -59,18 +59,18 @@ export async function getAuthenticatedUser() {
   } = await supabase.auth.getUser();
 
   if (error) {
-    throw new Error(`Autentifikatsiya xatosi: ${error.message}`);
+    throw new Error(error.message || "Foydalanuvchi ma'lumotlarini olishda xato");
   }
 
   if (!user) {
-    throw new Error("Tizimga kirilmagan. Iltimos, profilga kiring.");
+    throw new Error("Siz tizimga kirmagansiz. Iltimos, qayta kiring.");
   }
 
   return user;
 }
 
 /**
- * Foydalanuvchining arizasi va barcha hujjatlarini yuklab olish.
+ * Haydovchining arizasi va barcha hujjatlarini yuklash.
  */
 export async function getMyDriverApplicationWithDocuments() {
   const user = await getAuthenticatedUser();
@@ -83,7 +83,7 @@ export async function getMyDriverApplicationWithDocuments() {
     .maybeSingle();
 
   if (appError) {
-    console.error("Application fetching error:", appError);
+    console.error("Application error:", appError);
     throw new Error(appError.message);
   }
 
@@ -99,7 +99,7 @@ export async function getMyDriverApplicationWithDocuments() {
     .order("created_at", { ascending: true });
 
   if (docsError) {
-    console.error("Documents fetching error:", docsError);
+    console.error("Documents error:", docsError);
     throw new Error(docsError.message);
   }
 
@@ -107,7 +107,7 @@ export async function getMyDriverApplicationWithDocuments() {
 }
 
 /**
- * UI ma'lumotlarini DB formatiga (snake_case) o'tkazish va tozalash.
+ * Formadan kelgan ma'lumotlarni bazaga moslab tayyorlash.
  */
 export function buildFormDataFromApplication(formData) {
   if (!formData) return {};
@@ -131,7 +131,7 @@ export function buildFormDataFromApplication(formData) {
 }
 
 /**
- * Arizani yaratish yoki yangilash (Upsert).
+ * Arizani saqlash yoki yangilash (Upsert).
  */
 export async function upsertDriverApplication(formData) {
   const user = await getAuthenticatedUser();
@@ -176,13 +176,12 @@ export async function upsertDriverApplication(formData) {
 }
 
 /**
- * Hujjatlarni Storage ga yuklash va jadvalga yozish.
- * BU YERDA BACKTICKS VA O'ZGARUVCHI NOMLARI TUZATILDI.
+ * Hujjatlarni yuklash jarayoni.
+ * BACKTICKS VA O'ZGARUVCHI NOMLARI TUZATILDI.
  */
 export async function uploadDriverDocuments(applicationId, files = {}) {
   const user = await getAuthenticatedUser();
 
-  // Bazadagi mavjud hujjatlarni olish
   const { data: existingDocs } = await supabase
     .from("driver_documents")
     .select("*")
@@ -194,14 +193,14 @@ export async function uploadDriverDocuments(applicationId, files = {}) {
     const file = files[field.key];
     if (!file) continue;
 
-    // TUZATILDI: O'zgaruvchi nomi 'extension' deb belgilandi
+    // 'ext' o'rniga aniqroq 'extension' ishlatildi
     const extension = getFileExtension(file);
     const timestamp = Date.now();
     
-    // TUZATILDI: BACKTICKS ( ` ) ISHLATILDI VA O'ZGARUVCHILAR TO'G'RI CHAQIRILDI
+    // BACKTICKS ( ` ) ISHLATILDI VA XAVFSIZ YO'L YARATILDI
     const path = `${sanitizeSegment(user.id)}/${sanitizeSegment(applicationId)}/${sanitizeSegment(field.docType)}_${timestamp}.${extension}`;
 
-    // 1. Storage ga yuklash
+    // 1. Faylni Storage ga yuklash
     const { error: uploadError } = await supabase.storage
       .from(DOCUMENT_BUCKET)
       .upload(path, file, {
@@ -230,51 +229,50 @@ export async function uploadDriverDocuments(applicationId, files = {}) {
       updated_at: new Date().toISOString(),
     };
 
-    const existingRecord = existingMap[field.docType];
+    const existing = existingMap[field.docType];
 
-    if (existingRecord?.id) {
-      const { error: updateError } = await supabase
+    if (existing?.id) {
+      // Mavjud hujjatni yangilash
+      const { error } = await supabase
         .from("driver_documents")
         .update(documentPayload)
-        .eq("id", existingRecord.id);
+        .eq("id", existing.id);
 
-      if (updateError) throw new Error(`${field.label} yangilashda xato: ${updateError.message}`);
+      if (error) throw new Error(`${field.label} yangilanishda xato: ${error.message}`);
     } else {
-      const { error: insertError } = await supabase
+      // Yangi hujjat qo'shish
+      const { error } = await supabase
         .from("driver_documents")
         .insert({
           ...documentPayload,
           created_at: new Date().toISOString(),
         });
 
-      if (insertError) throw new Error(`${field.label} saqlashda xato: ${insertError.message}`);
+      if (error) throw new Error(`${field.label} saqlanishda xato: ${error.message}`);
     }
   }
 }
 
 /**
- * Asosiy ariza topshirish funksiyasi.
+ * Umumiy ariza topshirish mantiqi.
  */
 export async function submitDriverApplication(formData, files = {}) {
   try {
-    // 1. Matnli ma'lumotlarni saqlash
     const application = await upsertDriverApplication(formData);
-
-    // 2. Hujjatlarni yuklash
+    
     if (Object.keys(files).length > 0) {
       await uploadDriverDocuments(application.id, files);
     }
-
-    // 3. To'liq ma'lumotlarni qayta o'qib qaytarish
+    
     return await getMyDriverApplicationWithDocuments();
   } catch (error) {
-    console.error("submitDriverApplication ichida xato:", error);
+    console.error("submitDriverApplication Error:", error);
     throw error;
   }
 }
 
 /**
- * Bazadagi hujjatlarni Ant Design Upload formatiga o'tkazish.
+ * Bazadagi ma'lumotlarni Ant Design Upload formatiga o'tkazish.
  */
 export function mapExistingDocumentsToForm(records = []) {
   if (!records || records.length === 0) return {};
