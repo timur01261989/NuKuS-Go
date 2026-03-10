@@ -15,12 +15,7 @@ export function isApiOk(response) {
 export function extractOrder(response) {
   if (!response || typeof response !== "object") return null;
 
-  return (
-    response.order ??
-    response.data?.order ??
-    response.data ??
-    null
-  );
+  return response.order ?? response.data?.order ?? response.data ?? null;
 }
 
 export function extractOrderId(response) {

@@ -24,7 +24,11 @@ export function useTaxiOrderCreate(options = {}) {
     async (draft) => {
       const payload = toCreateOrderPayload(draft);
 
-      if (!payload.pickup  payload.pickup.lat == null  payload.pickup.lng == null) {
+      if (
+        !payload.pickup ||
+        payload.pickup.lat == null ||
+        payload.pickup.lng == null
+      ) {
         const errorMessage = "Pickup tanlanishi kerak";
         setCreateError(errorMessage);
 
