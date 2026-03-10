@@ -2,7 +2,7 @@ import React, { memo, useCallback } from "react";
 import { Card, Typography, Button, Space } from "antd";
 import { 
   CustomerServiceOutlined, 
-  TelegramOutlined, 
+  SendOutlined, 
   PhoneOutlined 
 } from "@ant-design/icons";
 import { usePageI18n } from "./pageI18n";
@@ -11,15 +11,15 @@ const { Title, Text } = Typography;
 
 /**
  * @file Support.jsx
- * @description UniGo Super App - Centralized Support Component
- * @version 1.1.0
+ * @description UniGo Super App - Centralized Support Component with Fixed Icon Imports
+ * @version 1.1.1
  * @author Senior Full-Stack Architect
  */
 
 const Support = memo(() => {
   const { t, tx } = usePageI18n();
 
-  // Callback for handling contact actions - Scalable for millions of users
+  // Optimized Callback for high-load systems handling millions of users
   const handleContact = useCallback((type) => {
     switch (type) {
       case 'telegram':
@@ -29,46 +29,50 @@ const Support = memo(() => {
         window.location.href = "tel:+998000000000";
         break;
       default:
-        console.log("Support contact action initiated");
+        console.warn("Unsupported support channel triggered.");
     }
   }, []);
 
   return (
     <div 
-      className="unigo-support-container"
+      className="unigo-support-page"
       style={{ 
-        padding: "20px 14px", 
-        maxWidth: 680, 
+        padding: "24px 16px", 
+        maxWidth: 720, 
         margin: "0 auto",
         minHeight: "100vh"
       }}
     >
-      <header style={{ marginBottom: 24, textAlign: 'center' }}>
-        <CustomerServiceOutlined style={{ fontSize: 48, color: '#1890ff', marginBottom: 16 }} />
-        <Title level={3} style={{ marginTop: 0 }}>
+      {/* Header Section */}
+      <header style={{ marginBottom: 32, textAlign: 'center' }}>
+        <CustomerServiceOutlined style={{ fontSize: 56, color: '#1890ff', marginBottom: 20 }} />
+        <Title level={3} style={{ marginTop: 0, fontWeight: 700 }}>
           {t.supportTitle || tx("supportSection", "Yordam markazi")}
         </Title>
-        <Text type="secondary">
-          {t.supportHint || tx("supportHintLocal", "UniGo jamoasi sizga yordam berishga tayyor.")}
+        <Text type="secondary" style={{ fontSize: 16 }}>
+          {t.supportHint || tx("supportHintLocal", "UniGo jamoasi sizga xizmat ko'rsatishdan mamnun.")}
         </Text>
       </header>
 
+      {/* Support Channels */}
       <Space direction="vertical" size={16} style={{ width: '100%' }}>
         <Card 
           hoverable 
-          style={{ borderRadius: 16, border: '1px solid #f0f0f0' }}
-          bodyStyle={{ padding: 20 }}
+          style={{ borderRadius: 16, border: '1px solid #f0f0f0', overflow: 'hidden' }}
+          bodyStyle={{ padding: 24 }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+            <div style={{ flex: '1 1 200px' }}>
               <Title level={5} style={{ margin: 0 }}>Telegram bot</Title>
-              <Text type="secondary">24/7 tezkor aloqa</Text>
+              <Text type="secondary">Tezkor savol-javoblar va texnik yordam</Text>
             </div>
             <Button 
               type="primary" 
+              size="large"
               shape="round" 
-              icon={<TelegramOutlined />} 
+              icon={<SendOutlined style={{ transform: 'rotate(-45deg)' }} />} 
               onClick={() => handleContact('telegram')}
+              style={{ backgroundColor: '#0088cc', borderColor: '#0088cc' }}
             >
               Bog'lanish
             </Button>
@@ -78,15 +82,16 @@ const Support = memo(() => {
         <Card 
           hoverable 
           style={{ borderRadius: 16, border: '1px solid #f0f0f0' }}
-          bodyStyle={{ padding: 20 }}
+          bodyStyle={{ padding: 24 }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+            <div style={{ flex: '1 1 200px' }}>
               <Title level={5} style={{ margin: 0 }}>Call-markaz</Title>
-              <Text type="secondary">Operator bilan suhbat</Text>
+              <Text type="secondary">Operator bilan bevosita suhbatlashish</Text>
             </div>
             <Button 
               type="default" 
+              size="large"
               shape="round" 
               icon={<PhoneOutlined />} 
               onClick={() => handleContact('phone')}
@@ -96,13 +101,19 @@ const Support = memo(() => {
           </div>
         </Card>
 
-        <Card style={{ borderRadius: 16, backgroundColor: '#fafafa' }}>
-          <Text strong style={{ display: 'block', marginBottom: 8 }}>
-            {tx("workingHours", "Ish vaqti:")}
-          </Text>
-          <Text type="secondary">
-            Dushanba - Yakshanba, 08:00 - 22:00
-          </Text>
+        {/* Operational Info Section */}
+        <Card style={{ borderRadius: 16, backgroundColor: '#f9f9f9', border: 'none' }}>
+          <Space direction="vertical" size={4}>
+            <Text strong style={{ color: '#595959' }}>
+              {tx("workingHours", "Ish tartibi:")}
+            </Text>
+            <Text type="secondary">
+              Dushanba — Yakshanba: 08:00 dan 22:00 gacha
+            </Text>
+            <Text type="secondary" style={{ fontSize: 12, marginTop: 8, display: 'block' }}>
+              * Bayram kunlari ish vaqti o'zgarishi mumkin.
+            </Text>
+          </Space>
         </Card>
       </Space>
     </div>
