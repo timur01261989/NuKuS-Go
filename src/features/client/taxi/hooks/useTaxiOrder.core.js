@@ -394,33 +394,18 @@ export function useTaxiOrderCore() {
     setDispatchLine([[c.lat, c.lng], pickup.latlng]);
   }, [step, dispatchIdx, nearCars, pickup.latlng]);
 
-  // Sheet visibility
-  const showSheet = useMemo(() => {
-    if (step === "dest_map") return !isDraggingMap;
-    return true;
-  }, [step, isDraggingMap]);
-
-  // Share link
-  const shareLink = useMemo(() => {
-    if (!orderId) return "";
-    try {
-      const origin = window.location.origin;
-      return `${origin}/share/${orderId}`;
-    } catch {
-      return "";
-    }
-  }, [orderId]);
-
-  // Map bottom position
-  const mapBottom = useMemo(() => {
-    if (step === "main") return 280;
-    if (step === "search") return 340;
-    if (step === "dest_map") return 240;
-    if (step === "route") return 330;
-    if (step === "searching") return 240;
-    if (step === "coming") return 380;
-    return 240;
-  }, [step]);
+  const {
+    isSearching,
+    isDriverAssigned,
+    showSheet,
+    shareLink,
+    mapBottom,
+  } = useTaxiOrderDerived({
+    orderStatus,
+    orderId,
+    step,
+    isDraggingMap,
+  });
 
   return {
     step,
