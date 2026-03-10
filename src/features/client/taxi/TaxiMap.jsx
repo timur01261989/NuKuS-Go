@@ -1,26 +1,15 @@
-import React, { useEffect } from "react";
+import React, { memo, useEffect } from "react";
 import { MapContainer, TileLayer, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
 import LocateButton from "./components/LocateButton";
 import { normalizeLatLng } from "./utils/latlng";
 
-/**
- * TaxiMap
- * - Wraps react-leaflet MapContainer
- * - Emits center changes + drag state
- * - Renders injected overlays (route/driver/searching) and center pin
- *
- * NOTE:
- * Old version used a `key` on MapContainer that remounted the map whenever center changed.
- * That caused heavy lag and sometimes state loops. We keep one map instance and just setView.
- */
-
 function CenterWatcher({ onCenterChange, onMoveStart, onMoveEnd }) {
   const map = useMap();
 
   useEffect(() => {
-    if (!map) return;
+    if (!map) return undefined;
 
     const fire = () => {
       const c = map.getCenter();
@@ -55,14 +44,13 @@ function CenterSetter({ center, zoom = 15 }) {
   useEffect(() => {
     const c = normalizeLatLng(center);
     if (!map || !c) return;
-    // avoid animation storms; use setView without fly when already close
     map.setView(c, map.getZoom() || zoom, { animate: false });
   }, [map, center, zoom]);
 
   return null;
 }
 
-export default function TaxiMap({
+function TaxiMap({
   mapRef,
   center,
   mapTile,
@@ -78,7 +66,7 @@ export default function TaxiMap({
   driverOverlay,
   centerPin,
 }) {
-  const safeCenter = normalizeLatLng(center) || [42.4602, 59.6137]; // Nukus fallback
+  const safeCenter = normalizeLatLng(center) || [42.4602, 59.6137];
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 0 }}>
@@ -92,30 +80,22 @@ export default function TaxiMap({
         zoomControl={false}
       >
         <TileLayer url={mapTile} />
-
         <CenterSetter center={safeCenter} />
-
         <CenterWatcher
           onCenterChange={onCenterChange}
           onMoveStart={onMoveStart}
           onMoveEnd={onMoveEnd}
         />
-
         {(step === "route" || step === "coming" || step === "stop_map") && routeLine}
-
         {searchingOverlay}
-
         {driverOverlay}
       </MapContainer>
 
       {centerPin}
 
-      <LocateButton
-        mapRef={mapRef}
-        userLoc={userLoc}
-        bottom={mapBottom}
-        onRequestLocate={onRequestLocate}
-      />
+      <LocateButton mapRef={mapRef} userLoc={userLoc} bottom={mapBottom} onRequestLocate={onRequestLocate} />
     </div>
   );
 }
+
+export default memo(TaxiMap);

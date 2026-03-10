@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import React, { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { useClientText } from "../shared/i18n_clientLocalize";
 import { useNavigate } from "react-router-dom";
 import {
@@ -155,7 +155,7 @@ function LocateMeButton({ mapRef, userLoc, bottom = 240, onRequestLocate }) {
 }
 
 /** --- main component --- */
-export default function ClientTaxiPage() {
+function ClientTaxiPage() {
   const { cp } = useClientText();
   const navigate = useNavigate();
   const mapRef = useRef(null);
@@ -1337,3 +1337,6 @@ export default function ClientTaxiPage() {
     </div>
   );
 }
+
+
+export default memo(ClientTaxiPage);

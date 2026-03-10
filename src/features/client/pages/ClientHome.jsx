@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { memo, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { prefetch } from "@/lib/prefetch";
 import { supabase } from "@/lib/supabase";
@@ -13,7 +13,7 @@ function initials(name) {
   return parts.map((p) => (p[0] || "").toUpperCase()).join("") || "U";
 }
 
-export default function ClientHome() {
+function ClientHome() {
   const navigate = useNavigate();
   const { t } = useLanguage();
 
@@ -324,3 +324,5 @@ function BottomNavItem({ icon, label, active, onClick }) {
     </button>
   );
 }
+
+export default memo(ClientHome);

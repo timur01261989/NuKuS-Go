@@ -1,14 +1,9 @@
 import { useClientText } from "../shared/i18n_clientLocalize";
-import React from "react";
+import React, { memo } from "react";
 import { Button } from "antd";
 import { CheckOutlined } from "@ant-design/icons";
 
-/**
- * DestinationPicker (dest_map step)
- * - Xarita markazi bo‘yicha yakuniy nuqta tanlash
- * - Pastdan mini-sheet (auto hide/show) tashqaridan boshqariladi
- */
-export default function DestinationPicker({
+function DestinationPicker({
   showSheet = true,
   dest,
   pickup,
@@ -52,3 +47,5 @@ export default function DestinationPicker({
     </div>
   );
 }
+
+export default memo(DestinationPicker);

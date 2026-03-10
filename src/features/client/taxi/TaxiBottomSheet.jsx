@@ -1,6 +1,7 @@
-import React from "react";
+import React, { memo } from "react";
 
-/** Generic bottom sheet container (placeholder, can be expanded) */
-export default function TaxiBottomSheet({ children }) {
+function TaxiBottomSheet({ children }) {
   return <>{children}</>;
 }
+
+export default memo(TaxiBottomSheet);

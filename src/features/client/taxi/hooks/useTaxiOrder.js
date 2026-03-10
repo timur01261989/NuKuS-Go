@@ -2,8 +2,14 @@ import { translateClientPhrase } from "../../shared/i18n_clientLocalize";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { message } from "antd";
 import api from "@/utils/apiHelper";
+import { extractApiError, extractOrder, extractOrderId } from "@/utils/apiResponse";
 import { haversineKm } from "../../shared/geo/haversine";
 import { nominatimReverse as _nominatimReverse } from "../../shared/geo/nominatim";
+import { toCreateOrderPayload, fromOrderResponse } from "../lib/taxiOrderAdapter";
+import { loadMyAddressesV1 as loadMyAddressesV1Impl, loadSavedPlaces as loadSavedPlacesImpl, savePlace as savePlaceImpl, loadTaxiShortcuts, getActiveOrderId, setActiveOrderId } from "../lib/taxiStorage";
+import { speak as speakImpl } from "../lib/taxiSpeech";
+import { money as moneyImpl, clamp as clampImpl, estimateTotalPrice } from "../lib/taxiPricing";
+import { useTaxiSearch, nominatimSearch as nominatimSearchImpl } from "./useTaxiSearch";
 
 // Constants
 export const MAX_KM = 50;
@@ -17,22 +23,7 @@ async function nominatimReverse(lat, lng, signal) {
 
 // Nominatim search utility
 export async function nominatimSearch(q, signal) {
-  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=7&addressdetails=1&q=${encodeURIComponent(
-    q
-  )}&countrycodes=uz`;
-  try {
-    const res = await fetch(url, { signal, headers: { "Accept-Language": "uz,ru,en" } });
-    const data = await res.json();
-    return (data || []).map((x) => ({
-      id: x.place_id,
-      label: x.display_name,
-      lat: parseFloat(x.lat),
-      lng: parseFloat(x.lon),
-    }));
-  } catch (e) {
-    if (e?.name === "AbortError") return [];
-    return [];
-  }
+  return nominatimSearchImpl(q, signal);
 }
 
 // OSRM route calculation
@@ -70,13 +61,12 @@ export async function osrmRouteMulti(points) {
 
 // Format money utility
 export function money(n) {
-  const x = Math.round(Number(n || 0));
-  return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " so'm";
+  return moneyImpl(n);
 }
 
 // Clamp utility
 export function clamp(n, a, b) {
-  return Math.max(a, Math.min(b, n));
+  return clampImpl(n, a, b);
 }
 
 // Debounced reverse geocoding hook
@@ -111,42 +101,20 @@ export function useDebouncedReverse(when, latlng, delay = 350) {
 
 // Local storage utilities
 export function loadMyAddressesV1() {
-  try {
-    const raw = localStorage.getItem("savedAddresses_v1");
-    const arr = raw ? JSON.parse(raw) : [];
-    if (Array.isArray(arr)) return arr;
-  } catch {}
-  return [];
+  return loadMyAddressesV1Impl();
 }
 
 export function loadSavedPlaces() {
-  try {
-    const raw = localStorage.getItem("client_saved_places");
-    const arr = raw ? JSON.parse(raw) : [];
-    if (Array.isArray(arr)) return arr;
-  } catch {}
-  return [];
+  return loadSavedPlacesImpl();
 }
 
 export function savePlace(place) {
-  const list = loadSavedPlaces();
-  const exists = list.find((x) => x.id === place.id);
-  const next = exists ? list.map((x) => (x.id === place.id ? place : x)) : [place, ...list].slice(0, 20);
-  localStorage.setItem("client_saved_places", JSON.stringify(next));
-  return next;
+  return savePlaceImpl(place);
 }
 
 // Speech synthesis utility ("Alisa")
 export function speak(text) {
-  try {
-    if (!("speechSynthesis" in window)) return;
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = "ru-RU";
-    u.rate = 1;
-    u.pitch = 1;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(u);
-  } catch {}
+  return speakImpl(text);
 }
 
 // Main taxi order hook
@@ -172,14 +140,18 @@ export function useTaxiOrder() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [pickupSearchText, setPickupSearchText] = useState("");
   const [destSearchText, setDestSearchText] = useState("");
-  const [pickupResults, setPickupResults] = useState([]);
-  const [destResults, setDestResults] = useState([]);
-  const [searchBusy, setSearchBusy] = useState(false);
+  const [pickupResultsLegacy, setPickupResults] = useState([]);
+  const [destResultsLegacy, setDestResults] = useState([]);
+  const [searchBusyLegacy, setSearchBusy] = useState(false);
 
   // Saved places and shortcuts
   const [savedPlaces, setSavedPlaces] = useState([]);
   const [myAddressesV1, setMyAddressesV1] = useState(() => loadMyAddressesV1());
   const [shortcuts, setShortcuts] = useState({ home: null, work: null });
+  const searchState = useTaxiSearch({ searchOpen, pickupSearchText, destSearchText });
+  const pickupResults = searchState.pickupResults?.length ? searchState.pickupResults : pickupResultsLegacy;
+  const destResults = searchState.destResults?.length ? searchState.destResults : destResultsLegacy;
+  const searchBusy = searchState.searchBusy || searchBusyLegacy;
 
   // Route and tariff
   const [route, setRoute] = useState(null);
@@ -245,9 +217,7 @@ export function useTaxiOrder() {
   );
 
   const totalPrice = useMemo(() => {
-    const d = distanceKm || 0;
-    const p = (tariff.base + d * tariff.perKm) * (tariff.mult || 1);
-    return Math.round(p);
+    return estimateTotalPrice(distanceKm || 0, tariff);
   }, [distanceKm, tariff]);
 
   // Search result filtering
@@ -285,7 +255,7 @@ export function useTaxiOrder() {
     const saved = loadSavedPlaces();
     setSavedPlaces(saved);
     try {
-      const sc = JSON.parse(localStorage.getItem('taxiShortcuts') || '{}');
+      const sc = loadTaxiShortcuts();
       setShortcuts({ home: sc.home || null, work: sc.work || null });
     } catch {}
 
@@ -350,47 +320,7 @@ export function useTaxiOrder() {
     };
   }, [step, pickup.latlng?.[0], pickup.latlng?.[1], dest.latlng?.[0], dest.latlng?.[1], waypoints.length]);
 
-  // Search debouncing
-  const pickupAbortRef = useRef(null);
-  const destAbortRef = useRef(null);
-
-  useEffect(() => {
-    if (!searchOpen) return;
-    const t = setTimeout(async () => {
-      const q = pickupSearchText.trim();
-      if (!q) {
-        setPickupResults([]);
-        return;
-      }
-      if (pickupAbortRef.current) pickupAbortRef.current.abort();
-      const ac = new AbortController();
-      pickupAbortRef.current = ac;
-      setSearchBusy(true);
-      const res = await nominatimSearch(q, ac.signal);
-      setPickupResults(res);
-      setSearchBusy(false);
-    }, 250);
-    return () => clearTimeout(t);
-  }, [pickupSearchText, searchOpen]);
-
-  useEffect(() => {
-    if (!searchOpen) return;
-    const t = setTimeout(async () => {
-      const q = destSearchText.trim();
-      if (!q) {
-        setDestResults([]);
-        return;
-      }
-      if (destAbortRef.current) destAbortRef.current.abort();
-      const ac = new AbortController();
-      destAbortRef.current = ac;
-      setSearchBusy(true);
-      const res = await nominatimSearch(q, ac.signal);
-      setDestResults(res);
-      setSearchBusy(false);
-    }, 250);
-    return () => clearTimeout(t);
-  }, [destSearchText, searchOpen]);
+  // Search debouncing moved to useTaxiSearch hook.
 
   // Callback: set pickup from suggestion
   const setPickupFromSuggestion = useCallback(
@@ -442,8 +372,8 @@ export function useTaxiOrder() {
           message.error(cp("Manzil topilmadi"));
           return;
         }
-        const ll = [Number(first.lat), Number(first.lon)];
-        const addr = first.display_name || q;
+        const ll = [Number(first.lat), Number(first.lng)];
+        const addr = first.label || first.address || q;
         setDest({ latlng: ll, address: addr });
         setDestSearchText(addr);
         setSearchOpen(false);
@@ -474,31 +404,22 @@ export function useTaxiOrder() {
     const hide = message.loading(cp("Buyurtma yuborilmoqda..."), 0);
     try {
       const payloadBase = {
+        ...toCreateOrderPayload({
+          pickup: { ...pickup, address: pickup.address || cp("Yo'lovchini olish nuqtasi") },
+          dest,
+          tariff,
+          totalPrice,
+          distanceKm: dest.latlng ? (distanceKm || haversineKm(pickup.latlng, dest.latlng)) : 0,
+          waypoints,
+          orderFor,
+          otherPhone,
+          wishes,
+          comment,
+          scheduledTime,
+        }),
         status: "searching",
         price: Math.round(totalPrice),
-        // Stage-3: server pricing (final price computed server-side, client price is only an estimate)
         use_server_pricing: true,
-        service_type: "taxi",
-        tariff_id: tariff.id,
-        pickup_location: pickup.address || cp("Yo'lovchini olish nuqtasi"),
-        dropoff_location: dest.address || "",
-        from_lat: pickup.latlng[0],
-        from_lng: pickup.latlng[1],
-        to_lat: dest.latlng ? dest.latlng[0] : null,
-        to_lng: dest.latlng ? dest.latlng[1] : null,
-        distance_km: dest.latlng ? (distanceKm || haversineKm(pickup.latlng, dest.latlng)) : 0,
-        duration_min: dest.latlng ? Math.max(1, Math.round(((distanceKm || haversineKm(pickup.latlng, dest.latlng)) || 0) * 2)) : 0,
-        waypoints: waypoints.map((w) => ({
-          lat: w.latlng?.[0],
-          lng: w.latlng?.[1],
-          address: w.address || "",
-        })),
-        pickup_entrance: pickup.entrance || "",
-        order_for: orderFor,
-        other_phone: orderFor === "other" ? (otherPhone || "") : "",
-        wishes: wishes,
-        comment: comment || "",
-        scheduled_time: scheduledTime,
       };
 
       const actions = ["create", "create_taxi", "create_city", "new"];
@@ -508,24 +429,24 @@ export function useTaxiOrder() {
       for (const action of actions) {
         try {
           res = await api.post("/api/order", { action, ...payloadBase });
-          if (res?.data || res?.id || res?.orderId) break;
+          if (extractOrderId(res)) break;
         } catch (e) {
           lastErr = e;
         }
       }
 
-      const id = res?.data?.id || res?.id || res?.orderId;
+      const id = extractOrderId(res);
       if (!id) throw lastErr || new Error(cp("Serverdan ID kelmadi"));
 
       setOrderId(String(id));
-      localStorage.setItem("activeOrderId", String(id));
+      setActiveOrderId(String(id));
       setOrderStatus("searching");
       setStep("searching");
       speak(cp("Haydovchi qidirilmoqda"));
       message.success(cp("Buyurtma yuborildi"));
     } catch (e) {
       console.error("Order error:", e);
-      message.error("Zakaz berishda xatolik: " + (e?.message || cp("Server bilan aloqa yo'q")));
+      message.error("Zakaz berishda xatolik: " + (extractApiError(e) || cp("Server bilan aloqa yo'q")));
     } finally {
       hide();
     }
@@ -540,12 +461,12 @@ export function useTaxiOrder() {
     }
     const hide = message.loading(cp("Bekor qilinmoqda..."), 0);
     try {
-      await api.post("/api/order", { action: "cancel", order_id: orderId });
+      await api.post("/api/order_status", { order_id: orderId, status: "cancelled_by_client" });
     } catch (e) {
       console.warn(e);
     } finally {
       hide();
-      localStorage.removeItem("activeOrderId");
+      setActiveOrderId(null);
       setOrderId(null);
       setOrderStatus(null);
       setAssignedDriver(null);
@@ -561,27 +482,29 @@ export function useTaxiOrder() {
     let mounted = true;
     const run = async () => {
       try {
-        const saved = localStorage.getItem("activeOrderId");
+        const saved = getActiveOrderId();
         if (saved) setOrderId(saved);
 
         const res = await api.post("/api/order", { action: "active" });
-        const o = res?.data || res;
+        const normalized = fromOrderResponse(extractOrder(res) || res);
         if (!mounted) return;
-        if (o?.id) {
-          setOrderId(String(o.id));
-          localStorage.setItem("activeOrderId", String(o.id));
-          setOrderStatus(o.status || o.order_status || "searching");
-          setPickup((p) => ({
-            ...p,
-            latlng: o.from_lat && o.from_lng ? [Number(o.from_lat), Number(o.from_lng)] : p.latlng,
-            address: o.pickup_location || p.address,
-          }));
-          if (o.to_lat && o.to_lng) {
-            setDest({ latlng: [Number(o.to_lat), Number(o.to_lng)], address: o.dropoff_location || "" });
+        if (normalized?.id) {
+          setOrderId(String(normalized.id));
+          setActiveOrderId(String(normalized.id));
+          setOrderStatus(normalized.status || "searching");
+          if (normalized.pickup) {
+            setPickup((p) => ({
+              ...p,
+              latlng: normalized.pickup.lat != null && normalized.pickup.lng != null ? [Number(normalized.pickup.lat), Number(normalized.pickup.lng)] : p.latlng,
+              address: normalized.pickup.address || p.address,
+            }));
           }
-          if (o.status === "accepted" || o.status === "coming" || o.status === "arrived") {
+          if (normalized.dropoff?.lat != null && normalized.dropoff?.lng != null) {
+            setDest({ latlng: [Number(normalized.dropoff.lat), Number(normalized.dropoff.lng)], address: normalized.dropoff.address || "" });
+          }
+          if (normalized.status === "accepted" || normalized.status === "coming" || normalized.status === "arrived") {
             setStep("coming");
-          } else if (o.status === "searching") {
+          } else if (normalized.status === "searching" || normalized.status === "offered") {
             setStep("searching");
           } else {
             setStep("main");
@@ -608,28 +531,29 @@ export function useTaxiOrder() {
       try {
         const res = await api.post("/api/order", { action: "get", order_id: orderId });
         if (!alive) return;
-        const o = res?.data || res;
-        const st = o?.status || o?.order_status;
+        const o = fromOrderResponse(extractOrder(res) || res);
+        const rawOrder = o?.raw || o;
+        const st = o?.status || rawOrder?.status || rawOrder?.order_status;
         if (st && st !== orderStatus) {
           setOrderStatus(st);
           if (st === "accepted") speak(cp("Haydovchi topildi"));
           if (st === "arrived") speak(cp("Haydovchi yetib keldi"));
           if (st === "completed" || st === "done") {
             speak(cp("Safar yakunlandi. Rahmat!"));
-            const drvId = o?.driver?.id || o?.driver_id || o?.assigned_driver_id || null;
-            const clientId = o?.client_id || o?.user_id || null;
+            const drvId = rawOrder?.driver?.id || rawOrder?.driver_id || rawOrder?.assigned_driver_id || null;
+            const clientId = rawOrder?.client_id || rawOrder?.user_id || null;
             setCompletedOrderForRating({
               id: orderId,
               driver_id: drvId,
               client_id: clientId,
             });
             setRatingVisible(true);
-            const price = Number(o?.price || o?.amount || o?.priceUzs || 0);
+            const price = Number(rawOrder?.price || rawOrder?.amount || rawOrder?.priceUzs || rawOrder?.price_uzs || 0);
             setEarnedBonus(Math.max(1, Math.floor(price * 0.01)));
           }
         }
 
-        const drv = o?.driver || o?.assigned_driver || o?.assignedDriver;
+        const drv = o?.driver || rawOrder?.driver || rawOrder?.assigned_driver || rawOrder?.assignedDriver;
         if (drv) {
           setAssignedDriver({
             first_name: drv.first_name || drv.name || "Haydovchi",
