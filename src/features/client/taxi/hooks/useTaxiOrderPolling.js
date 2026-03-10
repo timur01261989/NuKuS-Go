@@ -1,105 +1,117 @@
-import { useEffect } from 'react';
-import api from '@/utils/apiHelper';
-import { extractOrder } from '@/utils/apiResponse';
-import { fromOrderResponse } from '../lib/taxiOrderAdapter';
-import { getActiveOrderId, setActiveOrderId } from '../lib/taxiStorage';
+import { useEffect } from "react";
+import api from "@/utils/apiHelper";
+import { haversineKm } from "../../shared/geo/haversine";
 
-export function useTaxiOrderPolling({ orderId, setOrderId, setOrderStatus, setPickup, setDest, setStep, cp, speak, setCompletedOrderForRating, setRatingVisible, setEarnedBonus, setAssignedDriver, assignedDriver, pickup, setEtaMin }) {
+export function useRestoreActiveOrder({ setOrderId, setOrderStatus, setPickup, setDest, setStep }) {
   useEffect(() => {
     let mounted = true;
     const run = async () => {
       try {
-        const saved = getActiveOrderId();
+        const saved = localStorage.getItem("activeOrderId");
         if (saved) setOrderId(saved);
-        const res = await api.post('/api/order', { action: 'active' });
-        const normalized = fromOrderResponse(extractOrder(res) || res);
-        if (!mounted || !normalized?.id) return;
-        setOrderId(normalized.id);
-        setActiveOrderId(normalized.id);
-        setOrderStatus(normalized.status || 'searching');
-        if (normalized.pickup) {
-          setPickup((prev) => ({
-            ...prev,
-            latlng: normalized.pickup.lat != null && normalized.pickup.lng != null ? [Number(normalized.pickup.lat), Number(normalized.pickup.lng)] : prev.latlng,
-            address: normalized.pickup.address || prev.address,
+
+        const res = await api.post("/api/order", { action: "active" });
+        const o = res?.data || res;
+        if (!mounted) return;
+        if (o?.id) {
+          setOrderId(String(o.id));
+          localStorage.setItem("activeOrderId", String(o.id));
+          setOrderStatus(o.status || o.order_status || "searching");
+          setPickup((p) => ({
+            ...p,
+            latlng: o.from_lat && o.from_lng ? [Number(o.from_lat), Number(o.from_lng)] : p.latlng,
+            address: o.pickup_location || p.address,
           }));
+          if (o.to_lat && o.to_lng) {
+            setDest({ latlng: [Number(o.to_lat), Number(o.to_lng)], address: o.dropoff_location || "" });
+          }
+          if (o.status === "accepted" || o.status === "coming" || o.status === "arrived") {
+            setStep("coming");
+          } else if (o.status === "searching") {
+            setStep("searching");
+          } else {
+            setStep("main");
+          }
         }
-        if (normalized.dropoff) {
-          setDest({
-            latlng: normalized.dropoff.lat != null && normalized.dropoff.lng != null ? [Number(normalized.dropoff.lat), Number(normalized.dropoff.lng)] : null,
-            address: normalized.dropoff.address || '',
-          });
-        }
-        if (normalized.status === 'accepted' || normalized.status === 'coming' || normalized.status === 'arrived') setStep('coming');
-        else if (normalized.status === 'searching' || normalized.status === 'offered') setStep('searching');
-      } catch {
-        // ignore initial active fetch failures
-      }
+      } catch {}
     };
     run();
     return () => {
       mounted = false;
     };
-  }, [setDest, setOrderId, setOrderStatus, setPickup, setStep]);
+  }, [setOrderId, setOrderStatus, setPickup, setDest, setStep]);
+}
 
+export function useOrderStatusPolling({ orderId, pickup, orderStatus, step, assignedDriver, setOrderStatus, setAssignedDriver, setCompletedOrderForRating, setRatingVisible, setEarnedBonus, setEtaMin, cp, speak }) {
   useEffect(() => {
-    if (!orderId) return undefined;
-    let alive = true;
+    if (!orderId) return;
     let timer = null;
+    let alive = true;
 
     const tick = async () => {
       try {
-        const res = await api.post('/api/order', { action: 'get', order_id: orderId });
+        const res = await api.post("/api/order", { action: "get", order_id: orderId });
         if (!alive) return;
-        const normalized = fromOrderResponse(extractOrder(res) || res);
-        if (!normalized) return;
-        const st = normalized.status;
-        setOrderStatus(st);
-        if (st === 'accepted') speak(cp('Haydovchi topildi'));
-        if (st === 'arrived') speak(cp('Haydovchi yetib keldi'));
-        if (st === 'completed' || st === 'done') {
-          speak(cp('Safar yakunlandi. Rahmat!'));
-          const drvId = normalized.driver?.id || normalized.raw?.driver_id || normalized.raw?.assigned_driver_id || null;
-          const clientId = normalized.raw?.client_id || normalized.raw?.user_id || null;
-          setCompletedOrderForRating({ id: orderId, driver_id: drvId, client_id: clientId });
-          setRatingVisible(true);
-          const price = Number(normalized.raw?.price || normalized.raw?.amount || normalized.raw?.priceUzs || normalized.raw?.price_uzs || 0);
-          setEarnedBonus(Math.max(1, Math.floor(price * 0.01)));
+        const o = res?.data || res;
+        const st = o?.status || o?.order_status;
+        if (st && st !== orderStatus) {
+          setOrderStatus(st);
+          if (st === "accepted") speak(cp("Haydovchi topildi"));
+          if (st === "arrived") speak(cp("Haydovchi yetib keldi"));
+          if (st === "completed" || st === "done") {
+            speak(cp("Safar yakunlandi. Rahmat!"));
+            const drvId = o?.driver?.id || o?.driver_id || o?.assigned_driver_id || null;
+            const clientId = o?.client_id || o?.user_id || null;
+            setCompletedOrderForRating({ id: orderId, driver_id: drvId, client_id: clientId });
+            setRatingVisible(true);
+            const price = Number(o?.price || o?.amount || o?.priceUzs || 0);
+            setEarnedBonus(Math.max(1, Math.floor(price * 0.01)));
+          }
         }
-        if (normalized.driver) {
-          const drv = normalized.driver;
+
+        const drv = o?.driver || o?.assigned_driver || o?.assignedDriver;
+        if (drv) {
           setAssignedDriver({
-            first_name: drv.first_name || drv.full_name || drv.name || 'Haydovchi',
-            avatar_url: drv.avatar_url || drv.avatar || '',
-            car_model: drv.car_model || drv.car || '',
-            plate: drv.plate || drv.car_plate || '',
+            first_name: drv.first_name || drv.name || "Haydovchi",
+            avatar_url: drv.avatar_url || drv.avatar || "",
+            car_model: drv.car_model || drv.car || "",
+            plate: drv.plate || drv.car_plate || "",
             lat: Number(drv.lat ?? drv.driver_lat ?? drv.latitude),
             lng: Number(drv.lng ?? drv.driver_lng ?? drv.longitude),
             bearing: Number(drv.bearing ?? drv.heading ?? 0),
             rating: Number(drv.rating ?? 4.8),
-            phone: drv.phone || '',
+            phone: drv.phone || "",
           });
         }
-        if (assignedDriver?.lat && assignedDriver?.lng && pickup?.latlng) {
-          const haversineKm = (await import('../../shared/geo/haversine')).haversineKm;
+
+        if (assignedDriver?.lat && assignedDriver?.lng && pickup.latlng) {
           const d = haversineKm([assignedDriver.lat, assignedDriver.lng], pickup.latlng);
           setEtaMin(Math.max(1, Math.round(d * 3)));
         }
-      } catch {
-        // ignore polling errors
-      }
+      } catch {}
     };
 
-    const nextInterval = () => 4000;
+    tick();
+    const nextInterval = () => {
+      if (step === "searching" || orderStatus === "searching") return 2000;
+      if (orderStatus === "accepted" || orderStatus === "coming" || orderStatus === "arrived") return 3500;
+      if (orderStatus === "ontrip" || orderStatus === "in_trip") return 8000;
+      return 4000;
+    };
+
+    let stopped = false;
     const loop = async () => {
+      if (stopped) return;
       await tick();
-      if (!alive) return;
+      if (stopped) return;
       timer = setTimeout(loop, nextInterval());
     };
+
     loop();
     return () => {
       alive = false;
+      stopped = true;
       if (timer) clearTimeout(timer);
     };
-  }, [orderId, setOrderStatus, cp, speak, setCompletedOrderForRating, setRatingVisible, setEarnedBonus, setAssignedDriver, assignedDriver, pickup?.latlng, setEtaMin]);
+  }, [orderId, pickup.latlng?.[0], pickup.latlng?.[1], orderStatus, step, assignedDriver, setOrderStatus, setAssignedDriver, setCompletedOrderForRating, setRatingVisible, setEarnedBonus, setEtaMin, cp, speak]);
 }

@@ -1,13 +1,11 @@
 export function speak(text) {
   try {
-    if (!('speechSynthesis' in window)) return;
-    const utterance = new SpeechSynthesisUtterance(String(text || ''));
-    utterance.lang = 'ru-RU';
-    utterance.rate = 1;
-    utterance.pitch = 1;
+    if (!("speechSynthesis" in window)) return;
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "ru-RU";
+    u.rate = 1;
+    u.pitch = 1;
     window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
-  } catch {
-    // ignore speech failures
-  }
+    window.speechSynthesis.speak(u);
+  } catch {}
 }
