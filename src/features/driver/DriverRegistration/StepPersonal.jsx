@@ -1,5 +1,6 @@
 import React from "react";
 import { Col, Form, Input, Row, Typography } from "antd";
+import { normalizeName, normalizePassport, normalizePhone } from "./helpers";
 
 const { Text } = Typography;
 const PHONE_PREFIX = "+998";
@@ -28,8 +29,7 @@ export default function StepPersonal() {
         Shaxsiy ma'lumotlar
       </Typography.Title>
       <Text style={{ color: "#94a3b8", display: "block", marginBottom: 20 }}>
-        Ariza uchun asosiy ma'lumotlaringizni kiriting. Telefon raqam faqat 9 ta
-        raqam ko'rinishida yoziladi.
+        Ariza uchun asosiy ma'lumotlaringizni kiriting. Barcha maydonlar qoidalarga muvofiq avtomatik to'g'rilanadi.
       </Text>
 
       <Row gutter={[16, 8]}>
@@ -37,9 +37,10 @@ export default function StepPersonal() {
           <Form.Item
             name="lastName"
             label={<span style={labelStyle}>Familiya</span>}
+            normalize={normalizeName}
             rules={[{ required: true, message: "Familiya kiriting" }]}
           >
-            <Input placeholder="Familiyangiz" style={inputStyle} size="large" />
+            <Input placeholder="FAMILIYANGIZ" style={inputStyle} size="large" />
           </Form.Item>
         </Col>
 
@@ -47,9 +48,10 @@ export default function StepPersonal() {
           <Form.Item
             name="firstName"
             label={<span style={labelStyle}>Ism</span>}
+            normalize={normalizeName}
             rules={[{ required: true, message: "Ism kiriting" }]}
           >
-            <Input placeholder="Ismingiz" style={inputStyle} size="large" />
+            <Input placeholder="ISMINGIZ" style={inputStyle} size="large" />
           </Form.Item>
         </Col>
 
@@ -57,8 +59,9 @@ export default function StepPersonal() {
           <Form.Item
             name="middleName"
             label={<span style={labelStyle}>Otasining ismi</span>}
+            normalize={normalizeName}
           >
-            <Input placeholder="Ixtiyoriy" style={inputStyle} size="large" />
+            <Input placeholder="IXTIYORIY" style={inputStyle} size="large" />
           </Form.Item>
         </Col>
 
@@ -66,26 +69,30 @@ export default function StepPersonal() {
           <Form.Item
             name="phone"
             label={<span style={labelStyle}>Telefon (9 ta raqam)</span>}
+            normalize={normalizePhone}
             rules={[
               { required: true, message: "Telefon kiriting" },
               {
                 validator: (_, value) =>
-                  !value || String(value).replace(/\D/g, "").length === 9
+                  !value || String(value).length === 9
                     ? Promise.resolve()
                     : Promise.reject(
-                        new Error("Telefon 9 ta raqam bo'lishi kerak")
+                        new Error("Telefon aniq 9 ta raqam bo'lishi kerak")
                       ),
               },
             ]}
           >
             <Input
               addonBefore={
-                <span style={{ color: "#e2e8f0", fontWeight: 700 }}>{PHONE_PREFIX}</span>
+                <span style={{ color: "#e2e8f0", fontWeight: 700 }}>
+                  {PHONE_PREFIX}
+                </span>
               }
               maxLength={9}
               placeholder="901234567"
               style={inputStyle}
               size="large"
+              inputMode="numeric"
             />
           </Form.Item>
         </Col>
@@ -93,11 +100,23 @@ export default function StepPersonal() {
         <Col xs={24} md={12}>
           <Form.Item
             name="passportNumber"
-            label={<span style={labelStyle}>Pasport seriya raqami</span>}
-            rules={[{ required: true, message: "Pasport raqamini kiriting" }]}
+            label={<span style={labelStyle}>Pasport seriya va raqami</span>}
+            normalize={normalizePassport}
+            rules={[
+              { required: true, message: "Pasport raqamini kiriting" },
+              {
+                validator: (_, value) =>
+                  !value || value.length === 9
+                    ? Promise.resolve()
+                    : Promise.reject(
+                        new Error("Pasport formati AA1234567 bo'lishi kerak")
+                      ),
+              },
+            ]}
           >
             <Input
               placeholder="AA1234567"
+              maxLength={9}
               style={inputStyle}
               size="large"
             />

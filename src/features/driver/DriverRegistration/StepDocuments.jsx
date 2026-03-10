@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from "react";
 import {
-  Alert,
   Button,
   Card,
   Col,
@@ -9,6 +8,7 @@ import {
   Typography,
   Upload,
   message,
+  Alert,
 } from "antd";
 import {
   CheckCircleOutlined,
@@ -60,7 +60,7 @@ export default function StepDocuments({
     if (!file || !config) return Upload.LIST_IGNORE;
 
     if (!isValidImageFile(file)) {
-      message.error("Faqat rasm fayl yuklash mumkin");
+      message.error("Faqat rasm formatidagi fayllarni yuklash mumkin");
       return Upload.LIST_IGNORE;
     }
 
@@ -73,7 +73,7 @@ export default function StepDocuments({
       updateFiles({ [key]: compressed });
       updatePreviews({ [key]: makeFilePreview(compressed) });
     } catch (error) {
-      message.error(error?.message || "Rasmni qayta ishlashda xato");
+      message.error(error?.message || "Rasmni qayta ishlashda xato yuz berdi");
     } finally {
       setCompressingKey("");
     }
@@ -88,22 +88,9 @@ export default function StepDocuments({
           Hujjatlar va rasmlar
         </Title>
         <Text style={{ color: "#94a3b8" }}>
-          Har bir rasm brauzer ichida siqiladi va keyin saqlanadi. Shu sabab upload
-          tezroq ishlaydi va storage kamroq joy egallaydi.
+          Iltimos, hujjatlarni yorug' joyda, yozuvlari aniq o'qiladigan qilib rasmga oling.
         </Text>
       </div>
-
-      <Alert
-        showIcon
-        type="info"
-        message="Rasmlar avtomatik siqiladi"
-        description="Rasm tanlangan zahoti brauzer ichida siqiladi, keyin storage ga yuklanadi. Mavjud upload logikasi saqlangan."
-        style={{
-          borderRadius: 16,
-          background: "rgba(8, 145, 178, 0.08)",
-          border: "1px solid rgba(34, 211, 238, 0.18)",
-        }}
-      />
 
       <Row gutter={[16, 16]}>
         {orderedFields.map((field) => {
@@ -133,10 +120,6 @@ export default function StepDocuments({
                 bodyStyle={{ padding: 16 }}
               >
                 <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                  <Text style={{ color: "#94a3b8" }}>
-                    Maksimal siqish: {field.maxWidth}px · sifat {field.quality}
-                  </Text>
-
                   {preview?.url ? (
                     <img src={preview.url} alt={field.label} style={previewImageStyle} />
                   ) : existing?.file_url ? (
@@ -150,7 +133,7 @@ export default function StepDocuments({
                           <InboxOutlined style={{ fontSize: 28, color: "#67e8f9" }} />
                         )}
                         <Text style={{ color: "#94a3b8" }}>
-                          {isProcessing ? "Rasm siqilmoqda..." : "Rasm tanlanmagan"}
+                          {isProcessing ? "Rasm tayyorlanmoqda..." : "Rasm tanlanmagan"}
                         </Text>
                       </Space>
                     </div>
@@ -175,7 +158,7 @@ export default function StepDocuments({
                     >
                       {preview?.url || existing?.file_url
                         ? "Rasmni almashtirish"
-                        : "Rasm tanlash"}
+                        : "Rasm yuklash"}
                     </Button>
                   </Upload>
 

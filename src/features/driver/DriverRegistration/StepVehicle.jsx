@@ -1,6 +1,7 @@
 import React from "react";
 import { Col, Form, Input, InputNumber, Row, Select, Typography } from "antd";
 import { TRANSPORT_OPTIONS } from "./uploadConfig";
+import { normalizePlateNumber } from "./helpers";
 
 const { Text, Title } = Typography;
 
@@ -67,9 +68,10 @@ export default function StepVehicle({ currentYear }) {
           <Form.Item
             name="plateNumber"
             label={<span style={labelStyle}>Davlat raqami</span>}
+            normalize={normalizePlateNumber}
             rules={[{ required: true, message: "Davlat raqamini kiriting" }]}
           >
-            <Input placeholder="01A123BC" style={fieldStyle} size="large" />
+            <Input placeholder="01A123BC" maxLength={8} style={fieldStyle} size="large" />
           </Form.Item>
         </Col>
 
@@ -81,6 +83,7 @@ export default function StepVehicle({ currentYear }) {
               max={currentYear + 1}
               placeholder="2024"
               size="large"
+              controls={false}
             />
           </Form.Item>
         </Col>
@@ -98,10 +101,11 @@ export default function StepVehicle({ currentYear }) {
           >
             <InputNumber
               style={{ width: "100%", ...fieldStyle }}
-              min={0}
+              min={1}
               max={60}
               placeholder="4"
               size="large"
+              controls={false}
             />
           </Form.Item>
         </Col>
@@ -117,6 +121,7 @@ export default function StepVehicle({ currentYear }) {
               max={50000}
               placeholder="1500"
               size="large"
+              controls={false}
             />
           </Form.Item>
         </Col>
@@ -133,6 +138,7 @@ export default function StepVehicle({ currentYear }) {
               step={0.1}
               placeholder="8.5"
               size="large"
+              controls={false}
             />
           </Form.Item>
         </Col>
@@ -147,8 +153,7 @@ export default function StepVehicle({ currentYear }) {
             }}
           >
             <Text style={{ color: "#94a3b8" }}>
-              Engil mashinaga barcha xizmatlar ruxsat qilinadi, lekin freight dispatch
-              faqat belgilangan kg limit ichida ko'rsatiladi.
+              Yengil mashinaga barcha xizmatlar ruxsat qilinadi, lekin yuk tashish xizmati faqat belgilangan kg limit ichida ko'rsatiladi.
             </Text>
           </div>
         </Col>

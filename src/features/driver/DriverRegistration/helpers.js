@@ -6,10 +6,35 @@ export function normalizePhone(value = "") {
   return digitsOnly(value).slice(0, 9);
 }
 
+export function normalizeName(value = "") {
+  // Faqat harflar va bo'shliqlarni qoldiradi, barchasini KATTA HARFGA o'tkazadi (O'zbek harflari ham qo'llab-quvvatlanadi)
+  return String(value)
+    .toUpperCase()
+    .replace(/[^A-ZЎҚҒҲЁЧШЬЪЭЮЯOʻGʻ' ]/g, "");
+}
+
+export function normalizePassport(value = "") {
+  // Avval barcha belgilarni katta harfga o'tkazamiz va faqat harf/raqamlarni qoldiramiz
+  const cleaned = String(value).toUpperCase().replace(/[^A-Z0-9]/g, "");
+  // Birinchi 2 ta belgi faqat harf bo'lishi kerak
+  const letters = cleaned.slice(0, 2).replace(/[^A-Z]/g, "");
+  // Qolgan 7 ta belgi faqat raqam bo'lishi kerak
+  const digits = cleaned.slice(2).replace(/\D/g, "").slice(0, 7);
+  return `${letters}${digits}`;
+}
+
+export function normalizePlateNumber(value = "") {
+  return String(value).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+}
+
 export function cleanupObjectUrls(previews = {}) {
   Object.values(previews).forEach((item) => {
     if (item?.objectUrl) {
-      try { URL.revokeObjectURL(item.objectUrl); } catch (_err) {}
+      try {
+        URL.revokeObjectURL(item.objectUrl);
+      } catch (_err) {
+        console.error("Xotirani tozalashda xatolik:", _err);
+      }
     }
   });
 }
@@ -17,7 +42,14 @@ export function cleanupObjectUrls(previews = {}) {
 export function makeFilePreview(file) {
   if (!file) return null;
   const objectUrl = URL.createObjectURL(file);
-  return { name: file.name, size: file.size, type: file.type, objectUrl, url: objectUrl, source: "local" };
+  return {
+    name: file.name,
+    size: file.size,
+    type: file.type,
+    objectUrl,
+    url: objectUrl,
+    source: "local",
+  };
 }
 
 export function isValidImageFile(file) {
@@ -33,9 +65,18 @@ export function getReadableFileSize(bytes) {
 
 export function docRowsToPreviewMap(rows = [], fieldMap = {}) {
   return rows.reduce((acc, row) => {
-    const field = Object.values(fieldMap).find((item) => item.docType === row.doc_type);
+    const field = Object.values(fieldMap).find(
+      (item) => item.docType === row.doc_type
+    );
     if (!field) return acc;
-    acc[field.key] = { name: row.file_name || field.label, size: row.file_size || 0, type: row.mime_type || "image/jpeg", url: row.file_url || "", objectUrl: null, source: "remote" };
+    acc[field.key] = {
+      name: row.file_name || field.label,
+      size: row.file_size || 0,
+      type: row.mime_type || "image/jpeg",
+      url: row.file_url || "",
+      objectUrl: null,
+      source: "remote",
+    };
     return acc;
   }, {});
 }
@@ -57,7 +98,8 @@ export async function compressImage(file, options = {}) {
     img.src = dataUrl;
   });
   let { width, height } = image;
-  if (width <= maxWidth && height <= maxHeight && file.size <= 700 * 1024) return file;
+  if (width <= maxWidth && height <= maxHeight && file.size <= 700 * 1024)
+    return file;
   const ratio = Math.min(maxWidth / width, maxHeight / height, 1);
   const targetWidth = Math.max(1, Math.round(width * ratio));
   const targetHeight = Math.max(1, Math.round(height * ratio));
@@ -68,11 +110,18 @@ export async function compressImage(file, options = {}) {
   if (!ctx) return file;
   ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
   const blob = await new Promise((resolve, reject) => {
-    canvas.toBlob((result) => {
-      if (!result) return reject(new Error("Rasmni siqishda xato yuz berdi"));
-      resolve(result);
-    }, "image/jpeg", quality);
+    canvas.toBlob(
+      (result) => {
+        if (!result) return reject(new Error("Rasmni siqishda xato yuz berdi"));
+        resolve(result);
+      },
+      "image/jpeg",
+      quality
+    );
   });
   const newName = String(file.name || "image").replace(/\.[^.]+$/, "") + ".jpg";
-  return new File([blob], newName, { type: "image/jpeg", lastModified: Date.now() });
+  return new File([blob], newName, {
+    type: "image/jpeg",
+    lastModified: Date.now(),
+  });
 }
