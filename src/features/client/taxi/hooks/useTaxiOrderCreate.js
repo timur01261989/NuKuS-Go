@@ -1,6 +1,11 @@
 import { useCallback, useMemo, useState } from "react";
 import { toCreateOrderPayload, fromOrderResponse } from "../lib/taxiOrderAdapter";
-import { extractOrder, extractOrderId, extractApiError, isApiOk } from "../../../../utils/apiResponse";
+import {
+  extractOrder,
+  extractOrderId,
+  extractApiError,
+  isApiOk,
+} from "../../../../utils/apiResponse";
 import { postJson } from "../../../../utils/apiHelper";
 
 const ORDER_ENDPOINT = "/api/order";
@@ -10,10 +15,7 @@ async function createOrderRequest(payload) {
 }
 
 export function useTaxiOrderCreate(options = {}) {
-  const {
-    onCreated,
-    onError,
-  } = options;
+  const { onCreated, onError } = options;
 
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState("");
@@ -22,10 +24,14 @@ export function useTaxiOrderCreate(options = {}) {
     async (draft) => {
       const payload = toCreateOrderPayload(draft);
 
-      if (!payload.pickup || payload.pickup.lat == null || payload.pickup.lng == null) {
+      if (!payload.pickup  payload.pickup.lat == null  payload.pickup.lng == null) {
         const errorMessage = "Pickup tanlanishi kerak";
         setCreateError(errorMessage);
-        if (typeof onError === "function") onError(errorMessage);
+
+        if (typeof onError === "function") {
+          onError(errorMessage);
+        }
+
         return {
           ok: false,
           error: errorMessage,
@@ -44,7 +50,11 @@ export function useTaxiOrderCreate(options = {}) {
 
         if (!ok && errorMessage) {
           setCreateError(errorMessage);
-          if (typeof onError === "function") onError(errorMessage);
+
+          if (typeof onError === "function") {
+            onError(errorMessage);
+          }
+
           return {
             ok: false,
             error: errorMessage,
@@ -60,7 +70,11 @@ export function useTaxiOrderCreate(options = {}) {
         if (!orderId) {
           const idError = "Serverdan order id qaytmadi";
           setCreateError(idError);
-          if (typeof onError === "function") onError(idError);
+
+          if (typeof onError === "function") {
+            onError(idError);
+          }
+
           return {
             ok: false,
             error: idError,
@@ -85,7 +99,10 @@ export function useTaxiOrderCreate(options = {}) {
       } catch (error) {
         const message = error?.message || "Order yaratishda xatolik";
         setCreateError(message);
-        if (typeof onError === "function") onError(message);
+
+        if (typeof onError === "function") {
+          onError(message);
+        }
 
         return {
           ok: false,
