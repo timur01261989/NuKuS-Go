@@ -1,10 +1,28 @@
 import { supabase } from "@/lib/supabase";
-import { DRIVER_DOCUMENT_FIELDS, DRIVER_DOCUMENT_FIELD_MAP } from "./uploadConfig";
+import { DRIVER_DOCUMENT_FIELDS } from "./uploadConfig";
 
+/**
+ * BUCKET NAME - Supabase Storage dagi papka nomi
+ */
 const DOCUMENT_BUCKET = "driver-documents";
 
 /**
- * Storage uchun xavfsiz papka nomlarini yaratish
+ * DRIVER_DOCUMENT_FIELD_MAP - DriverRegister.jsx tomonidan kutilayotgan mapping.
+ * Bu ob'ekt UI dagi keylarni (passportFront) bazadagi doc_type (passport_front) bilan bog'laydi.
+ */
+export const DRIVER_DOCUMENT_FIELD_MAP = DRIVER_DOCUMENT_FIELDS.reduce((acc, field) => {
+  acc[field.key] = {
+    key: field.key,
+    docType: field.docType,
+    label: field.label,
+    required: field.required
+  };
+  return acc;
+}, {});
+
+/**
+ * Xavfsiz fayl yo'li (path) yaratish uchun segmentlarni tozalash.
+ * Bo'shliqlar va maxsus belgilarni pastki chiziqqa almashtiradi.
  */
 function sanitizeSegment(value) {
   return String(value || "")
@@ -13,7 +31,8 @@ function sanitizeSegment(value) {
 }
 
 /**
- * Fayl kengaytmasini aniqlash (fallback bilan)
+ * Fayl kengaytmasini aniqlash. 
+ * Agar fayl nomi bo'lmasa, mime-type dan kelib chiqib fallback beradi.
  */
 function getFileExtension(file) {
   if (!file) return "jpg";
@@ -29,7 +48,8 @@ function getFileExtension(file) {
 }
 
 /**
- * Hujjatlar massivini doc_type bo'yicha Map ko'rinishiga o'tkazish
+ * Hujjatlar ro'yxatini doc_type bo'yicha Map ko'rinishiga o'tkazish.
+ * Bu bazadan kelgan ma'lumotni tezkor qidirish uchun kerak.
  */
 function buildDocumentRowMap(rows = []) {
   return (rows || []).reduce((acc, row) => {
@@ -41,7 +61,8 @@ function buildDocumentRowMap(rows = []) {
 }
 
 /**
- * Joriy autentifikatsiyadan o'tgan foydalanuvchini olish
+ * Foydalanuvchi sessiyasini tekshirish.
+ * Agar login qilinmagan bo'lsa, xato qaytaradi.
  */
 export async function getAuthenticatedUser() {
   const {
@@ -50,23 +71,24 @@ export async function getAuthenticatedUser() {
   } = await supabase.auth.getUser();
 
   if (error) {
-    throw new Error(`Avtorizatsiya xatosi: ${error.message}`);
+    throw new Error(`Autentifikatsiya xatosi: ${error.message}`);
   }
 
   if (!user) {
-    throw new Error("Tizimga kirilmagan. Iltimos, qayta kiring.");
+    throw new Error("Siz tizimga kirmagansiz. Iltimos, profilga kiring.");
   }
 
   return user;
 }
 
 /**
- * Haydovchining arizasi va barcha hujjatlarini birgalikda olish
+ * Haydovchining arizasi va barcha yuklangan hujjatlarini bazadan yuklab olish.
+ * DriverRegister sahifasi yuklanganda ishlatiladi.
  */
 export async function getMyDriverApplicationWithDocuments() {
   const user = await getAuthenticatedUser();
 
-  // 1. Arizani olish
+  // 1. Arizani user_id orqali qidirish
   const { data: application, error: appError } = await supabase
     .from("driver_applications")
     .select("*")
@@ -74,7 +96,7 @@ export async function getMyDriverApplicationWithDocuments() {
     .maybeSingle();
 
   if (appError) {
-    console.error("Ariza yuklashda xato:", appError);
+    console.error("Application loading error:", appError);
     throw new Error(appError.message);
   }
 
@@ -82,7 +104,7 @@ export async function getMyDriverApplicationWithDocuments() {
     return { application: null, documents: [] };
   }
 
-  // 2. Hujjatlarni olish
+  // 2. Arizaga tegishli barcha hujjatlarni olish
   const { data: documents, error: docsError } = await supabase
     .from("driver_documents")
     .select("*")
@@ -90,7 +112,7 @@ export async function getMyDriverApplicationWithDocuments() {
     .order("created_at", { ascending: true });
 
   if (docsError) {
-    console.error("Hujjatlarni yuklashda xato:", docsError);
+    console.error("Documents loading error:", docsError);
     throw new Error(docsError.message);
   }
 
@@ -98,22 +120,18 @@ export async function getMyDriverApplicationWithDocuments() {
 }
 
 /**
- * Formadagi ma'lumotlarni bazaga moslab (formatting) tayyorlash
+ * Formadagi camelCase ma'lumotlarni bazadagi snake_case ustunlarga o'tkazish.
+ * Ma'lumotlarni tozalash (trim) va formatlash (uppercase) shu yerda bajariladi.
  */
 export function buildFormDataFromApplication(formData) {
   if (!formData) return {};
 
   return {
-    // Ism-familiya har doim KATTA HARFLARDA
     last_name: String(formData.lastName || "").toUpperCase().trim(),
     first_name: String(formData.firstName || "").toUpperCase().trim(),
     middle_name: String(formData.middleName || "").toUpperCase().trim(),
-    
-    // Telefon va raqamli maydonlar faqat raqamlar
     phone: String(formData.phone || "").replace(/\D/g, ""),
     passport_number: String(formData.passportNumber || "").toUpperCase().replace(/[^A-Z0-9]/g, ""),
-    
-    // Avtomobil ma'lumotlari
     vehicle_type: formData.vehicleType,
     brand: formData.brand,
     model: formData.model,
@@ -127,7 +145,7 @@ export function buildFormDataFromApplication(formData) {
 }
 
 /**
- * Arizani yaratish yoki yangilash (Upsert)
+ * Arizani Upsert qilish (bor bo'lsa yangilash, yo'q bo'lsa yaratish).
  */
 export async function upsertDriverApplication(formData) {
   const user = await getAuthenticatedUser();
@@ -136,11 +154,10 @@ export async function upsertDriverApplication(formData) {
   const payload = {
     ...baseData,
     user_id: user.id,
-    status: "pending", // Har safar yangilanganda status pendingga qaytadi
+    status: "pending",
     updated_at: new Date().toISOString(),
   };
 
-  // Oldin ariza borligini tekshirish
   const { data: existingApp } = await supabase
     .from("driver_applications")
     .select("id")
@@ -173,12 +190,13 @@ export async function upsertDriverApplication(formData) {
 }
 
 /**
- * Hujjatlarni Storage ga yuklash va DB dagi jadvalni sinxronlash
+ * Fayllarni Storage ga yuklash va driver_documents jadvaliga yozish.
+ * Har bir fayl uchun alohida path generatsiya qilinadi.
  */
 export async function uploadDriverDocuments(applicationId, files = {}) {
   const user = await getAuthenticatedUser();
 
-  // Mavjud hujjatlarni olish (qayta yuklamaslik yoki almashtirish uchun)
+  // 1. Bazadagi mavjud hujjatlarni olamiz (Duplicate bo'lmasligi uchun)
   const { data: existingDocs } = await supabase
     .from("driver_documents")
     .select("*")
@@ -186,17 +204,18 @@ export async function uploadDriverDocuments(applicationId, files = {}) {
 
   const existingMap = buildDocumentRowMap(existingDocs || []);
 
+  // 2. Har bir konfiguratsiya qilingan maydon bo'yicha sikl
   for (const field of DRIVER_DOCUMENT_FIELDS) {
     const file = files[field.key];
-    if (!file) continue; // Agar rasm tanlanmagan bo'lsa, o'tkazib yuboramiz
+    if (!file) continue;
 
     const extension = getFileExtension(file);
     const timestamp = Date.now();
     
-    // TEMPLATE LITERAL (Backticks) TO'G'IRLANDI
+    // BACKTICKS ( ` ) - MUHIM! Template literal xatosi to'liq tuzatildi.
     const path = `${sanitizeSegment(user.id)}/${sanitizeSegment(applicationId)}/${sanitizeSegment(field.docType)}_${timestamp}.${extension}`;
 
-    // 1. Storage ga yuklash
+    // Storage ga yuklash
     const { error: uploadError } = await supabase.storage
       .from(DOCUMENT_BUCKET)
       .upload(path, file, {
@@ -208,7 +227,7 @@ export async function uploadDriverDocuments(applicationId, files = {}) {
       throw new Error(`${field.label} faylini yuklashda xato: ${uploadError.message}`);
     }
 
-    // 2. Public URL olish
+    // Public URL olish
     const { data: publicUrlData } = supabase.storage
       .from(DOCUMENT_BUCKET)
       .getPublicUrl(path);
@@ -228,15 +247,15 @@ export async function uploadDriverDocuments(applicationId, files = {}) {
     const existingRecord = existingMap[field.docType];
 
     if (existingRecord?.id) {
-      // Yangilash
+      // Mavjud hujjatni yangilash
       const { error: updateError } = await supabase
         .from("driver_documents")
         .update(documentPayload)
         .eq("id", existingRecord.id);
 
-      if (updateError) throw new Error(`${field.label} ma'lumotini yangilashda xato: ${updateError.message}`);
+      if (updateError) throw new Error(`${field.label} bazada yangilanmadi: ${updateError.message}`);
     } else {
-      // Yangi qo'shish
+      // Yangi hujjat kiritish
       const { error: insertError } = await supabase
         .from("driver_documents")
         .insert({
@@ -244,41 +263,42 @@ export async function uploadDriverDocuments(applicationId, files = {}) {
           created_at: new Date().toISOString(),
         });
 
-      if (insertError) throw new Error(`${field.label} ma'lumotini saqlashda xato: ${insertError.message}`);
+      if (insertError) throw new Error(`${field.label} bazaga saqlanmadi: ${insertError.message}`);
     }
   }
 }
 
 /**
- * To'liq ariza topshirish jarayoni (Asosiy funksiya)
+ * ARIZANI TOPSHIRISH (ASOSIY ENTRY POINT)
+ * Barcha bosqichlarni ketma-ket bajaradi.
  */
 export async function submitDriverApplication(formData, files = {}) {
   try {
-    // 1. Arizani (tekstual ma'lumotlar) saqlash
+    // 1. Textual ma'lumotlarni saqlash
     const application = await upsertDriverApplication(formData);
 
-    // 2. Hujjatlarni (fayllar) Storage va DB ga yuklash
+    // 2. Agar fayllar bo'lsa, ularni yuklash
     if (Object.keys(files).length > 0) {
       await uploadDriverDocuments(application.id, files);
     }
 
-    // 3. Yangilangan holatni qaytarish
+    // 3. Yakuniy holatni bazadan qayta o'qib qaytarish
     return await getMyDriverApplicationWithDocuments();
   } catch (error) {
-    console.error("submitDriverApplication ichida xato:", error);
+    console.error("submitDriverApplication Error:", error);
     throw error;
   }
 }
 
 /**
- * Mavjud hujjatlarni forma uchun map qilish
+ * Bazadan kelgan hujjatlarni Ant Design Upload komponenti formatiga o'tkazish.
  */
 export function mapExistingDocumentsToForm(records = []) {
   if (!records || records.length === 0) return {};
   
   const byDocType = buildDocumentRowMap(records);
 
-  return Object.values(DRIVER_DOCUMENT_FIELD_MAP || {}).reduce((acc, field) => {
+  return Object.values(DRIVER_DOCUMENT_FIELD_MAP).reduce((acc, field) => {
     const record = byDocType[field.docType];
     if (record) {
       acc[field.key] = {
