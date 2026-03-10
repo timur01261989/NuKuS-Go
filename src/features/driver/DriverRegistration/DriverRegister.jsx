@@ -322,8 +322,7 @@ export default function DriverRegister() {
                     maxWidth: 760,
                   }}
                 >
-                  Ma'lumotlarni to'ldiring, hujjatlarni yuklang va arizani yuboring.
-                  Hozirgi ish logikasi saqlangan, faqat tashqi ko'rinish professional uslubga keltirildi.
+                  Ma'lumotlarni to'ldiring, hujjatlarni yuklang va arizani yuboring.                  
                 </Paragraph>
                 {headerExtra}
               </Space>

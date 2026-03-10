@@ -103,30 +103,76 @@ export async function getMyDriverApplicationWithDocuments() {
     throw new Error(docsError.message);
   }
 
-  return { application, documents };
+  return {
+    application,
+    documents: documents || [],
+  };
 }
 
 /**
- * Formadan kelgan ma'lumotlarni bazaga moslab tayyorlash.
+ * Bazadagi application obyektini form uchun mos ko'rinishga o'tkazish.
+ * DriverRegister.jsx bootstrap vaqtida aynan shu funksiyani ishlatadi.
  */
-export function buildFormDataFromApplication(formData) {
-  if (!formData) return {};
+export function buildFormDataFromApplication(application) {
+  if (!application) {
+    return {};
+  }
 
   return {
-    last_name: String(formData.lastName || "").toUpperCase().trim(),
-    first_name: String(formData.firstName || "").toUpperCase().trim(),
-    middle_name: String(formData.middleName || "").toUpperCase().trim(),
-    phone: String(formData.phone || "").replace(/\D/g, ""),
-    passport_number: String(formData.passportNumber || "").toUpperCase().replace(/[^A-Z0-9]/g, ""),
-    vehicle_type: formData.vehicleType,
-    brand: formData.brand,
-    model: formData.model,
-    plate_number: String(formData.plateNumber || "").toUpperCase().replace(/[^A-Z0-9]/g, ""),
-    year: formData.year ? parseInt(formData.year) : null,
-    color: formData.color,
-    seats: formData.seats ? parseInt(formData.seats) : 0,
-    cargo_kg: formData.cargoKg ? parseFloat(formData.cargoKg) : 0,
-    cargo_m3: formData.cargoM3 ? parseFloat(formData.cargoM3) : 0,
+    lastName: application.last_name || "",
+    firstName: application.first_name || "",
+    middleName: application.middle_name || "",
+    phone: String(application.phone || "").replace(/\D/g, ""),
+    passportNumber: application.passport_number || "",
+
+    vehicleType: application.transport_type || "light_car",
+    brand: application.vehicle_brand || "",
+    model: application.vehicle_model || "",
+    plateNumber: application.vehicle_plate || "",
+    year: application.vehicle_year ?? "",
+    color: application.vehicle_color || "",
+    seats: application.seat_count ?? 0,
+    cargoKg: application.requested_max_freight_weight_kg ?? 0,
+    cargoM3: application.requested_payload_volume_m3 ?? 0,
+
+    status: application.status || "pending",
+    rejectionReason: application.rejection_reason || "",
+    adminNote: application.admin_note || "",
+  };
+}
+
+/**
+ * Formadan kelgan ma'lumotlarni bazaga mos payload ko'rinishiga o'tkazish.
+ * MUHIM: schema nomlari driver_applications jadvalidagi real ustunlarga mos.
+ */
+function buildApplicationPayload(formData) {
+  return {
+    last_name: String(formData.lastName || "").toUpperCase().trim() || null,
+    first_name: String(formData.firstName || "").toUpperCase().trim() || null,
+    middle_name: String(formData.middleName || "").toUpperCase().trim() || null,
+    phone: String(formData.phone || "").replace(/\D/g, "") || null,
+    passport_number:
+      String(formData.passportNumber || "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "") || null,
+
+    transport_type: formData.vehicleType || null,
+    vehicle_brand: formData.brand || null,
+    vehicle_model: formData.model || null,
+    vehicle_plate:
+      String(formData.plateNumber || "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "") || null,
+    vehicle_year: formData.year ? parseInt(formData.year, 10) : null,
+    vehicle_color: formData.color || null,
+    seat_count: formData.seats ? parseInt(formData.seats, 10) : 0,
+
+    requested_max_freight_weight_kg: formData.cargoKg
+      ? parseFloat(formData.cargoKg)
+      : 0,
+    requested_payload_volume_m3: formData.cargoM3
+      ? parseFloat(formData.cargoM3)
+      : 0,
   };
 }
 
@@ -135,7 +181,7 @@ export function buildFormDataFromApplication(formData) {
  */
 export async function upsertDriverApplication(formData) {
   const user = await getAuthenticatedUser();
-  const baseData = buildFormDataFromApplication(formData);
+  const baseData = buildApplicationPayload(formData);
 
   const payload = {
     ...baseData,
@@ -144,11 +190,15 @@ export async function upsertDriverApplication(formData) {
     updated_at: new Date().toISOString(),
   };
 
-  const { data: existingApp } = await supabase
+  const { data: existingApp, error: existingError } = await supabase
     .from("driver_applications")
     .select("id")
     .eq("user_id", user.id)
     .maybeSingle();
+
+  if (existingError) {
+    throw new Error(`Mavjud arizani tekshirishda xato: ${existingError.message}`);
+  }
 
   if (existingApp?.id) {
     const { data, error } = await supabase
@@ -166,6 +216,7 @@ export async function upsertDriverApplication(formData) {
       .insert({
         ...payload,
         created_at: new Date().toISOString(),
+        submitted_at: new Date().toISOString(),
       })
       .select()
       .single();
@@ -177,15 +228,18 @@ export async function upsertDriverApplication(formData) {
 
 /**
  * Hujjatlarni yuklash jarayoni.
- * BACKTICKS VA O'ZGARUVCHI NOMLARI TUZATILDI.
  */
 export async function uploadDriverDocuments(applicationId, files = {}) {
   const user = await getAuthenticatedUser();
 
-  const { data: existingDocs } = await supabase
+  const { data: existingDocs, error: existingDocsError } = await supabase
     .from("driver_documents")
     .select("*")
     .eq("application_id", applicationId);
+
+  if (existingDocsError) {
+    throw new Error(`Mavjud hujjatlarni olishda xato: ${existingDocsError.message}`);
+  }
 
   const existingMap = buildDocumentRowMap(existingDocs || []);
 
@@ -193,11 +247,8 @@ export async function uploadDriverDocuments(applicationId, files = {}) {
     const file = files[field.key];
     if (!file) continue;
 
-    // 'ext' o'rniga aniqroq 'extension' ishlatildi
     const extension = getFileExtension(file);
     const timestamp = Date.now();
-    
-    // BACKTICKS ( ` ) ISHLATILDI VA XAVFSIZ YO'L YARATILDI
     const path = `${sanitizeSegment(user.id)}/${sanitizeSegment(applicationId)}/${sanitizeSegment(field.docType)}_${timestamp}.${extension}`;
 
     // 1. Faylni Storage ga yuklash
@@ -259,11 +310,11 @@ export async function uploadDriverDocuments(applicationId, files = {}) {
 export async function submitDriverApplication(formData, files = {}) {
   try {
     const application = await upsertDriverApplication(formData);
-    
+
     if (Object.keys(files).length > 0) {
       await uploadDriverDocuments(application.id, files);
     }
-    
+
     return await getMyDriverApplicationWithDocuments();
   } catch (error) {
     console.error("submitDriverApplication Error:", error);
@@ -276,7 +327,7 @@ export async function submitDriverApplication(formData, files = {}) {
  */
 export function mapExistingDocumentsToForm(records = []) {
   if (!records || records.length === 0) return {};
-  
+
   const byDocType = buildDocumentRowMap(records);
 
   return Object.values(DRIVER_DOCUMENT_FIELD_MAP).reduce((acc, field) => {
