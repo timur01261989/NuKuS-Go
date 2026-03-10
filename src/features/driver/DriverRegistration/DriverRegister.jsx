@@ -1,390 +1,134 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { Alert, Button, Card, Col, Divider, Form, Row, Space, Steps, Typography, message } from "antd";
+import { CarOutlined, CheckCircleOutlined, FileImageOutlined, IdcardOutlined } from "@ant-design/icons";
 import StepPersonal from "./StepPersonal";
 import StepVehicle from "./StepVehicle";
 import StepDocuments from "./StepDocuments";
-import {
-  initialErrorsState,
-  initialFilesState,
-  initialFormState,
-} from "./initialState";
-import {
-  buildApplicationPayload,
-  buildExistingPreview,
-  fileToPreview,
-  revokePreview,
-} from "./helpers";
-import { DOC_TYPE_TO_FIELD_KEY_MAP, DRIVER_DOCUMENT_FIELDS } from "./uploadConfig";
+import { initialFilesState, initialFormState, initialPreviewsState } from "./initialState";
+import { buildFormDataFromApplication, DRIVER_DOCUMENT_FIELD_MAP, getMyDriverApplicationWithDocuments, submitDriverApplication } from "./supabase";
+import { cleanupObjectUrls, docRowsToPreviewMap, normalizePhone } from "./helpers";
+import { hasStepErrors, validateDocumentsStep, validatePersonalStep, validateVehicleStep } from "./validation";
 
-const STORAGE_BUCKET = "driver-documents";
+const { Title, Paragraph, Text } = Typography;
+const stepItems = [
+  { title: "Shaxsiy ma'lumot", icon: <IdcardOutlined /> },
+  { title: "Transport ma'lumotlari", icon: <CarOutlined /> },
+  { title: "Hujjatlar", icon: <FileImageOutlined /> },
+];
 
 export default function DriverRegister() {
-  const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState(initialFormState);
+  const [form] = Form.useForm();
+  const [current, setCurrent] = useState(0);
   const [files, setFiles] = useState(initialFilesState);
-  const [persistedDocuments, setPersistedDocuments] = useState({});
-  const [stepErrors, setStepErrorsState] = useState(initialErrorsState);
+  const [previews, setPreviews] = useState(initialPreviewsState);
+  const [existingDocuments, setExistingDocuments] = useState({});
+  const [initialLoading, setInitialLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [bootstrapLoading, setBootstrapLoading] = useState(true);
-  const [fatalError, setFatalError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
-
-  const previews = useMemo(() => {
-    const nextPreviews = {};
-    for (const [key, file] of Object.entries(files)) {
-      nextPreviews[key] = file ? fileToPreview(file) : null;
-    }
-    return nextPreviews;
-  }, [files]);
+  const [applicationStatus, setApplicationStatus] = useState("");
 
   useEffect(() => {
-    return () => {
-      Object.values(previews).forEach((url) => revokePreview(url));
-    };
-  }, [previews]);
-
-  useEffect(() => {
-    let alive = true;
-
+    let mounted = true;
     async function bootstrap() {
-      setBootstrapLoading(true);
-      setFatalError("");
-      setSuccessMessage("");
-
       try {
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession();
-
-        if (sessionError) throw sessionError;
-
-        const user = session?.user || null;
-        if (!alive) return;
-
-        if (!user) {
-          setFatalError("Ro'yxatdan o'tish uchun avval tizimga kiring.");
-          return;
+        const result = await getMyDriverApplicationWithDocuments();
+        if (!mounted) return;
+        if (result?.application) {
+          const nextValues = buildFormDataFromApplication(result.application);
+          form.setFieldsValue({ ...initialFormState, ...nextValues, phone: normalizePhone(nextValues?.phone || "") });
+          setApplicationStatus(result.application.status || "");
+        } else {
+          form.setFieldsValue(initialFormState);
         }
-
-        const { data: existingApp, error: existingError } = await supabase
-          .from("driver_applications")
-          .select("id, user_id, first_name, last_name, phone, vehicle_type, brand, model, plate_number, status, created_at")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (existingError) throw existingError;
-        if (!alive) return;
-
-        if (existingApp) {
-          setFormData((prev) => ({
-            ...prev,
-            lastName: existingApp.last_name || prev.lastName,
-            firstName: existingApp.first_name || prev.firstName,
-            phone: (existingApp.phone || "").replace(/^\+998/, "") || prev.phone,
-            vehicleType: existingApp.vehicle_type || prev.vehicleType,
-            brand: existingApp.brand || prev.brand,
-            model: existingApp.model || prev.model,
-            plateNumber: existingApp.plate_number || prev.plateNumber,
-          }));
-
-          const { data: docs, error: docsError } = await supabase
-            .from("driver_documents")
-            .select("id, application_id, user_id, doc_type, file_path, file_url, file_size, mime_type, created_at")
-            .eq("application_id", existingApp.id)
-            .order("created_at", { ascending: true });
-
-          if (docsError) throw docsError;
-          if (!alive) return;
-
-          const normalized = normalizePersistedDocuments(docs || []);
-          setPersistedDocuments(normalized);
-        }
+        const nextPreviews = docRowsToPreviewMap(result?.documents || [], DRIVER_DOCUMENT_FIELD_MAP);
+        setPreviews((prev) => ({ ...prev, ...nextPreviews }));
+        const docsMap = (result?.documents || []).reduce((acc, item) => { acc[item.doc_type] = item; return acc; }, {});
+        setExistingDocuments(docsMap);
       } catch (error) {
-        console.error("[DriverRegister bootstrap error]", error);
-        if (alive) {
-          setFatalError(
-            error?.message || "Driver register ma'lumotlarini yuklab bo'lmadi."
-          );
-        }
-      } finally {
-        if (alive) setBootstrapLoading(false);
-      }
+        message.error(error?.message || "Ma'lumotlarni yuklashda xato");
+      } finally { if (mounted) setInitialLoading(false); }
     }
-
     bootstrap();
+    return () => { mounted = false; cleanupObjectUrls(previews); };
+  }, [form]);
 
-    return () => {
-      alive = false;
-    };
-  }, []);
+  const updateFiles = (patch) => setFiles((prev) => ({ ...prev, ...patch }));
+  const updatePreviews = (patch) => setPreviews((prev) => ({ ...prev, ...patch }));
 
-  const updateForm = (patch) => {
-    setFormData((prev) => ({ ...prev, ...patch }));
-  };
-
-  const updateFiles = (patch) => {
-    setFiles((prev) => ({ ...prev, ...patch }));
-
-    const keys = Object.keys(patch || {});
-    if (keys.length) {
-      setPersistedDocuments((prev) => {
-        const next = { ...prev };
-        keys.forEach((key) => {
-          if (patch[key]) {
-            delete next[key];
-          }
-        });
-        return next;
-      });
+  const goNext = async () => {
+    const values = await form.validateFields();
+    const personalErrors = validatePersonalStep(values);
+    const vehicleErrors = validateVehicleStep(values);
+    if (current === 0 && hasStepErrors(personalErrors)) {
+      Object.entries(personalErrors).forEach(([name, error]) => form.setFields([{ name, errors: [error] }]));
+      return;
     }
+    if (current === 1 && hasStepErrors(vehicleErrors)) {
+      Object.entries(vehicleErrors).forEach(([name, error]) => form.setFields([{ name, errors: [error] }]));
+      return;
+    }
+    setCurrent((prev) => Math.min(prev + 1, 2));
   };
 
-  const setStepErrors = (section, nextErrors) => {
-    setStepErrorsState((prev) => ({
-      ...prev,
-      [section]: sanitizeErrors(nextErrors),
-    }));
-  };
-
-  const nextStep = () => setStep((prev) => Math.min(prev + 1, 3));
-  const prevStep = () => setStep((prev) => Math.max(prev - 1, 1));
+  const goPrev = () => setCurrent((prev) => Math.max(prev - 1, 0));
 
   const handleSubmit = async () => {
-    setSubmitting(true);
-    setFatalError("");
-    setSuccessMessage("");
-
-    try {
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
-
-      if (sessionError) throw sessionError;
-
-      const user = session?.user || null;
-      if (!user) {
-        throw new Error("Sessiya topilmadi. Avval qayta login qiling.");
-      }
-
-      const applicationPayload = buildApplicationPayload(formData, user.id);
-
-      const { data: applicationRow, error: upsertError } = await supabase
-        .from("driver_applications")
-        .upsert(applicationPayload, { onConflict: "user_id" })
-        .select("id, user_id, first_name, last_name, phone, vehicle_type, brand, model, plate_number, status, created_at")
-        .single();
-
-      if (upsertError) throw upsertError;
-
-      const uploadedDocs = {};
-
-      for (const field of DRIVER_DOCUMENT_FIELDS) {
-        const file = files[field.key];
-        if (!file) continue;
-
-        const path = createStoragePath(user.id, applicationRow.id, field, file);
-
-        const { error: uploadError } = await supabase.storage
-          .from(STORAGE_BUCKET)
-          .upload(path, file, {
-            cacheControl: "3600",
-            upsert: true,
-          });
-
-        if (uploadError) {
-          throw new Error(`${field.label} yuklashda xato: ${uploadError.message}`);
-        }
-
-        const { data: publicData } = supabase.storage
-          .from(STORAGE_BUCKET)
-          .getPublicUrl(path);
-
-        const docPayload = {
-          application_id: applicationRow.id,
-          user_id: user.id,
-          doc_type: field.docType,
-          file_path: path,
-          file_url: publicData?.publicUrl || null,
-          file_size: file.size || null,
-          mime_type: file.type || null,
-        };
-
-        const existingDocument = persistedDocuments[field.key];
-
-        if (existingDocument?.id) {
-          const { error: updateDocError } = await supabase
-            .from("driver_documents")
-            .update(docPayload)
-            .eq("id", existingDocument.id);
-
-          if (updateDocError) {
-            throw new Error(
-              `${field.label} ma'lumotini yangilashda xato: ${updateDocError.message}`
-            );
-          }
-        } else {
-          const { error: insertDocError } = await supabase
-            .from("driver_documents")
-            .insert(docPayload);
-
-          if (insertDocError) {
-            throw new Error(
-              `${field.label} ma'lumotini saqlashda xato: ${insertDocError.message}`
-            );
-          }
-        }
-
-        uploadedDocs[field.key] = {
-          id: existingDocument?.id || null,
-          path,
-          publicUrl: publicData?.publicUrl || null,
-          name: file.name || null,
-          size: file.size || null,
-          type: file.type || null,
-          docType: field.docType,
-        };
-      }
-
-      const mergedDocuments = {
-        ...persistedDocuments,
-        ...uploadedDocs,
-      };
-
-      setPersistedDocuments(mergedDocuments);
-      setFiles(initialFilesState);
-      setSuccessMessage("Ariza muvaffaqiyatli yuborildi.");
-    } catch (error) {
-      console.error("[DriverRegister submit error]", error);
-      setFatalError(error?.message || "Arizani yuborishda xato yuz berdi.");
-    } finally {
-      setSubmitting(false);
+    const values = await form.validateFields();
+    const docErrors = validateDocumentsStep(files, previews);
+    if (hasStepErrors(docErrors)) {
+      const firstError = Object.values(docErrors)[0];
+      message.error(firstError || "Hujjatlarni to'liq yuklang");
+      return;
     }
+    setSubmitting(true);
+    try {
+      const payload = { ...values, phone: normalizePhone(values.phone || "") };
+      const result = await submitDriverApplication(payload, files);
+      const nextPreviews = docRowsToPreviewMap(result?.documents || [], DRIVER_DOCUMENT_FIELD_MAP);
+      setPreviews((prev) => ({ ...prev, ...nextPreviews }));
+      setFiles(initialFilesState);
+      const docsMap = (result?.documents || []).reduce((acc, item) => { acc[item.doc_type] = item; return acc; }, {});
+      setExistingDocuments(docsMap);
+      setApplicationStatus(result?.application?.status || "pending");
+      message.success("Ariza muvaffaqiyatli yuborildi");
+    } catch (error) {
+      message.error(error?.message || "Arizani yuborishda xato");
+    } finally { setSubmitting(false); }
   };
 
-  if (bootstrapLoading) {
-    return (
-      <div className="mx-auto max-w-5xl p-6">
-        <div className="rounded-3xl bg-slate-900 p-8 text-white">
-          Yuklanmoqda...
-        </div>
-      </div>
-    );
-  }
+  const headerExtra = useMemo(() => {
+    if (!applicationStatus) return null;
+    const type = applicationStatus === "approved" ? "success" : applicationStatus === "rejected" ? "error" : "info";
+    return <Alert type={type} showIcon message={`Joriy holat: ${applicationStatus}`} />;
+  }, [applicationStatus]);
 
   return (
-    <div className="mx-auto max-w-5xl p-6">
-      {fatalError ? (
-        <div className="mb-4 rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {fatalError}
-        </div>
-      ) : null}
-
-      {successMessage ? (
-        <div className="mb-4 rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          {successMessage}
-        </div>
-      ) : null}
-
-      {step === 1 ? (
-        <StepPersonal
-          formData={formData}
-          errors={stepErrors.personal}
-          setStepErrors={setStepErrors}
-          updateForm={updateForm}
-          onNext={nextStep}
-          onBack={() => window.history.back()}
-        />
-      ) : null}
-
-      {step === 2 ? (
-        <StepVehicle
-          formData={formData}
-          errors={stepErrors.vehicle}
-          setStepErrors={setStepErrors}
-          updateForm={updateForm}
-          onNext={nextStep}
-          onBack={prevStep}
-        />
-      ) : null}
-
-      {step === 3 ? (
-        <StepDocuments
-          files={files}
-          previews={Object.fromEntries(
-            Object.entries(previews).map(([key, url]) => [
-              key,
-              url
-                ? {
-                    url,
-                    name: files[key]?.name || null,
-                    size: files[key]?.size || null,
-                    type: files[key]?.type || null,
-                  }
-                : null,
-            ])
-          )}
-          persistedDocuments={persistedDocuments}
-          errors={stepErrors.documents}
-          setStepErrors={setStepErrors}
-          updateFiles={updateFiles}
-          updatePreviews={() => {}}
-          onBack={prevStep}
-          onSubmit={handleSubmit}
-          submitting={submitting}
-        />
-      ) : null}
+    <div style={{ minHeight: "100vh", padding: 24, background: "radial-gradient(circle at top left, rgba(24,144,255,0.08), transparent 32%), radial-gradient(circle at top right, rgba(114,46,209,0.08), transparent 28%), linear-gradient(180deg, #f6f8fb 0%, #eef2f7 100%)" }}>
+      <div style={{ maxWidth: 1180, margin: "0 auto" }}>
+        <Card loading={initialLoading} bordered={false} style={{ borderRadius: 24, overflow: "hidden", boxShadow: "0 24px 60px rgba(15, 23, 42, 0.08)" }} bodyStyle={{ padding: 0 }}>
+          <div style={{ padding: 28, background: "linear-gradient(135deg, rgba(19,42,76,1) 0%, rgba(31,79,155,1) 45%, rgba(24,144,255,1) 100%)", color: "#fff" }}>
+            <Space direction="vertical" size={8} style={{ width: "100%" }}>
+              <Text style={{ color: "rgba(255,255,255,0.72)", fontWeight: 700 }}>DRIVER REGISTRATION</Text>
+              <Title level={2} style={{ color: "#fff", margin: 0 }}>Haydovchi bo'lib ishlash uchun ariza</Title>
+              <Paragraph style={{ color: "rgba(255,255,255,0.78)", margin: 0 }}>Avvalgi chiroyli dizayn saqlandi, endi rasmlar avtomatik siqiladi va hujjatlar alohida driver_documents jadvaliga yoziladi.</Paragraph>
+              {headerExtra}
+            </Space>
+          </div>
+          <div style={{ padding: 24 }}>
+            <Steps current={current} items={stepItems} responsive />
+            <Divider />
+            <Form form={form} layout="vertical" initialValues={initialFormState} requiredMark={false} scrollToFirstError>
+              {current === 0 ? <StepPersonal /> : null}
+              {current === 1 ? <StepVehicle currentYear={new Date().getFullYear()} /> : null}
+              {current === 2 ? <StepDocuments files={files} previews={previews} updateFiles={updateFiles} updatePreviews={updatePreviews} existingDocuments={existingDocuments} submitting={submitting} /> : null}
+            </Form>
+            <Divider />
+            <Row justify="space-between" align="middle" gutter={[12, 12]}>
+              <Col>{current > 0 ? <Button size="large" onClick={goPrev}>Ortga</Button> : null}</Col>
+              <Col>{current < 2 ? <Button type="primary" size="large" onClick={goNext}>Keyingi</Button> : <Button type="primary" size="large" icon={<CheckCircleOutlined />} loading={submitting} onClick={handleSubmit}>Arizani yuborish</Button>}</Col>
+            </Row>
+          </div>
+        </Card>
+      </div>
     </div>
   );
-}
-
-function normalizePersistedDocuments(documents = []) {
-  return documents.reduce((acc, item) => {
-    const fieldKey = DOC_TYPE_TO_FIELD_KEY_MAP[item.doc_type];
-    if (!fieldKey) return acc;
-
-    const preview = buildExistingPreview(item);
-
-    acc[fieldKey] = {
-      id: item.id,
-      path: item.file_path || null,
-      publicUrl: item.file_url || null,
-      name: preview?.name || null,
-      size: item.file_size || null,
-      type: item.mime_type || null,
-      docType: item.doc_type,
-      url: item.file_url || null,
-    };
-
-    return acc;
-  }, {});
-}
-
-function createStoragePath(userId, applicationId, field, file) {
-  const safeUserId = String(userId || "unknown-user").replace(/[^a-zA-Z0-9_-]/g, "_");
-  const safeApplicationId = String(applicationId || "unknown-app").replace(/[^a-zA-Z0-9_-]/g, "_");
-  const ext = getFileExtension(file);
-  const ts = Date.now();
-  return `${safeUserId}/${safeApplicationId}/${field.docType}/${ts}.${ext}`;
-}
-
-function getFileExtension(file) {
-  const name = String(file?.name || "").toLowerCase();
-  const fileType = String(file?.type || "").toLowerCase();
-
-  if (name.includes(".")) {
-    return name.split(".").pop() || "jpg";
-  }
-
-  if (fileType.includes("png")) return "png";
-  if (fileType.includes("webp")) return "webp";
-  return "jpg";
-}
-
-function sanitizeErrors(errorMap = {}) {
-  return Object.entries(errorMap || {}).reduce((acc, [key, value]) => {
-    if (value) acc[key] = value;
-    return acc;
-  }, {});
 }

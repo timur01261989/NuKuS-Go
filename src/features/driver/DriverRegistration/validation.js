@@ -1,61 +1,33 @@
-import { uploadSections } from "./uploadConfig";
+import { DRIVER_DOCUMENT_FIELDS } from "./uploadConfig";
 
-export function validatePersonalStep(formData) {
+export function validatePersonalStep(data) {
   const errors = {};
-
-  if (!String(formData.lastName || "").trim()) {
-    errors.lastName = "Familiya kiritilmadi";
-  }
-
-  if (!String(formData.firstName || "").trim()) {
-    errors.firstName = "Ism kiritilmadi";
-  }
-
-  if (!String(formData.phone || "").trim()) {
-    errors.phone = "Telefon raqami kiritilmadi";
-  } else if (String(formData.phone).length !== 9) {
-    errors.phone = "Telefon 9 ta raqam bo'lishi kerak";
-  }
-
+  if (!String(data.lastName || "").trim()) errors.lastName = "Familiya kiritilmadi";
+  if (!String(data.firstName || "").trim()) errors.firstName = "Ism kiritilmadi";
+  if (!String(data.phone || "").trim()) errors.phone = "Telefon kiritilmadi";
+  if (String(data.phone || "").trim().length !== 9) errors.phone = "Telefon 9 ta raqam bo'lishi kerak";
+  if (!String(data.passportNumber || "").trim()) errors.passportNumber = "Pasport raqami kiritilmadi";
   return errors;
 }
 
-export function validateVehicleStep(formData) {
+export function validateVehicleStep(data) {
   const errors = {};
-
-  if (!String(formData.vehicleType || "").trim()) {
-    errors.vehicleType = "Transport turi tanlanmadi";
-  }
-
-  if (!String(formData.brand || "").trim()) {
-    errors.brand = "Mashina markasi kiritilmadi";
-  }
-
-  if (!String(formData.model || "").trim()) {
-    errors.model = "Model kiritilmadi";
-  }
-
-  if (!String(formData.plateNumber || "").trim()) {
-    errors.plateNumber = "Davlat raqami kiritilmadi";
-  }
-
+  if (!String(data.vehicleType || "").trim()) errors.vehicleType = "Transport turi tanlanmadi";
+  if (!String(data.brand || "").trim()) errors.brand = "Mashina markasi kiritilmadi";
+  if (!String(data.model || "").trim()) errors.model = "Mashina modeli kiritilmadi";
+  if (!String(data.plateNumber || "").trim()) errors.plateNumber = "Davlat raqami kiritilmadi";
   return errors;
 }
 
-export function validateDocumentsStep(files) {
+export function validateDocumentsStep(files = {}, previews = {}) {
   const errors = {};
-
-  for (const section of uploadSections) {
-    for (const field of section.fields) {
-      if (field.required && !files?.[field.key]) {
-        errors[field.key] = `${field.label} yuklanmadi`;
-      }
-    }
+  for (const field of DRIVER_DOCUMENT_FIELDS) {
+    if (!field.required) continue;
+    if (!files[field.key] && !previews[field.key]) errors[field.key] = `${field.label} kerak`;
   }
-
   return errors;
 }
 
-export function hasErrors(errorObject) {
-  return Object.values(errorObject || {}).some(Boolean);
+export function hasStepErrors(errorMap) {
+  return Object.keys(errorMap || {}).length > 0;
 }
