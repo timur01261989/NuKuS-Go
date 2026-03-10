@@ -155,7 +155,8 @@ export default function DriverRegister() {
     setPreviews((prev) => ({ ...prev, ...patch }));
 
   const goNext = async () => {
-    const values = await form.validateFields();
+    await form.validateFields();
+    const values = form.getFieldsValue(true);
     const personalErrors = validatePersonalStep(values);
     const vehicleErrors = validateVehicleStep(values);
 
