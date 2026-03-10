@@ -1,105 +1,158 @@
-import { storageFolderMap } from "./uploadConfig";
-
-export function onlyDigits(value = "") {
-  return String(value).replace(/\D+/g, "");
+export function digitsOnly(value = "") {
+  return String(value).replace(/\D/g, "");
 }
 
-export function normalizePhoneInput(value = "") {
-  return onlyDigits(value).slice(0, 9);
+export function normalizePhone(value = "") {
+  const digits = digitsOnly(value).slice(0, 9);
+  return digits;
 }
 
-export function normalizePassportNumber(value = "") {
-  const cleaned = String(value).toUpperCase().replace(/[^A-Z0-9]/g, "");
-  const letters = cleaned.slice(0, 2).replace(/[^A-Z]/g, "");
-  const digits = cleaned.slice(2).replace(/\D/g, "").slice(0, 7);
-  return `${letters}${digits}`;
-}
-
-export function normalizePlateNumber(value = "") {
-  return String(value).toUpperCase().replace(/[^A-Z0-9\s-]/g, "").slice(0, 12);
-}
-
-export function normalizeYear(value = "") {
-  return onlyDigits(value).slice(0, 4);
-}
-
-export function toIntegerString(value = "", maxLen = 4) {
-  return onlyDigits(value).slice(0, maxLen);
-}
-
-export function fileToPreview(file) {
-  if (!file) return null;
-  try {
-    return URL.createObjectURL(file);
-  } catch {
-    return null;
-  }
-}
-
-export function revokePreview(previewUrl) {
-  if (!previewUrl) return;
-  try {
-    URL.revokeObjectURL(previewUrl);
-  } catch {}
-}
-
-export function readableFileSize(size = 0) {
-  if (!size) return "0 KB";
-  const units = ["B", "KB", "MB", "GB"];
-  let value = size;
-  let idx = 0;
-  while (value >= 1024 && idx < units.length - 1) {
-    value /= 1024;
-    idx += 1;
-  }
-  return `${value.toFixed(value >= 10 || idx === 0 ? 0 : 1)} ${units[idx]}`;
-}
-
-export function createStoragePath(userId, fieldKey, fileName = "file") {
-  const folder = storageFolderMap[fieldKey] || fieldKey;
-  const safeName = String(fileName).replace(/[^a-zA-Z0-9._-]/g, "_");
-  const stamp = Date.now();
-  return `${userId}/${folder}/${stamp}_${safeName}`;
-}
-
-export function buildApplicationPayload(formData, uploadedFilesMap = {}, userId = null) {
-  return {
-    user_id: userId,
-    last_name: formData.lastName?.trim() || null,
-    first_name: formData.firstName?.trim() || null,
-    middle_name: formData.middleName?.trim() || null,
-    phone: formData.phone ? `+998${formData.phone}` : null,
-    passport_number: formData.passportNumber?.trim() || null,
-    vehicle_type: formData.vehicleType || null,
-    brand: formData.brand?.trim() || null,
-    model: formData.model?.trim() || null,
-    plate_number: formData.plateNumber?.trim() || null,
-    year: formData.year ? Number(formData.year) : null,
-    color: formData.color?.trim() || null,
-    seats: formData.seats ? Number(formData.seats) : null,
-    cargo_kg: formData.cargoKg ? Number(formData.cargoKg) : null,
-    cargo_m3: formData.cargoM3 ? Number(formData.cargoM3) : null,
-    notes: formData.notes?.trim() || null,
-    documents: uploadedFilesMap,
-    status: "pending",
-  };
-}
-
-export async function uploadSingleFile({ supabase, bucket, userId, fieldKey, file }) {
-  if (!supabase || !bucket || !userId || !fieldKey || !file) return null;
-  const path = createStoragePath(userId, fieldKey, file.name || fieldKey);
-  const { error } = await supabase.storage.from(bucket).upload(path, file, {
-    cacheControl: "3600",
-    upsert: true,
+export function cleanupObjectUrls(previews = {}) {
+  Object.values(previews).forEach((item) => {
+    if (item?.objectUrl) {
+      try {
+        URL.revokeObjectURL(item.objectUrl);
+      } catch (_err) {
+        // noop
+      }
+    }
   });
-  if (error) throw error;
+}
 
-  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+export function makeFilePreview(file) {
+  if (!file) return null;
+
+  const objectUrl = URL.createObjectURL(file);
+
   return {
-    path,
-    publicUrl: data?.publicUrl || null,
-    name: file.name || null,
-    size: file.size || null,
-    type: file.type || null,
+    name: file.name,
+    size: file.size,
+    type: file.type,
+    objectUrl,
+    url: objectUrl,
+    source: "local",
   };
+}
+
+export function getImageMimeType(file) {
+  const type = String(file?.type || "").toLowerCase();
+  if (type === "image/png") return "image/png";
+  if (type === "image/webp") return "image/webp";
+  return "image/jpeg";
+}
+
+export function fileExtensionByMime(mime) {
+  if (mime === "image/png") return "png";
+  if (mime === "image/webp") return "webp";
+  return "jpg";
+}
+
+export async function compressImage(file, options = {}) {
+  if (!file) return null;
+
+  if (!String(file.type || "").startsWith("image/")) {
+    return file;
+  }
+
+  const {
+    maxWidth = 1400,
+    quality = 0.75,
+    maxHeight = 2000,
+  } = options;
+
+  const dataUrl = await readFileAsDataUrl(file);
+  const image = await loadImage(dataUrl);
+
+  let { width, height } = image;
+
+  if (width <= maxWidth && height <= maxHeight && file.size <= 700 * 1024) {
+    return file;
+  }
+
+  const widthRatio = maxWidth / width;
+  const heightRatio = maxHeight / height;
+  const ratio = Math.min(widthRatio, heightRatio, 1);
+
+  const targetWidth = Math.max(1, Math.round(width * ratio));
+  const targetHeight = Math.max(1, Math.round(height * ratio));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+
+  const ctx = canvas.getContext("2d", { alpha: false });
+  if (!ctx) return file;
+
+  ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+  const mime = getImageMimeType(file) === "image/png" ? "image/jpeg" : "image/jpeg";
+
+  const blob = await canvasToBlob(canvas, mime, quality);
+  if (!blob) return file;
+
+  const ext = fileExtensionByMime(mime);
+  const safeBaseName = String(file.name || "image")
+    .replace(/\.[^.]+$/, "")
+    .replace(/[^a-zA-Z0-9_-]/g, "_");
+
+  return new File([blob], `${safeBaseName}.${ext}`, {
+    type: mime,
+    lastModified: Date.now(),
+  });
+}
+
+export function buildExistingPreview(documentRow) {
+  if (!documentRow) return null;
+
+  return {
+    id: documentRow.id,
+    name: documentRow.file_name,
+    size: documentRow.file_size,
+    type: documentRow.mime_type,
+    url: documentRow.file_url,
+    source: "remote",
+    docType: documentRow.doc_type,
+  };
+}
+
+export function docRowsToPreviewMap(rows = [], fieldMap = {}) {
+  return rows.reduce((acc, row) => {
+    const matchedField = Object.values(fieldMap).find(
+      (field) => field.docType === row.doc_type
+    );
+
+    if (matchedField) {
+      acc[matchedField.key] = buildExistingPreview(row);
+    }
+
+    return acc;
+  }, {});
+}
+
+export function isValidImageFile(file) {
+  return !!file && String(file.type || "").startsWith("image/");
+}
+
+async function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(reader.error || new Error("File o'qishda xato"));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Rasmni yuklashda xato"));
+    image.src = src;
+  });
+}
+
+async function canvasToBlob(canvas, mimeType, quality) {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), mimeType, quality);
+  });
 }

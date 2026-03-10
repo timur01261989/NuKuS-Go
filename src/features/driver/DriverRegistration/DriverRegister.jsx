@@ -1,123 +1,66 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { useEffect, useState } from "react";
+import { initialFilesState, initialFormState, initialPreviewsState } from "./initialState";
 import StepPersonal from "./StepPersonal";
 import StepVehicle from "./StepVehicle";
 import StepDocuments from "./StepDocuments";
+import { docRowsToPreviewMap } from "./helpers";
 import {
-  initialErrorsState,
-  initialFilesState,
-  initialFormState,
-} from "./initialState";
+  buildFormDataFromApplication,
+  DRIVER_DOCUMENT_FIELD_MAP,
+  getMyDriverApplicationWithDocuments,
+  submitDriverApplication,
+} from "./supabase";
 import {
-  buildApplicationPayload,
-  fileToPreview,
-  revokePreview,
-  uploadSingleFile,
-} from "./helpers";
-
-const STORAGE_BUCKET = "driver-documents";
+  validateDocumentsStep,
+  validatePersonalStep,
+  validateVehicleStep,
+} from "./validation";
 
 export default function DriverRegister() {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState(initialFormState);
   const [files, setFiles] = useState(initialFilesState);
-  const [persistedDocuments, setPersistedDocuments] = useState({});
-  const [stepErrors, setStepErrorsState] = useState(initialErrorsState);
+  const [previews, setPreviews] = useState(initialPreviewsState);
+  const [existingDocuments, setExistingDocuments] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [bootstrapLoading, setBootstrapLoading] = useState(true);
-  const [fatalError, setFatalError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
-
-  const previews = useMemo(() => {
-    const nextPreviews = {};
-    for (const [key, file] of Object.entries(files)) {
-      nextPreviews[key] = file ? fileToPreview(file) : null;
-    }
-    return nextPreviews;
-  }, [files]);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   useEffect(() => {
-    return () => {
-      Object.values(previews).forEach((url) => revokePreview(url));
-    };
-  }, [previews]);
-
-  useEffect(() => {
-    let alive = true;
+    let mounted = true;
 
     async function bootstrap() {
-      setBootstrapLoading(true);
-      setFatalError("");
-      setSuccessMessage("");
-
       try {
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession();
+        setLoading(true);
+        const { application, documents } = await getMyDriverApplicationWithDocuments();
 
-        if (sessionError) throw sessionError;
+        if (!mounted) return;
 
-        const user = session?.user || null;
-        if (!alive) return;
-
-        if (!user) {
-          setFatalError("Ro'yxatdan o'tish uchun avval tizimga kiring.");
-          return;
+        if (application) {
+          const nextFormData = buildFormDataFromApplication(application);
+          if (nextFormData) setFormData(nextFormData);
         }
 
-        const { data: existingApp, error: existingError } = await supabase
-          .from("driver_applications")
-          .select("*")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (existingError) throw existingError;
-        if (!alive || !existingApp) return;
-
-        setFormData((prev) => ({
-          ...prev,
-          lastName: existingApp.last_name || prev.lastName,
-          firstName: existingApp.first_name || prev.firstName,
-          middleName: existingApp.middle_name || prev.middleName,
-          phone: (existingApp.phone || "").replace(/^\+998/, "") || prev.phone,
-          passportNumber:
-            existingApp.passport_number || prev.passportNumber,
-          vehicleType: existingApp.vehicle_type || prev.vehicleType,
-          brand: existingApp.brand || prev.brand,
-          model: existingApp.model || prev.model,
-          plateNumber: existingApp.plate_number || prev.plateNumber,
-          year: existingApp.year ? String(existingApp.year) : prev.year,
-          color: existingApp.color || prev.color,
-          seats: existingApp.seats ? String(existingApp.seats) : prev.seats,
-          cargoKg: existingApp.cargo_kg
-            ? String(existingApp.cargo_kg)
-            : prev.cargoKg,
-          cargoM3: existingApp.cargo_m3
-            ? String(existingApp.cargo_m3)
-            : prev.cargoM3,
-          notes: existingApp.notes || prev.notes,
-        }));
-
-        const existingDocuments = normalizePersistedDocuments(existingApp.documents);
-        setPersistedDocuments(existingDocuments);
-      } catch (error) {
-        console.error("[DriverRegister bootstrap error]", error);
-        if (alive) {
-          setFatalError(
-            error?.message ||
-              "Driver register ma'lumotlarini yuklab bo'lmadi."
-          );
+        if (documents?.length) {
+          setExistingDocuments(documents);
+          setPreviews((prev) => ({
+            ...prev,
+            ...docRowsToPreviewMap(documents, DRIVER_DOCUMENT_FIELD_MAP),
+          }));
         }
+      } catch (bootstrapError) {
+        if (!mounted) return;
+        setError(bootstrapError?.message || "Ma'lumotlarni yuklashda xato");
       } finally {
-        if (alive) setBootstrapLoading(false);
+        if (mounted) setLoading(false);
       }
     }
 
     bootstrap();
 
     return () => {
-      alive = false;
+      mounted = false;
     };
   }, []);
 
@@ -127,133 +70,91 @@ export default function DriverRegister() {
 
   const updateFiles = (patch) => {
     setFiles((prev) => ({ ...prev, ...patch }));
+  };
 
-    const keys = Object.keys(patch || {});
-    if (keys.length) {
-      setPersistedDocuments((prev) => {
-        const next = { ...prev };
-        keys.forEach((key) => {
-          if (patch[key]) {
-            delete next[key];
-          }
-        });
-        return next;
-      });
+  const updatePreviews = (patch) => {
+    setPreviews((prev) => ({ ...prev, ...patch }));
+  };
+
+  const nextStep = () => {
+    setError("");
+
+    if (step === 1) {
+      const validationError = validatePersonalStep(formData);
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
     }
+
+    if (step === 2) {
+      const validationError = validateVehicleStep(formData);
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+    }
+
+    setStep((current) => Math.min(current + 1, 3));
   };
 
-  const setStepErrors = (section, nextErrors) => {
-    setStepErrorsState((prev) => ({
-      ...prev,
-      [section]: sanitizeErrors(nextErrors),
-    }));
+  const prevStep = () => {
+    setError("");
+    setStep((current) => Math.max(current - 1, 1));
   };
-
-  const nextStep = () => setStep((prev) => Math.min(prev + 1, 3));
-  const prevStep = () => setStep((prev) => Math.max(prev - 1, 1));
 
   const handleSubmit = async () => {
-    setSubmitting(true);
-    setFatalError("");
-    setSuccessMessage("");
+    setError("");
+    setSuccess("");
+
+    const validationError = validateDocumentsStep(files, previews);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
 
     try {
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
+      setSubmitting(true);
+      await submitDriverApplication(formData, files, existingDocuments);
+      setSuccess("Ariza muvaffaqiyatli yuborildi");
 
-      if (sessionError) throw sessionError;
-
-      const user = session?.user || null;
-      if (!user) {
-        throw new Error("Sessiya topilmadi. Avval qayta login qiling.");
-      }
-
-      const uploadedFilesMap = {};
-
-      for (const [fieldKey, file] of Object.entries(files)) {
-        if (!file) continue;
-
-        uploadedFilesMap[fieldKey] = await uploadSingleFile({
-          supabase,
-          bucket: STORAGE_BUCKET,
-          userId: user.id,
-          fieldKey,
-          file,
-        });
-      }
-
-      const mergedDocuments = {
-        ...persistedDocuments,
-        ...uploadedFilesMap,
-      };
-
-      const payload = buildApplicationPayload(formData, mergedDocuments, user.id);
-
-      const { error: upsertError } = await supabase
-        .from("driver_applications")
-        .upsert(payload, { onConflict: "user_id" });
-
-      if (upsertError) throw upsertError;
-
-      setPersistedDocuments(mergedDocuments);
+      const refreshed = await getMyDriverApplicationWithDocuments();
+      setExistingDocuments(refreshed.documents || []);
+      setPreviews((prev) => ({
+        ...prev,
+        ...docRowsToPreviewMap(refreshed.documents || [], DRIVER_DOCUMENT_FIELD_MAP),
+      }));
       setFiles(initialFilesState);
-      setSuccessMessage("Ariza muvaffaqiyatli yuborildi.");
-      alert("Ariza muvaffaqiyatli yuborildi.");
-    } catch (error) {
-      console.error("[DriverRegister submit error]", error);
-      setFatalError(
-        error?.message || "Arizani yuborishda xato yuz berdi."
-      );
+    } catch (submitError) {
+      setError(submitError?.message || "Arizani yuborishda xato");
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (bootstrapLoading) {
-    return (
-      <div className="mx-auto max-w-5xl p-6">
-        <div className="rounded-3xl bg-slate-900 p-8 text-white">
-          Yuklanmoqda...
-        </div>
-      </div>
-    );
+  if (loading) {
+    return <div>Yuklanmoqda...</div>;
   }
 
   return (
-    <div className="mx-auto max-w-5xl p-6">
-      {fatalError ? (
-        <div className="mb-4 rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {fatalError}
-        </div>
-      ) : null}
-
-      {successMessage ? (
-        <div className="mb-4 rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          {successMessage}
-        </div>
-      ) : null}
+    <div>
+      {error ? <div style={{ color: "red", marginBottom: 12 }}>{error}</div> : null}
+      {success ? <div style={{ color: "green", marginBottom: 12 }}>{success}</div> : null}
 
       {step === 1 ? (
         <StepPersonal
           formData={formData}
-          errors={stepErrors.personal}
-          setStepErrors={setStepErrors}
           updateForm={updateForm}
           onNext={nextStep}
-          onBack={() => window.history.back()}
         />
       ) : null}
 
       {step === 2 ? (
         <StepVehicle
           formData={formData}
-          errors={stepErrors.vehicle}
-          setStepErrors={setStepErrors}
           updateForm={updateForm}
-          onNext={nextStep}
           onBack={prevStep}
+          onNext={nextStep}
         />
       ) : null}
 
@@ -261,10 +162,8 @@ export default function DriverRegister() {
         <StepDocuments
           files={files}
           previews={previews}
-          persistedDocuments={persistedDocuments}
-          errors={stepErrors.documents}
-          setStepErrors={setStepErrors}
           updateFiles={updateFiles}
+          updatePreviews={updatePreviews}
           onBack={prevStep}
           onSubmit={handleSubmit}
           submitting={submitting}
@@ -272,40 +171,4 @@ export default function DriverRegister() {
       ) : null}
     </div>
   );
-}
-
-function sanitizeErrors(errorObject) {
-  return Object.fromEntries(
-    Object.entries(errorObject || {}).filter(([, value]) => Boolean(value))
-  );
-}
-
-function normalizePersistedDocuments(documents) {
-  if (!documents || typeof documents !== "object") return {};
-
-  const next = {};
-  for (const [key, value] of Object.entries(documents)) {
-    if (!value) continue;
-
-    if (typeof value === "string") {
-      next[key] = {
-        publicUrl: value,
-        path: value,
-        name: key,
-        size: null,
-        type: null,
-      };
-      continue;
-    }
-
-    next[key] = {
-      publicUrl: value.publicUrl || value.url || null,
-      path: value.path || null,
-      name: value.name || key,
-      size: value.size ?? null,
-      type: value.type ?? null,
-    };
-  }
-
-  return next;
 }
