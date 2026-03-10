@@ -146,6 +146,7 @@ export async function upsertDriverApplication(formData) {
   };
 
   const existing = await getMyDriverApplicationWithDocuments();
+
   if (existing.application?.id) {
     const { data, error } = await supabase
       .from("driver_applications")
@@ -193,9 +194,9 @@ export async function uploadDriverDocuments(applicationId, files = {}) {
     if (!file) continue;
 
     const extension = getFileExtension(file);
-    const path = ${sanitizeSegment(user.id)}/${sanitizeSegment(
+    const path = `${sanitizeSegment(user.id)}/${sanitizeSegment(
       applicationId
-    )}/${sanitizeSegment(field.docType)}_${Date.now()}.${extension};
+    )}/${sanitizeSegment(field.docType)}_${Date.now()}.${extension}`;
 
     const { error: uploadError } = await supabase.storage
       .from(DOCUMENT_BUCKET)
@@ -205,7 +206,9 @@ export async function uploadDriverDocuments(applicationId, files = {}) {
       });
 
     if (uploadError) {
-      throw new Error(uploadError.message || ${field.label} ni yuklashda xato);
+      throw new Error(
+        uploadError.message || `${field.label} ni yuklashda xato`
+      );
     }
 
     const { data: publicUrlData } = supabase.storage
@@ -218,7 +221,7 @@ export async function uploadDriverDocuments(applicationId, files = {}) {
       doc_type: field.docType,
       file_path: path,
       file_url: publicUrlData?.publicUrl || "",
-      file_name: file.name || ${field.docType}.${extension},
+      file_name: file.name || `${field.docType}.${extension}`,
       file_size: file.size || 0,
       mime_type: file.type || "image/jpeg",
       updated_at: new Date().toISOString(),
@@ -233,7 +236,7 @@ export async function uploadDriverDocuments(applicationId, files = {}) {
         .eq("id", existing.id);
 
       if (error) {
-        throw new Error(error.message || ${field.label} ni yangilashda xato);
+        throw new Error(error.message || `${field.label} ni yangilashda xato`);
       }
     } else {
       const { error } = await supabase.from("driver_documents").insert({
@@ -242,7 +245,7 @@ export async function uploadDriverDocuments(applicationId, files = {}) {
       });
 
       if (error) {
-        throw new Error(error.message || ${field.label} ni saqlashda xato);
+        throw new Error(error.message || `${field.label} ni saqlashda xato`);
       }
     }
   }
