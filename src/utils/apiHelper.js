@@ -484,4 +484,13 @@ const api = {
   },
 };
 
+
+export async function postJson(url, data = {}, opts = {}) {
+  return api.post(url, data, opts);
+}
+
+export async function getJson(url, opts = {}) {
+  return api.get(url, opts);
+}
+
 export default api;
