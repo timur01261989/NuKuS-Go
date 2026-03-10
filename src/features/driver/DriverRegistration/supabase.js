@@ -38,6 +38,31 @@ function getFileExtension(file) {
 }
 
 /**
+ * Fayl nomi yo'q bo'lsa xavfsiz fallback nom yaratish.
+ */
+function buildFallbackFileName(docType, extension) {
+  return `${sanitizeSegment(docType)}_${Date.now()}.${extension}`;
+}
+
+/**
+ * Number parse helper. Bo'sh yoki noto'g'ri qiymat kelsa null qaytaradi.
+ */
+function toNullableInt(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = parseInt(value, 10);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+/**
+ * Float parse helper. Bo'sh yoki noto'g'ri qiymat kelsa null qaytaradi.
+ */
+function toNullableFloat(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = parseFloat(value);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+/**
  * Hujjatlarni doc_type bo'yicha Map ko'rinishiga o'tkazish.
  */
 function buildDocumentRowMap(rows = []) {
@@ -163,16 +188,12 @@ function buildApplicationPayload(formData) {
       String(formData.plateNumber || "")
         .toUpperCase()
         .replace(/[^A-Z0-9]/g, "") || null,
-    vehicle_year: formData.year ? parseInt(formData.year, 10) : null,
+    vehicle_year: toNullableInt(formData.year),
     vehicle_color: formData.color || null,
-    seat_count: formData.seats ? parseInt(formData.seats, 10) : 0,
+    seat_count: toNullableInt(formData.seats),
 
-    requested_max_freight_weight_kg: formData.cargoKg
-      ? parseFloat(formData.cargoKg)
-      : 0,
-    requested_payload_volume_m3: formData.cargoM3
-      ? parseFloat(formData.cargoM3)
-      : 0,
+    requested_max_freight_weight_kg: toNullableFloat(formData.cargoKg),
+    requested_payload_volume_m3: toNullableFloat(formData.cargoM3),
   };
 }
 
@@ -268,13 +289,18 @@ export async function uploadDriverDocuments(applicationId, files = {}) {
       .from(DOCUMENT_BUCKET)
       .getPublicUrl(path);
 
+    const safeFileName =
+      file?.name && String(file.name).trim()
+        ? file.name
+        : buildFallbackFileName(field.docType, extension);
+
     const documentPayload = {
       application_id: applicationId,
       user_id: user.id,
       doc_type: field.docType,
       file_path: path,
       file_url: publicUrlData?.publicUrl || "",
-      file_name: file.name || `${field.docType}.${extension}`,
+      file_name: safeFileName,
       file_size: file.size || 0,
       mime_type: file.type || "image/jpeg",
       updated_at: new Date().toISOString(),
@@ -323,7 +349,8 @@ export async function submitDriverApplication(formData, files = {}) {
 }
 
 /**
- * Bazadagi ma'lumotlarni Ant Design Upload formatiga o'tkazish.
+ * Bazadagi ma'lumotlarni form uchun map ko'rinishiga o'tkazish.
+ * Kesilib qolgan return/qavs muammosi tuzatildi.
  */
 export function mapExistingDocumentsToForm(records = []) {
   if (!records || records.length === 0) return {};
@@ -335,10 +362,14 @@ export function mapExistingDocumentsToForm(records = []) {
     if (record) {
       acc[field.key] = {
         uid: record.id,
-        name: record.file_name,
+        name: record.file_name || buildFallbackFileName(field.docType, "jpg"),
         status: "done",
-        url: record.file_url,
+        url: record.file_url || "",
         docType: record.doc_type,
+        file_path: record.file_path || "",
+        file_size: record.file_size || 0,
+        mime_type: record.mime_type || "image/jpeg",
+        source: "remote",
       };
     }
     return acc;
