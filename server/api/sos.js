@@ -1,42 +1,28 @@
-import { json, badRequest, serverError } from '../_shared/cors.js';
+import { applyCors, json, badRequest, serverError } from '../_shared/cors.js';
 import { getSupabaseAdmin, getAuthedUserId } from '../_shared/supabase.js';
-
-function hasSupabaseEnv() {
-  return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
-}
-
-export async function sos_handler(req, res) {
-  try {
-    if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Method not allowed' });
-    if (!hasSupabaseEnv()) return serverError(res, 'SUPABASE_URL va service role key (SUPABASE_SERVICE_ROLE_KEY) server envda yo\'q');
-    const sb = getSupabaseAdmin();
-    const body = typeof req.body === 'string' ? JSON.parse(req.body||'{}') : (req.body||{});
-
-    const user_id = await getAuthedUserId(req, sb);
-    if (!user_id) return badRequest(res, 'Auth user kerak');
-
-    const order_id = body.order_id ? String(body.order_id).trim() : null;
-    const message = body.message ? String(body.message).trim() : null;
-    const lat = body.lat === undefined ? null : Number(body.lat);
-    const lng = body.lng === undefined ? null : Number(body.lng);
-
-    const { data, error } = await sb.from('sos_tickets').insert([{
-      order_id, user_id, message, lat, lng, status: 'open'
-    }]).select('*').single();
-
-    if (error) throw error;
-    return json(res, 201, { ok:true, ticket: data });
-  } catch (e) {
-    return serverError(res, e);
-  }
-}
+import { triggerSOS } from '../_shared/safety/sosService.js';
 
 export default async function handler(req, res) {
-  const rk = req.routeKey || (req.query && req.query.routeKey) || '';
-  switch (rk) {
-    case 'sos':
-      return await sos_handler(req, res);
-    default:
-      return await sos_handler(req, res);
+  if (applyCors(req, res, ['POST'])) return;
+  if (req.method !== 'POST') return badRequest(res, 'method_not_allowed');
+
+  try {
+    const sb = getSupabaseAdmin();
+    const userId = await getAuthedUserId(req, sb);
+    if (!userId) return badRequest(res, 'unauthorized');
+
+    const body = req.body || {};
+    const alert = await triggerSOS({
+      supabase: sb,
+      userId,
+      orderId: body.order_id ?? null,
+      lat: body.lat ?? null,
+      lng: body.lng ?? null,
+      message: body.message ?? '',
+    });
+
+    return json(res, 200, { ok: true, alert });
+  } catch (error) {
+    return serverError(res, error);
   }
 }

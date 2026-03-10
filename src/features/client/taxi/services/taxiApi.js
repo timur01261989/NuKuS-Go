@@ -6,6 +6,14 @@ export const taxiApi = {
   cancelOrder: (payload) => api.post("/api/order", payload),
   status: (payload) => api.post("/api/order", payload),
   dispatch: (payload) => api.post("/api/dispatch", payload),
+  acceptOffer: (payload) => api.post("/api/offer", { action: "accept", ...payload }),
+  rejectOffer: (payload) => api.post("/api/offer", { action: "reject", ...payload }),
+  expireOffers: (payload = {}) => api.post("/api/offer", { action: "timeout", ...payload }),
 };
 
 export default taxiApi;
+
+
+export async function driverHeartbeat(payload) {
+  return post('/api/driver_heartbeat', payload);
+}

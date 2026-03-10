@@ -1,5 +1,7 @@
 import { json, badRequest, serverError, nowIso } from '../_shared/cors.js';
 import { getSupabaseAdmin, getAuthedUserId } from '../_shared/supabase.js';
+import { emitOrderEvent } from '../_shared/orders/orderEvents.js';
+import { acceptOrderOffer, rejectOrderOffer, expireStaleOffers } from '../_shared/orders/orderOfferService.js';
 
 function normalizeDriverId(body) {
   return String(body.driver_id || body.driverId || '').trim();
@@ -11,16 +13,7 @@ function hasSupabaseEnv() {
 
 async function logOrderEvent(sb, payload) {
   try {
-    await sb.from('order_events').insert([{
-      order_id: String(payload.order_id || ''),
-      event_code: String(payload.event_code || payload.event || ''),
-      from_status: payload.from_status ?? null,
-      to_status: payload.to_status ?? null,
-      actor_role: payload.actor_role ?? null,
-      actor_user_id: payload.actor_user_id ?? payload.actor_id ?? null,
-      reason: payload.reason ?? null,
-      created_at: nowIso(),
-    }]);
+    await emitOrderEvent(sb, payload);
   } catch (_) {}
 }
 
@@ -28,11 +21,11 @@ export async function offer_respond_handler(req, res) {
   try {
     if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Method not allowed' });
     const body = typeof req.body === 'string' ? JSON.parse(req.body||'{}') : (req.body||{});
-    const order_id = String(body.order_id||'').trim();
+    const order_id = String(body.order_id || body.orderId || '').trim();
     const explicitDriverId = normalizeDriverId(body);
     const action = String(body.action||'').trim();
     if (!order_id) return badRequest(res, 'order_id kerak');
-    if (!['accept','reject'].includes(action)) return badRequest(res, 'action accept|reject');
+    if (!['accept','reject','decline'].includes(action)) return badRequest(res, 'action accept|reject');
     if (!hasSupabaseEnv()) return serverError(res, 'SUPABASE_URL va service role key (SUPABASE_SERVICE_ROLE_KEY) server envda yo\'q');
 
     const sb = getSupabaseAdmin();
@@ -41,31 +34,17 @@ export async function offer_respond_handler(req, res) {
     if (!driver_id) return badRequest(res, 'Auth driver kerak');
     if (authedUserId && explicitDriverId && authedUserId !== explicitDriverId) return json(res, 403, { ok:false, error:'driver_id token user_id bilan mos emas' });
 
-    const status = action === 'accept' ? 'accepted' : 'rejected';
-
-    const { data: off, error: oe } = await sb.from('order_offers')
-      .update({ status, responded_at: nowIso() })
-      .eq('order_id', order_id)
-      .eq('driver_id', driver_id)
-      .select('*')
-      .single();
-    if (oe) throw oe;
-
     if (action === 'accept') {
-      const { data: rpcData, error: rpcErr } = await sb.rpc('accept_order_atomic', { p_order_id: order_id, p_driver_id: driver_id });
-      if (rpcErr) return json(res, 200, { ok:false, taken:true, error: rpcErr.message, offer: off });
-      await logOrderEvent(sb, {
-        order_id,
-        event_code: 'order.accepted',
-        from_status: 'offered',
-        to_status: 'accepted',
-        actor_role: 'driver',
-        actor_user_id: driver_id,
-      });
-      return json(res, 200, { ok:true, offer: off, result: rpcData || null });
+      try {
+        const accepted = await acceptOrderOffer(sb, { orderId: order_id, driverId: driver_id });
+        return json(res, 200, { ok:true, order: accepted.order, offer: { order_id, driver_id, status: 'accepted' } });
+      } catch (e) {
+        return json(res, 200, { ok:false, taken:true, error: e?.message || 'offer_accept_failed' });
+      }
     }
 
-    return json(res, 200, { ok:true, offer: off });
+    const rejected = await rejectOrderOffer(sb, { orderId: order_id, driverId: driver_id, reason: action === 'decline' ? 'declined' : 'rejected' });
+    return json(res, 200, { ok:true, offer: rejected.offer || { order_id, driver_id, status: 'rejected' } });
   } catch (e) {
     return serverError(res, e);
   }
@@ -75,14 +54,8 @@ export async function offer_timeout_handler(req, res) {
   try {
     if (!hasSupabaseEnv()) return serverError(res, 'SUPABASE_URL va service role key (SUPABASE_SERVICE_ROLE_KEY) server envda yo\'q');
     const sb = getSupabaseAdmin();
-    const now = new Date().toISOString();
-    const { data, error } = await sb.from('order_offers')
-      .update({ status:'timeout', responded_at: nowIso() })
-      .eq('status', 'sent')
-      .lt('expires_at', now)
-      .select('id');
-    if (error) throw error;
-    return json(res, 200, { ok:true, updated: (data||[]).length });
+    const out = await expireStaleOffers(sb);
+    return json(res, 200, { ok:true, updated: out.updated, offers: out.offers || [] });
   } catch (e) {
     return serverError(res, e);
   }
@@ -107,7 +80,7 @@ export async function messages_handler(req, res) {
 
     if (req.method === 'POST') {
       const body = typeof req.body === 'string' ? JSON.parse(req.body||'{}') : (req.body||{});
-      const order_id = String(body.order_id||'').trim();
+      const order_id = String(body.order_id || body.orderId || '').trim();
       const authedUserId = await getAuthedUserId(req, sb);
       const sender_user_id = authedUserId || String(body.sender_user_id||'').trim();
       const msg = String(body.body||'').trim();

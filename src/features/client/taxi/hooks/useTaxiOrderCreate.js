@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { message } from "antd";
 import api from "@/utils/apiHelper";
+import taxiApi from "../services/taxiApi";
 import { haversineKm } from "../../shared/geo/haversine";
 const MAX_KM = 50;
 
@@ -62,13 +63,16 @@ export function useTaxiOrderCreate(params) {
         }
       }
 
-      const id = res?.data?.id || res?.id || res?.orderId;
+      const id = res?.order?.id || res?.data?.id || res?.id || res?.orderId;
       if (!id) throw lastErr || new Error(cp("Serverdan ID kelmadi"));
 
       setOrderId(String(id));
       localStorage.setItem("activeOrderId", String(id));
       setOrderStatus("searching");
       setStep("searching");
+      try {
+        await taxiApi.dispatch({ order_id: String(id) });
+      } catch {}
       speak(cp("Haydovchi qidirilmoqda"));
       message.success(cp("Buyurtma yuborildi"));
     } catch (e) {

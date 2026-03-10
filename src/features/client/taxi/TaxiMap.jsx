@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { memo, useEffect } from "react";
 import { MapContainer, TileLayer, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -62,7 +62,7 @@ function CenterSetter({ center, zoom = 15 }) {
   return null;
 }
 
-export default function TaxiMap({
+function TaxiMap({
   mapRef,
   center,
   mapTile,
@@ -119,3 +119,5 @@ export default function TaxiMap({
     </div>
   );
 }
+
+export default memo(TaxiMap);

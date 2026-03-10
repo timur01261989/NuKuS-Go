@@ -1,5 +1,5 @@
 import { useClientText } from "../shared/i18n_clientLocalize";
-import React, { useMemo, useState } from "react";
+import React, { memo, useMemo, useState } from "react";
 import { Button, Drawer, Input, List, Spin, Tag, Typography } from "antd";
 import {
   ArrowLeftOutlined,
@@ -17,7 +17,7 @@ import {
  *
  * NOTE: Qidiruv (fetch/debounce/abort) mantiqi ClientTaxiPage’da bo‘ladi.
  */
-export default function TaxiSearchSheet({
+function TaxiSearchSheet({
   searchOpen,
   setSearchOpen,
   setStep,
@@ -216,3 +216,5 @@ export default function TaxiSearchSheet({
     </Drawer>
   );
 }
+
+export default memo(TaxiSearchSheet);

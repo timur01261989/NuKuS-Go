@@ -49,9 +49,12 @@ import TaxiSearchSheet from "./TaxiSearchSheet";
 import DestinationPicker from "./DestinationPicker";
 import { haversineKm } from "../shared/geo/haversine";
 import AutoMarketAdsPanel from "./components/AutoMarketAdsPanel";
+import ClientTaxiScreen from "./containers/ClientTaxiScreen";
 import { listMarketCars } from "../../../services/marketService.js";
 import RatingModal from "@features/shared/components/RatingModal";
 import ClientBonusWidget from "@/features/client/components/ClientBonusWidget";
+import TaxiOrderTimeline from "./components/TaxiOrderTimeline";
+import { useOrderTimeline } from "./hooks/useOrderTimeline";
 import {
   useTaxiOrder,
   money,
@@ -258,6 +261,8 @@ export default function ClientTaxiPage() {
     handleOrderCreate,
     handleCancel,
   } = useTaxiOrder();
+
+  const { events: timelineEvents } = useOrderTimeline(orderId);
 
   // Mobile BACK handling
   const isPopNavRef = useRef(false);
@@ -1280,60 +1285,85 @@ export default function ClientTaxiPage() {
     `}</style>
   );
 
-  return (
-    <div style={{ width: "100%", height: "100vh" }}>
-      {Styles}
-      {MapUI}
-      {Header}
-
-      {step === "main" && MainSheet}
-      {step === "search" && null}
-      {step === "dest_map" && DestMapSheet}
-      {step === "route" && RouteSheet}
-      {step === "searching" && SearchingSheet}
-      {step === "coming" && ComingSheet}
-
+  const overlaysNode = (
+    <>
       {SearchDrawer}
       {StopPickerOverlay}
+    </>
+  );
+
+  const modalsNode = (
+    <>
       {PodyezdModal}
       {WishesModal}
       {ScheduleModal}
       {ShareModal}
+    </>
+  );
 
-      <RatingModal
-        visible={ratingVisible}
-        order={completedOrderForRating}
-        onFinish={() => {
-          setRatingVisible(false);
-          setCompletedOrderForRating(null);
-          if (earnedBonus > 0) {
-            setTimeout(() => setBonusVisible(true), 300);
-          } else {
-            setTimeout(() => {
-              setOrderId(null);
-              setOrderStatus(null);
-              setAssignedDriver(null);
-              setStep("main");
-            }, 500);
-          }
-        }}
-      />
+  const timelineNode = orderId ? (
+    <div style={{ position: 'fixed', left: 12, right: 12, bottom: step === 'coming' ? 260 : 120, zIndex: 1150, maxWidth: 520, margin: '0 auto', pointerEvents: 'none' }}>
+      <div style={{ pointerEvents: 'auto' }}>
+        <TaxiOrderTimeline events={timelineEvents} />
+      </div>
+    </div>
+  ) : null;
 
-      <ClientBonusWidget
-        userId={completedOrderForRating?.client_id || null}
-        earnedPoints={earnedBonus}
-        visible={bonusVisible}
-        onClose={() => {
-          setBonusVisible(false);
-          setEarnedBonus(0);
+  const ratingNode = (
+    <RatingModal
+      visible={ratingVisible}
+      order={completedOrderForRating}
+      onFinish={() => {
+        setRatingVisible(false);
+        setCompletedOrderForRating(null);
+        if (earnedBonus > 0) {
+          setTimeout(() => setBonusVisible(true), 300);
+        } else {
           setTimeout(() => {
             setOrderId(null);
             setOrderStatus(null);
             setAssignedDriver(null);
             setStep("main");
           }, 500);
-        }}
-      />
-    </div>
+        }
+      }}
+    />
+  );
+
+  const bonusNode = (
+    <ClientBonusWidget
+      userId={completedOrderForRating?.client_id || null}
+      earnedPoints={earnedBonus}
+      visible={bonusVisible}
+      onClose={() => {
+        setBonusVisible(false);
+        setEarnedBonus(0);
+        setTimeout(() => {
+          setOrderId(null);
+          setOrderStatus(null);
+          setAssignedDriver(null);
+          setStep("main");
+        }, 500);
+      }}
+    />
+  );
+
+  return (
+    <ClientTaxiScreen
+      step={step}
+      stylesNode={Styles}
+      mapNode={MapUI}
+      headerNode={Header}
+      mainSheet={MainSheet}
+      destMapSheet={DestMapSheet}
+      routeSheet={RouteSheet}
+      searchingSheet={SearchingSheet}
+      comingSheet={ComingSheet}
+      overlaysNode={overlaysNode}
+      modalsNode={modalsNode}
+      timelineNode={timelineNode}
+      ratingNode={ratingNode}
+      bonusNode={bonusNode}
+    />
   );
 }

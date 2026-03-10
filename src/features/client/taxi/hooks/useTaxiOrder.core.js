@@ -6,7 +6,10 @@ import { nominatimReverse as _nominatimReverse } from "../../shared/geo/nominati
 import { useTaxiSearch, nominatimSearch } from "./useTaxiSearch";
 import { useTaxiRouteBuilder, osrmRouteMulti } from "./useTaxiRouteBuilder";
 import { useTaxiOrderCreate } from "./useTaxiOrderCreate";
-import { useOrderStatusPolling, useRestoreActiveOrder } from "./useTaxiOrderPolling";
+import { useTaxiOrderState } from "./useTaxiOrderState";
+import { useTaxiOrderActions } from "./useTaxiOrderActions";
+import { useTaxiOrderLifecycle } from "./useTaxiOrderLifecycle";
+import { useTaxiOrderDerived } from "./useTaxiOrderDerived";
 import { loadMyAddressesV1, loadSavedPlaces, loadTaxiShortcuts, savePlace } from "../lib/taxiStorage";
 import { speak } from "../lib/taxiSpeech";
 import { money, clamp } from "../lib/taxiPricing";
@@ -96,14 +99,25 @@ export function useTaxiOrderCore() {
   );
 
   // Order and driver
-  const [orderId, setOrderId] = useState(null);
-  const [orderStatus, setOrderStatus] = useState(null);
-  const [assignedDriver, setAssignedDriver] = useState(null);
-  const [ratingVisible, setRatingVisible] = useState(false);
-  const [completedOrderForRating, setCompletedOrderForRating] = useState(null);
-  const [bonusVisible, setBonusVisible] = useState(false);
-  const [earnedBonus, setEarnedBonus] = useState(0);
-  const [etaMin, setEtaMin] = useState(null);
+  const orderState = useTaxiOrderState();
+  const {
+    orderId,
+    setOrderId,
+    orderStatus,
+    setOrderStatus,
+    assignedDriver,
+    setAssignedDriver,
+    ratingVisible,
+    setRatingVisible,
+    completedOrderForRating,
+    setCompletedOrderForRating,
+    bonusVisible,
+    setBonusVisible,
+    earnedBonus,
+    setEarnedBonus,
+    etaMin,
+    setEtaMin,
+  } = orderState;
 
   // Order extras
   const [podyezdOpen, setPodyezdOpen] = useState(false);
@@ -307,34 +321,37 @@ export function useTaxiOrderCore() {
 
   const handleOrderCreate = useTaxiOrderCreate({ cp, pickup, dest, tariff, totalPrice, distanceKm, waypoints, orderFor, otherPhone, wishes, comment, scheduledTime, setOrderId, setOrderStatus, setStep, speak });
 
-  // Cancel order
-  const handleCancel = useCallback(async () => {
-    if (!orderId) {
-      setStep("main");
-      setOrderStatus(null);
-      return;
-    }
-    const hide = message.loading(cp("Bekor qilinmoqda..."), 0);
-    try {
-      await api.post("/api/order", { action: "cancel", order_id: orderId });
-    } catch (e) {
-      console.warn(e);
-    } finally {
-      hide();
-      localStorage.removeItem("activeOrderId");
-      setOrderId(null);
-      setOrderStatus(null);
-      setAssignedDriver(null);
-      setNearCars([]);
-      setDispatchLine(null);
-      setStep("main");
-      speak(cp("Safar bekor qilindi"));
-    }
-  }, [orderId]);
+  const { handleCancel } = useTaxiOrderActions({
+    cp,
+    orderId,
+    setStep,
+    setOrderId,
+    setOrderStatus,
+    setAssignedDriver,
+    setNearCars,
+    setDispatchLine,
+    speak,
+  });
 
-  useRestoreActiveOrder({ setOrderId, setOrderStatus, setPickup, setDest, setStep });
-
-  useOrderStatusPolling({ orderId, pickup, orderStatus, step, assignedDriver, setOrderStatus, setAssignedDriver, setCompletedOrderForRating, setRatingVisible, setEarnedBonus, setEtaMin, cp, speak });
+  useTaxiOrderLifecycle({
+    orderId,
+    pickup,
+    orderStatus,
+    step,
+    assignedDriver,
+    setOrderId,
+    setOrderStatus,
+    setPickup,
+    setDest,
+    setStep,
+    setAssignedDriver,
+    setCompletedOrderForRating,
+    setRatingVisible,
+    setEarnedBonus,
+    setEtaMin,
+    cp,
+    speak,
+  });
 
   // Simulate nearby cars during search
   useEffect(() => {
@@ -494,6 +511,8 @@ export function useTaxiOrderCore() {
     showSheet,
     shareLink,
     mapBottom,
+    isSearching,
+    isDriverAssigned,
     setPickupFromSuggestion,
     setDestFromSuggestion,
     applyDestinationFromAddressString,
