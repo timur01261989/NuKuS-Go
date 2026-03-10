@@ -89,7 +89,8 @@ const contentStyles = {
 const stepPanelStyles = {
   borderRadius: 20,
   border: "1px solid rgba(148, 163, 184, 0.16)",
-  background: "linear-gradient(180deg, rgba(15,23,42,0.95) 0%, rgba(17,24,39,0.92) 100%)",
+  background:
+    "linear-gradient(180deg, rgba(15,23,42,0.95) 0%, rgba(17,24,39,0.92) 100%)",
   padding: 20,
   boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
 };
@@ -118,6 +119,7 @@ export default function DriverRegister() {
             ...initialFormState,
             ...nextValues,
             phone: normalizePhone(nextValues?.phone || ""),
+            vehicleType: nextValues?.vehicleType || initialFormState.vehicleType,
           });
           setApplicationStatus(result.application.status || "");
         } else {
@@ -155,48 +157,82 @@ export default function DriverRegister() {
     setPreviews((prev) => ({ ...prev, ...patch }));
 
   const goNext = async () => {
-    await form.validateFields();
-    const values = form.getFieldsValue(true);
-    const personalErrors = validatePersonalStep(values);
-    const vehicleErrors = validateVehicleStep(values);
+    try {
+      await form.validateFields();
+      const values = form.getFieldsValue(true);
 
-    if (current === 0 && hasStepErrors(personalErrors)) {
-      Object.entries(personalErrors).forEach(([name, error]) =>
-        form.setFields([{ name, errors: [error] }])
-      );
-      return;
+      const personalErrors = validatePersonalStep(values);
+      const vehicleErrors = validateVehicleStep(values);
+
+      if (current === 0 && hasStepErrors(personalErrors)) {
+        Object.entries(personalErrors).forEach(([name, error]) =>
+          form.setFields([{ name, errors: [error] }])
+        );
+        return;
+      }
+
+      if (current === 1 && hasStepErrors(vehicleErrors)) {
+        Object.entries(vehicleErrors).forEach(([name, error]) =>
+          form.setFields([{ name, errors: [error] }])
+        );
+        return;
+      }
+
+      setCurrent((prev) => Math.min(prev + 1, 2));
+    } catch (_error) {
+      // Ant Form own validation messages already shown
     }
-
-    if (current === 1 && hasStepErrors(vehicleErrors)) {
-      Object.entries(vehicleErrors).forEach(([name, error]) =>
-        form.setFields([{ name, errors: [error] }])
-      );
-      return;
-    }
-
-    setCurrent((prev) => Math.min(prev + 1, 2));
   };
 
   const goPrev = () => setCurrent((prev) => Math.max(prev - 1, 0));
 
   const handleSubmit = async () => {
-    const values = await form.validateFields();
-    const docErrors = validateDocumentsStep(files, previews);
-
-    if (hasStepErrors(docErrors)) {
-      const firstError = Object.values(docErrors)[0];
-      message.error(firstError || "Hujjatlarni to'liq yuklang");
-      return;
-    }
-
-    setSubmitting(true);
-
     try {
-      const payload = {
+      await form.validateFields();
+      const values = form.getFieldsValue(true);
+
+      const normalizedValues = {
         ...values,
         phone: normalizePhone(values.phone || ""),
+        vehicleType: values.vehicleType || form.getFieldValue("vehicleType") || "",
       };
-      const result = await submitDriverApplication(payload, files);
+
+      if (!normalizedValues.vehicleType) {
+        message.error("Transport turini tanlang");
+        setCurrent(1);
+        return;
+      }
+
+      const personalErrors = validatePersonalStep(normalizedValues);
+      const vehicleErrors = validateVehicleStep(normalizedValues);
+      const docErrors = validateDocumentsStep(files, previews);
+
+      if (hasStepErrors(personalErrors)) {
+        Object.entries(personalErrors).forEach(([name, error]) =>
+          form.setFields([{ name, errors: [error] }])
+        );
+        setCurrent(0);
+        return;
+      }
+
+      if (hasStepErrors(vehicleErrors)) {
+        Object.entries(vehicleErrors).forEach(([name, error]) =>
+          form.setFields([{ name, errors: [error] }])
+        );
+        setCurrent(1);
+        return;
+      }
+
+      if (hasStepErrors(docErrors)) {
+        const firstError = Object.values(docErrors)[0];
+        message.error(firstError || "Hujjatlarni to'liq yuklang");
+        setCurrent(2);
+        return;
+      }
+
+      setSubmitting(true);
+
+      const result = await submitDriverApplication(normalizedValues, files);
       const nextPreviews = docRowsToPreviewMap(
         result?.documents || [],
         DRIVER_DOCUMENT_FIELD_MAP
@@ -226,8 +262,8 @@ export default function DriverRegister() {
       applicationStatus === "approved"
         ? "success"
         : applicationStatus === "rejected"
-          ? "error"
-          : "info";
+        ? "error"
+        : "info";
 
     return (
       <Alert
@@ -310,7 +346,13 @@ export default function DriverRegister() {
           >
             <div style={heroStyles}>
               <Space direction="vertical" size={8} style={{ width: "100%" }}>
-                <Text style={{ color: "rgba(255,255,255,0.68)", fontWeight: 800, letterSpacing: 1.5 }}>
+                <Text
+                  style={{
+                    color: "rgba(255,255,255,0.68)",
+                    fontWeight: 800,
+                    letterSpacing: 1.5,
+                  }}
+                >
                   DRIVER REGISTRATION
                 </Text>
                 <Title level={2} style={{ color: "#ffffff", margin: 0 }}>
@@ -323,7 +365,7 @@ export default function DriverRegister() {
                     maxWidth: 760,
                   }}
                 >
-                  Ma'lumotlarni to'ldiring, hujjatlarni yuklang va arizani yuboring.                  
+                  Ma'lumotlarni to'ldiring, hujjatlarni yuklang va arizani yuboring.
                 </Paragraph>
                 {headerExtra}
               </Space>
@@ -332,7 +374,12 @@ export default function DriverRegister() {
             <div style={contentStyles}>
               <div style={stepPanelStyles}>
                 <Steps current={current} items={stepItems} responsive />
-                <Divider style={{ borderColor: "rgba(148, 163, 184, 0.12)", margin: "20px 0" }} />
+                <Divider
+                  style={{
+                    borderColor: "rgba(148, 163, 184, 0.12)",
+                    margin: "20px 0",
+                  }}
+                />
 
                 <Form
                   form={form}
@@ -340,6 +387,7 @@ export default function DriverRegister() {
                   initialValues={initialFormState}
                   requiredMark={false}
                   scrollToFirstError
+                  preserve={true}
                 >
                   {current === 0 ? <StepPersonal /> : null}
                   {current === 1 ? (
@@ -358,7 +406,12 @@ export default function DriverRegister() {
                 </Form>
               </div>
 
-              <Divider style={{ borderColor: "rgba(148, 163, 184, 0.12)", margin: "20px 0" }} />
+              <Divider
+                style={{
+                  borderColor: "rgba(148, 163, 184, 0.12)",
+                  margin: "20px 0",
+                }}
+              />
 
               <Row justify="space-between" align="middle" gutter={[12, 12]}>
                 <Col>
