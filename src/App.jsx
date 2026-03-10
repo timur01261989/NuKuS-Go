@@ -38,7 +38,7 @@ const Logout = lazy(() => import("./pages/Logout"));
 const Support = lazy(() => import("./pages/Support"));
 const MyAddresses = lazy(() => import("./pages/MyAddresses"));
 const ClientOrders = lazy(() => import("./pages/ClientOrders"));
-const DriverPending = lazy(() => import("./pages/DriverPending"));
+const DriverPending = lazy(() => import("./features/driver/DriverRegistration/DriverPending"));
 
 // --- CLIENT ---
 const ClientHome = lazy(() => import("@features/client/pages/ClientHome"));
