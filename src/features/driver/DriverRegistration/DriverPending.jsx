@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { memo, useCallback, useEffect } from "react";
 import { Alert, Button, Card, ConfigProvider, Result, Space, Typography } from "antd";
 import {
   CheckCircleOutlined,
@@ -43,7 +43,7 @@ const contentStyles = {
   padding: 24,
 };
 
-export default function DriverPending({
+function DriverPending({
   status = "pending",
   rejectionReason = "",
   adminNote = "",
@@ -59,6 +59,34 @@ export default function DriverPending({
 
     return undefined;
   }, [status]);
+
+  const goClient = useCallback(() => {
+    try {
+      localStorage.removeItem("driverMode");
+      localStorage.removeItem("driverActiveService");
+      localStorage.removeItem("activeRole");
+      localStorage.removeItem("selectedRole");
+      localStorage.removeItem("currentRole");
+      localStorage.removeItem("driverEntryPoint");
+      localStorage.setItem("appMode", "client");
+
+      sessionStorage.removeItem("driverMode");
+      sessionStorage.removeItem("driverActiveService");
+      sessionStorage.removeItem("activeRole");
+      sessionStorage.removeItem("selectedRole");
+      sessionStorage.removeItem("currentRole");
+      sessionStorage.removeItem("driverEntryPoint");
+      sessionStorage.setItem("appMode", "client");
+    } catch (_error) {
+      // storage access blocked bo'lsa ham client route ga o'tish davom etadi
+    }
+
+    window.location.assign("/client/home");
+  }, []);
+
+  const refreshStatus = useCallback(() => {
+    window.location.reload();
+  }, []);
 
   const isPending = status === "pending";
   const isApproved = status === "approved";
@@ -83,9 +111,9 @@ export default function DriverPending({
     : {
         status: "info",
         icon: <ClockCircleOutlined style={{ color: "#38bdf8" }} />,
-        title: "Arizangiz ko'rib chiqilmoqda",
+        title: "Arizangiz tekshirilmoqda",
         subTitle:
-          "Siz yuborgan ma'lumotlar va hujjatlar admin tomonidan tekshirilmoqda. Tasdiqlanguncha kuting.",
+          "Iltimos admin tasdig'ini kuting. Tasdiqlangandan so'ng sizga xabar yuboriladi.",
       };
 
   return (
@@ -124,7 +152,7 @@ export default function DriverPending({
                     maxWidth: 760,
                   }}
                 >
-                  Arizangiz holati shu sahifada ko'rsatiladi. Admin tekshiruvi tugagach, status yangilanadi.
+                  Ariza statusi shu sahifada ko'rsatiladi.
                 </Paragraph>
               </Space>
             </div>
@@ -142,7 +170,7 @@ export default function DriverPending({
                   type="info"
                   showIcon
                   message="Holat: pending"
-                  description="Ariza yuborilgan. Hozircha tahrirlash yopilgan. Admin tekshiruvini kuting."
+                  description="Arizangiz tekshirilmoqda. Iltimos admin tasdig'ini kuting. Tasdiqlangandan so'ng sizga xabar yuboriladi."
                   style={{ borderRadius: 16, marginTop: 8 }}
                 />
               ) : null}
@@ -171,7 +199,15 @@ export default function DriverPending({
                 </Space>
               ) : null}
 
-              <div style={{ marginTop: 24, display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
+              <div
+                style={{
+                  marginTop: 24,
+                  display: "flex",
+                  gap: 12,
+                  flexWrap: "wrap",
+                  justifyContent: "center",
+                }}
+              >
                 {isRejected ? (
                   <Button
                     type="primary"
@@ -193,9 +229,14 @@ export default function DriverPending({
                 ) : null}
 
                 {!isApproved ? (
-                  <Button onClick={() => window.location.assign("/")}>
-                    Bosh sahifaga qaytish
-                  </Button>
+                  <>
+                    <Button type="primary" onClick={refreshStatus}>
+                      Holatni yangilash
+                    </Button>
+                    <Button onClick={goClient}>
+                      Client rejimiga qaytish
+                    </Button>
+                  </>
                 ) : null}
               </div>
             </div>
@@ -205,3 +246,5 @@ export default function DriverPending({
     </ConfigProvider>
   );
 }
+
+export default memo(DriverPending);
