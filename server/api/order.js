@@ -1,5 +1,6 @@
 const ORDER_SELECT = [
   "id",
+  "user_id",
   "client_id",
   "driver_id",
   "service_type",
@@ -37,10 +38,6 @@ function toNumber(value) {
   if (value == null || value === "") return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
-}
-
-function normalizeLng(raw) {
-  return raw ?? raw === 0 ? raw : null;
 }
 
 function isValidLatitude(value) {
@@ -140,8 +137,11 @@ function buildNormalizedPayload(body) {
   const options = body?.options && typeof body.options === "object" ? body.options : {};
   const meta = body?.meta && typeof body.meta === "object" ? body.meta : {};
 
+  const canonicalUserId = body?.user_id ?? body?.userId ?? body?.client_id ?? body?.clientId ?? null;
+
   return {
-    client_id: body?.client_id ?? body?.user_id ?? body?.userId ?? null,
+    user_id: canonicalUserId,
+    client_id: canonicalUserId,
     driver_id: body?.driver_id ?? body?.driverId ?? null,
     service_type: serviceType,
     status: toText(body?.status) || "searching",
@@ -163,7 +163,8 @@ function buildResponseOrder(row) {
   if (!row) return null;
   return {
     id: row.id,
-    client_id: row.client_id ?? null,
+    user_id: row.user_id ?? row.client_id ?? null,
+    client_id: row.client_id ?? row.user_id ?? null,
     driver_id: row.driver_id ?? null,
     service_type: row.service_type ?? "taxi",
     status: row.status ?? null,
@@ -252,9 +253,9 @@ async function handleGetById(supabase, body) {
 }
 
 async function handleActiveOrder(supabase, body) {
-  const clientId = toText(body?.client_id ?? body?.user_id ?? body?.clientId ?? body?.userId);
-  if (!clientId) {
-    return { status: 400, payload: { ok: false, error: "client_id kerak" } };
+  const userId = toText(body?.user_id ?? body?.userId ?? body?.client_id ?? body?.clientId);
+  if (!userId) {
+    return { status: 400, payload: { ok: false, error: "user_id kerak" } };
   }
 
   const activeStatuses = ["searching", "offered", "accepted", "arrived", "in_progress"];
@@ -262,7 +263,7 @@ async function handleActiveOrder(supabase, body) {
   const { data, error } = await supabase
     .from("orders")
     .select(ORDER_SELECT)
-    .eq("client_id", clientId)
+    .eq("user_id", userId)
     .in("status", activeStatuses)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -332,6 +333,16 @@ async function handleCancel(supabase, body) {
 async function handleCreateOrder(supabase, body) {
   const payload = buildNormalizedPayload(body);
 
+  if (!payload.user_id) {
+    return {
+      status: 400,
+      payload: {
+        ok: false,
+        error: "user_id kerak",
+      },
+    };
+  }
+
   if (!payload.pickup) {
     return {
       status: 400,
@@ -343,6 +354,7 @@ async function handleCreateOrder(supabase, body) {
   }
 
   const insertPayload = {
+    user_id: payload.user_id,
     client_id: payload.client_id,
     driver_id: payload.driver_id,
     service_type: payload.service_type,
@@ -352,6 +364,7 @@ async function handleCreateOrder(supabase, body) {
     payment_method: payload.payment_method,
     car_type: payload.car_type,
     comment: payload.comment,
+    note: payload.comment,
     price_uzs: payload.price_uzs,
     surge_multiplier: payload.surge_multiplier,
     distance_m: payload.distance_m,

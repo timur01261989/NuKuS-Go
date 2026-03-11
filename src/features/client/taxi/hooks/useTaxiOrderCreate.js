@@ -1,5 +1,6 @@
 import { useCallback, useRef } from "react";
 import { message } from "antd";
+import { supabase } from "@/lib/supabase";
 import { toCreateOrderPayload, fromOrderResponse } from "../lib/taxiOrderAdapter";
 import {
   extractOrder,
@@ -13,6 +14,12 @@ const ORDER_ENDPOINT = "/api/order";
 
 async function createOrderRequest(payload) {
   return postJson(ORDER_ENDPOINT, payload);
+}
+
+async function resolveCurrentUserId() {
+  const { data, error } = await supabase.auth.getUser();
+  if (error) throw error;
+  return data?.user?.id || null;
 }
 
 export function useTaxiOrderCreate(options = {}) {
@@ -40,7 +47,20 @@ export function useTaxiOrderCreate(options = {}) {
   const handleOrderCreate = useCallback(async () => {
     if (creatingRef.current) return;
 
+    const authUserId = await resolveCurrentUserId();
+    if (!authUserId) {
+      message.error(cp ? cp("Avval tizimga kiring") : "Avval tizimga kiring");
+      return {
+        ok: false,
+        error: "auth_required",
+        order: null,
+        orderId: null,
+      };
+    }
+
     const draft = {
+      user_id: authUserId,
+      client_id: authUserId,
       pickup,
       dropoff: dest?.latlng
         ? {

@@ -59,21 +59,18 @@ export function toDropoffLocation(value) {
 
 export function toCreateOrderPayload(draft = {}) {
   const pickup = toPickupLocation(
-    draft.pickup ??
-      draft.from ??
-      draft.from_location ??
-      draft.pickup_location
+    draft.pickup ?? draft.from ?? draft.from_location ?? draft.pickup_location
   );
 
   const dropoff = toDropoffLocation(
-    draft.dropoff ??
-      draft.to ??
-      draft.to_location ??
-      draft.dropoff_location
+    draft.dropoff ?? draft.to ?? draft.to_location ?? draft.dropoff_location
   );
 
+  const userId = draft.user_id ?? draft.userId ?? draft.client_id ?? draft.clientId ?? null;
+
   return {
-    client_id: draft.client_id ?? draft.user_id ?? draft.userId ?? null,
+    user_id: userId,
+    client_id: userId,
     service_type: draft.service_type ?? draft.serviceType ?? "taxi",
     payment_method: draft.payment_method ?? draft.paymentMethod ?? null,
     car_type: draft.car_type ?? draft.carType ?? draft.tariff ?? draft.tarif ?? null,
@@ -86,7 +83,7 @@ export function toCreateOrderPayload(draft = {}) {
     pickup,
     dropoff: dropoff || null,
 
-    // Legacy compatibility fields. Kept on purpose so old backend/client code does not break.
+    // Transition compatibility for older payload readers.
     pickup_location: pickup
       ? {
           address: pickup.address,
@@ -124,6 +121,7 @@ export function fromOrderResponse(order = null) {
 
   return {
     id: order.id ?? order.order_id ?? order.orderId ?? null,
+    user_id: order.user_id ?? order.client_id ?? null,
     client_id: order.client_id ?? order.user_id ?? null,
     driver_id: order.driver_id ?? null,
     status: order.status ?? null,
@@ -132,7 +130,7 @@ export function fromOrderResponse(order = null) {
     dropoff: dropoff || null,
     payment_method: order.payment_method ?? null,
     car_type: order.car_type ?? null,
-    comment: order.comment ?? null,
+    comment: order.comment ?? order.note ?? null,
     price_uzs: order.price_uzs ?? null,
     surge_multiplier: order.surge_multiplier ?? 1,
     distance_m: order.distance_m ?? null,

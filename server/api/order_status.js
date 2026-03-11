@@ -77,12 +77,12 @@ export default async function handler(req, res) {
     const { data: updated, error: upErr } = await sb.from('orders').update(patch).eq('id', order_id).select('*').single();
     if (upErr) throw upErr;
 
-    if (next_status === 'completed' && updated.payment_method === 'wallet' && updated.client_id && updated.driver_id && Number(updated.price_uzs || 0) > 0) {
+    if (next_status === 'completed' && updated.payment_method === 'wallet' && (updated.user_id || updated.client_id) && updated.driver_id && Number(updated.price_uzs || 0) > 0) {
       const amount = Number(updated.price_uzs || 0);
-      await ensureWallet(sb, updated.client_id);
+      await ensureWallet(sb, updated.user_id || updated.client_id);
       await ensureWallet(sb, updated.driver_id);
-      await walletTx(sb, { user_id: updated.client_id, kind: 'order_payment', direction: 'debit', service_type: updated.service_type, amount_uzs: amount, order_id, description: 'Order payment', metadata: { order_id } });
-      await changeBalance(sb, updated.client_id, -amount);
+      await walletTx(sb, { user_id: updated.user_id || updated.client_id, kind: 'order_payment', direction: 'debit', service_type: updated.service_type, amount_uzs: amount, order_id, description: 'Order payment', metadata: { order_id } });
+      await changeBalance(sb, updated.user_id || updated.client_id, -amount);
       await walletTx(sb, { user_id: updated.driver_id, kind: 'order_payout', direction: 'credit', service_type: updated.service_type, amount_uzs: amount, order_id, description: 'Order payout', metadata: { order_id } });
       await changeBalance(sb, updated.driver_id, amount);
       await sb.from('driver_presence').update({ state: 'online', current_order_id: null, updated_at: nowIso(), last_seen_at: nowIso() }).eq('driver_id', updated.driver_id);
