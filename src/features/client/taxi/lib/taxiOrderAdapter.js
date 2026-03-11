@@ -46,6 +46,8 @@ function normalizeLocationLike(input) {
     address,
     lat,
     lng,
+    latlng: [lat, lng],
+    coords: [lat, lng],
   };
 }
 

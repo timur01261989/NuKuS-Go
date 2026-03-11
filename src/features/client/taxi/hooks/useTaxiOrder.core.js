@@ -82,7 +82,10 @@ export function useTaxiOrderCore() {
   const [searchBusy, setSearchBusy] = useState(false);
 
   // Saved places and shortcuts
-  const [savedPlaces, setSavedPlaces] = useState([]);
+  const [savedPlaces, setSavedPlaces] = useState(() => {
+    const loaded = loadSavedPlaces();
+    return Array.isArray(loaded) ? loaded : [];
+  });
   const [myAddressesV1, setMyAddressesV1] = useState(() => loadMyAddressesV1());
   const [shortcuts, setShortcuts] = useState({ home: null, work: null });
 
@@ -199,8 +202,10 @@ export function useTaxiOrderCore() {
   // Get user location on mount
   useEffect(() => {
     const saved = loadSavedPlaces();
-    setSavedPlaces(saved);
-    setShortcuts(loadTaxiShortcuts());
+    setSavedPlaces(Array.isArray(saved) ? saved : []);
+
+    const loadedShortcuts = loadTaxiShortcuts();
+    setShortcuts(loadedShortcuts && typeof loadedShortcuts === "object" ? loadedShortcuts : { home: null, work: null });
 
     let mounted = true;
     const ok = (pos) => {

@@ -8,11 +8,13 @@ import {
   isApiOk,
 } from "../../../../utils/apiResponse";
 import { postJson } from "../../../../utils/apiHelper";
+import { supabase } from "@/lib/supabase";
 
 const ORDER_ENDPOINT = "/api/order";
 
-async function createOrderRequest(payload) {
-  return postJson(ORDER_ENDPOINT, payload);
+async function createOrderRequest(payload, accessToken = "") {
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined;
+  return postJson(ORDER_ENDPOINT, payload, headers ? { headers } : undefined);
 }
 
 function readNestedUuidCandidate(source) {
@@ -52,6 +54,28 @@ function tryParseJson(raw) {
     return JSON.parse(raw);
   } catch {
     return null;
+  }
+}
+
+
+async function resolveUserIdFromAuth() {
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) return null;
+    const id = data?.user?.id;
+    return id && String(id).trim() ? String(id).trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+async function resolveAccessToken() {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const token = data?.session?.access_token;
+    return token && String(token).trim() ? String(token).trim() : "";
+  } catch {
+    return "";
   }
 }
 
@@ -127,7 +151,8 @@ export function useTaxiOrderCreate(options = {}) {
   const handleOrderCreate = useCallback(async () => {
     if (creatingRef.current) return;
 
-    const resolvedUserId = clientId || resolveUserIdFromStorage();
+    const authUserId = await resolveUserIdFromAuth();
+    const resolvedUserId = authUserId || clientId || resolveUserIdFromStorage();
 
     if (!resolvedUserId) {
       message.error(
@@ -192,7 +217,8 @@ export function useTaxiOrderCreate(options = {}) {
     creatingRef.current = true;
 
     try {
-      const response = await createOrderRequest(payload);
+      const accessToken = await resolveAccessToken();
+      const response = await createOrderRequest(payload, accessToken);
       const ok = isApiOk(response);
       const apiError = extractApiError(response);
 
