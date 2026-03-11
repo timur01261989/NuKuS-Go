@@ -1133,10 +1133,18 @@ export default function ClientTaxiPage() {
   ) : null;
 
   // Map UI
+  const mapCenter = useMemo(() => {
+    const dynamicSteps = new Set(["main", "search", "dest_map", "stop_map"]);
+    if (dynamicSteps.has(step) && normalizeLatLng(centerLatLng)) {
+      return normalizeLatLng(centerLatLng);
+    }
+    return normalizeLatLng(pickup?.latlng) || userLoc || [42.4602, 59.6156];
+  }, [step, centerLatLng, pickup?.latlng, userLoc]);
+
   const MapUI = (
     <TaxiMap
       mapRef={mapRef}
-      center={normalizeLatLng(pickup?.latlng) || userLoc || [42.4602, 59.6156]}
+      center={mapCenter}
       mapTile={mapTile}
       step={step}
       userLoc={userLoc}

@@ -1,4 +1,4 @@
-import React, { memo, useEffect } from "react";
+import React, { memo, useEffect, useRef } from "react";
 import { MapContainer, TileLayer, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -51,12 +51,27 @@ function CenterWatcher({ onCenterChange, onMoveStart, onMoveEnd }) {
 
 function CenterSetter({ center, zoom = 15 }) {
   const map = useMap();
+  const lastAppliedRef = useRef(null);
 
   useEffect(() => {
     const c = normalizeLatLng(center);
     if (!map || !c) return;
-    // avoid animation storms; use setView without fly when already close
+
+    const current = map.getCenter();
+    const sameAsCurrent =
+      Math.abs(current.lat - c[0]) < 0.00001 &&
+      Math.abs(current.lng - c[1]) < 0.00001;
+
+    const last = lastAppliedRef.current;
+    const sameAsLast =
+      Array.isArray(last) &&
+      Math.abs(last[0] - c[0]) < 0.00001 &&
+      Math.abs(last[1] - c[1]) < 0.00001;
+
+    if (sameAsCurrent || sameAsLast) return;
+
     map.setView(c, map.getZoom() || zoom, { animate: false });
+    lastAppliedRef.current = c;
   }, [map, center, zoom]);
 
   return null;

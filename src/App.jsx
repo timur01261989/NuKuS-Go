@@ -47,6 +47,7 @@ const ClientProfile = lazy(() => import("@features/client/pages/ClientProfile"))
 const ClientPaymentMethods = lazy(() => import("@features/client/pages/ClientPaymentMethods"));
 const ClientPromo = lazy(() => import("@features/client/pages/ClientPromo"));
 const ClientTaxi = lazy(() => import("@features/client/taxi/ClientTaxiPage"));
+const ClientNavigatorPage = lazy(() => import("@features/client/taxi/ClientNavigatorPage"));
 const ClientIntercity = lazy(() => import("@features/client/intercity/ClientIntercityPage"));
 const ClientInterDistrict = lazy(() => import("@features/client/interDistrict/ClientInterDistrictPage"));
 const ClientFreight = lazy(() => import("@features/client/freight/ClientFreightPage"));
@@ -114,6 +115,7 @@ export default function App() {
                 >
                   <Route path="home" element={<ClientHome />} />
                   <Route path="taxi" element={<ClientTaxi />} />
+                  <Route path="navigator" element={<ClientNavigatorPage />} />
                   <Route path="inter-provincial" element={<ClientIntercity />} />
                   <Route path="inter-district" element={<ClientInterDistrict />} />
                   <Route path="freight" element={<ClientFreight />} />
