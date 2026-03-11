@@ -74,7 +74,7 @@ export function toCreateOrderPayload(draft = {}) {
 
   return {
     client_id: draft.client_id ?? draft.user_id ?? draft.userId ?? null,
-    service_type: draft.service_type ?? draft.serviceType ?? "city_taxi",
+    service_type: draft.service_type ?? draft.serviceType ?? "taxi",
     payment_method: draft.payment_method ?? draft.paymentMethod ?? null,
     car_type: draft.car_type ?? draft.carType ?? draft.tariff ?? draft.tarif ?? null,
     comment: draft.comment ?? draft.note ?? draft.notes ?? null,
@@ -127,7 +127,7 @@ export function fromOrderResponse(order = null) {
     client_id: order.client_id ?? order.user_id ?? null,
     driver_id: order.driver_id ?? null,
     status: order.status ?? null,
-    service_type: order.service_type ?? "city_taxi",
+    service_type: order.service_type ?? "taxi",
     pickup,
     dropoff: dropoff || null,
     payment_method: order.payment_method ?? null,

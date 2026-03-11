@@ -128,7 +128,7 @@ function buildNormalizedPayload(body) {
   const dropoff = normalizeDropoff(body);
 
   const paymentMethod = toText(body?.payment_method ?? body?.paymentMethod) || null;
-  const serviceType = toText(body?.service_type ?? body?.serviceType) || "city_taxi";
+  const serviceType = toText(body?.service_type ?? body?.serviceType) || "taxi";
   const carType = toText(body?.car_type ?? body?.carType ?? body?.tariff ?? body?.tarif) || null;
   const comment = toText(body?.comment ?? body?.note ?? body?.notes) || null;
 
@@ -165,7 +165,7 @@ function buildResponseOrder(row) {
     id: row.id,
     client_id: row.client_id ?? null,
     driver_id: row.driver_id ?? null,
-    service_type: row.service_type ?? "city_taxi",
+    service_type: row.service_type ?? "taxi",
     status: row.status ?? null,
     pickup: row.pickup ?? null,
     dropoff: row.dropoff ?? null,
