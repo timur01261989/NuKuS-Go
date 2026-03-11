@@ -1,8 +1,8 @@
 -- Unified order contract hardening for city taxi and related services.
 -- Safe additive migration: does not drop existing columns or tables.
 
-create index if not exists idx_orders_client_active
-  on public.orders (client_id, created_at desc)
+create index if not exists idx_orders_user_active
+  on public.orders (user_id, created_at desc)
   where status in ('draft','pending','searching','offered','accepted','arrived','in_progress','in_trip');
 
 create index if not exists idx_orders_driver_active

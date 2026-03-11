@@ -20,7 +20,7 @@ export default function TripHistory({ onBack }) {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { data } = await supabase.from('orders').select('*').or(`user_id.eq.${user.id},client_id.eq.${user.id}`).eq('status', 'completed').order('created_at', { ascending: false });
+      const { data } = await supabase.from('orders').select('*').eq("user_id", user.id).eq('status', 'completed').order('created_at', { ascending: false });
       if (data) setTrips(data);
     }
     setLoading(false);

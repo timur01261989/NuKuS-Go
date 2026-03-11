@@ -37,7 +37,7 @@ export default function RideHistory({ userId, role, onBack }) {
         const r = await supabase
           .from('orders')
           .select('*')
-          .or(`user_id.eq.${userId},client_id.eq.${userId}`)
+          .eq("user_id", userId)
           .order('created_at', { ascending: false });
 
         data = r.data || [];

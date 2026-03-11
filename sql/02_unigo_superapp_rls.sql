@@ -29,7 +29,9 @@ drop policy if exists wallets_select_own on public.wallets;
 drop policy if exists wallet_transactions_select_own on public.wallet_transactions;
 drop policy if exists billing_transactions_select_own on public.billing_transactions;
 drop policy if exists orders_select_own_or_assigned on public.orders;
+drop policy if exists orders_insert_own on public.orders;
 drop policy if exists orders_insert_client on public.orders;
+drop policy if exists orders_update_own on public.orders;
 drop policy if exists orders_update_client_limited on public.orders;
 drop policy if exists order_offers_select_driver on public.order_offers;
 drop policy if exists order_events_select_participant on public.order_events;
@@ -107,13 +109,13 @@ create policy orders_select_own_or_assigned on public.orders
 for select to authenticated
 using (user_id = auth.uid() or driver_id = auth.uid());
 
-create policy orders_insert_client on public.orders
+create policy orders_insert_own on public.orders
 for insert to authenticated
 with check (user_id = auth.uid());
 
-create policy orders_update_client_limited on public.orders
+create policy orders_update_own on public.orders
 for update to authenticated
-using (client_id = auth.uid())
+using (user_id = auth.uid())
 with check (user_id = auth.uid());
 
 -- order_offers
@@ -128,7 +130,7 @@ using (
   exists (
     select 1 from public.orders o
     where o.id = order_events.order_id
-      and (coalesce(o.user_id, o.client_id) = auth.uid() or o.driver_id = auth.uid())
+      and (o.user_id = auth.uid() or o.driver_id = auth.uid())
   )
 );
 
@@ -139,7 +141,7 @@ using (
   exists (
     select 1 from public.orders o
     where o.id = order_status_history.order_id
-      and (coalesce(o.user_id, o.client_id) = auth.uid() or o.driver_id = auth.uid())
+      and (o.user_id = auth.uid() or o.driver_id = auth.uid())
   )
 );
 

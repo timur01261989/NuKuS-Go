@@ -78,7 +78,7 @@ export default function RatingModal({ visible, order, onFinish }) {
       const { error } = await supabase.from("order_ratings").insert([
         {
           order_id: order.id,
-          from_user_id: order.user_id || order.client_id || null,
+          from_user_id: order.user_id || null,
           to_user_id: order.driver_id || null,
           role: "client_rates_driver",
           stars,

@@ -61,8 +61,8 @@ export function useOrderStatusPolling({ orderId, pickup, orderStatus, step, assi
           if (st === "completed" || st === "done") {
             speak(cp("Safar yakunlandi. Rahmat!"));
             const drvId = o?.driver?.id || o?.driver_id || o?.assigned_driver_id || null;
-            const clientId = o?.client_id || o?.user_id || null;
-            setCompletedOrderForRating({ id: orderId, driver_id: drvId, client_id: clientId });
+            const userId = o?.user_id || null;
+            setCompletedOrderForRating({ id: orderId, driver_id: drvId, user_id: userId });
             setRatingVisible(true);
             const price = Number(o?.price || o?.amount || o?.priceUzs || 0);
             setEarnedBonus(Math.max(1, Math.floor(price * 0.01)));

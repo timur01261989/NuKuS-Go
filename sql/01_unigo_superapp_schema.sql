@@ -370,7 +370,6 @@ create index if not exists idx_billing_transactions_source on public.billing_tra
 create table if not exists public.orders (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(id) on delete cascade,
-  client_id uuid not null references public.profiles(id) on delete cascade,
   driver_id uuid references public.profiles(id) on delete set null,
   service_type text not null check (service_type in ('taxi','delivery','inter_district','inter_city','freight')),
   status text not null default 'searching' check (status in ('draft','pending','searching','offered','accepted','arrived','in_progress','in_trip','completed','cancelled_by_client','cancelled_by_driver','cancelled','expired')),
@@ -405,7 +404,6 @@ create table if not exists public.orders (
 );
 
 create index if not exists idx_orders_user on public.orders(user_id, created_at desc);
-create index if not exists idx_orders_client on public.orders(client_id, created_at desc);
 create index if not exists idx_orders_driver on public.orders(driver_id, created_at desc);
 create index if not exists idx_orders_status on public.orders(status, service_type, created_at desc);
 drop trigger if exists trg_orders_touch_updated_at on public.orders;
@@ -413,31 +411,6 @@ create trigger trg_orders_touch_updated_at
 before update on public.orders
 for each row execute function public.touch_updated_at();
 
-create or replace function public.sync_orders_user_identity()
-returns trigger
-language plpgsql
-as $$
-begin
-  if new.user_id is null and new.client_id is not null then
-    new.user_id := new.client_id;
-  end if;
-
-  if new.client_id is null and new.user_id is not null then
-    new.client_id := new.user_id;
-  end if;
-
-  if new.user_id is not null and new.client_id is not null and new.user_id <> new.client_id then
-    new.client_id := new.user_id;
-  end if;
-
-  return new;
-end;
-$$;
-
-drop trigger if exists trg_orders_sync_user_identity on public.orders;
-create trigger trg_orders_sync_user_identity
-before insert or update on public.orders
-for each row execute function public.sync_orders_user_identity();
 
 create table if not exists public.order_offers (
   id uuid primary key default gen_random_uuid(),
@@ -807,7 +780,7 @@ begin
   if v_order.payment_method = 'wallet' and coalesce(v_order.price_uzs, 0) > 0 then
     select balance_uzs into v_wallet_balance
     from public.wallets
-    where user_id = v_order.client_id
+    where user_id = v_order.user_id
     for update;
 
     if coalesce(v_wallet_balance, 0) < v_order.price_uzs then
@@ -818,7 +791,7 @@ begin
        set balance_uzs = balance_uzs - v_order.price_uzs,
            total_spent_uzs = total_spent_uzs + v_order.price_uzs,
            updated_at = now()
-     where user_id = v_order.client_id;
+     where user_id = v_order.user_id;
 
     update public.wallets
        set balance_uzs = balance_uzs + coalesce(v_order.driver_payout_uzs, 0),
@@ -828,7 +801,7 @@ begin
 
     insert into public.wallet_transactions(user_id, direction, kind, service_type, amount_uzs, order_id, description)
     values
-      (v_order.client_id, 'debit', 'order_payment', v_order.service_type, v_order.price_uzs, p_order_id, 'Order payment'),
+      (v_order.user_id, 'debit', 'order_payment', v_order.service_type, v_order.price_uzs, p_order_id, 'Order payment'),
       (v_order.driver_id, 'credit', 'order_payout', v_order.service_type, coalesce(v_order.driver_payout_uzs, 0), p_order_id, 'Driver payout');
 
     if coalesce(v_order.commission_uzs, 0) > 0 then

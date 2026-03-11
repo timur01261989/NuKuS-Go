@@ -12,9 +12,8 @@ import { supabase } from "@/lib/supabase";
 
 const ORDER_ENDPOINT = "/api/order";
 
-async function createOrderRequest(payload, accessToken = "") {
-  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined;
-  return postJson(ORDER_ENDPOINT, payload, headers ? { headers } : undefined);
+async function createOrderRequest(payload) {
+  return postJson(ORDER_ENDPOINT, payload);
 }
 
 function readNestedUuidCandidate(source) {
@@ -24,8 +23,6 @@ function readNestedUuidCandidate(source) {
     source.id,
     source.user_id,
     source.userId,
-    source.client_id,
-    source.clientId,
     source.uid,
     source.sub,
   ];
@@ -57,36 +54,12 @@ function tryParseJson(raw) {
   }
 }
 
-
-async function resolveUserIdFromAuth() {
-  try {
-    const { data, error } = await supabase.auth.getUser();
-    if (error) return null;
-    const id = data?.user?.id;
-    return id && String(id).trim() ? String(id).trim() : null;
-  } catch {
-    return null;
-  }
-}
-
-async function resolveAccessToken() {
-  try {
-    const { data } = await supabase.auth.getSession();
-    const token = data?.session?.access_token;
-    return token && String(token).trim() ? String(token).trim() : "";
-  } catch {
-    return "";
-  }
-}
-
 function resolveUserIdFromStorage() {
   if (typeof window === "undefined") return null;
 
   const directStorageKeys = [
     "user_id",
     "userId",
-    "client_id",
-    "clientId",
     "uid",
     "auth_user_id",
     "supabase.auth.user.id",
@@ -128,7 +101,7 @@ function resolveUserIdFromStorage() {
 export function useTaxiOrderCreate(options = {}) {
   const {
     cp,
-    clientId,
+    userId,
     pickup,
     dest,
     tariff,
@@ -151,8 +124,20 @@ export function useTaxiOrderCreate(options = {}) {
   const handleOrderCreate = useCallback(async () => {
     if (creatingRef.current) return;
 
-    const authUserId = await resolveUserIdFromAuth();
-    const resolvedUserId = authUserId || clientId || resolveUserIdFromStorage();
+    let resolvedUserId = userId || null;
+
+    if (!resolvedUserId) {
+      try {
+        const { data } = await supabase.auth.getUser();
+        resolvedUserId = data?.user?.id || null;
+      } catch {
+        resolvedUserId = null;
+      }
+    }
+
+    if (!resolvedUserId) {
+      resolvedUserId = resolveUserIdFromStorage();
+    }
 
     if (!resolvedUserId) {
       message.error(
@@ -171,7 +156,6 @@ export function useTaxiOrderCreate(options = {}) {
 
     const draft = {
       user_id: resolvedUserId,
-      client_id: resolvedUserId,
       pickup,
       dropoff: dest?.latlng
         ? {
@@ -217,8 +201,7 @@ export function useTaxiOrderCreate(options = {}) {
     creatingRef.current = true;
 
     try {
-      const accessToken = await resolveAccessToken();
-      const response = await createOrderRequest(payload, accessToken);
+      const response = await createOrderRequest(payload);
       const ok = isApiOk(response);
       const apiError = extractApiError(response);
 
@@ -297,7 +280,7 @@ export function useTaxiOrderCreate(options = {}) {
       creatingRef.current = false;
     }
   }, [
-    clientId,
+    userId,
     cp,
     pickup,
     dest,

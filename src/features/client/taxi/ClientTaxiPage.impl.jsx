@@ -552,11 +552,11 @@ export default function ClientTaxiPage() {
             Ish
           </Button>
         </div>
-        {(Array.isArray(savedPlaces) ? savedPlaces.length : 0) === 0 ? (
+        {savedPlaces.length === 0 ? (
           <div style={{ fontSize: 12, opacity: 0.55, padding: "8px 0" }}>Hozircha saqlangan manzil yo'q</div>
         ) : (
           <div className="yg-saved">
-            {(Array.isArray(savedPlaces) ? savedPlaces : []).slice(0, 4).map((p) => (
+            {savedPlaces.slice(0, 4).map((p) => (
               <button key={p.id || p.place_id || `${p.lat},${p.lng}`} className="yg-saved-item" onClick={() => handlePickSaved(p)}>
                 <div className="yg-saved-ic">📍</div>
                 <div className="yg-saved-txt">
@@ -1090,7 +1090,7 @@ export default function ClientTaxiPage() {
       <div className="yg-wave" />
       <div className="yg-wave" />
       <div className="yg-wave" />
-      {(Array.isArray(dispatchLine) ? dispatchLine.length : 0) > 1 ? (
+      {dispatchLine.length > 1 ? (
         <Polyline positions={dispatchLine} pathOptions={{ weight: 4, opacity: 0.65, dashArray: "8 10" }} />
       ) : null}
       {nearCars.map((c, idx) => {
@@ -1340,7 +1340,7 @@ export default function ClientTaxiPage() {
 
   const bonusNode = (
     <ClientBonusWidget
-      userId={completedOrderForRating?.client_id || null}
+      userId={completedOrderForRating?.user_id || null}
       earnedPoints={earnedBonus}
       visible={bonusVisible}
       onClose={() => {

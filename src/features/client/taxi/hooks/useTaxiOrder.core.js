@@ -82,10 +82,7 @@ export function useTaxiOrderCore() {
   const [searchBusy, setSearchBusy] = useState(false);
 
   // Saved places and shortcuts
-  const [savedPlaces, setSavedPlaces] = useState(() => {
-    const loaded = loadSavedPlaces();
-    return Array.isArray(loaded) ? loaded : [];
-  });
+  const [savedPlaces, setSavedPlaces] = useState([]);
   const [myAddressesV1, setMyAddressesV1] = useState(() => loadMyAddressesV1());
   const [shortcuts, setShortcuts] = useState({ home: null, work: null });
 
@@ -202,10 +199,8 @@ export function useTaxiOrderCore() {
   // Get user location on mount
   useEffect(() => {
     const saved = loadSavedPlaces();
-    setSavedPlaces(Array.isArray(saved) ? saved : []);
-
-    const loadedShortcuts = loadTaxiShortcuts();
-    setShortcuts(loadedShortcuts && typeof loadedShortcuts === "object" ? loadedShortcuts : { home: null, work: null });
+    setSavedPlaces(saved);
+    setShortcuts(loadTaxiShortcuts());
 
     let mounted = true;
     const ok = (pos) => {
@@ -325,7 +320,7 @@ export function useTaxiOrderCore() {
   );
 
   const currentUserId = useMemo(() => {
-    const storageKeys = ["user_id", "userId", "client_id", "clientId", "uid", "auth_user_id", "supabase.auth.user.id"];
+    const storageKeys = ["user_id", "userId", "uid", "auth_user_id", "supabase.auth.user.id"];
 
     for (const key of storageKeys) {
       try {
@@ -340,7 +335,7 @@ export function useTaxiOrderCore() {
 
     const readNestedUserId = (value) => {
       if (!value || typeof value !== "object") return null;
-      const candidates = [value.id, value.user_id, value.userId, value.client_id, value.clientId, value.uid, value.sub];
+      const candidates = [value.id, value.user_id, value.userId, value.uid, value.sub];
       for (const candidate of candidates) {
         if (candidate != null && String(candidate).trim()) return String(candidate).trim();
       }
@@ -372,7 +367,7 @@ export function useTaxiOrderCore() {
     return null;
   }, []);
 
-  const handleOrderCreate = useTaxiOrderCreate({ clientId: currentUserId, cp, pickup, dest, tariff, totalPrice, distanceKm, waypoints, orderFor, otherPhone, wishes, comment, scheduledTime, setOrderId, setOrderStatus, setStep, speak });
+  const handleOrderCreate = useTaxiOrderCreate({ userId: currentUserId, cp, pickup, dest, tariff, totalPrice, distanceKm, waypoints, orderFor, otherPhone, wishes, comment, scheduledTime, setOrderId, setOrderStatus, setStep, speak });
 
   const { handleCancel } = useTaxiOrderActions({
     cp,

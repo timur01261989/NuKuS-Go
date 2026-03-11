@@ -1,6 +1,5 @@
 const ORDER_SELECT = [
   "id",
-  "client_id",
   "user_id",
   "driver_id",
   "service_type",
@@ -26,18 +25,6 @@ const ORDER_SELECT = [
   "cancel_reason",
   "created_at",
   "updated_at",
-  "car_type",
-  "comment",
-  "pickup_lat",
-  "pickup_lng",
-  "dropoff_lat",
-  "dropoff_lng",
-  "distance_km",
-  "price",
-  "distance_m",
-  "duration_s",
-  "surge_multiplier",
-  "options",
 ].join(",");
 
 function json(res, status, payload) {
@@ -177,7 +164,7 @@ function buildNormalizedPayload(body) {
   const cargoVolumeM3 = toNumber(body?.cargo_volume_m3 ?? body?.cargoVolumeM3 ?? options?.cargoVolumeM3 ?? options?.volumeM3);
   const passengerCount = toInteger(body?.passenger_count ?? body?.passengerCount ?? options?.passengerCount) ?? (serviceType === "taxi" ? 1 : null);
 
-  const normalizedUserId = normalizeUuid(body?.user_id ?? body?.userId ?? body?.client_id ?? body?.clientId);
+  const normalizedUserId = normalizeUuid(body?.user_id ?? body?.userId);
   const normalizedDriverId = normalizeUuid(body?.driver_id ?? body?.driverId);
 
   const routeMeta = {
@@ -193,7 +180,6 @@ function buildNormalizedPayload(body) {
 
   return {
     user_id: normalizedUserId,
-    client_id: normalizedUserId,
     driver_id: normalizedDriverId,
     service_type: serviceType,
     status: toText(body?.status) || "searching",
@@ -219,28 +205,21 @@ function buildResponseOrder(row) {
 
   return {
     id: row.id,
-    user_id: row.user_id ?? row.client_id ?? null,
-    client_id: row.client_id ?? row.user_id ?? null,
+    user_id: row.user_id ?? null,
     driver_id: row.driver_id ?? null,
     service_type: row.service_type ?? "taxi",
     status: row.status ?? null,
     pickup: row.pickup ?? null,
     dropoff: row.dropoff ?? null,
     payment_method: row.payment_method ?? null,
-    car_type: row.car_type ?? pricing.car_type ?? null,
-    comment: row.comment ?? row.note ?? null,
-    note: row.note ?? row.comment ?? null,
-    price_uzs: row.price_uzs ?? row.price ?? null,
-    price: row.price ?? row.price_uzs ?? null,
-    surge_multiplier: row.surge_multiplier ?? pricing.surge_multiplier ?? 1,
-    distance_m: row.distance_m ?? pricing.distance_m ?? null,
-    distance_km: row.distance_km ?? (row.distance_m != null ? Number(row.distance_m) / 1000 : null),
-    duration_s: row.duration_s ?? pricing.duration_s ?? null,
-    pickup_lat: row.pickup_lat ?? row.pickup?.lat ?? null,
-    pickup_lng: row.pickup_lng ?? row.pickup?.lng ?? null,
-    dropoff_lat: row.dropoff_lat ?? row.dropoff?.lat ?? null,
-    dropoff_lng: row.dropoff_lng ?? row.dropoff?.lng ?? null,
-    options: row.options ?? options,
+    car_type: pricing.car_type ?? null,
+    comment: row.note ?? null,
+    note: row.note ?? null,
+    price_uzs: row.price_uzs ?? null,
+    surge_multiplier: pricing.surge_multiplier ?? 1,
+    distance_m: pricing.distance_m ?? null,
+    duration_s: pricing.duration_s ?? null,
+    options,
     meta: routeMeta,
     cargo_title: row.cargo_title ?? null,
     cargo_weight_kg: row.cargo_weight_kg ?? null,
@@ -343,8 +322,8 @@ async function handleGetById(supabase, body) {
 }
 
 async function handleActiveOrder(supabase, body, authedUserId = null) {
-  const clientId = normalizeUuid(authedUserId ?? body?.user_id ?? body?.userId ?? body?.client_id ?? body?.clientId);
-  if (!clientId) {
+  const userId = normalizeUuid(authedUserId ?? body?.user_id ?? body?.userId);
+  if (!userId) {
     return { status: 400, payload: { ok: false, error: "user_id kerak" } };
   }
 
@@ -353,7 +332,7 @@ async function handleActiveOrder(supabase, body, authedUserId = null) {
   const { data, error } = await supabase
     .from("orders")
     .select(ORDER_SELECT)
-    .or(`user_id.eq.${clientId},client_id.eq.${clientId}`)
+    .eq("user_id", userId)
     .in("status", activeStatuses)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -420,7 +399,7 @@ async function handleCancel(supabase, body, authedUserId = null) {
   await supabase.from("order_status_history").insert({
     order_id: orderId,
     status: "cancelled",
-    changed_by: normalizeUuid(authedUserId ?? body?.user_id ?? body?.userId ?? body?.client_id ?? body?.clientId ?? body?.driver_id ?? body?.driverId),
+    changed_by: normalizeUuid(authedUserId ?? body?.user_id ?? body?.userId ?? body?.driver_id ?? body?.driverId),
     note: cancelReason || "Cancelled via API",
   });
 
@@ -439,7 +418,7 @@ async function handleCancel(supabase, body, authedUserId = null) {
 async function handleCreateOrder(supabase, body, authedUserId = null) {
   const payload = buildNormalizedPayload(body);
 
-  const payloadUserId = payload.user_id ?? payload.client_id ?? null;
+  const payloadUserId = payload.user_id ?? null;
   const canonicalUserId = normalizeUuid(authedUserId ?? payloadUserId);
 
   if (authedUserId && payloadUserId && canonicalUserId !== payloadUserId) {
@@ -474,7 +453,6 @@ async function handleCreateOrder(supabase, body, authedUserId = null) {
 
   const insertPayload = {
     user_id: canonicalUserId,
-    client_id: canonicalUserId,
     driver_id: payload.driver_id,
     service_type: payload.service_type,
     status: payload.status,
@@ -482,20 +460,8 @@ async function handleCreateOrder(supabase, body, authedUserId = null) {
     dropoff: payload.dropoff,
     payment_method: payload.payment_method,
     note: payload.note,
-    comment: payload.note,
     price_uzs: payload.price_uzs,
-    price: payload.price_uzs,
     route_meta: payload.route_meta,
-    options: payload.route_meta?.options ?? {},
-    surge_multiplier: payload.route_meta?.pricing?.surge_multiplier ?? 1,
-    distance_m: payload.route_meta?.pricing?.distance_m ?? null,
-    distance_km: payload.route_meta?.pricing?.distance_m != null ? Number(payload.route_meta.pricing.distance_m) / 1000 : null,
-    duration_s: payload.route_meta?.pricing?.duration_s ?? null,
-    car_type: payload.route_meta?.pricing?.car_type ?? null,
-    pickup_lat: payload.pickup?.lat ?? null,
-    pickup_lng: payload.pickup?.lng ?? null,
-    dropoff_lat: payload.dropoff?.lat ?? null,
-    dropoff_lng: payload.dropoff?.lng ?? null,
     cargo_title: payload.cargo_title,
     cargo_weight_kg: payload.cargo_weight_kg,
     cargo_volume_m3: payload.cargo_volume_m3,

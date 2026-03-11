@@ -21,33 +21,30 @@ drop policy if exists "orders_select_client_or_driver" on public.orders;
 drop policy if exists "orders_update_client_or_driver" on public.orders;
 drop policy if exists "orders_delete_client" on public.orders;
 
-create policy "orders_select_client_or_driver"
+create policy "orders_select_own_or_driver"
 on public.orders
 for select
 to authenticated
-using (client_id = auth.uid() or driver_id = auth.uid());
+using (user_id = auth.uid() or driver_id = auth.uid());
 
-create policy "orders_insert_client"
+create policy "orders_insert_own"
 on public.orders
 for insert
 to authenticated
-with check (client_id = auth.uid());
+with check (user_id = auth.uid());
 
-create policy "orders_update_client_or_driver"
+create policy "orders_update_own_or_driver"
 on public.orders
 for update
 to authenticated
-using (client_id = auth.uid() or driver_id = auth.uid())
-with check (client_id = auth.uid() or driver_id = auth.uid());
+using (user_id = auth.uid() or driver_id = auth.uid())
+with check (user_id = auth.uid() or driver_id = auth.uid());
 
-create policy "orders_delete_client"
+create policy "orders_delete_own"
 on public.orders
 for delete
 to authenticated
-using (client_id = auth.uid());
+using (user_id = auth.uid());
 
-update public.orders
-set user_id = client_id
-where user_id is null and client_id is not null;
 
 commit;
