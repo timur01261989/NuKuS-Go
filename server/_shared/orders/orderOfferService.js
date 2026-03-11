@@ -99,7 +99,7 @@ export async function acceptOrderOffer(supabase, {
     .update({ driver_id: safeDriverId, status: 'accepted', accepted_at: nowIso(), updated_at: nowIso() })
     .eq('id', safeOrderId)
     .is('driver_id', null)
-    .select('id,status,driver_id,service_type,pickup,dropoff,price_uzs,client_id')
+    .select('id,status,driver_id,service_type,pickup,dropoff,price_uzs,user_id,client_id')
     .maybeSingle();
 
   if (orderUpdateError) throw orderUpdateError;

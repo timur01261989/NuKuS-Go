@@ -55,7 +55,7 @@ function tryParseJson(raw) {
   }
 }
 
-function resolveClientIdFromStorage() {
+function resolveUserIdFromStorage() {
   if (typeof window === "undefined") return null;
 
   const directStorageKeys = [
@@ -127,9 +127,9 @@ export function useTaxiOrderCreate(options = {}) {
   const handleOrderCreate = useCallback(async () => {
     if (creatingRef.current) return;
 
-    const resolvedClientId = clientId || resolveClientIdFromStorage();
+    const resolvedUserId = clientId || resolveUserIdFromStorage();
 
-    if (!resolvedClientId) {
+    if (!resolvedUserId) {
       message.error(
         cp
           ? cp("Foydalanuvchi ID topilmadi. Qayta login qiling")
@@ -138,15 +138,15 @@ export function useTaxiOrderCreate(options = {}) {
 
       return {
         ok: false,
-        error: "missing_client_id",
+        error: "missing_user_id",
         order: null,
         orderId: null,
       };
     }
 
     const draft = {
-      client_id: resolvedClientId,
-      user_id: resolvedClientId,
+      user_id: resolvedUserId,
+      client_id: resolvedUserId,
       pickup,
       dropoff: dest?.latlng
         ? {

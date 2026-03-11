@@ -105,16 +105,16 @@ using (user_id = auth.uid());
 -- orders
 create policy orders_select_own_or_assigned on public.orders
 for select to authenticated
-using (client_id = auth.uid() or driver_id = auth.uid());
+using (user_id = auth.uid() or driver_id = auth.uid());
 
 create policy orders_insert_client on public.orders
 for insert to authenticated
-with check (client_id = auth.uid());
+with check (user_id = auth.uid());
 
 create policy orders_update_client_limited on public.orders
 for update to authenticated
 using (client_id = auth.uid())
-with check (client_id = auth.uid());
+with check (user_id = auth.uid());
 
 -- order_offers
 create policy order_offers_select_driver on public.order_offers
@@ -128,7 +128,7 @@ using (
   exists (
     select 1 from public.orders o
     where o.id = order_events.order_id
-      and (o.client_id = auth.uid() or o.driver_id = auth.uid())
+      and (coalesce(o.user_id, o.client_id) = auth.uid() or o.driver_id = auth.uid())
   )
 );
 
@@ -139,7 +139,7 @@ using (
   exists (
     select 1 from public.orders o
     where o.id = order_status_history.order_id
-      and (o.client_id = auth.uid() or o.driver_id = auth.uid())
+      and (coalesce(o.user_id, o.client_id) = auth.uid() or o.driver_id = auth.uid())
   )
 );
 

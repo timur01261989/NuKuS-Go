@@ -121,6 +121,7 @@ export async function getMyDriverApplicationWithDocuments() {
     .from("driver_documents")
     .select("*")
     .eq("application_id", application.id)
+    .eq("user_id", user.id)
     .order("created_at", { ascending: true });
 
   if (docsError) {
@@ -253,10 +254,26 @@ export async function upsertDriverApplication(formData) {
 export async function uploadDriverDocuments(applicationId, files = {}) {
   const user = await getAuthenticatedUser();
 
+  const { data: ownedApplication, error: ownedApplicationError } = await supabase
+    .from("driver_applications")
+    .select("id,user_id")
+    .eq("id", applicationId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (ownedApplicationError) {
+    throw new Error(`Ariza egasini tekshirishda xato: ${ownedApplicationError.message}`);
+  }
+
+  if (!ownedApplication?.id) {
+    throw new Error("Bu ariza sizga tegishli emas yoki topilmadi");
+  }
+
   const { data: existingDocs, error: existingDocsError } = await supabase
     .from("driver_documents")
     .select("*")
-    .eq("application_id", applicationId);
+    .eq("application_id", applicationId)
+    .eq("user_id", user.id);
 
   if (existingDocsError) {
     throw new Error(`Mavjud hujjatlarni olishda xato: ${existingDocsError.message}`);

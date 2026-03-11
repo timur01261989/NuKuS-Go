@@ -1,6 +1,7 @@
 const ORDER_SELECT = [
   "id",
   "client_id",
+  "user_id",
   "driver_id",
   "service_type",
   "status",
@@ -164,7 +165,7 @@ function buildNormalizedPayload(body) {
   const cargoVolumeM3 = toNumber(body?.cargo_volume_m3 ?? body?.cargoVolumeM3 ?? options?.cargoVolumeM3 ?? options?.volumeM3);
   const passengerCount = toInteger(body?.passenger_count ?? body?.passengerCount ?? options?.passengerCount) ?? (serviceType === "taxi" ? 1 : null);
 
-  const normalizedClientId = normalizeUuid(body?.client_id ?? body?.clientId ?? body?.user_id ?? body?.userId);
+  const normalizedUserId = normalizeUuid(body?.user_id ?? body?.userId ?? body?.client_id ?? body?.clientId);
   const normalizedDriverId = normalizeUuid(body?.driver_id ?? body?.driverId);
 
   const routeMeta = {
@@ -179,7 +180,8 @@ function buildNormalizedPayload(body) {
   };
 
   return {
-    client_id: normalizedClientId,
+    user_id: normalizedUserId,
+    client_id: normalizedUserId,
     driver_id: normalizedDriverId,
     service_type: serviceType,
     status: toText(body?.status) || "searching",
@@ -205,8 +207,8 @@ function buildResponseOrder(row) {
 
   return {
     id: row.id,
-    client_id: row.client_id ?? null,
-    user_id: row.client_id ?? null,
+    user_id: row.user_id ?? row.client_id ?? null,
+    client_id: row.client_id ?? row.user_id ?? null,
     driver_id: row.driver_id ?? null,
     service_type: row.service_type ?? "taxi",
     status: row.status ?? null,
@@ -279,6 +281,21 @@ async function getSupabaseAdmin() {
   });
 }
 
+function getBearerToken(req) {
+  const h = req?.headers?.authorization || req?.headers?.Authorization || "";
+  const m = String(h).match(/^Bearer\s+(.+)$/i);
+  return m ? m[1].trim() : "";
+}
+
+async function getAuthedUserId(req, supabase) {
+  const token = getBearerToken(req);
+  if (!token) return null;
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error) return null;
+  return data?.user?.id || null;
+}
+
+
 async function handleGetById(supabase, body) {
   const orderId = toText(body?.order_id ?? body?.orderId ?? body?.id);
   if (!orderId) {
@@ -307,10 +324,10 @@ async function handleGetById(supabase, body) {
   };
 }
 
-async function handleActiveOrder(supabase, body) {
-  const clientId = normalizeUuid(body?.client_id ?? body?.user_id ?? body?.clientId ?? body?.userId);
+async function handleActiveOrder(supabase, body, authedUserId = null) {
+  const clientId = normalizeUuid(authedUserId ?? body?.user_id ?? body?.userId ?? body?.client_id ?? body?.clientId);
   if (!clientId) {
-    return { status: 400, payload: { ok: false, error: "client_id kerak" } };
+    return { status: 400, payload: { ok: false, error: "user_id kerak" } };
   }
 
   const activeStatuses = ["pending", "searching", "offered", "accepted", "arrived", "in_progress", "in_trip"];
@@ -318,7 +335,7 @@ async function handleActiveOrder(supabase, body) {
   const { data, error } = await supabase
     .from("orders")
     .select(ORDER_SELECT)
-    .eq("client_id", clientId)
+    .or(`user_id.eq.${clientId},client_id.eq.${clientId}`)
     .in("status", activeStatuses)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -353,7 +370,7 @@ async function handleActiveOrder(supabase, body) {
   };
 }
 
-async function handleCancel(supabase, body) {
+async function handleCancel(supabase, body, authedUserId = null) {
   const orderId = toText(body?.order_id ?? body?.orderId ?? body?.id);
   const cancelReason = toText(body?.cancel_reason ?? body?.cancelReason ?? body?.reason) || null;
 
@@ -385,7 +402,7 @@ async function handleCancel(supabase, body) {
   await supabase.from("order_status_history").insert({
     order_id: orderId,
     status: "cancelled",
-    changed_by: normalizeUuid(body?.client_id ?? body?.clientId ?? body?.user_id ?? body?.userId ?? body?.driver_id ?? body?.driverId),
+    changed_by: normalizeUuid(authedUserId ?? body?.user_id ?? body?.userId ?? body?.client_id ?? body?.clientId ?? body?.driver_id ?? body?.driverId),
     note: cancelReason || "Cancelled via API",
   });
 
@@ -401,15 +418,28 @@ async function handleCancel(supabase, body) {
   };
 }
 
-async function handleCreateOrder(supabase, body) {
+async function handleCreateOrder(supabase, body, authedUserId = null) {
   const payload = buildNormalizedPayload(body);
 
-  if (!payload.client_id) {
+  const payloadUserId = payload.user_id ?? payload.client_id ?? null;
+  const canonicalUserId = normalizeUuid(authedUserId ?? payloadUserId);
+
+  if (authedUserId && payloadUserId && canonicalUserId !== payloadUserId) {
+    return {
+      status: 403,
+      payload: {
+        ok: false,
+        error: "token user_id payload user_id bilan mos emas",
+      },
+    };
+  }
+
+  if (!canonicalUserId) {
     return {
       status: 400,
       payload: {
         ok: false,
-        error: "client_id yoki user_id yuborilishi shart",
+        error: "user_id yuborilishi shart",
       },
     };
   }
@@ -425,7 +455,8 @@ async function handleCreateOrder(supabase, body) {
   }
 
   const insertPayload = {
-    client_id: payload.client_id,
+    user_id: canonicalUserId,
+    client_id: canonicalUserId,
     driver_id: payload.driver_id,
     service_type: payload.service_type,
     status: payload.status,
@@ -460,7 +491,7 @@ async function handleCreateOrder(supabase, body) {
 
   await supabase.from("order_events").insert({
     order_id: data.id,
-    actor_user_id: payload.client_id,
+    actor_user_id: canonicalUserId,
     actor_role: "client",
     event_code: "order.created",
     from_status: null,
@@ -474,7 +505,7 @@ async function handleCreateOrder(supabase, body) {
   await supabase.from("order_status_history").insert({
     order_id: data.id,
     status: data.status,
-    changed_by: payload.client_id,
+    changed_by: canonicalUserId,
     note: "Created via API",
   });
 
@@ -496,6 +527,7 @@ export default async function handler(req, res) {
     const body = await readBody(req);
     const action = toText(body?.action).toLowerCase();
     const supabase = await getSupabaseAdmin();
+    const authedUserId = await getAuthedUserId(req, supabase);
 
     if (method === "GET") {
       const result = await handleGetById(supabase, body);
@@ -512,16 +544,16 @@ export default async function handler(req, res) {
     }
 
     if (action === "active") {
-      const result = await handleActiveOrder(supabase, body);
+      const result = await handleActiveOrder(supabase, body, authedUserId);
       return json(res, result.status, result.payload);
     }
 
     if (action === "cancel") {
-      const result = await handleCancel(supabase, body);
+      const result = await handleCancel(supabase, body, authedUserId);
       return json(res, result.status, result.payload);
     }
 
-    const result = await handleCreateOrder(supabase, body);
+    const result = await handleCreateOrder(supabase, body, authedUserId);
     return json(res, result.status, result.payload);
   } catch (error) {
     return json(res, 500, {
