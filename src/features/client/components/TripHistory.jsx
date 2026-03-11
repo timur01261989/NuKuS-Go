@@ -20,7 +20,7 @@ export default function TripHistory({ onBack }) {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { data } = await supabase.from('orders').select('*').eq('client_id', user.id).eq('status', 'completed').order('created_at', { ascending: false });
+      const { data } = await supabase.from('orders').select('*').or(`user_id.eq.${user.id},client_id.eq.${user.id}`).eq('status', 'completed').order('created_at', { ascending: false });
       if (data) setTrips(data);
     }
     setLoading(false);
@@ -45,19 +45,19 @@ export default function TripHistory({ onBack }) {
             <Card style={{ borderRadius: 20, marginBottom: 15, border: 'none', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }} bodyStyle={{ padding: '15px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
                 <Tag color="default" icon={<ClockCircleOutlined />}>{new Date(trip.created_at).toLocaleDateString()}</Tag>
-                <Text strong style={{ color: '#1890ff' }}>{parseInt(trip.price || 0).toLocaleString()} {t.som}</Text>
+                <Text strong style={{ color: '#1890ff' }}>{parseInt(trip.price_uzs || trip.price || 0).toLocaleString()} {t.som}</Text>
               </div>
               <div style={{ position: 'relative', paddingLeft: '20px' }}>
                 <div style={{ position: 'absolute', left: 4, top: 6, bottom: 6, width: 2, background: '#ddd' }} />
                 <div style={{ marginBottom: 10 }}>
                   <div style={{ width: 8, height: 8, background: '#52c41a', borderRadius: '50%', position: 'absolute', left: 1, top: 6 }} />
                   <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>{t.fromLabel}:</Text>
-                  <Text strong>{trip.pickup_location?.split(',').slice(0, 2).join(',')}</Text>
+                  <Text strong>{trip.pickup?.address?.split(',').slice(0, 2).join(',') || trip.pickup_location?.split(',').slice(0, 2).join(',')}</Text>
                 </div>
                 <div>
                   <div style={{ width: 8, height: 8, background: '#ff4d4f', borderRadius: 2, position: 'absolute', left: 1, bottom: 12 }} />
                   <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>{t.toLabel}:</Text>
-                  <Text strong>{trip.dropoff_location?.split(',').slice(0, 2).join(',') || t.locateOnMap}</Text>
+                  <Text strong>{trip.dropoff?.address?.split(',').slice(0, 2).join(',') || trip.dropoff_location?.split(',').slice(0, 2).join(',') || t.locateOnMap}</Text>
                 </div>
               </div>
               <div style={{ marginTop: 15, paddingTop: 10, borderTop: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>

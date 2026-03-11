@@ -37,7 +37,7 @@ export default function RideHistory({ userId, role, onBack }) {
         const r = await supabase
           .from('orders')
           .select('*')
-          .eq('client_id', userId)
+          .or(`user_id.eq.${userId},client_id.eq.${userId}`)
           .order('created_at', { ascending: false });
 
         data = r.data || [];
@@ -95,11 +95,11 @@ export default function RideHistory({ userId, role, onBack }) {
                 </div>
                 <div style={{ flex: 1 }}>
                   <Text strong style={{ display: 'block', fontSize: 14, fontFamily: 'YangoHeadline' }}>
-                    {item.pickup_address || tr('rideHistory.startPoint', "Boshlang'ich nuqta")}
+                    {item.pickup?.address || item.pickup_address || tr('rideHistory.startPoint', "Boshlang'ich nuqta")}
                   </Text>
                   <div style={{ height: 12 }} />
                   <Text strong style={{ display: 'block', fontSize: 14, fontFamily: 'YangoHeadline' }}>
-                    {item.destination_address || tr("rideHistory.destinationReached", "Manzilga yetib borildi")}
+                    {item.dropoff?.address || item.destination_address || tr("rideHistory.destinationReached", "Manzilga yetib borildi")}
                   </Text>
                 </div>
               </div>
@@ -108,7 +108,7 @@ export default function RideHistory({ userId, role, onBack }) {
                 <div>
                    <Text type="secondary" style={{ fontSize: 12 }}>{tr('rideHistory.tripPrice', 'Safar narxi:')}</Text>
                    <div style={{ fontSize: 18, fontWeight: 'bold', fontFamily: 'YangoHeadline' }}>
-                     {item.price?.toLocaleString()} {tr('common.sum', "so'm")}
+                     {Number(item.price_uzs || item.price || 0).toLocaleString()} {tr('common.sum', "so'm")}
                    </div>
                 </div>
                 <Button type="text" icon={<RightOutlined />} />

@@ -15,6 +15,14 @@ export function payOrderWithWallet({ order_id, user_id, amount_uzs }) {
   return postJson('/api/order-pay-wallet', { order_id, user_id, amount_uzs });
 }
 
-export function completeOrder({ order_id, client_id, driver_id, final_price_uzs, service_type }) {
-  return postJson('/api/order-complete', { order_id, client_id, driver_id, final_price_uzs, service_type });
+export function completeOrder({ order_id, user_id, client_id, driver_id, final_price_uzs, service_type }) {
+  const canonicalUserId = user_id || client_id || null;
+  return postJson('/api/order-complete', {
+    order_id,
+    user_id: canonicalUserId,
+    client_id: canonicalUserId,
+    driver_id,
+    final_price_uzs,
+    service_type,
+  });
 }
