@@ -109,144 +109,8 @@ const destIcon = L.divIcon({
   iconAnchor: [22, 54],
 });
 
-/** --- Constants extracted to global scope for memory efficiency --- */
-const DYNAMIC_MAP_STEPS = new Set(["main", "search", "dest_map", "stop_map"]);
-
-/** --- Static Styles extracted for memory efficiency --- */
-const StaticStylesNode = (
-  <style>{`
-    .yg-header{
-      position: fixed;
-      top: 10px; left: 10px; right: 10px;
-      z-index: 1200;
-      display:flex; align-items:center; gap:10px;
-      pointer-events:auto;
-    }
-    .yg-header .ant-btn{ box-shadow: 0 6px 16px rgba(0,0,0,.18); border: none; }
-    .yg-sheet{
-      position: fixed;
-      left: 0; right: 0; bottom: 0;
-      z-index: 1100;
-      background: rgba(255,255,255,.96);
-      backdrop-filter: blur(10px);
-      border-top-left-radius: 22px;
-      border-top-right-radius: 22px;
-      padding: 18px 16px 18px;
-      box-shadow: 0 -14px 40px rgba(0,0,0,.18);
-      max-width: 520px;
-      margin: 0 auto;
-    }
-    .yg-sheet.hidden{ opacity:0; pointer-events:none; transform: translateY(10px); transition: .18s ease; }
-    .yg-sheet-title{ display:flex; align-items:center; gap:10px; margin-bottom: 14px; }
-    .yg-logo{ width:44px; height:44px; border-radius: 18px; background: linear-gradient(180deg,#f6c200,#ffdf55); }
-    .yg-long{
-      width: 100%;
-      height: 56px;
-      border-radius: 18px;
-      font-size: 18px;
-      font-weight: 700;
-      display:flex; align-items:center; justify-content:center;
-      background: #f2f2f2;
-      border: none;
-    }
-    .yg-long-right{ margin-left: 10px; font-size: 20px; opacity:.6; }
-    .yg-bottom-row{ display:flex; gap: 12px; align-items:center; margin-top: 14px; }
-    .yg-blue{ flex: 1; height: 54px; border-radius: 18px; font-size: 18px; font-weight: 800; }
-    .yg-yellow{ flex: 1; height: 58px; border-radius: 18px; font-size: 20px; font-weight: 900; background: #f6c200 !important; border: none !important; color: #111 !important; }
-    .yg-round{ width: 54px; height: 54px; border-radius: 18px; border:none; background:#f2f2f2; box-shadow: 0 8px 22px rgba(0,0,0,.12); }
-    .yg-gray{ flex:1; height: 50px; border-radius: 16px; border:none; background:#f2f2f2; font-weight:700; }
-    .yg-field{ display:flex; align-items:center; gap:10px; padding: 10px 12px; border-radius: 16px; background: #fff; box-shadow: 0 8px 18px rgba(0,0,0,.06); }
-    .yg-field-icon{ width: 34px; height: 34px; border-radius: 12px; display:flex; align-items:center; justify-content:center; background:#f3f3f3; }
-    .yg-field-body{ flex:1; min-width:0; }
-    .yg-field-label{ font-size: 12px; opacity:.7; }
-    .yg-field-value{ font-size: 15px; font-weight: 700; white-space: nowrap; overflow:hidden; text-overflow: ellipsis; }
-    .yg-chip{ border-radius: 999px; border:none; background:#f2f2f2; font-weight:700; }
-    .yg-saved{ display:flex; flex-direction:column; gap: 10px; }
-    .yg-saved-item{ width:100%; border:none; border-radius: 16px; background:#fff; display:flex; gap:10px; padding:10px 12px; box-shadow: 0 8px 18px rgba(0,0,0,.06); text-align:left; cursor:pointer;}
-    .yg-saved-ic{ width: 34px; height: 34px; border-radius: 12px; background:#f3f3f3; display:flex; align-items:center; justify-content:center; }
-    .yg-saved-txt{ flex:1; min-width:0; }
-    .yg-saved-title{ font-weight: 800; }
-    .yg-saved-sub{ font-size: 12px; opacity:.6; margin-top: 2px; white-space: nowrap; overflow:hidden; text-overflow: ellipsis;}
-    .yg-search-top{ padding: 14px 14px 0; }
-    .yg-search-fields{ background:#fff; border-radius: 18px; box-shadow: 0 10px 24px rgba(0,0,0,.08); overflow:hidden; }
-    .yg-search-field{ display:flex; gap:10px; align-items:center; padding: 10px 12px; }
-    .yg-search-field + .yg-search-field{ border-top:1px solid #eee; }
-    .yg-search-ic{ width: 34px; height: 34px; border-radius: 12px; background:#f3f3f3; display:flex; align-items:center; justify-content:center; }
-    .yg-search-cap{ font-size: 11px; opacity:.7; }
-    .yg-li-ic{ width: 34px; height: 34px; border-radius: 12px; background:#f3f3f3; display:flex; align-items:center; justify-content:center; }
-    .yg-dest-mini{ display:flex; justify-content: space-between; align-items:flex-end; gap: 10px; }
-    .yg-dest-mini-left{ flex:1; min-width:0; }
-    .yg-dest-mini-right{ display:flex; flex-direction: column; align-items:flex-end; gap:8px; }
-    .yg-price{ font-weight: 900; font-size: 16px; }
-    .yg-ready{ border-radius: 16px; height: 44px; font-weight: 900; }
-    .yg-route-top{ }
-    .yg-route-row{ display:flex; gap:10px; align-items:center; margin-bottom: 10px; }
-    .yg-route-txt{ flex:1; min-width:0; }
-    .yg-tab{ font-size:12px; font-weight:800; background:#eee; padding: 8px 12px; border-radius: 999px; }
-    .yg-tariffs{ display:flex; gap: 10px; overflow-x:auto; padding-bottom: 6px; }
-    .yg-tariff{ min-width: 120px; border-radius: 18px; border: 2px solid transparent; background:#fff; box-shadow: 0 10px 24px rgba(0,0,0,.08); padding: 12px 12px; text-align:left; cursor:pointer; }
-    .yg-tariff.active{ border-color: #f6c200; }
-    .yg-stop{ display:flex; gap:10px; align-items:center; padding: 10px 12px; border-radius: 16px; background:#fff; box-shadow: 0 8px 18px rgba(0,0,0,.06); margin-top: 8px; }
-    .yg-stop-dot{ width: 10px; height: 10px; border-radius: 50%; background:#111; opacity:.55; }
-    .yg-stop-addr{ font-size: 12px; opacity:.7; white-space: nowrap; overflow:hidden; text-overflow: ellipsis; }
-    .yg-driver-card{ margin-top: 12px; background:#fff; border-radius: 22px; padding: 14px; box-shadow: 0 12px 26px rgba(0,0,0,.08); }
-    .yg-plate-row{ display:flex; justify-content: space-between; align-items:center; margin-top: 12px; }
-    .yg-plate{ font-size: 32px; font-weight: 900; letter-spacing: 1px; border: 2px solid #111; padding: 6px 12px; border-radius: 14px; }
-    .yg-actions{ display:flex; gap: 10px; margin-top: 12px; }
-    .yg-act{ flex:1; height: 48px; border-radius: 16px; border:none; background:#f2f2f2; font-weight:800; }
-    .yg-cancel-link{ color:#ff4d4f; font-weight:900; text-align:center; padding: 8px 0 2px; cursor:pointer; }
-    .yg-center-pin{ position:absolute; left:50%; top:50%; transform: translate(-50%,-100%); z-index: 900; pointer-events:none; }
-    .yg-center-pin.lift{ transform: translate(-50%,-110%); transition: .12s ease; }
-    .yg-pin-wrap, .yg-dest-wrap{ display:flex; flex-direction:column; align-items:center; }
-    .yg-pin-yellow{
-      width: 44px; height: 44px; border-radius: 18px;
-      background: #f6c200;
-      box-shadow: 0 12px 26px rgba(0,0,0,.18);
-      display:flex; align-items:center; justify-content:center;
-    }
-    .yg-dest-flag{
-      width: 44px; height: 44px; border-radius: 18px;
-      background: #fff;
-      box-shadow: 0 12px 26px rgba(0,0,0,.18);
-      display:flex; align-items:center; justify-content:center;
-    }
-    .yg-pin-stem{ width: 6px; height: 18px; background: rgba(0,0,0,.75); border-radius: 999px; margin-top: -2px; }
-    .yg-pin-dot{ width: 14px; height: 14px; border-radius: 50%; border: 3px solid #fff; background: #111; margin-top: -6px; box-shadow: 0 6px 14px rgba(0,0,0,.22); }
-    .yg-pin-dot.red{ background:#ff4d4f; }
-    .yg-small-box{ background:#f2f2f2; border-radius: 14px; padding: 12px; }
-    .yg-wave{
-      position:absolute; left:50%; top:50%;
-      width: 18px; height: 18px;
-      border-radius: 50%;
-      border: 2px solid rgba(24,144,255,.55);
-      transform: translate(-50%,-50%);
-      animation: yg-wave 1.4s infinite;
-      z-index: 650;
-      pointer-events:none;
-    }
-    .yg-wave:nth-child(2){ animation-delay: .35s; }
-    .yg-wave:nth-child(3){ animation-delay: .7s; }
-    @keyframes yg-wave{
-      0%{ opacity:.8; transform: translate(-50%,-50%) scale(1); }
-      100%{ opacity:0; transform: translate(-50%,-50%) scale(7); }
-    }
-    .yg-vehicle-icon .yg-car-label{
-      position:absolute;
-      left:50%; top: -28px;
-      transform: translateX(-50%);
-      background:#fff;
-      border-radius: 999px;
-      padding: 6px 10px;
-      font-size: 12px;
-      font-weight: 900;
-      box-shadow: 0 10px 20px rgba(0,0,0,.18);
-      white-space: nowrap;
-    }
-  `}</style>
-);
-
 /** --- Map helpers --- */
-const CenterWatcher = React.memo(({ onCenterChange, onMoveStart, onMoveEnd }) => {
+function CenterWatcher({ onCenterChange, onMoveStart, onMoveEnd }) {
   const map = useMap();
 
   useEffect(() => {
@@ -277,9 +141,9 @@ const CenterWatcher = React.memo(({ onCenterChange, onMoveStart, onMoveEnd }) =>
   }, [map, onCenterChange, onMoveStart, onMoveEnd]);
 
   return null;
-});
+}
 
-const LocateMeButton = React.memo(({ mapRef, userLoc, bottom = 240, onRequestLocate }) => {
+function LocateMeButton({ mapRef, userLoc, bottom = 240, onRequestLocate }) {
   return (
     <div style={{ position: "absolute", right: 16, bottom, zIndex: 800 }}>
       <Button
@@ -291,17 +155,17 @@ const LocateMeButton = React.memo(({ mapRef, userLoc, bottom = 240, onRequestLoc
       />
     </div>
   );
-});
+}
 
 /** --- main component --- */
-const ClientTaxiPage = React.memo(function ClientTaxiPage() {
+export default function ClientTaxiPage() {
   const { cp } = useClientText();
   const navigate = useNavigate();
   const mapRef = useRef(null);
   const tariffSectionRef = useRef(null);
   const scrollTariffOnOpenRef = useRef(false);
 
-  // Use the custom hook - Faqat keraklilar qoldirildi
+  // Use the custom hook
   const {
     step,
     setStep,
@@ -325,10 +189,13 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
     setPickupSearchText,
     destSearchText,
     setDestSearchText,
+    pickupResults,
+    destResults,
     searchBusy,
     searchResults,
     savedPlaces,
     setSavedPlaces,
+    myAddressesV1,
     homeAddr,
     workAddr,
     route,
@@ -338,6 +205,7 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
     tariffs,
     orderId,
     setOrderId,
+    orderStatus,
     setOrderStatus,
     assignedDriver,
     setAssignedDriver,
@@ -371,6 +239,8 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
     setScheduleOpen,
     scheduledTime,
     setScheduledTime,
+    shortcuts,
+    setShortcuts,
     nearCars,
     setNearCars,
     dispatchLine,
@@ -439,7 +309,7 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [setStep]);
+  }, []);
 
   const requestLocateNow = useCallback(() => {
     if (!navigator.geolocation) {
@@ -459,7 +329,7 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
     );
-  }, [cp, setUserLoc, setPickup]);
+  }, []);
 
   // Suggestions callbacks
   const setPickupFromSuggestionHandler = useCallback(
@@ -477,7 +347,7 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
       setSearchOpen(false);
       if (dest?.latlng) setStep("route");
     },
-    [dest?.latlng, setPickup, setPickupSearchText, setSearchOpen, setStep]
+    [dest?.latlng]
   );
 
   const setDestFromSuggestionHandler = useCallback(
@@ -495,7 +365,7 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
       setSearchOpen(false);
       if (pickup?.latlng) setStep("route");
     },
-    [pickup?.latlng, setDest, setDestSearchText, setSearchOpen, setStep]
+    [pickup?.latlng]
   );
 
   // Navigation callbacks
@@ -504,13 +374,36 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
     setStep("search");
     setPickupSearchText(pickup.address || "");
     setDestSearchText(dest.address || "");
-  }, [pickup.address, dest.address, setSearchOpen, setStep, setPickupSearchText, setDestSearchText]);
+  }, [pickup.address, dest.address]);
+
+  const choosePickup = useCallback(
+    (item) => {
+      if (!item) return;
+      setPickup({ latlng: [item.lat, item.lng], address: item.label, entrance: "" });
+      const map = mapRef.current;
+      if (map) map.flyTo([item.lat, item.lng], 16, { duration: 0.6 });
+      setSearchOpen(false);
+      setStep("main");
+    },
+    []
+  );
+
+  const chooseDestination = useCallback(
+    (item) => {
+      if (!item) return;
+      setDest({ latlng: [item.lat, item.lng], address: item.label });
+      setSavedPlaces(savePlace({ id: String(item.id || Date.now()), title: item.label, lat: item.lat, lng: item.lng, type: "recent" }));
+      setSearchOpen(false);
+      setStep("route");
+    },
+    []
+  );
 
   const openPickupMapEdit = useCallback(() => {
     setStep("main");
     setSearchOpen(false);
     message.info(cp("Xaritani siljitib yo'lovchini olish nuqtasini o'zgartiring"));
-  }, [setStep, setSearchOpen, cp]);
+  }, []);
 
   const openDestMapEdit = useCallback(() => {
     setStep("dest_map");
@@ -520,11 +413,13 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
       const c = dest.latlng || pickup.latlng || userLoc;
       if (c) map.flyTo(c, 16, { duration: 0.6 });
     }
-  }, [dest.latlng, pickup.latlng, userLoc, setStep, setSearchOpen]);
+  }, [dest.latlng, pickup.latlng, userLoc]);
+
+  const openDestMapSelect = openDestMapEdit;
 
   const openShareRide = useCallback(() => {
     setShareOpen(true);
-  }, [setShareOpen]);
+  }, []);
 
   const addStopFromCenter = useCallback(() => {
     if (!centerLatLng) return;
@@ -533,7 +428,7 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
     setWaypoints((w) => [...w, stop].slice(0, 3));
     setAddStopOpen(false);
     message.success(cp("Oraliq bekat qo'shildi"));
-  }, [centerLatLng, step, destAddrFromCenter, pickupAddrFromCenter, setWaypoints, setAddStopOpen, cp]);
+  }, [centerLatLng, step, destAddrFromCenter, pickupAddrFromCenter]);
 
   const handlePickSaved = useCallback(
     (p) => {
@@ -541,16 +436,16 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
       setDest({ latlng: [Number(p.lat), Number(p.lng)], address: p.label || p.name || "" });
       setStep("route");
     },
-    [setDest, setStep]
+    []
   );
 
   const updateEntrance = useCallback((val) => {
     setPickup((p) => ({ ...p, entrance: val }));
-  }, [setPickup]);
+  }, []);
 
   const changeDestination = useCallback(() => {
     setStep("dest_map");
-  }, [setStep]);
+  }, []);
 
   // Tariff scroll effect
   useEffect(() => {
@@ -564,45 +459,28 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
     }
   }, [step]);
 
-  // Memoized Header Actions
-  const handleDarkModeToggle = useCallback((v) => setDarkMode(v), [setDarkMode]);
-  
-  const headerRight = useMemo(() => (
+  // Header
+  const headerRight = (
     <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
       <Switch
         checked={darkMode}
-        onChange={handleDarkModeToggle}
+        onChange={(v) => setDarkMode(v)}
         checkedChildren="🌙"
         unCheckedChildren="☀️"
       />
     </div>
-  ), [darkMode, handleDarkModeToggle]);
+  );
 
-  const Header = useMemo(() => (
+  const Header = (
     <div className="yg-header">
       <div style={{ width: 40, height: 40 }} />
       <div style={{ flex: 1 }} />
       {headerRight}
     </div>
-  ), [headerRight]);
-
-  // Memoized Callbacks for Inline elements to prevent recreation
-  const handleOpenPodyezd = useCallback(() => setPodyezdOpen(true), [setPodyezdOpen]);
-  const handleApplyHome = useCallback(() => applyDestinationFromAddressString(homeAddr?.address), [applyDestinationFromAddressString, homeAddr]);
-  const handleApplyWork = useCallback(() => applyDestinationFromAddressString(workAddr?.address), [applyDestinationFromAddressString, workAddr]);
-  const handleCarIconClick = useCallback(() => {
-    if (step !== "route") {
-      scrollTariffOnOpenRef.current = true;
-      setStep("route");
-      return;
-    }
-    try {
-      tariffSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    } catch {}
-  }, [step, setStep]);
+  );
 
   // Summary rows
-  const PickupSummaryRow = useMemo(() => (
+  const PickupSummaryRow = (
     <div className="yg-field">
       <div className="yg-field-icon">
         <EnvironmentOutlined />
@@ -615,14 +493,14 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
         <Button size="small" className="yg-chip" onClick={openPickupMapEdit}>
           Xarita
         </Button>
-        <Button size="small" className="yg-chip" onClick={handleOpenPodyezd}>
+        <Button size="small" className="yg-chip" onClick={() => setPodyezdOpen(true)}>
           Podyezd
         </Button>
       </div>
     </div>
-  ), [pickup.address, cp, openPickupMapEdit, handleOpenPodyezd]);
+  );
 
-  const DestSummaryRow = useMemo(() => (
+  const DestSummaryRow = (
     <div className="yg-field">
       <div className="yg-field-icon">
         <FlagOutlined />
@@ -635,10 +513,10 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
         {dest.address ? cp("O'zgartirish") : cp("Qidirish")}
       </Button>
     </div>
-  ), [dest.address, cp, openDestinationSearch]);
+  );
 
-  // Sheets (Memoized strictly to prevent re-renders on map drag)
-  const MainSheet = useMemo(() => (
+  // Sheets
+  const MainSheet = (
     <div className="yg-sheet">
       <div className="yg-sheet-title">
         <div className="yg-logo" />
@@ -661,7 +539,7 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
             icon={<HomeOutlined />}
             style={{ flex: 1, borderRadius: 12 }}
             disabled={!homeAddr}
-            onClick={handleApplyHome}
+            onClick={() => applyDestinationFromAddressString(homeAddr?.address)}
           >
             Uy
           </Button>
@@ -669,7 +547,7 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
             icon={<BankOutlined />}
             style={{ flex: 1, borderRadius: 12 }}
             disabled={!workAddr}
-            onClick={handleApplyWork}
+            onClick={() => applyDestinationFromAddressString(workAddr?.address)}
           >
             Ish
           </Button>
@@ -695,12 +573,21 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
         <Button className="yg-blue" type="primary" onClick={handleOrderCreate}>
           Buyurtma berish
         </Button>
-        <Button className="yg-round" icon={<CarOutlined />} onClick={handleCarIconClick} />
+        <Button className="yg-round" icon={<CarOutlined />} onClick={() => {
+          if (step !== "route") {
+            scrollTariffOnOpenRef.current = true;
+            setStep("route");
+            return;
+          }
+          try {
+            tariffSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+          } catch {}
+        }} />
       </div>
     </div>
-  ), [PickupSummaryRow, openDestinationSearch, homeAddr, workAddr, savedPlaces, handleApplyHome, handleApplyWork, handlePickSaved, handleOrderCreate, handleCarIconClick]);
+  );
 
-  const SearchDrawer = useMemo(() => (
+  const SearchDrawer = (
     <TaxiSearchSheet
       pickupAddress={pickup.address}
       searchOpen={searchOpen}
@@ -716,17 +603,12 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
       setDestFromSuggestion={setDestFromSuggestionHandler}
       setPickupFromSuggestion={setPickupFromSuggestionHandler}
       openPickupMapEdit={openPickupMapEdit}
-      openDestMapSelect={openDestMapEdit}
+      openDestMapSelect={openDestMapSelect}
       openShareRide={openShareRide}
     />
-  ), [pickup.address, searchOpen, setSearchOpen, setStep, pickupSearchText, setPickupSearchText, destSearchText, setDestSearchText, searchBusy, searchResults, savedPlaces, setDestFromSuggestionHandler, setPickupFromSuggestionHandler, openPickupMapEdit, openDestMapEdit, openShareRide]);
+  );
 
-  const handleDestMapConfirm = useCallback(() => {
-    setStep("route");
-    setSearchOpen(false);
-  }, [setStep, setSearchOpen]);
-
-  const DestMapSheet = useMemo(() => (
+  const DestMapSheet = (
     <DestinationPicker
       showSheet={showSheet}
       dest={dest}
@@ -736,38 +618,14 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
       haversineKm={haversineKm}
       MAX_KM={MAX_KM}
       message={message}
-      onConfirm={handleDestMapConfirm}
+      onConfirm={() => {
+        setStep("route");
+        setSearchOpen(false);
+      }}
     />
-  ), [showSheet, dest, pickup, totalPrice, handleDestMapConfirm]);
+  );
 
-  const handleAddStopOpen = useCallback(() => {
-    setAddStopOpen(true);
-    setStep('stop_map');
-  }, [setAddStopOpen, setStep]);
-
-  const handleRemoveWaypoint = useCallback((idx) => {
-    setWaypoints((arr) => arr.filter((_, i) => i !== idx));
-  }, [setWaypoints]);
-
-  const handleNavigateToNavigator = useCallback(() => {
-    const p = normalizeLatLng(pickup?.latlng);
-    const d = normalizeLatLng(dest?.latlng);
-    if (!p || !d) {
-      message.info("Manzil tanlang");
-      return;
-    }
-    navigate("/client/navigator", {
-      state: {
-        pickup: p,
-        dest: d,
-        waypoints: (waypoints || []).map(normalizeLatLng).filter(Boolean),
-      },
-    });
-  }, [pickup, dest, waypoints, navigate]);
-
-  const handleOpenSchedule = useCallback(() => setScheduleOpen(true), [setScheduleOpen]);
-  
-  const RouteSheet = useMemo(() => (
+  const RouteSheet = (
     <div className="yg-sheet">
       <div className="yg-route-top">
         <div className="yg-route-row">
@@ -799,7 +657,10 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
               size="small"
               icon={<PlusOutlined style={{ fontSize: 16 }} />}
               className="yg-chip"
-              onClick={handleAddStopOpen}
+              onClick={() => {
+                setAddStopOpen(true);
+                setStep('stop_map');
+              }}
               disabled={waypoints.length >= 3}
             />
           </div>
@@ -818,7 +679,7 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
                     size="small"
                     icon={<CloseOutlined />}
                     className="yg-chip"
-                    onClick={() => handleRemoveWaypoint(idx)}
+                    onClick={() => setWaypoints((arr) => arr.filter((_, i) => i !== idx))}
                   />
                 </div>
               ))}
@@ -833,7 +694,21 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
             size="small"
             style={{ borderRadius: 999 }}
             icon={<CompassOutlined />}
-            onClick={handleNavigateToNavigator}
+            onClick={() => {
+              const p = normalizeLatLng(pickup?.latlng);
+              const d = normalizeLatLng(dest?.latlng);
+              if (!p || !d) {
+                message.info("Manzil tanlang");
+                return;
+              }
+              navigate("/client/navigator", {
+                state: {
+                  pickup: p,
+                  dest: d,
+                  waypoints: (waypoints || []).map(normalizeLatLng).filter(Boolean),
+                },
+              });
+            }}
           >
             Navigator
           </Button>
@@ -844,7 +719,7 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
           {tariffs.map((t) => (
             <button
               key={t.id}
-              className={"yg-tariff " + (tariff?.id === t.id ? "active" : "")}
+              className={"yg-tariff " + (tariff.id === t.id ? "active" : "")}
               onClick={() => setTariff(t)}
             >
               <div style={{ fontSize: 11, opacity: 0.7 }}>{Math.max(1, Math.round(durationMin))} daq</div>
@@ -879,7 +754,7 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
           <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
             <Button
               icon={<ClockCircleOutlined />}
-              onClick={handleOpenSchedule}
+              onClick={() => setScheduleOpen(true)}
               style={{ flex: 1, borderRadius: 12 }}
             >
               Rejalash
@@ -898,15 +773,13 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
           <Button className="yg-yellow" type="primary" onClick={handleOrderCreate}>
             Buyurtma berish
           </Button>
-          <Button className="yg-round" icon={<ShareAltOutlined />} onClick={openShareRide} />
+          <Button className="yg-round" icon={<ShareAltOutlined />} onClick={() => setShareOpen(true)} />
         </div>
       </div>
     </div>
-  ), [pickup, dest, openDestinationSearch, changeDestination, waypoints, handleAddStopOpen, handleRemoveWaypoint, handleNavigateToNavigator, tariffs, tariff, setTariff, durationMin, distanceKm, orderFor, setOrderFor, otherPhone, setOtherPhone, handleOpenSchedule, comment, wishes, scheduledTime, handleOrderCreate, openShareRide]);
+  );
 
-  const handleOpenAd = useCallback((id) => navigate(`/auto-market/ad/${id}`), [navigate]);
-
-  const SearchingSheet = useMemo(() => (
+  const SearchingSheet = (
     <div className="yg-sheet">
       <div style={{ fontSize: 22, fontWeight: 900 }}>Yaqin-atrofda mos...</div>
       <div style={{ opacity: 0.7, marginTop: 2 }}>Moslarini qidiryapmiz</div>
@@ -924,14 +797,14 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
         <AutoMarketAdsPanel
           title="Avto savdo e'lonlari"
           mode="waiting"
-          onOpenAd={handleOpenAd}
+          onOpenAd={(id) => navigate(`/auto-market/ad/${id}`)}
           fetchAds={listMarketCars}
         />
       </div>
     </div>
-  ), [handleCancel, handleOpenAd]);
+  );
 
-  const ComingSheet = useMemo(() => (
+  const ComingSheet = (
     <div className="yg-sheet">
       <div style={{ fontSize: 26, fontWeight: 900 }}>
         {etaMin ? `~${etaMin} daq va keladi` : "Haydovchi yo'lda"}
@@ -965,7 +838,7 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
           <div className="yg-field-label">Mijozni olish</div>
           <div className="yg-field-value">{pickup.address || "—"}</div>
         </div>
-        <Button size="small" className="yg-chip" onClick={openShareRide}>Ulashish</Button>
+        <Button size="small" className="yg-chip" onClick={() => setShareOpen(true)}>Ulashish</Button>
       </div>
 
       <Divider style={{ margin: "12px 0" }} />
@@ -973,7 +846,7 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
       <AutoMarketAdsPanel
         title="Avto savdo e'lonlari"
         mode="waiting"
-        onOpenAd={handleOpenAd}
+        onOpenAd={(id) => navigate(`/auto-market/ad/${id}`)}
         fetchAds={listMarketCars}
       />
 
@@ -981,20 +854,10 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
         Safarni bekor qilish
       </div>
     </div>
-  ), [etaMin, assignedDriver, pickup.address, openShareRide, handleOpenAd, handleCancel]);
+  );
 
-  // Stop picker overlay handlers
-  const handleOverlayClose = useCallback(() => {
-    setAddStopOpen(false);
-    setStep("route");
-  }, [setAddStopOpen, setStep]);
-
-  const handleOverlayAdd = useCallback(() => {
-    addStopFromCenter();
-    setStep("route");
-  }, [addStopFromCenter, setStep]);
-
-  const StopPickerOverlay = useMemo(() => (
+  // Stop picker overlay
+  const StopPickerOverlay = (
     <div
       style={{
         position: "fixed",
@@ -1005,7 +868,10 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
         justifyContent: "flex-end",
         background: "rgba(0,0,0,0.15)",
       }}
-      onClick={handleOverlayClose}
+      onClick={() => {
+        setAddStopOpen(false);
+        setStep("route");
+      }}
     >
       <div
         style={{
@@ -1027,38 +893,41 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
         <div style={{ display: "flex", gap: 10 }}>
           <Button
             style={{ flex: 1, borderRadius: 12 }}
-            onClick={handleOverlayClose}
+            onClick={() => {
+              setAddStopOpen(false);
+              setStep("route");
+            }}
           >
             Bekor
           </Button>
           <Button
             type="primary"
             style={{ flex: 1, borderRadius: 12, background: "#000", borderColor: "#000" }}
-            onClick={handleOverlayAdd}
+            onClick={() => {
+              addStopFromCenter();
+              setStep("route");
+            }}
           >
             Qo'shish
           </Button>
         </div>
       </div>
     </div>
-  ), [step, addStopOpen, handleOverlayClose, destAddrFromCenter, pickupAddrFromCenter, handleOverlayAdd]);
+  );
 
-  // Modals callbacks
-  const handlePodyezdClose = useCallback(() => setPodyezdOpen(false), [setPodyezdOpen]);
-  const handlePodyezdInput = useCallback((e) => updateEntrance(e.target.value), [updateEntrance]);
-
-  const PodyezdModal = useMemo(() => (
+  // Modals
+  const PodyezdModal = (
     <Modal
       open={podyezdOpen}
-      onCancel={handlePodyezdClose}
-      onOk={handlePodyezdClose}
+      onCancel={() => setPodyezdOpen(false)}
+      onOk={() => setPodyezdOpen(false)}
       okText="Saqlash"
       cancelText="Bekor"
       title="Podyezd (kirish joyi)"
     >
       <Input
         value={pickup.entrance}
-        onChange={handlePodyezdInput}
+        onChange={(e) => updateEntrance(e.target.value)}
         placeholder="Masalan: 2"
         maxLength={8}
       />
@@ -1066,15 +935,13 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
         Podyezd haydovchiga aniq eshik tagiga kelish uchun ko'rsatiladi.
       </div>
     </Modal>
-  ), [podyezdOpen, handlePodyezdClose, pickup.entrance, handlePodyezdInput]);
+  );
 
-  const handleWishesClose = useCallback(() => setWishesOpen(false), [setWishesOpen]);
-  
-  const WishesModal = useMemo(() => (
+  const WishesModal = (
     <Modal
       open={wishesOpen}
-      onCancel={handleWishesClose}
-      onOk={handleWishesClose}
+      onCancel={() => setWishesOpen(false)}
+      onOk={() => setWishesOpen(false)}
       okText="Tayyor"
       cancelText="Bekor"
       title="Istaklar (Pozhelaniya)"
@@ -1114,15 +981,13 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
         </div>
       </div>
     </Modal>
-  ), [wishesOpen, handleWishesClose, wishes, setWishes, comment, setComment]);
+  );
 
-  const handleScheduleClose = useCallback(() => setScheduleOpen(false), [setScheduleOpen]);
-  
-  const ScheduleModal = useMemo(() => (
+  const ScheduleModal = (
     <Modal
       open={scheduleOpen}
-      onCancel={handleScheduleClose}
-      onOk={handleScheduleClose}
+      onCancel={() => setScheduleOpen(false)}
+      onOk={() => setScheduleOpen(false)}
       okText="Tayyor"
       cancelText="Bekor"
       title="Oldindan buyurtma (Zaplanirovat)"
@@ -1160,22 +1025,12 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
         </div>
       </div>
     </Modal>
-  ), [scheduleOpen, handleScheduleClose, scheduledTime, setScheduledTime]);
+  );
 
-  const handleShareClose = useCallback(() => setShareOpen(false), [setShareOpen]);
-  const handleShareCopy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(shareLink);
-      message.success("Nusxa olindi");
-    } catch {
-      message.info("Nusxa olish uchun brauzer ruxsat bermadi");
-    }
-  }, [shareLink]);
-
-  const ShareModal = useMemo(() => (
+  const ShareModal = (
     <Modal
       open={shareOpen}
-      onCancel={handleShareClose}
+      onCancel={() => setShareOpen(false)}
       footer={null}
       title="Buyurtmani ulashish"
       zIndex={6500}
@@ -1188,14 +1043,21 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
       <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
         <Button
           type="primary"
-          onClick={handleShareCopy}
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(shareLink);
+              message.success("Nusxa olindi");
+            } catch {
+              message.info("Nusxa olish uchun brauzer ruxsat bermadi");
+            }
+          }}
         >
           Nusxa olish
         </Button>
-        <Button onClick={handleShareClose}>Yopish</Button>
+        <Button onClick={() => setShareOpen(false)}>Yopish</Button>
       </div>
     </Modal>
-  ), [shareOpen, handleShareClose, shareLink, handleShareCopy]);
+  );
 
   // Map tile selection
   const mapTile = darkMode ? tileNight : tileDay;
@@ -1223,73 +1085,63 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
   }, [route]);
 
   // Searching overlay
-  const SearchingOverlay = useMemo(() => {
-    if (step !== "searching") return null;
-    return (
-      <>
-        <div className="yg-wave" />
-        <div className="yg-wave" />
-        <div className="yg-wave" />
-        {dispatchLine.length > 1 ? (
-          <Polyline positions={dispatchLine} pathOptions={{ weight: 4, opacity: 0.65, dashArray: "8 10" }} />
-        ) : null}
-        {nearCars.map((c, idx) => {
-          const pos = normalizeLatLng([toNum(c.lat), toNum(c.lng)]);
-          if (!pos) return null;
-          return (
-            <VehicleMarker
-              key={c.id || idx}
-              position={pos}
-              bearing={c.bearing}
-              label={idx === dispatchIdx ? `${Math.max(1, Math.round(durationMin / 2))} daq` : undefined}
-              color={idx === dispatchIdx ? "#f6c200" : "#ddd"}
-              durationMs={700}
-            />
-          );
-        })}
-      </>
-    );
-  }, [step, dispatchLine, nearCars, dispatchIdx, durationMin]);
+  const SearchingOverlay = step === "searching" ? (
+    <>
+      <div className="yg-wave" />
+      <div className="yg-wave" />
+      <div className="yg-wave" />
+      {(dispatchLine?.length ?? 0) > 1 ? (
+        <Polyline positions={dispatchLine} pathOptions={{ weight: 4, opacity: 0.65, dashArray: "8 10" }} />
+      ) : null}
+      {nearCars.map((c, idx) => {
+        const pos = normalizeLatLng([toNum(c.lat), toNum(c.lng)]);
+        if (!pos) return null;
+        return (
+          <VehicleMarker
+            key={c.id}
+            position={pos}
+            bearing={c.bearing}
+            label={idx === dispatchIdx ? `${Math.max(1, Math.round(durationMin / 2))} daq` : undefined}
+            color={idx === dispatchIdx ? "#f6c200" : "#ddd"}
+            durationMs={700}
+          />
+        );
+      })}
+    </>
+  ) : null;
 
   // Driver overlay
-  const DriverOverlay = useMemo(() => {
-    if (step !== "coming" || !normalizeLatLng([toNum(assignedDriver?.lat), toNum(assignedDriver?.lng)])) return null;
-    return (
-      <>
-        <VehicleMarker
-          position={normalizeLatLng([toNum(assignedDriver?.lat), toNum(assignedDriver?.lng)])}
-          bearing={assignedDriver?.bearing}
-          label={etaMin ? `${etaMin} daq` : undefined}
-          color="#f6c200"
-          durationMs={800}
+  const DriverOverlay = step === "coming" && normalizeLatLng([toNum(assignedDriver?.lat), toNum(assignedDriver?.lng)]) ? (
+    <>
+      <VehicleMarker
+        position={normalizeLatLng([toNum(assignedDriver?.lat), toNum(assignedDriver?.lng)])}
+        bearing={assignedDriver?.bearing}
+        label={etaMin ? `${etaMin} daq` : undefined}
+        color="#f6c200"
+        durationMs={800}
+      />
+      {normalizeLatLng(pickup?.latlng) ? (
+        <Polyline
+          positions={[
+            normalizeLatLng([toNum(assignedDriver?.lat), toNum(assignedDriver?.lng)]),
+            normalizeLatLng(pickup?.latlng),
+          ]}
+          pathOptions={{ weight: 6, opacity: 0.9 }}
         />
-        {normalizeLatLng(pickup?.latlng) ? (
-          <Polyline
-            positions={[
-              normalizeLatLng([toNum(assignedDriver?.lat), toNum(assignedDriver?.lng)]),
-              normalizeLatLng(pickup?.latlng),
-            ]}
-            pathOptions={{ weight: 6, opacity: 0.9 }}
-          />
-        ) : null}
-      </>
-    );
-  }, [step, assignedDriver, etaMin, pickup?.latlng]);
+      ) : null}
+    </>
+  ) : null;
 
-  // Map UI Center handling - DYNAMIC_MAP_STEPS xotiradan tashqariga olib chiqildi
+  // Map UI
   const mapCenter = useMemo(() => {
-    if (DYNAMIC_MAP_STEPS.has(step) && normalizeLatLng(centerLatLng)) {
+    const dynamicSteps = new Set(["main", "search", "dest_map", "stop_map"]);
+    if (dynamicSteps.has(step) && normalizeLatLng(centerLatLng)) {
       return normalizeLatLng(centerLatLng);
     }
-    // Agar foydalanuvchi joylashuvi aniqlanmasa, default markaz sifatida Nukus kordinatalari.
     return normalizeLatLng(pickup?.latlng) || userLoc || [42.4602, 59.6156];
   }, [step, centerLatLng, pickup?.latlng, userLoc]);
 
-  const handleCenterChange = useCallback((ll) => setCenterLatLng(ll), [setCenterLatLng]);
-  const handleMoveStart = useCallback(() => setIsDraggingMap(true), [setIsDraggingMap]);
-  const handleMoveEnd = useCallback(() => setIsDraggingMap(false), [setIsDraggingMap]);
-
-  const MapUI = useMemo(() => (
+  const MapUI = (
     <TaxiMap
       mapRef={mapRef}
       center={mapCenter}
@@ -1298,90 +1150,216 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
       userLoc={userLoc}
       onRequestLocate={requestLocateNow}
       mapBottom={mapBottom}
-      onCenterChange={handleCenterChange}
-      onMoveStart={handleMoveStart}
-      onMoveEnd={handleMoveEnd}
+      onCenterChange={(ll) => setCenterLatLng(ll)}
+      onMoveStart={() => setIsDraggingMap(true)}
+      onMoveEnd={() => setIsDraggingMap(false)}
       routeLine={RouteLine}
       searchingOverlay={SearchingOverlay}
       driverOverlay={DriverOverlay}
       centerPin={CenterPin}
     />
-  ), [mapCenter, mapTile, step, userLoc, requestLocateNow, mapBottom, handleCenterChange, handleMoveStart, handleMoveEnd, RouteLine, SearchingOverlay, DriverOverlay, CenterPin]);
+  );
 
-  const overlaysNode = useMemo(() => (
+  // Styles
+  const Styles = (
+    <style>{`
+      .yg-header{
+        position: fixed;
+        top: 10px; left: 10px; right: 10px;
+        z-index: 1200;
+        display:flex; align-items:center; gap:10px;
+        pointer-events:auto;
+      }
+      .yg-header .ant-btn{ box-shadow: 0 6px 16px rgba(0,0,0,.18); border: none; }
+      .yg-sheet{
+        position: fixed;
+        left: 0; right: 0; bottom: 0;
+        z-index: 1100;
+        background: rgba(255,255,255,.96);
+        backdrop-filter: blur(10px);
+        border-top-left-radius: 22px;
+        border-top-right-radius: 22px;
+        padding: 18px 16px 18px;
+        box-shadow: 0 -14px 40px rgba(0,0,0,.18);
+        max-width: 520px;
+        margin: 0 auto;
+      }
+      .yg-sheet.hidden{ opacity:0; pointer-events:none; transform: translateY(10px); transition: .18s ease; }
+      .yg-sheet-title{ display:flex; align-items:center; gap:10px; margin-bottom: 14px; }
+      .yg-logo{ width:44px; height:44px; border-radius: 18px; background: linear-gradient(180deg,#f6c200,#ffdf55); }
+      .yg-long{
+        width: 100%;
+        height: 56px;
+        border-radius: 18px;
+        font-size: 18px;
+        font-weight: 700;
+        display:flex; align-items:center; justify-content:center;
+        background: #f2f2f2;
+        border: none;
+      }
+      .yg-long-right{ margin-left: 10px; font-size: 20px; opacity:.6; }
+      .yg-bottom-row{ display:flex; gap: 12px; align-items:center; margin-top: 14px; }
+      .yg-blue{ flex: 1; height: 54px; border-radius: 18px; font-size: 18px; font-weight: 800; }
+      .yg-yellow{ flex: 1; height: 58px; border-radius: 18px; font-size: 20px; font-weight: 900; background: #f6c200 !important; border: none !important; color: #111 !important; }
+      .yg-round{ width: 54px; height: 54px; border-radius: 18px; border:none; background:#f2f2f2; box-shadow: 0 8px 22px rgba(0,0,0,.12); }
+      .yg-gray{ flex:1; height: 50px; border-radius: 16px; border:none; background:#f2f2f2; font-weight:700; }
+      .yg-field{ display:flex; align-items:center; gap:10px; padding: 10px 12px; border-radius: 16px; background: #fff; box-shadow: 0 8px 18px rgba(0,0,0,.06); }
+      .yg-field-icon{ width: 34px; height: 34px; border-radius: 12px; display:flex; align-items:center; justify-content:center; background:#f3f3f3; }
+      .yg-field-body{ flex:1; min-width:0; }
+      .yg-field-label{ font-size: 12px; opacity:.7; }
+      .yg-field-value{ font-size: 15px; font-weight: 700; white-space: nowrap; overflow:hidden; text-overflow: ellipsis; }
+      .yg-chip{ border-radius: 999px; border:none; background:#f2f2f2; font-weight:700; }
+      .yg-saved{ display:flex; flex-direction:column; gap: 10px; }
+      .yg-saved-item{ width:100%; border:none; border-radius: 16px; background:#fff; display:flex; gap:10px; padding:10px 12px; box-shadow: 0 8px 18px rgba(0,0,0,.06); text-align:left; cursor:pointer;}
+      .yg-saved-ic{ width: 34px; height: 34px; border-radius: 12px; background:#f3f3f3; display:flex; align-items:center; justify-content:center; }
+      .yg-saved-txt{ flex:1; min-width:0; }
+      .yg-saved-title{ font-weight: 800; }
+      .yg-saved-sub{ font-size: 12px; opacity:.6; margin-top: 2px; white-space: nowrap; overflow:hidden; text-overflow: ellipsis;}
+      .yg-search-top{ padding: 14px 14px 0; }
+      .yg-search-fields{ background:#fff; border-radius: 18px; box-shadow: 0 10px 24px rgba(0,0,0,.08); overflow:hidden; }
+      .yg-search-field{ display:flex; gap:10px; align-items:center; padding: 10px 12px; }
+      .yg-search-field + .yg-search-field{ border-top:1px solid #eee; }
+      .yg-search-ic{ width: 34px; height: 34px; border-radius: 12px; background:#f3f3f3; display:flex; align-items:center; justify-content:center; }
+      .yg-search-cap{ font-size: 11px; opacity:.7; }
+      .yg-li-ic{ width: 34px; height: 34px; border-radius: 12px; background:#f3f3f3; display:flex; align-items:center; justify-content:center; }
+      .yg-dest-mini{ display:flex; justify-content: space-between; align-items:flex-end; gap: 10px; }
+      .yg-dest-mini-left{ flex:1; min-width:0; }
+      .yg-dest-mini-right{ display:flex; flex-direction: column; align-items:flex-end; gap:8px; }
+      .yg-price{ font-weight: 900; font-size: 16px; }
+      .yg-ready{ border-radius: 16px; height: 44px; font-weight: 900; }
+      .yg-route-top{ }
+      .yg-route-row{ display:flex; gap:10px; align-items:center; margin-bottom: 10px; }
+      .yg-route-txt{ flex:1; min-width:0; }
+      .yg-tab{ font-size:12px; font-weight:800; background:#eee; padding: 8px 12px; border-radius: 999px; }
+      .yg-tariffs{ display:flex; gap: 10px; overflow-x:auto; padding-bottom: 6px; }
+      .yg-tariff{ min-width: 120px; border-radius: 18px; border: 2px solid transparent; background:#fff; box-shadow: 0 10px 24px rgba(0,0,0,.08); padding: 12px 12px; text-align:left; cursor:pointer; }
+      .yg-tariff.active{ border-color: #f6c200; }
+      .yg-stop{ display:flex; gap:10px; align-items:center; padding: 10px 12px; border-radius: 16px; background:#fff; box-shadow: 0 8px 18px rgba(0,0,0,.06); margin-top: 8px; }
+      .yg-stop-dot{ width: 10px; height: 10px; border-radius: 50%; background:#111; opacity:.55; }
+      .yg-stop-addr{ font-size: 12px; opacity:.7; white-space: nowrap; overflow:hidden; text-overflow: ellipsis; }
+      .yg-driver-card{ margin-top: 12px; background:#fff; border-radius: 22px; padding: 14px; box-shadow: 0 12px 26px rgba(0,0,0,.08); }
+      .yg-plate-row{ display:flex; justify-content: space-between; align-items:center; margin-top: 12px; }
+      .yg-plate{ font-size: 32px; font-weight: 900; letter-spacing: 1px; border: 2px solid #111; padding: 6px 12px; border-radius: 14px; }
+      .yg-actions{ display:flex; gap: 10px; margin-top: 12px; }
+      .yg-act{ flex:1; height: 48px; border-radius: 16px; border:none; background:#f2f2f2; font-weight:800; }
+      .yg-cancel-link{ color:#ff4d4f; font-weight:900; text-align:center; padding: 8px 0 2px; cursor:pointer; }
+      .yg-center-pin{ position:absolute; left:50%; top:50%; transform: translate(-50%,-100%); z-index: 900; pointer-events:none; }
+      .yg-center-pin.lift{ transform: translate(-50%,-110%); transition: .12s ease; }
+      .yg-pin-wrap, .yg-dest-wrap{ display:flex; flex-direction:column; align-items:center; }
+      .yg-pin-yellow{
+        width: 44px; height: 44px; border-radius: 18px;
+        background: #f6c200;
+        box-shadow: 0 12px 26px rgba(0,0,0,.18);
+        display:flex; align-items:center; justify-content:center;
+      }
+      .yg-dest-flag{
+        width: 44px; height: 44px; border-radius: 18px;
+        background: #fff;
+        box-shadow: 0 12px 26px rgba(0,0,0,.18);
+        display:flex; align-items:center; justify-content:center;
+      }
+      .yg-pin-stem{ width: 6px; height: 18px; background: rgba(0,0,0,.75); border-radius: 999px; margin-top: -2px; }
+      .yg-pin-dot{ width: 14px; height: 14px; border-radius: 50%; border: 3px solid #fff; background: #111; margin-top: -6px; box-shadow: 0 6px 14px rgba(0,0,0,.22); }
+      .yg-pin-dot.red{ background:#ff4d4f; }
+      .yg-small-box{ background:#f2f2f2; border-radius: 14px; padding: 12px; }
+      .yg-wave{
+        position:absolute; left:50%; top:50%;
+        width: 18px; height: 18px;
+        border-radius: 50%;
+        border: 2px solid rgba(24,144,255,.55);
+        transform: translate(-50%,-50%);
+        animation: yg-wave 1.4s infinite;
+        z-index: 650;
+        pointer-events:none;
+      }
+      .yg-wave:nth-child(2){ animation-delay: .35s; }
+      .yg-wave:nth-child(3){ animation-delay: .7s; }
+      @keyframes yg-wave{
+        0%{ opacity:.8; transform: translate(-50%,-50%) scale(1); }
+        100%{ opacity:0; transform: translate(-50%,-50%) scale(7); }
+      }
+      .yg-vehicle-icon .yg-car-label{
+        position:absolute;
+        left:50%; top: -28px;
+        transform: translateX(-50%);
+        background:#fff;
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: 12px;
+        font-weight: 900;
+        box-shadow: 0 10px 20px rgba(0,0,0,.18);
+        white-space: nowrap;
+      }
+    `}</style>
+  );
+
+  const overlaysNode = (
     <>
       {SearchDrawer}
       {StopPickerOverlay}
     </>
-  ), [SearchDrawer, StopPickerOverlay]);
+  );
 
-  const modalsNode = useMemo(() => (
+  const modalsNode = (
     <>
       {PodyezdModal}
       {WishesModal}
       {ScheduleModal}
       {ShareModal}
     </>
-  ), [PodyezdModal, WishesModal, ScheduleModal, ShareModal]);
+  );
 
-  const timelineNode = useMemo(() => {
-    if (!orderId) return null;
-    return (
-      <div style={{ position: 'fixed', left: 12, right: 12, bottom: step === 'coming' ? 260 : 120, zIndex: 1150, maxWidth: 520, margin: '0 auto', pointerEvents: 'none' }}>
-        <div style={{ pointerEvents: 'auto' }}>
-          <TaxiOrderTimeline events={timelineEvents} />
-        </div>
+  const timelineNode = orderId ? (
+    <div style={{ position: 'fixed', left: 12, right: 12, bottom: step === 'coming' ? 260 : 120, zIndex: 1150, maxWidth: 520, margin: '0 auto', pointerEvents: 'none' }}>
+      <div style={{ pointerEvents: 'auto' }}>
+        <TaxiOrderTimeline events={timelineEvents} />
       </div>
-    );
-  }, [orderId, step, timelineEvents]);
+    </div>
+  ) : null;
 
-  const handleRatingFinish = useCallback(() => {
-    setRatingVisible(false);
-    setCompletedOrderForRating(null);
-    if (earnedBonus > 0) {
-      setTimeout(() => setBonusVisible(true), 300);
-    } else {
-      setTimeout(() => {
-        setOrderId(null);
-        setOrderStatus(null);
-        setAssignedDriver(null);
-        setStep("main");
-      }, 500);
-    }
-  }, [setRatingVisible, setCompletedOrderForRating, earnedBonus, setBonusVisible, setOrderId, setOrderStatus, setAssignedDriver, setStep]);
-
-  const ratingNode = useMemo(() => (
+  const ratingNode = (
     <RatingModal
       visible={ratingVisible}
       order={completedOrderForRating}
-      onFinish={handleRatingFinish}
+      onFinish={() => {
+        setRatingVisible(false);
+        setCompletedOrderForRating(null);
+        if (earnedBonus > 0) {
+          setTimeout(() => setBonusVisible(true), 300);
+        } else {
+          setTimeout(() => {
+            setOrderId(null);
+            setOrderStatus(null);
+            setAssignedDriver(null);
+            setStep("main");
+          }, 500);
+        }
+      }}
     />
-  ), [ratingVisible, completedOrderForRating, handleRatingFinish]);
+  );
 
-  const handleBonusClose = useCallback(() => {
-    setBonusVisible(false);
-    setEarnedBonus(0);
-    setTimeout(() => {
-      setOrderId(null);
-      setOrderStatus(null);
-      setAssignedDriver(null);
-      setStep("main");
-    }, 500);
-  }, [setBonusVisible, setEarnedBonus, setOrderId, setOrderStatus, setAssignedDriver, setStep]);
-
-  const bonusNode = useMemo(() => (
+  const bonusNode = (
     <ClientBonusWidget
       userId={completedOrderForRating?.user_id || null}
       earnedPoints={earnedBonus}
       visible={bonusVisible}
-      onClose={handleBonusClose}
+      onClose={() => {
+        setBonusVisible(false);
+        setEarnedBonus(0);
+        setTimeout(() => {
+          setOrderId(null);
+          setOrderStatus(null);
+          setAssignedDriver(null);
+          setStep("main");
+        }, 500);
+      }}
     />
-  ), [completedOrderForRating, earnedBonus, bonusVisible, handleBonusClose]);
+  );
 
   return (
     <ClientTaxiScreen
       step={step}
-      stylesNode={StaticStylesNode}
+      stylesNode={Styles}
       mapNode={MapUI}
       headerNode={Header}
       mainSheet={MainSheet}
@@ -1396,6 +1374,4 @@ const ClientTaxiPage = React.memo(function ClientTaxiPage() {
       bonusNode={bonusNode}
     />
   );
-});
-
-export default ClientTaxiPage;
+}
