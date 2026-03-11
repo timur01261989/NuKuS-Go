@@ -263,6 +263,7 @@ export default function ClientTaxiPage() {
   } = useTaxiOrder();
 
   const { events: timelineEvents } = useOrderTimeline(orderId);
+  const showTaxiMarketAds = String(import.meta?.env?.VITE_SHOW_TAXI_MARKET_ADS || "").trim() === "1";
 
   // Mobile BACK handling
   const isPopNavRef = useRef(false);
@@ -459,6 +460,31 @@ export default function ClientTaxiPage() {
     }
   }, [step]);
 
+  const handlePageBack = useCallback(() => {
+    if (step === "stop_map") {
+      setStep("route");
+      return;
+    }
+    if (step === "searching" || step === "coming") {
+      setStep("route");
+      return;
+    }
+    if (step === "route") {
+      setStep("main");
+      return;
+    }
+    if (step === "dest_map") {
+      setStep(dest?.address ? "route" : "main");
+      return;
+    }
+    if (step === "search") {
+      setStep("main");
+      setSearchOpen(false);
+      return;
+    }
+    navigate("/client/home");
+  }, [navigate, step, dest?.address]);
+
   // Header
   const headerRight = (
     <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -473,7 +499,7 @@ export default function ClientTaxiPage() {
 
   const Header = (
     <div className="yg-header">
-      <div style={{ width: 40, height: 40 }} />
+      <Button shape="circle" icon={<ArrowLeftOutlined />} onClick={handlePageBack} />
       <div style={{ flex: 1 }} />
       {headerRight}
     </div>
@@ -793,14 +819,16 @@ export default function ClientTaxiPage() {
         </Button>
       </div>
 
-      <div style={{ marginTop: 14 }}>
-        <AutoMarketAdsPanel
-          title="Avto savdo e'lonlari"
-          mode="waiting"
-          onOpenAd={(id) => navigate(`/auto-market/ad/${id}`)}
-          fetchAds={listMarketCars}
-        />
-      </div>
+      {showTaxiMarketAds ? (
+        <div style={{ marginTop: 14 }}>
+          <AutoMarketAdsPanel
+            title="Avto savdo e'lonlari"
+            mode="waiting"
+            onOpenAd={(id) => navigate(`/auto-market/ad/${id}`)}
+            fetchAds={listMarketCars}
+          />
+        </div>
+      ) : null}
     </div>
   );
 
@@ -843,12 +871,14 @@ export default function ClientTaxiPage() {
 
       <Divider style={{ margin: "12px 0" }} />
 
-      <AutoMarketAdsPanel
-        title="Avto savdo e'lonlari"
-        mode="waiting"
-        onOpenAd={(id) => navigate(`/auto-market/ad/${id}`)}
-        fetchAds={listMarketCars}
-      />
+      {showTaxiMarketAds ? (
+        <AutoMarketAdsPanel
+          title="Avto savdo e'lonlari"
+          mode="waiting"
+          onOpenAd={(id) => navigate(`/auto-market/ad/${id}`)}
+          fetchAds={listMarketCars}
+        />
+      ) : null}
 
       <div className="yg-cancel-link" onClick={handleCancel}>
         Safarni bekor qilish

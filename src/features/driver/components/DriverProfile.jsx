@@ -16,13 +16,15 @@ import { supabase } from "@/lib/supabase";
 import DriverWallet from "./DriverWallet";
 import ActivityChart from "./ActivityChart";
 import Leaderboard from "./Leaderboard";
+import { useDriverText } from "../shared/i18n_driverLocalize";
 
 const { Title, Text } = Typography;
 
-const t = (value) => value;
+const fallbackText = (value) => value;
 
 function DriverProfile({ onBack, onLogout }) {
-  const cp = t;
+  const driverText = typeof useDriverText === "function" ? useDriverText() : null;
+  const cp = driverText?.cp || fallbackText;
   const [driverData, setDriverData] = useState(null);
   const [stats, setStats] = useState({ total_trips: 0, rating: 5.0 });
   const [walletOpen, setWalletOpen] = useState(false);

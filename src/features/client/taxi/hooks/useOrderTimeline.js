@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
+const TIMELINE_ENABLED = String(import.meta?.env?.VITE_ENABLE_ORDER_TIMELINE || '').trim() === '1';
+
 function normalizeEvent(row) {
   if (!row || typeof row !== 'object') return null;
   return {
@@ -17,6 +19,10 @@ function normalizeEvent(row) {
   };
 }
 
+function isValidOrderId(orderId) {
+  return typeof orderId === 'string' && orderId.trim().length >= 8;
+}
+
 export function useOrderTimeline(orderId, limit = 30) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -25,21 +31,31 @@ export function useOrderTimeline(orderId, limit = 30) {
     let alive = true;
     let channel = null;
 
+    const enabled = TIMELINE_ENABLED && isValidOrderId(orderId) && !!supabase;
+    if (!enabled) {
+      setEvents([]);
+      setLoading(false);
+      return () => {};
+    }
+
     const load = async () => {
-      if (!orderId || !supabase) {
-        if (alive) setEvents([]);
-        return;
-      }
       setLoading(true);
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('order_events')
           .select('id,order_id,event_code,actor_role,actor_user_id,reason,from_status,to_status,payload,created_at')
           .eq('order_id', String(orderId))
           .order('created_at', { ascending: true })
           .limit(Math.max(1, Math.min(100, Number(limit) || 30)));
         if (!alive) return;
+        if (error) {
+          setEvents([]);
+          return;
+        }
         setEvents(Array.isArray(data) ? data.map(normalizeEvent).filter(Boolean) : []);
+      } catch {
+        if (!alive) return;
+        setEvents([]);
       } finally {
         if (alive) setLoading(false);
       }
@@ -47,7 +63,7 @@ export function useOrderTimeline(orderId, limit = 30) {
 
     load();
 
-    if (orderId && supabase?.channel) {
+    if (supabase?.channel) {
       channel = supabase
         .channel(`order-events:${orderId}`)
         .on(

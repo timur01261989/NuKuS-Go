@@ -33,6 +33,7 @@ import { supabase } from "@/lib/supabase";
 // DIQQAT: haversineKm bu yerdan import qilinadi, pastda qayta yozilmaydi
 import { osrmRouteDriving, haversineKm } from "@/shared/services/osrm";
 import { useAuth } from "@/shared/auth/AuthProvider";
+import { useDriverText } from "../shared/i18n_driverLocalize";
 import { getTripSettings, saveTripSettings } from "@/features/client/delivery/services/deliveryStore";
 
 import "leaflet/dist/leaflet.css";

@@ -119,23 +119,8 @@ const toggleOnline = async (next) => {
     const { data: u, error: uErr } = await supabase.auth.getUser();
     if (uErr) throw uErr;
     const user = u?.user;
-    if (!user) return;
+    if (!user?.id) throw new Error("driver_not_authenticated");
     userIdRef.current = user.id;
-
-    const driverPayload = {
-      driver_id: user.id,
-      is_online: next,
-      state: next ? 'online' : 'offline',
-      last_seen_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      active_service_type: next ? targetService : null,
-    };
-
-    const { error } = await supabase
-      .from("driver_presence")
-      .upsert([driverPayload], { onConflict: 'driver_id' });
-
-    if (error) throw error;
 
     if (next) {
       await setOnline(targetService);
