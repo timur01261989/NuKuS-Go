@@ -1,20 +1,28 @@
 const ORDER_SELECT = [
   "id",
-  "user_id",
   "client_id",
   "driver_id",
   "service_type",
   "status",
   "pickup",
   "dropoff",
-  "price_uzs",
-  "surge_multiplier",
-  "distance_m",
-  "duration_s",
-  "comment",
+  "route_meta",
+  "cargo_title",
+  "cargo_weight_kg",
+  "cargo_volume_m3",
+  "passenger_count",
+  "note",
   "payment_method",
-  "car_type",
-  "options",
+  "price_uzs",
+  "commission_uzs",
+  "driver_payout_uzs",
+  "offered_at",
+  "accepted_at",
+  "arrived_at",
+  "started_at",
+  "completed_at",
+  "cancelled_at",
+  "cancel_reason",
   "created_at",
   "updated_at",
 ].join(",");
@@ -38,6 +46,17 @@ function toNumber(value) {
   if (value == null || value === "") return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
+}
+
+function toInteger(value) {
+  const n = toNumber(value);
+  if (n == null) return null;
+  return Number.isInteger(n) ? n : Math.round(n);
+}
+
+function normalizeUuid(value) {
+  const text = toText(value);
+  return text || null;
 }
 
 function isValidLatitude(value) {
@@ -120,64 +139,100 @@ function normalizeDropoff(body) {
   );
 }
 
+function normalizeJsonObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
 function buildNormalizedPayload(body) {
   const pickup = normalizePickup(body);
   const dropoff = normalizeDropoff(body);
+  const options = normalizeJsonObject(body?.options);
+  const meta = normalizeJsonObject(body?.meta);
 
-  const paymentMethod = toText(body?.payment_method ?? body?.paymentMethod) || null;
+  const paymentMethod = toText(body?.payment_method ?? body?.paymentMethod) || "cash";
   const serviceType = toText(body?.service_type ?? body?.serviceType) || "taxi";
   const carType = toText(body?.car_type ?? body?.carType ?? body?.tariff ?? body?.tarif) || null;
   const comment = toText(body?.comment ?? body?.note ?? body?.notes) || null;
 
   const surgeMultiplier = toNumber(body?.surge_multiplier ?? body?.surgeMultiplier) ?? 1;
-  const priceUzs = toNumber(body?.price_uzs ?? body?.priceUzs ?? body?.price);
-  const distanceM = toNumber(body?.distance_m ?? body?.distanceM ?? body?.distance);
-  const durationS = toNumber(body?.duration_s ?? body?.durationS ?? body?.duration);
+  const priceUzs = toInteger(body?.price_uzs ?? body?.priceUzs ?? body?.price);
+  const distanceM = toInteger(body?.distance_m ?? body?.distanceM ?? body?.distance);
+  const durationS = toInteger(body?.duration_s ?? body?.durationS ?? body?.duration);
 
-  const options = body?.options && typeof body.options === "object" ? body.options : {};
-  const meta = body?.meta && typeof body.meta === "object" ? body.meta : {};
+  const cargoTitle = toText(body?.cargo_title ?? body?.cargoTitle ?? options?.cargoTitle) || null;
+  const cargoWeightKg = toNumber(body?.cargo_weight_kg ?? body?.cargoWeightKg ?? options?.cargoWeightKg ?? options?.weightKg);
+  const cargoVolumeM3 = toNumber(body?.cargo_volume_m3 ?? body?.cargoVolumeM3 ?? options?.cargoVolumeM3 ?? options?.volumeM3);
+  const passengerCount = toInteger(body?.passenger_count ?? body?.passengerCount ?? options?.passengerCount) ?? (serviceType === "taxi" ? 1 : null);
 
-  const canonicalUserId = body?.user_id ?? body?.userId ?? body?.client_id ?? body?.clientId ?? null;
+  const normalizedClientId = normalizeUuid(body?.client_id ?? body?.clientId ?? body?.user_id ?? body?.userId);
+  const normalizedDriverId = normalizeUuid(body?.driver_id ?? body?.driverId);
+
+  const routeMeta = {
+    ...meta,
+    options,
+    pricing: {
+      surge_multiplier: surgeMultiplier,
+      distance_m: distanceM,
+      duration_s: durationS,
+      car_type: carType,
+    },
+  };
 
   return {
-    user_id: canonicalUserId,
-    client_id: canonicalUserId,
-    driver_id: body?.driver_id ?? body?.driverId ?? null,
+    client_id: normalizedClientId,
+    driver_id: normalizedDriverId,
     service_type: serviceType,
     status: toText(body?.status) || "searching",
     pickup,
     dropoff: dropoff || null,
     payment_method: paymentMethod,
-    car_type: carType,
-    comment,
+    note: comment,
     price_uzs: priceUzs,
-    surge_multiplier: surgeMultiplier,
-    distance_m: distanceM,
-    duration_s: durationS,
-    options,
-    meta,
+    route_meta: routeMeta,
+    cargo_title: cargoTitle,
+    cargo_weight_kg: cargoWeightKg,
+    cargo_volume_m3: cargoVolumeM3,
+    passenger_count: passengerCount,
   };
 }
 
 function buildResponseOrder(row) {
   if (!row) return null;
+
+  const routeMeta = normalizeJsonObject(row.route_meta);
+  const pricing = normalizeJsonObject(routeMeta.pricing);
+  const options = normalizeJsonObject(routeMeta.options);
+
   return {
     id: row.id,
-    user_id: row.user_id ?? row.client_id ?? null,
-    client_id: row.client_id ?? row.user_id ?? null,
+    client_id: row.client_id ?? null,
+    user_id: row.client_id ?? null,
     driver_id: row.driver_id ?? null,
     service_type: row.service_type ?? "taxi",
     status: row.status ?? null,
     pickup: row.pickup ?? null,
     dropoff: row.dropoff ?? null,
     payment_method: row.payment_method ?? null,
-    car_type: row.car_type ?? null,
-    comment: row.comment ?? null,
+    car_type: pricing.car_type ?? null,
+    comment: row.note ?? null,
+    note: row.note ?? null,
     price_uzs: row.price_uzs ?? null,
-    surge_multiplier: row.surge_multiplier ?? 1,
-    distance_m: row.distance_m ?? null,
-    duration_s: row.duration_s ?? null,
-    options: row.options ?? {},
+    surge_multiplier: pricing.surge_multiplier ?? 1,
+    distance_m: pricing.distance_m ?? null,
+    duration_s: pricing.duration_s ?? null,
+    options,
+    meta: routeMeta,
+    cargo_title: row.cargo_title ?? null,
+    cargo_weight_kg: row.cargo_weight_kg ?? null,
+    cargo_volume_m3: row.cargo_volume_m3 ?? null,
+    passenger_count: row.passenger_count ?? null,
+    offered_at: row.offered_at ?? null,
+    accepted_at: row.accepted_at ?? null,
+    arrived_at: row.arrived_at ?? null,
+    started_at: row.started_at ?? null,
+    completed_at: row.completed_at ?? null,
+    cancelled_at: row.cancelled_at ?? null,
+    cancel_reason: row.cancel_reason ?? null,
     created_at: row.created_at ?? null,
     updated_at: row.updated_at ?? null,
   };
@@ -253,17 +308,17 @@ async function handleGetById(supabase, body) {
 }
 
 async function handleActiveOrder(supabase, body) {
-  const userId = toText(body?.user_id ?? body?.userId ?? body?.client_id ?? body?.clientId);
-  if (!userId) {
-    return { status: 400, payload: { ok: false, error: "user_id kerak" } };
+  const clientId = normalizeUuid(body?.client_id ?? body?.user_id ?? body?.clientId ?? body?.userId);
+  if (!clientId) {
+    return { status: 400, payload: { ok: false, error: "client_id kerak" } };
   }
 
-  const activeStatuses = ["searching", "offered", "accepted", "arrived", "in_progress"];
+  const activeStatuses = ["pending", "searching", "offered", "accepted", "arrived", "in_progress", "in_trip"];
 
   const { data, error } = await supabase
     .from("orders")
     .select(ORDER_SELECT)
-    .eq("user_id", userId)
+    .eq("client_id", clientId)
     .in("status", activeStatuses)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -300,16 +355,25 @@ async function handleActiveOrder(supabase, body) {
 
 async function handleCancel(supabase, body) {
   const orderId = toText(body?.order_id ?? body?.orderId ?? body?.id);
+  const cancelReason = toText(body?.cancel_reason ?? body?.cancelReason ?? body?.reason) || null;
+
   if (!orderId) {
     return { status: 400, payload: { ok: false, error: "order_id kerak" } };
   }
 
+  const patch = {
+    status: "cancelled",
+    cancelled_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  if (cancelReason) {
+    patch.cancel_reason = cancelReason;
+  }
+
   const { data, error } = await supabase
     .from("orders")
-    .update({
-      status: "cancelled",
-      updated_at: new Date().toISOString(),
-    })
+    .update(patch)
     .eq("id", orderId)
     .select(ORDER_SELECT)
     .single();
@@ -317,6 +381,13 @@ async function handleCancel(supabase, body) {
   if (error) {
     return { status: 500, payload: { ok: false, error: error.message } };
   }
+
+  await supabase.from("order_status_history").insert({
+    order_id: orderId,
+    status: "cancelled",
+    changed_by: normalizeUuid(body?.client_id ?? body?.clientId ?? body?.user_id ?? body?.userId ?? body?.driver_id ?? body?.driverId),
+    note: cancelReason || "Cancelled via API",
+  });
 
   return {
     status: 200,
@@ -333,12 +404,12 @@ async function handleCancel(supabase, body) {
 async function handleCreateOrder(supabase, body) {
   const payload = buildNormalizedPayload(body);
 
-  if (!payload.user_id) {
+  if (!payload.client_id) {
     return {
       status: 400,
       payload: {
         ok: false,
-        error: "user_id kerak",
+        error: "client_id yoki user_id yuborilishi shart",
       },
     };
   }
@@ -354,7 +425,6 @@ async function handleCreateOrder(supabase, body) {
   }
 
   const insertPayload = {
-    user_id: payload.user_id,
     client_id: payload.client_id,
     driver_id: payload.driver_id,
     service_type: payload.service_type,
@@ -362,14 +432,13 @@ async function handleCreateOrder(supabase, body) {
     pickup: payload.pickup,
     dropoff: payload.dropoff,
     payment_method: payload.payment_method,
-    car_type: payload.car_type,
-    comment: payload.comment,
-    note: payload.comment,
+    note: payload.note,
     price_uzs: payload.price_uzs,
-    surge_multiplier: payload.surge_multiplier,
-    distance_m: payload.distance_m,
-    duration_s: payload.duration_s,
-    options: payload.options,
+    route_meta: payload.route_meta,
+    cargo_title: payload.cargo_title,
+    cargo_weight_kg: payload.cargo_weight_kg,
+    cargo_volume_m3: payload.cargo_volume_m3,
+    passenger_count: payload.passenger_count,
     updated_at: new Date().toISOString(),
   };
 
@@ -388,6 +457,26 @@ async function handleCreateOrder(supabase, body) {
       },
     };
   }
+
+  await supabase.from("order_events").insert({
+    order_id: data.id,
+    actor_user_id: payload.client_id,
+    actor_role: "client",
+    event_code: "order.created",
+    from_status: null,
+    to_status: data.status,
+    payload: {
+      service_type: data.service_type,
+      payment_method: data.payment_method,
+    },
+  });
+
+  await supabase.from("order_status_history").insert({
+    order_id: data.id,
+    status: data.status,
+    changed_by: payload.client_id,
+    note: "Created via API",
+  });
 
   return {
     status: 200,

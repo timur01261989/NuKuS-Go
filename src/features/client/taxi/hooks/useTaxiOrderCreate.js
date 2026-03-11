@@ -1,6 +1,5 @@
 import { useCallback, useRef } from "react";
 import { message } from "antd";
-import { supabase } from "@/lib/supabase";
 import { toCreateOrderPayload, fromOrderResponse } from "../lib/taxiOrderAdapter";
 import {
   extractOrder,
@@ -16,15 +15,96 @@ async function createOrderRequest(payload) {
   return postJson(ORDER_ENDPOINT, payload);
 }
 
-async function resolveCurrentUserId() {
-  const { data, error } = await supabase.auth.getUser();
-  if (error) throw error;
-  return data?.user?.id || null;
+function readNestedUuidCandidate(source) {
+  if (!source || typeof source !== "object") return null;
+
+  const directCandidates = [
+    source.id,
+    source.user_id,
+    source.userId,
+    source.client_id,
+    source.clientId,
+    source.uid,
+    source.sub,
+  ];
+
+  for (const candidate of directCandidates) {
+    if (candidate != null && String(candidate).trim()) {
+      return String(candidate).trim();
+    }
+  }
+
+  const nestedKeys = ["user", "session", "profile", "currentUser", "auth"];
+  for (const key of nestedKeys) {
+    const nested = source[key];
+    if (nested && typeof nested === "object") {
+      const nestedResult = readNestedUuidCandidate(nested);
+      if (nestedResult) return nestedResult;
+    }
+  }
+
+  return null;
+}
+
+function tryParseJson(raw) {
+  if (typeof raw !== "string" || !raw.trim()) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function resolveClientIdFromStorage() {
+  if (typeof window === "undefined") return null;
+
+  const directStorageKeys = [
+    "user_id",
+    "userId",
+    "client_id",
+    "clientId",
+    "uid",
+    "auth_user_id",
+    "supabase.auth.user.id",
+  ];
+
+  for (const key of directStorageKeys) {
+    const localValue = window.localStorage?.getItem?.(key);
+    if (localValue && String(localValue).trim()) {
+      return String(localValue).trim();
+    }
+
+    const sessionValue = window.sessionStorage?.getItem?.(key);
+    if (sessionValue && String(sessionValue).trim()) {
+      return String(sessionValue).trim();
+    }
+  }
+
+  const storageCollections = [window.localStorage, window.sessionStorage].filter(Boolean);
+
+  for (const storage of storageCollections) {
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index);
+      if (!key) continue;
+
+      const raw = storage.getItem(key);
+      if (!raw) continue;
+
+      const parsed = tryParseJson(raw);
+      if (!parsed) continue;
+
+      const resolved = readNestedUuidCandidate(parsed);
+      if (resolved) return resolved;
+    }
+  }
+
+  return null;
 }
 
 export function useTaxiOrderCreate(options = {}) {
   const {
     cp,
+    clientId,
     pickup,
     dest,
     tariff,
@@ -47,20 +127,26 @@ export function useTaxiOrderCreate(options = {}) {
   const handleOrderCreate = useCallback(async () => {
     if (creatingRef.current) return;
 
-    const authUserId = await resolveCurrentUserId();
-    if (!authUserId) {
-      message.error(cp ? cp("Avval tizimga kiring") : "Avval tizimga kiring");
+    const resolvedClientId = clientId || resolveClientIdFromStorage();
+
+    if (!resolvedClientId) {
+      message.error(
+        cp
+          ? cp("Foydalanuvchi ID topilmadi. Qayta login qiling")
+          : "Foydalanuvchi ID topilmadi. Qayta login qiling"
+      );
+
       return {
         ok: false,
-        error: "auth_required",
+        error: "missing_client_id",
         order: null,
         orderId: null,
       };
     }
 
     const draft = {
-      user_id: authUserId,
-      client_id: authUserId,
+      client_id: resolvedClientId,
+      user_id: resolvedClientId,
       pickup,
       dropoff: dest?.latlng
         ? {
@@ -75,12 +161,15 @@ export function useTaxiOrderCreate(options = {}) {
       price_uzs: totalPrice || null,
       distance_m: distanceKm ? Math.round(distanceKm * 1000) : null,
       duration_s: null,
+      passenger_count: 1,
       options: {
         waypoints: Array.isArray(waypoints) ? waypoints : [],
         orderFor: orderFor || "self",
         otherPhone: otherPhone || "",
         wishes: wishes || {},
         scheduledTime: scheduledTime || null,
+        tariffId: tariff?.id || "start",
+        tariffTitle: tariff?.title || "Start",
       },
     };
 
@@ -182,6 +271,7 @@ export function useTaxiOrderCreate(options = {}) {
       creatingRef.current = false;
     }
   }, [
+    clientId,
     cp,
     pickup,
     dest,

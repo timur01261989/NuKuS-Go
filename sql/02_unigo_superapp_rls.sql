@@ -103,29 +103,18 @@ for select to authenticated
 using (user_id = auth.uid());
 
 -- orders
--- Canonical identity for the client/passenger is orders.user_id.
--- During transition we still allow legacy rows that only have client_id.
 create policy orders_select_own_or_assigned on public.orders
 for select to authenticated
-using (
-  coalesce(user_id, client_id) = auth.uid()
-  or driver_id = auth.uid()
-);
+using (client_id = auth.uid() or driver_id = auth.uid());
 
-create policy orders_insert_own on public.orders
+create policy orders_insert_client on public.orders
 for insert to authenticated
-with check (
-  coalesce(user_id, client_id) = auth.uid()
-);
+with check (client_id = auth.uid());
 
-create policy orders_update_own on public.orders
+create policy orders_update_client_limited on public.orders
 for update to authenticated
-using (
-  coalesce(user_id, client_id) = auth.uid()
-)
-with check (
-  coalesce(user_id, client_id) = auth.uid()
-);
+using (client_id = auth.uid())
+with check (client_id = auth.uid());
 
 -- order_offers
 create policy order_offers_select_driver on public.order_offers

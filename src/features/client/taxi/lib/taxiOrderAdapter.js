@@ -49,6 +49,10 @@ function normalizeLocationLike(input) {
   };
 }
 
+function normalizeObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
 export function toPickupLocation(value) {
   return normalizeLocationLike(value);
 }
@@ -66,24 +70,38 @@ export function toCreateOrderPayload(draft = {}) {
     draft.dropoff ?? draft.to ?? draft.to_location ?? draft.dropoff_location
   );
 
-  const userId = draft.user_id ?? draft.userId ?? draft.client_id ?? draft.clientId ?? null;
+  const options = normalizeObject(draft.options);
+  const meta = normalizeObject(draft.meta);
+
+  const routeMeta = {
+    ...meta,
+    options,
+    pricing: {
+      surge_multiplier: draft.surge_multiplier ?? draft.surgeMultiplier ?? 1,
+      distance_m: draft.distance_m ?? draft.distanceM ?? draft.distance ?? null,
+      duration_s: draft.duration_s ?? draft.durationS ?? draft.duration ?? null,
+      car_type: draft.car_type ?? draft.carType ?? draft.tariff ?? draft.tarif ?? null,
+    },
+  };
 
   return {
-    user_id: userId,
-    client_id: userId,
+    client_id: draft.client_id ?? draft.user_id ?? draft.userId ?? null,
+    user_id: draft.client_id ?? draft.user_id ?? draft.userId ?? null,
     service_type: draft.service_type ?? draft.serviceType ?? "taxi",
-    payment_method: draft.payment_method ?? draft.paymentMethod ?? null,
-    car_type: draft.car_type ?? draft.carType ?? draft.tariff ?? draft.tarif ?? null,
+    payment_method: draft.payment_method ?? draft.paymentMethod ?? "cash",
+    note: draft.comment ?? draft.note ?? draft.notes ?? null,
     comment: draft.comment ?? draft.note ?? draft.notes ?? null,
     price_uzs: draft.price_uzs ?? draft.priceUzs ?? draft.price ?? null,
-    surge_multiplier: draft.surge_multiplier ?? draft.surgeMultiplier ?? 1,
-    distance_m: draft.distance_m ?? draft.distanceM ?? draft.distance ?? null,
-    duration_s: draft.duration_s ?? draft.durationS ?? draft.duration ?? null,
-    options: draft.options && typeof draft.options === "object" ? draft.options : {},
+    passenger_count: draft.passenger_count ?? draft.passengerCount ?? options.passengerCount ?? 1,
+    cargo_title: draft.cargo_title ?? draft.cargoTitle ?? options.cargoTitle ?? null,
+    cargo_weight_kg: draft.cargo_weight_kg ?? draft.cargoWeightKg ?? options.cargoWeightKg ?? options.weightKg ?? null,
+    cargo_volume_m3: draft.cargo_volume_m3 ?? draft.cargoVolumeM3 ?? options.cargoVolumeM3 ?? options.volumeM3 ?? null,
+    route_meta: routeMeta,
+    options,
     pickup,
     dropoff: dropoff || null,
 
-    // Transition compatibility for older payload readers.
+    // Legacy compatibility fields. Kept on purpose so old backend/client code does not break.
     pickup_location: pickup
       ? {
           address: pickup.address,
@@ -118,24 +136,32 @@ export function fromOrderResponse(order = null) {
 
   const pickup = toPickupLocation(order.pickup ?? order.pickup_location ?? order.from_location);
   const dropoff = toDropoffLocation(order.dropoff ?? order.dropoff_location ?? order.to_location);
+  const routeMeta = normalizeObject(order.route_meta ?? order.meta);
+  const pricing = normalizeObject(routeMeta.pricing);
 
   return {
     id: order.id ?? order.order_id ?? order.orderId ?? null,
-    user_id: order.user_id ?? order.client_id ?? null,
     client_id: order.client_id ?? order.user_id ?? null,
+    user_id: order.client_id ?? order.user_id ?? null,
     driver_id: order.driver_id ?? null,
     status: order.status ?? null,
     service_type: order.service_type ?? "taxi",
     pickup,
     dropoff: dropoff || null,
     payment_method: order.payment_method ?? null,
-    car_type: order.car_type ?? null,
+    car_type: order.car_type ?? pricing.car_type ?? null,
     comment: order.comment ?? order.note ?? null,
+    note: order.note ?? order.comment ?? null,
     price_uzs: order.price_uzs ?? null,
-    surge_multiplier: order.surge_multiplier ?? 1,
-    distance_m: order.distance_m ?? null,
-    duration_s: order.duration_s ?? null,
-    options: order.options && typeof order.options === "object" ? order.options : {},
+    surge_multiplier: order.surge_multiplier ?? pricing.surge_multiplier ?? 1,
+    distance_m: order.distance_m ?? pricing.distance_m ?? null,
+    duration_s: order.duration_s ?? pricing.duration_s ?? null,
+    route_meta: routeMeta,
+    options: order.options && typeof order.options === "object" ? order.options : normalizeObject(routeMeta.options),
+    passenger_count: order.passenger_count ?? null,
+    cargo_title: order.cargo_title ?? null,
+    cargo_weight_kg: order.cargo_weight_kg ?? null,
+    cargo_volume_m3: order.cargo_volume_m3 ?? null,
     created_at: order.created_at ?? null,
     updated_at: order.updated_at ?? null,
   };

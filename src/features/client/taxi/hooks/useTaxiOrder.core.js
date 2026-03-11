@@ -319,7 +319,55 @@ export function useTaxiOrderCore() {
     [pickup?.latlng]
   );
 
-  const handleOrderCreate = useTaxiOrderCreate({ cp, pickup, dest, tariff, totalPrice, distanceKm, waypoints, orderFor, otherPhone, wishes, comment, scheduledTime, setOrderId, setOrderStatus, setStep, speak });
+  const currentUserId = useMemo(() => {
+    const storageKeys = ["user_id", "userId", "client_id", "clientId", "uid", "auth_user_id", "supabase.auth.user.id"];
+
+    for (const key of storageKeys) {
+      try {
+        const directValue = localStorage.getItem(key) || sessionStorage.getItem(key);
+        if (directValue && String(directValue).trim()) {
+          return String(directValue).trim();
+        }
+      } catch (_) {}
+    }
+
+    const storages = [typeof localStorage !== "undefined" ? localStorage : null, typeof sessionStorage !== "undefined" ? sessionStorage : null].filter(Boolean);
+
+    const readNestedUserId = (value) => {
+      if (!value || typeof value !== "object") return null;
+      const candidates = [value.id, value.user_id, value.userId, value.client_id, value.clientId, value.uid, value.sub];
+      for (const candidate of candidates) {
+        if (candidate != null && String(candidate).trim()) return String(candidate).trim();
+      }
+      const nestedKeys = ["user", "session", "profile", "currentUser", "auth"];
+      for (const nestedKey of nestedKeys) {
+        const nestedValue = value[nestedKey];
+        const nestedResult = readNestedUserId(nestedValue);
+        if (nestedResult) return nestedResult;
+      }
+      return null;
+    };
+
+    for (const storage of storages) {
+      try {
+        for (let index = 0; index < storage.length; index += 1) {
+          const key = storage.key(index);
+          if (!key) continue;
+          const raw = storage.getItem(key);
+          if (!raw) continue;
+          try {
+            const parsed = JSON.parse(raw);
+            const resolved = readNestedUserId(parsed);
+            if (resolved) return resolved;
+          } catch (_) {}
+        }
+      } catch (_) {}
+    }
+
+    return null;
+  }, []);
+
+  const handleOrderCreate = useTaxiOrderCreate({ clientId: currentUserId, cp, pickup, dest, tariff, totalPrice, distanceKm, waypoints, orderFor, otherPhone, wishes, comment, scheduledTime, setOrderId, setOrderStatus, setStep, speak });
 
   const { handleCancel } = useTaxiOrderActions({
     cp,
