@@ -552,11 +552,11 @@ export default function ClientTaxiPage() {
             Ish
           </Button>
         </div>
-        {savedPlaces.length === 0 ? (
+        {(savedPlaces?.length ?? 0) === 0 ? (
           <div style={{ fontSize: 12, opacity: 0.55, padding: "8px 0" }}>Hozircha saqlangan manzil yo'q</div>
         ) : (
           <div className="yg-saved">
-            {savedPlaces.slice(0, 4).map((p) => (
+            {(savedPlaces || []).slice(0, 4).map((p) => (
               <button key={p.id || p.place_id || `${p.lat},${p.lng}`} className="yg-saved-item" onClick={() => handlePickSaved(p)}>
                 <div className="yg-saved-ic">📍</div>
                 <div className="yg-saved-txt">
