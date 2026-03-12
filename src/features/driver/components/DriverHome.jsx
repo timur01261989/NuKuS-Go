@@ -99,6 +99,7 @@ export default function DriverHome({ onLogout }) {
     isOnline,
     activeService,
     activeVehicle,
+    serviceTypes,
     canUseService,
     refreshCapabilities,
     setOnline,
