@@ -5,29 +5,53 @@ import { getDefaultServiceTypes } from "@/features/driver/DriverRegistration/upl
 export const ACTIVE_VEHICLE_STORAGE_KEY = "driver_active_vehicle_id";
 
 function normalizeServiceTypes(rawValue, fallbackVehicleType = "light_car") {
-  if (!rawValue) return getDefaultServiceTypes(fallbackVehicleType);
+  const defaults = getDefaultServiceTypes(fallbackVehicleType);
+  if (!rawValue) return defaults;
+
   if (typeof rawValue === "string") {
     try {
       return normalizeServiceTypes(JSON.parse(rawValue), fallbackVehicleType);
     } catch {
-      return getDefaultServiceTypes(fallbackVehicleType);
+      return defaults;
     }
   }
+
+  const hasNestedShape = rawValue?.city || rawValue?.intercity || rawValue?.interdistrict;
+  if (hasNestedShape) {
+    return {
+      city: {
+        passenger: !!rawValue?.city?.passenger,
+        delivery: !!rawValue?.city?.delivery,
+        freight: !!rawValue?.city?.freight,
+      },
+      intercity: {
+        passenger: !!rawValue?.intercity?.passenger,
+        delivery: !!rawValue?.intercity?.delivery,
+        freight: !!rawValue?.intercity?.freight,
+      },
+      interdistrict: {
+        passenger: !!rawValue?.interdistrict?.passenger,
+        delivery: !!rawValue?.interdistrict?.delivery,
+        freight: !!rawValue?.interdistrict?.freight,
+      },
+    };
+  }
+
   return {
     city: {
-      passenger: !!rawValue?.city?.passenger,
-      delivery: !!rawValue?.city?.delivery,
-      freight: !!rawValue?.city?.freight,
+      passenger: !!rawValue?.city_passenger,
+      delivery: !!rawValue?.city_delivery,
+      freight: !!rawValue?.city_freight,
     },
     intercity: {
-      passenger: !!rawValue?.intercity?.passenger,
-      delivery: !!rawValue?.intercity?.delivery,
-      freight: !!rawValue?.intercity?.freight,
+      passenger: !!rawValue?.intercity_passenger,
+      delivery: !!rawValue?.intercity_delivery,
+      freight: !!rawValue?.intercity_freight,
     },
     interdistrict: {
-      passenger: !!rawValue?.interdistrict?.passenger,
-      delivery: !!rawValue?.interdistrict?.delivery,
-      freight: !!rawValue?.interdistrict?.freight,
+      passenger: !!rawValue?.interdistrict_passenger,
+      delivery: !!rawValue?.interdistrict_delivery,
+      freight: !!rawValue?.interdistrict_freight,
     },
   };
 }
@@ -87,7 +111,7 @@ async function safeSelectApplication(userId) {
 async function safeSelectServiceSettings(userId) {
   const result = await supabase
     .from('driver_service_settings')
-    .select('service_types')
+    .select('*')
     .eq('user_id', userId)
     .maybeSingle();
 
@@ -146,7 +170,7 @@ export async function fetchDriverCapability(userId = null) {
   const fallbackVehicle = buildFallbackVehicle(application);
   const activeVehicle = pickActiveVehicle(normalizedVehicles, fallbackVehicle);
   const vehicleType = activeVehicle?.vehicleType || application?.requested_vehicle_type || application?.transport_type || 'light_car';
-  const serviceTypes = normalizeServiceTypes(serviceSettings?.service_types || application?.requested_service_types, vehicleType);
+  const serviceTypes = normalizeServiceTypes(serviceSettings || application?.requested_service_types, vehicleType);
 
   return {
     userId: resolvedUserId,
@@ -162,13 +186,13 @@ export async function fetchDriverCapabilitiesByUserIds(userIds = []) {
   if (uniqueUserIds.length === 0) return new Map();
 
   const [settingsResult, vehiclesResult] = await Promise.all([
-    supabase.from('driver_service_settings').select('user_id, service_types').in('user_id', uniqueUserIds),
+    supabase.from('driver_service_settings').select('*').in('user_id', uniqueUserIds),
     supabase.from('vehicles').select('*').in('user_id', uniqueUserIds).order('is_active', { ascending: false }),
   ]);
 
   const settingsMap = new Map();
   if (!settingsResult.error) {
-    for (const row of settingsResult.data || []) settingsMap.set(row.user_id, row.service_types);
+    for (const row of settingsResult.data || []) settingsMap.set(row.user_id, normalizeServiceTypes(row, 'light_car'));
   }
 
   const vehiclesMap = new Map();

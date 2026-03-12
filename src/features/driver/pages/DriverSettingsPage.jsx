@@ -57,31 +57,67 @@ const CARD_STYLE = {
 const SECTION_LABEL_STYLE = { color: "#cbd5e1", fontWeight: 700 };
 
 function normalizeServiceTypes(rawValue, fallbackVehicleType = "light_car") {
-  if (!rawValue) return getDefaultServiceTypes(fallbackVehicleType);
+  const defaults = getDefaultServiceTypes(fallbackVehicleType);
+  if (!rawValue) return defaults;
   if (typeof rawValue === "string") {
     try {
       return normalizeServiceTypes(JSON.parse(rawValue), fallbackVehicleType);
     } catch (_error) {
-      return getDefaultServiceTypes(fallbackVehicleType);
+      return defaults;
     }
+  }
+
+  const hasNestedShape = rawValue?.city || rawValue?.intercity || rawValue?.interdistrict;
+  if (hasNestedShape) {
+    return {
+      city: {
+        passenger: !!rawValue?.city?.passenger,
+        delivery: !!rawValue?.city?.delivery,
+        freight: !!rawValue?.city?.freight,
+      },
+      intercity: {
+        passenger: !!rawValue?.intercity?.passenger,
+        delivery: !!rawValue?.intercity?.delivery,
+        freight: !!rawValue?.intercity?.freight,
+      },
+      interdistrict: {
+        passenger: !!rawValue?.interdistrict?.passenger,
+        delivery: !!rawValue?.interdistrict?.delivery,
+        freight: !!rawValue?.interdistrict?.freight,
+      },
+    };
   }
 
   return {
     city: {
-      passenger: !!rawValue?.city?.passenger,
-      delivery: !!rawValue?.city?.delivery,
-      freight: !!rawValue?.city?.freight,
+      passenger: !!rawValue?.city_passenger,
+      delivery: !!rawValue?.city_delivery,
+      freight: !!rawValue?.city_freight,
     },
     intercity: {
-      passenger: !!rawValue?.intercity?.passenger,
-      delivery: !!rawValue?.intercity?.delivery,
-      freight: !!rawValue?.intercity?.freight,
+      passenger: !!rawValue?.intercity_passenger,
+      delivery: !!rawValue?.intercity_delivery,
+      freight: !!rawValue?.intercity_freight,
     },
     interdistrict: {
-      passenger: !!rawValue?.interdistrict?.passenger,
-      delivery: !!rawValue?.interdistrict?.delivery,
-      freight: !!rawValue?.interdistrict?.freight,
+      passenger: !!rawValue?.interdistrict_passenger,
+      delivery: !!rawValue?.interdistrict_delivery,
+      freight: !!rawValue?.interdistrict_freight,
     },
+  };
+}
+
+function flattenServiceTypes(serviceTypes) {
+  return {
+    city_passenger: !!serviceTypes?.city?.passenger,
+    city_delivery: !!serviceTypes?.city?.delivery,
+    city_freight: !!serviceTypes?.city?.freight,
+    intercity_passenger: !!serviceTypes?.intercity?.passenger,
+    intercity_delivery: !!serviceTypes?.intercity?.delivery,
+    intercity_freight: !!serviceTypes?.intercity?.freight,
+    interdistrict_passenger: !!serviceTypes?.interdistrict?.passenger,
+    interdistrict_delivery: !!serviceTypes?.interdistrict?.delivery,
+    interdistrict_freight: !!serviceTypes?.interdistrict?.freight,
   };
 }
 
@@ -437,7 +473,7 @@ export default function DriverSettingsPage() {
         "light_car";
 
       const nextServiceTypes = normalizeServiceTypes(
-        settingsResult?.data?.service_types || applicationData?.requested_service_types,
+        settingsResult?.data || applicationData?.requested_service_types,
         vehicleType
       );
 
@@ -471,20 +507,30 @@ export default function DriverSettingsPage() {
       const user = await getCurrentUser();
       const now = new Date().toISOString();
 
+      const flatServicePayload = flattenServiceTypes(serviceTypes);
       const servicePayload = {
         user_id: user.id,
         service_types: serviceTypes,
+        ...flatServicePayload,
         updated_at: now,
       };
 
-      const upsertSettings = await supabase
+      let upsertSettings = await supabase
         .from("driver_service_settings")
         .upsert(servicePayload, { onConflict: "user_id" });
 
       if (upsertSettings.error) {
         const errorText = String(upsertSettings.error.message || "").toLowerCase();
-        if (!errorText.includes("does not exist") && !errorText.includes("relation")) {
-          throw upsertSettings.error;
+        if (errorText.includes("service_types") && (errorText.includes("column") || errorText.includes("schema cache"))) {
+          upsertSettings = await supabase
+            .from("driver_service_settings")
+            .upsert({ user_id: user.id, ...flatServicePayload, updated_at: now }, { onConflict: "user_id" });
+        }
+        if (upsertSettings.error) {
+          const fallbackText = String(upsertSettings.error.message || "").toLowerCase();
+          if (!fallbackText.includes("does not exist") && !fallbackText.includes("relation")) {
+            throw upsertSettings.error;
+          }
         }
       }
 
@@ -558,7 +604,14 @@ export default function DriverSettingsPage() {
           created_at: now,
         });
 
-        if (error) throw error;
+        if (error) {
+          const errorText = String(error.message || "").toLowerCase();
+          if (errorText.includes("does not exist") || errorText.includes("relation") || errorText.includes("schema cache")) {
+            message.warning("vehicle_change_requests jadvali hali yaratilmagan. SQL migratsiyani run qiling.");
+            return;
+          }
+          throw error;
+        }
 
         message.success(
           vehicleModalMode === "edit"
