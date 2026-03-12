@@ -428,7 +428,7 @@ const VehicleCard = memo(function VehicleCard({ vehicle, onSetActive, onEditRequ
   );
 });
 
-export default function DriverSettingsPage() {
+export default function DriverSettingsPage({ forceTab = null }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [savingServices, setSavingServices] = useState(false);

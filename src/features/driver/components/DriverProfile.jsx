@@ -124,7 +124,7 @@ function DriverProfile({ onBack, onLogout }) {
         <Title level={4} style={{ margin: 0, fontFamily: "YangoHeadline" }}>
           {cp("Profil")}
         </Title>
-        <Button icon={<SettingOutlined />} shape="circle" onClick={() => navigate("/driver/settings?tab=vehicles")} />
+        <Button icon={<SettingOutlined />} shape="circle" onClick={() => navigate("/driver/settings?tab=services")} />
       </div>
 
       <Card

@@ -46,7 +46,8 @@ export default function DriverSidebar({ open, onClose, onLogout }) {
               <MenuItem icon="person" title={passengerTitle} onClick={() => go("/client/home")} />
               <MenuItem icon="history" title={t.orderHistoryDriver || t.orders} onClick={() => go("/driver/orders")} />
               <MenuItem icon="account_balance_wallet" title={t.wallet} onClick={() => go("/driver/wallet")} />
-              <MenuItem icon="settings" title={t.settingsTitle || t.settings} onClick={() => go("/driver/settings")} />
+              <MenuItem icon="settings" title={t.settingsTitle || t.settings || "Sozlamalar"} onClick={() => go("/settings")} />
+              <MenuItem icon="tune" title={t.driverSettingsTitle || "Haydovchi sozlamalari"} onClick={() => go("/driver/settings?tab=services")} />
               <MenuItem icon="directions_car" title={t.driverVehicleManagement || "Mashinalar"} onClick={() => go("/driver/settings?tab=vehicles")} />
               <MenuItem icon="insights" title={t.insights || "Insights"} onClick={() => go("/driver/insights")} />
             </div>

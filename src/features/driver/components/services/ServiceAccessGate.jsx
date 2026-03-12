@@ -36,7 +36,7 @@ function ServiceAccessGateComponent({
     return `${vehicleLabel} • ${weight}kg • ${volume}m³`;
   }, [activeVehicle]);
 
-  const goToSettings = () => navigate("/driver/settings");
+  const goToSettings = () => navigate("/driver/settings?tab=services");
   const goToVehicles = () => navigate("/driver/vehicles");
 
   if (!serviceEnabled) {
@@ -54,7 +54,7 @@ function ServiceAccessGateComponent({
             <Text type="secondary">Xizmat yoqish joyi: Sozlamalar → Xizmat turlari</Text>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               <Button type="primary" icon={<SettingOutlined />} onClick={goToSettings}>
-                Sozlamalarga o‘tish
+Haydovchi sozlamalari
               </Button>
             </div>
           </Space>
@@ -81,7 +81,7 @@ function ServiceAccessGateComponent({
                 Mashinalar bo‘limiga o‘tish
               </Button>
               <Button icon={<SettingOutlined />} onClick={goToSettings}>
-                Sozlamalar
+Haydovchi sozlamalari
               </Button>
             </div>
           </Space>

@@ -6,13 +6,41 @@ import { canUseMenuService, fetchDriverCapability, syncCapabilityToStorage } fro
 
 const STORAGE_ONLINE = "driver_online";
 const STORAGE_SERVICE = "driver_active_service";
+const STORAGE_SERVICE_TYPES_CACHE = "driver_service_types_cache";
+const STORAGE_ACTIVE_VEHICLE_CACHE = "driver_active_vehicle_cache";
 const DriverOnlineContext = createContext(null);
 
 export function DriverOnlineProvider({ children }) {
-  const [isOnline, setIsOnline] = useState(false);
-  const [activeService, setActiveService] = useState(null);
-  const [serviceTypes, setServiceTypes] = useState(null);
-  const [activeVehicle, setActiveVehicle] = useState(null);
+  const [isOnline, setIsOnline] = useState(() => {
+    try {
+      return localStorage.getItem(STORAGE_ONLINE) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [activeService, setActiveService] = useState(() => {
+    try {
+      return localStorage.getItem(STORAGE_SERVICE) || null;
+    } catch {
+      return null;
+    }
+  });
+  const [serviceTypes, setServiceTypes] = useState(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_SERVICE_TYPES_CACHE);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [activeVehicle, setActiveVehicle] = useState(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_ACTIVE_VEHICLE_CACHE);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
 
   const refreshCapabilities = useCallback(async () => {
     try {
@@ -20,6 +48,8 @@ export function DriverOnlineProvider({ children }) {
       setServiceTypes(capability?.serviceTypes || null);
       setActiveVehicle(capability?.activeVehicle || null);
       syncCapabilityToStorage(capability);
+      if (capability?.serviceTypes) setServiceTypes(capability.serviceTypes);
+      if (capability?.activeVehicle) setActiveVehicle(capability.activeVehicle);
       return capability;
     } catch {
       return null;
@@ -28,13 +58,9 @@ export function DriverOnlineProvider({ children }) {
 
   useEffect(() => {
     try {
-      const storedOnline = localStorage.getItem(STORAGE_ONLINE) === "1";
-      const storedService = localStorage.getItem(STORAGE_SERVICE) || null;
-      setIsOnline(storedOnline);
-      setActiveService(storedService);
       refreshCapabilities();
-      if (storedOnline) {
-        Promise.resolve(startPresence(storedService)).catch(() => {});
+      if (localStorage.getItem(STORAGE_ONLINE) === "1") {
+        Promise.resolve(startPresence(localStorage.getItem(STORAGE_SERVICE) || null)).catch(() => {});
         startDot();
       }
     } catch {

@@ -300,6 +300,7 @@ export function syncCapabilityToStorage(capability) {
   if (typeof window === 'undefined') return;
   try {
     if (capability?.activeVehicle?.id) localStorage.setItem(ACTIVE_VEHICLE_STORAGE_KEY, capability.activeVehicle.id);
+    if (capability?.activeVehicle) localStorage.setItem('driver_active_vehicle_cache', JSON.stringify(capability.activeVehicle));
     if (capability?.serviceTypes) localStorage.setItem('driver_service_types_cache', JSON.stringify(capability.serviceTypes));
   } catch {
     // ignore

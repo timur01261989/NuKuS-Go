@@ -34,6 +34,7 @@ import DriverOnlineToggle from '../components/DriverOnlineToggle';
 import { useDriverOnline } from '../core/useDriverOnline';
 import { canUseOrderTypeInArea } from '../core/driverCapabilityService';
 import { canActivateService } from '../core/serviceGuards';
+import { useDriverText } from '../shared/i18n_driverLocalize';
 
 import './styles/theme.css';
 

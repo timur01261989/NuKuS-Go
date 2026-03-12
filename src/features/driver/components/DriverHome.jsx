@@ -14,7 +14,6 @@ import DriverProfile from "./DriverProfile";
 import DriverSidebar from "./DriverSidebar";
 
 import { supabase } from "../../../lib/supabase";
-import { syncPresenceService } from "../core/driverPresenceManager";
 import { useDriverOnline } from "../core/useDriverOnline";
 import { canActivateService } from "../core/serviceGuards";
 import { useSpeedometer } from "../speed/useSpeedometer";
@@ -148,24 +147,8 @@ const toggleOnline = async (next) => {
     if (!user) return;
     userIdRef.current = user.id;
 
-    const driverPayload = {
-      driver_id: user.id,
-      is_online: next,
-      state: next ? 'online' : 'offline',
-      last_seen_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      active_service_type: next ? targetService : null,
-    };
-
-    const { error } = await supabase
-      .from("driver_presence")
-      .upsert([driverPayload], { onConflict: 'driver_id' });
-
-    if (error) throw error;
-
     if (next) {
       await setOnline(targetService);
-      await syncPresenceService(targetService);
     } else {
       await setOffline();
     }
@@ -173,17 +156,11 @@ const toggleOnline = async (next) => {
     message.success(next ? tr("driverOnline", "Siz Online rejimdasiz") : tr("driverOffline", "Siz Offline rejimdasiz"));
   } catch (err) {
     console.error("Status update error:", err);
-    message.error(tr("errorChangingStatus", "Statusni o'zgartirishda xatolik!"));
+    message.error(err?.message || tr("errorChangingStatus", "Statusni o'zgartirishda xatolik!"));
   } finally {
     setLoading(false);
   }
 };
-
-useEffect(() => {
-  if (!isOnline) return;
-  const nextService = selectedService || activeService || (typeof window !== "undefined" ? localStorage.getItem("driver_active_service") : null) || "taxi";
-  syncPresenceService(nextService).catch(() => {});
-}, [isOnline, selectedService, activeService]);
 
   // =========================
   // HEADER DATA
@@ -412,7 +389,7 @@ useEffect(() => {
             <div>
               <p className="font-bold text-slate-800">{tr("driverStatus", "Haydovchi holati")}</p>
               <p className="text-sm text-slate-500">
-                {tr("currentStatus", "Siz hozir")} {isOnline ? `${tr("online", "onlayn")}${activeService ? ` (${activeService})` : ""}` : tr("offline", "oflayn")}
+                {tr("currentStatus", "Siz hozir")} {isOnline ? `${tr("online", "onlayn")}${activeService ? ` (${({taxi:"Shahar taksi",interProv:"Viloyatlar aro",interDist:"Tumanlar aro",delivery:"Eltish",freight:"Yuk tashish"}[activeService] || activeService)})` : ""}` : tr("offline", "oflayn")}
               </p>
             </div>
           </div>
@@ -570,7 +547,7 @@ useEffect(() => {
 
         <button
           type="button"
-          onClick={() => navigate("/driver/settings")}
+          onClick={() => navigate("/settings")}
           className="flex flex-col items-center gap-1 text-slate-400"
         >
           <span className="material-symbols-outlined" data-no-auto-translate="true">settings</span>

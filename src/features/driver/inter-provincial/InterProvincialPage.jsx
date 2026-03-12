@@ -36,6 +36,7 @@ import { useAuth } from "@/shared/auth/AuthProvider";
 import { getTripSettings, saveTripSettings } from "@/features/client/delivery/services/deliveryStore";
 import { useDriverOnline } from "@/features/driver/core/useDriverOnline";
 import { canUseOrderTypeInArea } from "@/features/driver/core/driverCapabilityService";
+import { useDriverText } from "@/features/driver/shared/i18n_driverLocalize";
 
 import "leaflet/dist/leaflet.css";
 
