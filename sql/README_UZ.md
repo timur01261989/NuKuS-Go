@@ -1,6 +1,6 @@
 # UniGo Super App SQL
 
-Ishga tushirish tartibi:
+Ishga tushirish tartibii:
 
 1. `00_reset_unigo_superapp.sql` — eski aralash public jadval va funksiyalarni tozalaydi.
 2. `01_unigo_superapp_schema.sql` — yangi asosiy schema: yagona user ID, driver applications, drivers, driver_presence, wallets, orders, auto market.
