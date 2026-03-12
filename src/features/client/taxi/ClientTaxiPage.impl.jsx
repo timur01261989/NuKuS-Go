@@ -48,9 +48,7 @@ import { normalizeLatLng, toNum } from "./utils/latlng";
 import TaxiSearchSheet from "./TaxiSearchSheet";
 import DestinationPicker from "./DestinationPicker";
 import { haversineKm } from "../shared/geo/haversine";
-import AutoMarketAdsPanel from "./components/AutoMarketAdsPanel";
 import ClientTaxiScreen from "./containers/ClientTaxiScreen";
-import { listMarketCars } from "../../../services/marketService.js";
 import RatingModal from "@features/shared/components/RatingModal";
 import ClientBonusWidget from "@/features/client/components/ClientBonusWidget";
 import TaxiOrderTimeline from "./components/TaxiOrderTimeline";
@@ -263,7 +261,6 @@ export default function ClientTaxiPage() {
   } = useTaxiOrder();
 
   const { events: timelineEvents } = useOrderTimeline(orderId);
-  const showTaxiMarketAds = String(import.meta?.env?.VITE_SHOW_TAXI_MARKET_ADS || "").trim() === "1";
 
   // Mobile BACK handling
   const isPopNavRef = useRef(false);
@@ -460,31 +457,6 @@ export default function ClientTaxiPage() {
     }
   }, [step]);
 
-  const handlePageBack = useCallback(() => {
-    if (step === "stop_map") {
-      setStep("route");
-      return;
-    }
-    if (step === "searching" || step === "coming") {
-      setStep("route");
-      return;
-    }
-    if (step === "route") {
-      setStep("main");
-      return;
-    }
-    if (step === "dest_map") {
-      setStep(dest?.address ? "route" : "main");
-      return;
-    }
-    if (step === "search") {
-      setStep("main");
-      setSearchOpen(false);
-      return;
-    }
-    navigate("/client/home");
-  }, [navigate, step, dest?.address]);
-
   // Header
   const headerRight = (
     <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -499,7 +471,7 @@ export default function ClientTaxiPage() {
 
   const Header = (
     <div className="yg-header">
-      <Button shape="circle" icon={<ArrowLeftOutlined />} onClick={handlePageBack} />
+      <div style={{ width: 40, height: 40 }} />
       <div style={{ flex: 1 }} />
       {headerRight}
     </div>
@@ -819,16 +791,6 @@ export default function ClientTaxiPage() {
         </Button>
       </div>
 
-      {showTaxiMarketAds ? (
-        <div style={{ marginTop: 14 }}>
-          <AutoMarketAdsPanel
-            title="Avto savdo e'lonlari"
-            mode="waiting"
-            onOpenAd={(id) => navigate(`/auto-market/ad/${id}`)}
-            fetchAds={listMarketCars}
-          />
-        </div>
-      ) : null}
     </div>
   );
 
@@ -842,10 +804,10 @@ export default function ClientTaxiPage() {
         <div className="yg-driver-top">
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ fontSize: 16, fontWeight: 900 }}>
-              Haydovchi <span style={{ marginLeft: 6 }}><StarFilled style={{ color: "#faad14" }} /> {assignedDriver?.rating?.toFixed?.(2) || "4.80"}</span>
+              Haydovchi <span style={{ marginLeft: 6 }}><StarFilled style={{ color: "#faad14" }} /> {assignedDriver?.rating?.toFixed?.(2) || "—"}</span>
             </div>
           </div>
-          <div style={{ opacity: 0.75 }}>{assignedDriver?.car_model || "Oq Chevrolet"}</div>
+          <div style={{ opacity: 0.75 }}>{assignedDriver?.car_model || "Mashina ma'lumoti yo'q"}</div>
         </div>
 
         <div className="yg-plate-row">
@@ -871,14 +833,6 @@ export default function ClientTaxiPage() {
 
       <Divider style={{ margin: "12px 0" }} />
 
-      {showTaxiMarketAds ? (
-        <AutoMarketAdsPanel
-          title="Avto savdo e'lonlari"
-          mode="waiting"
-          onOpenAd={(id) => navigate(`/auto-market/ad/${id}`)}
-          fetchAds={listMarketCars}
-        />
-      ) : null}
 
       <div className="yg-cancel-link" onClick={handleCancel}>
         Safarni bekor qilish
@@ -1161,6 +1115,26 @@ export default function ClientTaxiPage() {
       ) : null}
     </>
   ) : null;
+
+  const BackButton = (
+    <Button
+      type="default"
+      shape="circle"
+      icon={<ArrowLeftOutlined />}
+      onClick={() => navigate(-1)}
+      style={{
+        position: "fixed",
+        top: 16,
+        left: 16,
+        zIndex: 2200,
+        width: 42,
+        height: 42,
+        border: "none",
+        boxShadow: "0 6px 18px rgba(0,0,0,0.16)",
+        background: "#fff",
+      }}
+    />
+  );
 
   // Map UI
   const mapCenter = useMemo(() => {

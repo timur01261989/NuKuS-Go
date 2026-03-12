@@ -1,4 +1,5 @@
 import React, { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, Avatar, Typography, Row, Col, Statistic, Button, List, Rate, Tag, message } from "antd";
 import {
   UserOutlined,
@@ -16,15 +17,14 @@ import { supabase } from "@/lib/supabase";
 import DriverWallet from "./DriverWallet";
 import ActivityChart from "./ActivityChart";
 import Leaderboard from "./Leaderboard";
-import { useDriverText } from "../shared/i18n_driverLocalize";
 
 const { Title, Text } = Typography;
 
-const fallbackText = (value) => value;
+const t = (value) => value;
 
 function DriverProfile({ onBack, onLogout }) {
-  const driverText = typeof useDriverText === "function" ? useDriverText() : null;
-  const cp = driverText?.cp || fallbackText;
+  const cp = t;
+  const navigate = useNavigate();
   const [driverData, setDriverData] = useState(null);
   const [stats, setStats] = useState({ total_trips: 0, rating: 5.0 });
   const [walletOpen, setWalletOpen] = useState(false);
@@ -124,7 +124,7 @@ function DriverProfile({ onBack, onLogout }) {
         <Title level={4} style={{ margin: 0, fontFamily: "YangoHeadline" }}>
           {cp("Profil")}
         </Title>
-        <Button icon={<SettingOutlined />} shape="circle" />
+        <Button icon={<SettingOutlined />} shape="circle" onClick={() => navigate("/driver/settings?tab=vehicles")} />
       </div>
 
       <Card

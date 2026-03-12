@@ -5,6 +5,11 @@ import { nominatimReverse } from "@/features/client/shared/geo/nominatim";
 import { supabase } from "@/lib/supabase";
 import { useDriverOnline } from "../core/useDriverOnline";
 import { canActivateService } from "../core/serviceGuards";
+import UnifiedParcelFeed from "../delivery-integration/feed/UnifiedParcelFeed";
+import {
+  canUseOrderTypeInArea,
+  clampLoadToVehicle,
+} from "../core/driverCapabilityService";
 
 /**
  * DriverFreight.jsx (FULL)
@@ -244,7 +249,7 @@ function LocationPickerModal({ open, initialPoint, onCancel, onSave }) {
 
 /** ----------------------------- Component ----------------------------- */
 export default function FreightPage() {
-  const { isOnline: globalOnline, activeService, setOnline, setOffline } = useDriverOnline();
+  const { isOnline: globalOnline, activeService, setOnline, setOffline, activeVehicle, serviceTypes, refreshCapabilities } = useDriverOnline();
   const serviceType = "freight";
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -266,6 +271,10 @@ export default function FreightPage() {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
 
+  const freightEnabled = useMemo(() => canUseOrderTypeInArea({ serviceTypes }, "city", "freight"), [serviceTypes]);
+  const deliveryEnabled = useMemo(() => canUseOrderTypeInArea({ serviceTypes }, "city", "delivery"), [serviceTypes]);
+  const vehicleLimits = useMemo(() => clampLoadToVehicle({ activeVehicle }, Number(capacityKg || 0), Number(capacityM3 || 0)), [activeVehicle, capacityKg, capacityM3]);
+
   const mountedRef = useRef(false);
 
   const clearMsgs = useCallback(() => {
@@ -283,12 +292,37 @@ export default function FreightPage() {
       const uid = authData?.user?.id;
       if (!uid) throw new Error("Login bo‘lmagan: user topilmadi.");
 
+      if (activeVehicle?.id) {
+        const mapped = {
+          id: activeVehicle.id,
+          title: activeVehicle.brand || activeVehicle.model || "",
+          plate_number: activeVehicle.plateNumber || "",
+          body_type: activeVehicle.vehicleType || "gazel",
+          capacity_kg: activeVehicle.maxWeightKg || null,
+          capacity_m3: activeVehicle.maxVolumeM3 || null,
+          is_online: !!globalOnline && activeService === serviceType,
+          current_point: null,
+        };
+        const v = mapped;
+        setVehicleId(v.id || null);
+        setTitle(v.title || "");
+        setPlateNumber((v.plate_number || "").toUpperCase().slice(0, 9));
+        setBodyType(v.body_type || "gazel");
+        setCapacityKg(v.capacity_kg != null ? String(v.capacity_kg) : "");
+        setCapacityM3(v.capacity_m3 != null ? String(v.capacity_m3) : "");
+        setIsOnline(!!v.is_online && globalOnline && activeService === serviceType);
+        setCurrentPoint(null);
+        setCurrentAddress("");
+        setLoading(false);
+        return;
+      }
+
       const { data: vehicles, error: vErr } = await supabase
         .from("vehicles")
         .select(
-          "id, driver_id, title, plate_number, body_type, capacity_kg, capacity_m3, is_online, current_point, updated_at"
+          "id, user_id, driver_id, title, plate_number, body_type, vehicle_type, capacity_kg, capacity_m3, max_weight_kg, max_volume_m3, is_online, current_point, updated_at"
         )
-        .eq("driver_id", uid)
+        .or(`user_id.eq.${uid},driver_id.eq.${uid}`)
         .order("updated_at", { ascending: false })
         .limit(1);
 
@@ -325,12 +359,13 @@ export default function FreightPage() {
       }
 
       setLoading(false);
+      await Promise.resolve(refreshCapabilities?.()).catch(() => {});
     } catch (e) {
       console.error(e);
       setLoading(false);
       setError(e?.message || "Xatolik yuz berdi.");
     }
-  }, [clearMsgs]);
+  }, [activeService, activeVehicle, clearMsgs, globalOnline]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -354,6 +389,7 @@ export default function FreightPage() {
       if (!plateNumber.trim()) throw new Error("Davlat raqamini kiriting.");
 
       const payload = {
+        user_id: uid,
         driver_id: uid,
         title: title?.trim() || null,
         plate_number: plateNumber?.trim().toUpperCase().slice(0, 9),
@@ -400,7 +436,11 @@ const toggleOnline = useCallback(
         setError("Avval boshqa xizmatni offline qiling.");
         return;
       }
-      if (!currentPoint) {
+      if (!freightEnabled) {
+        setError("Yuk tashish xizmati Sozlamalarda yoqilmagan.");
+        return;
+      }
+      if (!currentPoint && !activeVehicle) {
         setError("Online bo‘lish uchun avval Joylashuvni xaritadan tanlang.");
         return;
       }
@@ -438,7 +478,7 @@ const toggleOnline = useCallback(
       if (mountedRef.current) setTogglingOnline(false);
     }
   },
-  [activeService, clearMsgs, currentPoint, setOffline, setOnline, vehicleId]
+  [activeService, activeVehicle, clearMsgs, currentPoint, freightEnabled, refreshCapabilities, setOffline, setOnline, vehicleId]
 );
 
 useEffect(() => {
@@ -630,6 +670,28 @@ const onlineUiDisabled = useMemo(() => loading || saving || togglingOnline, [loa
           {isOnline ? "Online: mos yuklar ko‘rinishi kerak." : "Offline: haydovchi topilmasin (yuklar yashirin)."}
         </div>
       </div>
+
+      <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+        <div className="flex flex-wrap items-center gap-2 mb-2">
+          <div className="text-sm px-3 py-1 rounded-full border border-white/10">Shahar yuk: {freightEnabled ? "yoqilgan" : "o‘chiq"}</div>
+          <div className="text-sm px-3 py-1 rounded-full border border-white/10">Shahar eltish: {deliveryEnabled ? "yoqilgan" : "o‘chiq"}</div>
+          <div className="text-sm px-3 py-1 rounded-full border border-white/10">Aktiv limit: {Number(vehicleLimits.maxWeightKg || 0)}kg / {Number(vehicleLimits.maxVolumeM3 || 0)}m³</div>
+        </div>
+        <div className="text-xs opacity-70">Bu sahifa endi haydovchi sozlamalari va aktiv mashina sig‘imi bilan bog‘langan. Sig‘imdan katta yuklar feedga chiqmaydi.</div>
+      </div>
+
+      <UnifiedParcelFeed
+        supabase={supabase}
+        driverId={vehicleId || activeVehicle?.id || null}
+        driverMode="CITY"
+        vehiclePlate={plateNumber || activeVehicle?.plateNumber || ""}
+        parcelFilter={{
+          serviceArea: "city",
+          orderType: "freight",
+          maxWeightKg: Number(vehicleLimits.maxWeightKg || 0),
+          maxVolumeM3: Number(vehicleLimits.maxVolumeM3 || 0),
+        }}
+      />
 
       <LocationPickerModal
         open={pickerOpen}

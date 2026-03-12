@@ -12,6 +12,31 @@ export function configureIntegrationApi({ apiHelper, supabase }) {
   _supabase = supabase || null;
 }
 
+
+function normalizeParcelRow(row = {}) {
+  const serviceArea = row.service_area || row.serviceArea || row.mode || row.driver_mode || null;
+  const orderType = row.order_type || row.orderType || (row.is_freight ? "freight" : "delivery");
+  const weightKg = Number(row.weight_kg ?? row.weightKg ?? row.cargo_weight_kg ?? row.max_kg ?? 0);
+  const volumeM3 = Number(row.volume_m3 ?? row.volumeM3 ?? row.cargo_volume_m3 ?? row.max_volume_m3 ?? 0);
+  return { ...row, serviceArea, orderType, weightKg, volumeM3 };
+}
+
+function filterParcels(rows = [], params = {}) {
+  const serviceArea = params.serviceArea || null;
+  const orderType = params.orderType || null;
+  const maxWeightKg = Number(params.maxWeightKg ?? 0);
+  const maxVolumeM3 = Number(params.maxVolumeM3 ?? 0);
+  return rows
+    .map(normalizeParcelRow)
+    .filter((row) => {
+      if (serviceArea && row.serviceArea && row.serviceArea !== serviceArea) return false;
+      if (orderType && row.orderType && row.orderType !== orderType) return false;
+      if (maxWeightKg > 0 && Number(row.weightKg || 0) > maxWeightKg) return false;
+      if (maxVolumeM3 > 0 && Number(row.volumeM3 || 0) > maxVolumeM3) return false;
+      return true;
+    });
+}
+
 function assertConfigured() {
   if (!_apiHelper && !_supabase) {
     throw new Error("integrationApi konfiguratsiya qilinmagan. configureIntegrationApi({ apiHelper, supabase }) chaqiring.");
@@ -27,7 +52,7 @@ export async function listParcels(params = {}) {
   const q = _supabase.from("parcels").select("*").eq("status", "searching").order("created_at", { ascending: false });
   const { data, error } = await q;
   if (error) throw error;
-  return data || [];
+  return filterParcels(data || [], params);
 }
 
 export async function acceptParcel({ parcelId, driverId, rideId, payload = {} }) {

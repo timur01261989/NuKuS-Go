@@ -153,6 +153,20 @@ export async function cashback_calc_handler(req, res) {
   }
 }
 
+
+export async function seat_hold_quote_handler(req, res) {
+  try {
+    if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Method not allowed' });
+    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+    const seats = Math.max(1, Number(body.seats || 1));
+    const seatPrice = Math.max(0, Number(body.seat_price_uzs || 0));
+    const holdAmount = Math.round(seats * seatPrice);
+    return json(res, 200, { ok: true, hold_amount_uzs: holdAmount, seats, seat_price_uzs: seatPrice });
+  } catch (e) {
+    return serverError(res, e);
+  }
+}
+
 export default async function handler(req, res) {
   // CORS
   applyCors(req, res);
@@ -168,6 +182,8 @@ export default async function handler(req, res) {
       return await wallet_topup_demo_handler(req, res);
     case 'cashback-calc':
       return await cashback_calc_handler(req, res);
+    case 'seat-hold-calc':
+      return await seat_hold_quote_handler(req, res);
     default:
       // default: wallet balance
       return await wallet_balance_handler(req, res);

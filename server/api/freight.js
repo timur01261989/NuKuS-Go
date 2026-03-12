@@ -35,7 +35,7 @@ async function enrichMatchesWithVehiclesAndStats(sb, matches) {
     if (ids.length) {
       const { data: vehicles } = await sb
         .from("vehicles")
-        .select("id,driver_id,body_type,capacity_kg,capacity_m3,is_online,is_verified,current_point,current_updated_at,route_from_point,route_to_point,route_depart_at,photo_urls,title,plate_number")
+        .select("id,user_id,body_type,capacity_kg,capacity_m3,is_online,is_verified,current_point,current_updated_at,route_from_point,route_to_point,route_depart_at,photo_urls,title,plate_number")
         .in("id", ids);
       const map = new Map((vehicles || []).map((v) => [v.id, v]));
       for (const m of arr) {
@@ -49,7 +49,7 @@ async function enrichMatchesWithVehiclesAndStats(sb, matches) {
   const driverIds = Array.from(
     new Set(
       arr
-        .map((m) => m.driver_id || m.driverId || m.vehicle?.driver_id)
+        .map((m) => m.driver_user_id || m.driverId || m.vehicle?.user_id)
         .filter(Boolean)
         .map(String)
     )
@@ -99,7 +99,7 @@ async function enrichMatchesWithVehiclesAndStats(sb, matches) {
 
   // Last active + verified from vehicles (already in response)
   for (const m of arr) {
-    const did = String(m.driver_id || m.driverId || m.vehicle?.driver_id || "");
+    const did = String(m.driver_user_id || m.driverId || m.vehicle?.user_id || "");
     if (!did) continue;
     if (!stats[did]) stats[did] = { deliveredCount: 0, ratingAvg: null, ratingCount: 0, lastActiveAt: null, isVerified: null };
     const v = m.vehicle || {};
@@ -108,7 +108,7 @@ async function enrichMatchesWithVehiclesAndStats(sb, matches) {
   }
 
   for (const m of arr) {
-    const did = String(m.driver_id || m.driverId || m.vehicle?.driver_id || "");
+    const did = String(m.driver_user_id || m.driverId || m.vehicle?.user_id || "");
     if (!did) continue;
     m.driver_stats = stats[did] || null;
   }
@@ -166,7 +166,7 @@ function extractLatLng(pointVal) {
 async function fallbackMatchVehicles(sb, { cargo, radiusKm = 30 }) {
   const { data: vehicles, error } = await sb
     .from("vehicles")
-    .select("id,driver_id,body_type,capacity_kg,capacity_m3,is_online,is_verified,current_point,current_updated_at,route_from_point,route_to_point,route_depart_at,photo_urls,title,plate_number")
+    .select("id,user_id,body_type,capacity_kg,capacity_m3,is_online,is_verified,current_point,current_updated_at,route_from_point,route_to_point,route_depart_at,photo_urls,title,plate_number")
     .eq("is_online", true)
     .limit(200);
   if (error) throw error;
@@ -192,7 +192,7 @@ async function fallbackMatchVehicles(sb, { cargo, radiusKm = 30 }) {
     const score = 100 - Math.min(dFrom, 100) - Math.min(dTo, 100);
     results.push({
       vehicle_id: v.id,
-      driver_id: v.driver_id,
+      driver_user_id: v.user_id,
       score,
       dist_from_km: dFrom,
       dist_to_km: dTo,
@@ -214,14 +214,14 @@ export default async function freightHandler(req, res) {
     // Cargo (Client)
     // =====================
     if (action === "create_cargo") {
-      const clientId = (await getAuthedUserId(req, sb)) || body.clientId || body.ownerUserId || body.ownerId;
+      const ownerUserId = (await getAuthedUserId(req, sb)) || body.user_id || body.userId || body.ownerUserId || body.ownerId;
       const pickup = pickLatLng(body.pickup);
       const dropoff = pickLatLng(body.dropoff);
-      if (!clientId) return json(res, 400, { error: "clientId required" });
+      if (!ownerUserId) return json(res, 400, { error: "user_id required" });
       if (!pickup || !dropoff) return json(res, 400, { error: "pickup/dropoff latlng required" });
 
       const row = {
-        client_id: clientId,
+        user_id: ownerUserId,
         title: body.title || body.cargoName || null,
         description: body.note || null,
         cargo_type: body.cargoType || null,
@@ -238,7 +238,7 @@ export default async function freightHandler(req, res) {
 
       const { data, error } = await sb.from("cargo_orders").insert(row).select("*").single();
       if (error) throw error;
-      await insertStatusEvent(sb, { cargoId: data.id, status: "posted", actorId: ownerId, note: "created" });
+      await insertStatusEvent(sb, { cargoId: data.id, status: "posted", actorId: ownerUserId, note: "created" });
       return json(res, 200, { ok: true, data });
     }
 
@@ -259,7 +259,7 @@ export default async function freightHandler(req, res) {
       if (error) throw error;
       const { data: offers } = await sb
         .from("cargo_offers")
-        .select("id,price,eta_minutes,note,status,created_at,vehicle_id,driver_id")
+        .select("id,price,eta_minutes,note,status,created_at,vehicle_id,driver_user_id")
         .eq("cargo_id", cargoId)
         .order("created_at", { ascending: false })
         .limit(50);
@@ -313,7 +313,7 @@ export default async function freightHandler(req, res) {
       if (!cargoId) return json(res, 400, { error: "cargoId required" });
       const { data, error } = await sb
         .from("cargo_offers")
-        .select("id,price,eta_minutes,note,status,created_at,vehicle_id,driver_id")
+        .select("id,price,eta_minutes,note,status,created_at,vehicle_id,driver_user_id")
         .eq("cargo_id", cargoId)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -323,7 +323,7 @@ export default async function freightHandler(req, res) {
     if (action === "accept_offer") {
       const cargoId = body.cargoId;
       const offerId = body.offerId;
-      const ownerId = (await getAuthedUserId(req, sb)) || body.ownerId || null;
+      const ownerUserId = (await getAuthedUserId(req, sb)) || body.user_id || body.userId || body.ownerId || null;
       if (!cargoId || !offerId) return json(res, 400, { error: "cargoId & offerId required" });
 
       const { data: accepted, error: ae } = await sb
@@ -346,7 +346,7 @@ export default async function freightHandler(req, res) {
         .single();
       if (ce) throw ce;
 
-      await insertStatusEvent(sb, { cargoId, status: "driver_selected", actorId: clientId, note: "offer accepted" });
+      await insertStatusEvent(sb, { cargoId, status: "driver_selected", actorId: ownerUserId, note: "offer accepted" });
       return json(res, 200, { ok: true, cargo, offer: accepted });
     }
 
@@ -358,7 +358,7 @@ export default async function freightHandler(req, res) {
       if (!driverId) return json(res, 400, { error: "driverId required" });
 
       const row = {
-        driver_id: driverId,
+        user_id: driverId,
         title: body.title || null,
         body_type: body.bodyType || body.body_type || "other",
         capacity_kg: Number(body.capacityKg || body.capacity_kg || 0) || 0,
@@ -407,7 +407,7 @@ export default async function freightHandler(req, res) {
 
       const { data: v, error: ve } = await sb
         .from("vehicles")
-        .select("id,capacity_kg,capacity_m3,route_from_point,route_to_point,current_point")
+        .select("id,user_id,body_type,capacity_kg,capacity_m3,route_from_point,route_to_point,current_point")
         .eq("id", vehicleId)
         .single();
       if (ve) throw ve;
@@ -464,7 +464,7 @@ export default async function freightHandler(req, res) {
 
       const { data: vehicle, error: ve } = await sb
         .from("vehicles")
-        .select("id,driver_id,current_point,route_from_point,route_to_point")
+.select("id,user_id,current_point,route_from_point,route_to_point")
         .eq("id", vehicleId)
         .single();
       if (ve) throw ve;
@@ -486,7 +486,7 @@ export default async function freightHandler(req, res) {
       const row = {
         cargo_id: cargoId,
         vehicle_id: vehicleId,
-        driver_id: driverId,
+        driver_user_id: driverId,
         price,
         eta_minutes: etaMinutes,
         note,
@@ -523,7 +523,7 @@ export default async function freightHandler(req, res) {
       const row = {
         cargo_id: cargoId,
         vehicle_id: vehicleId,
-        driver_id: driverId,
+        driver_user_id: driverId,
         price,
         eta_minutes: body.etaMinutes ?? null,
         note: body.note || null,

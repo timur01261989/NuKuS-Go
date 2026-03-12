@@ -5,6 +5,67 @@ function hasSupabaseEnv() {
   return !!(process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY));
 }
 
+
+async function ensureDriverAccess(sb, userId) {
+  const uid = String(userId || '').trim();
+  if (!uid) throw new Error('driver_id_required');
+
+  let { data: driver, error } = await sb
+    .from('drivers')
+    .select('user_id,is_verified,is_active,is_suspended')
+    .eq('user_id', uid)
+    .maybeSingle();
+  if (error) throw error;
+  if (driver) return driver;
+
+  const { data: app, error: appError } = await sb
+    .from('driver_applications')
+    .select('id,user_id,status,transport_type,seat_count,requested_max_freight_weight_kg,requested_payload_volume_m3,vehicle_brand,vehicle_model,vehicle_year,vehicle_plate,vehicle_color')
+    .eq('user_id', uid)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (appError) throw appError;
+  if (!app || app.status !== 'approved') {
+    throw new Error('Driver row topilmadi. Avval tasdiqlangan driver bo\'lish kerak.');
+  }
+
+  const rpcResult = await sb.rpc('apply_driver_permissions', { p_user_id: uid }).catch(() => ({ error: null }));
+  if (rpcResult?.error) {
+    // fallback if rpc missing
+    const allowed = app.transport_type === 'truck' ? ['freight'] : (app.transport_type === 'bus_gazel' ? ['delivery','inter_district','inter_city','freight'] : ['taxi','delivery','inter_district','inter_city','freight']);
+    const insertPayload = {
+      user_id: uid,
+      application_id: app.id,
+      transport_type: app.transport_type || 'light_car',
+      allowed_services: allowed,
+      seat_count: Number(app.seat_count || 0),
+      max_freight_weight_kg: Number(app.requested_max_freight_weight_kg || 0),
+      payload_volume_m3: Number(app.requested_payload_volume_m3 || 0),
+      vehicle_brand: app.vehicle_brand || null,
+      vehicle_model: app.vehicle_model || null,
+      vehicle_year: app.vehicle_year || null,
+      vehicle_plate: app.vehicle_plate || null,
+      vehicle_color: app.vehicle_color || null,
+      is_verified: true,
+      is_active: true,
+      is_suspended: false,
+      approved_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    const { error: insertError } = await sb.from('drivers').upsert([insertPayload], { onConflict: 'user_id' });
+    if (insertError) throw insertError;
+  }
+
+  const { data: ensured, error: ensuredError } = await sb
+    .from('drivers')
+    .select('user_id,is_verified,is_active,is_suspended')
+    .eq('user_id', uid)
+    .maybeSingle();
+  if (ensuredError) throw ensuredError;
+  if (!ensured) throw new Error('Driver row yaratilmadi');
+  return ensured;
+}
 export default async function handler(req, res) {
   try {
     const url = new URL(req.url, 'http://localhost');
@@ -48,6 +109,8 @@ export default async function handler(req, res) {
       if (device_id) payload.device_id = String(device_id);
       if (platform) payload.platform = String(platform);
       if (app_version) payload.app_version = String(app_version);
+
+      await ensureDriverAccess(sb, driver_id);
 
       let query = sb.from('driver_presence').upsert([payload], { onConflict: 'driver_id' });
       let { data, error } = await query

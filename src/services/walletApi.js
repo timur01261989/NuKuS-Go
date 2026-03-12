@@ -35,9 +35,9 @@ async function postJson(path, body) {
 // If user_id is omitted, server will use the authed user id.
 export function getWalletBalance(user_id) {
   const q = user_id ? `?user_id=${encodeURIComponent(user_id)}` : '';
-  return getJson(`/api/wallet${q}`);
+  return getJson(`/api/wallet-balance${q}`);
 }
 
 export function demoTopup(user_id, amount_uzs) {
-  return postJson('/api/wallet?routeKey=wallet-topup-demo', { user_id, amount_uzs });
+  return postJson('/api/wallet-topup-demo', { user_id, amount_uzs });
 }

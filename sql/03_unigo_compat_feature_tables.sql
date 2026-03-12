@@ -43,10 +43,44 @@ create table if not exists public.vehicles (
 
 create table if not exists public.delivery_orders (
   id uuid primary key default gen_random_uuid(),
-  client_id uuid references public.profiles(id) on delete cascade,
-  driver_id uuid references public.profiles(id) on delete set null,
+  user_id uuid references public.profiles(id) on delete cascade,
+  driver_user_id uuid references public.profiles(id) on delete set null,
+  created_by uuid references public.profiles(id) on delete set null,
+  service_mode text default 'city',
   status text default 'pending',
-  pickup jsonb, dropoff jsonb, note text, price_uzs bigint, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+  parcel_type text,
+  parcel_label text,
+  weight_kg numeric(10,2) default 0,
+  price bigint default 0,
+  commission_amount bigint default 0,
+  payment_method text,
+  comment text,
+  receiver_name text,
+  receiver_phone text,
+  sender_phone text,
+  pickup_mode text,
+  dropoff_mode text,
+  pickup_region text,
+  pickup_district text,
+  pickup_label text,
+  pickup_lat double precision,
+  pickup_lng double precision,
+  dropoff_region text,
+  dropoff_district text,
+  dropoff_label text,
+  dropoff_lat double precision,
+  dropoff_lng double precision,
+  matched_trip_id uuid references public.inter_prov_trips(id) on delete set null,
+  matched_trip_title text,
+  matched_driver_user_id uuid references public.profiles(id) on delete set null,
+  matched_driver_name text,
+  history jsonb not null default '[]'::jsonb,
+  pickup jsonb,
+  dropoff jsonb,
+  note text,
+  price_uzs bigint,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists public.parcels (
@@ -55,37 +89,156 @@ create table if not exists public.parcels (
 
 create table if not exists public.cargo_orders (
   id uuid primary key default gen_random_uuid(),
-  client_id uuid references public.profiles(id) on delete cascade, driver_id uuid references public.profiles(id) on delete set null,
-  status text default 'pending', cargo_name text, weight_kg numeric(10,2), price_uzs bigint, pickup jsonb, dropoff jsonb, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+  user_id uuid references public.profiles(id) on delete cascade,
+  driver_user_id uuid references public.profiles(id) on delete set null,
+  selected_offer_id uuid,
+  status text default 'pending',
+  title text,
+  description text,
+  cargo_type text,
+  cargo_name text,
+  weight_kg numeric(10,2),
+  volume_m3 numeric(10,2),
+  price_uzs bigint,
+  budget bigint,
+  pickup jsonb,
+  dropoff jsonb,
+  from_address text,
+  to_address text,
+  from_point text,
+  to_point text,
+  pickup_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 create table if not exists public.cargo_offers (
-  id uuid primary key default gen_random_uuid(), cargo_order_id uuid references public.cargo_orders(id) on delete cascade, driver_id uuid references public.profiles(id) on delete cascade, status text default 'sent', created_at timestamptz not null default now()
+  id uuid primary key default gen_random_uuid(),
+  cargo_order_id uuid references public.cargo_orders(id) on delete cascade,
+  cargo_id uuid references public.cargo_orders(id) on delete cascade,
+  driver_user_id uuid references public.profiles(id) on delete cascade,
+  vehicle_id uuid references public.vehicles(id) on delete set null,
+  price bigint,
+  eta_minutes int,
+  note text,
+  status text default 'sent',
+  created_at timestamptz not null default now()
 );
 create table if not exists public.cargo_status_events (
-  id bigserial primary key, cargo_order_id uuid references public.cargo_orders(id) on delete cascade, status text, created_at timestamptz not null default now()
+  id bigserial primary key,
+  cargo_order_id uuid references public.cargo_orders(id) on delete cascade,
+  cargo_id uuid references public.cargo_orders(id) on delete cascade,
+  actor_id uuid references public.profiles(id) on delete set null,
+  status text,
+  note text,
+  created_at timestamptz not null default now()
 );
 create table if not exists public.cargo_tracking_points (
-  id bigserial primary key, cargo_order_id uuid references public.cargo_orders(id) on delete cascade, lat double precision, lng double precision, created_at timestamptz not null default now()
+  id bigserial primary key,
+  cargo_order_id uuid references public.cargo_orders(id) on delete cascade,
+  cargo_id uuid references public.cargo_orders(id) on delete cascade,
+  lat double precision,
+  lng double precision,
+  created_at timestamptz not null default now()
 );
 create table if not exists public.cargo_ratings (
   id uuid primary key default gen_random_uuid(), cargo_order_id uuid references public.cargo_orders(id) on delete cascade, from_user_id uuid references public.profiles(id), to_user_id uuid references public.profiles(id), rating numeric(3,2), comment text, created_at timestamptz not null default now()
 );
 
 create table if not exists public.inter_prov_trips (
-  id uuid primary key default gen_random_uuid(), driver_id uuid references public.profiles(id), from_region text, to_region text, seat_price_uzs bigint, status text default 'active', created_at timestamptz not null default now()
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.profiles(id),
+  from_region text,
+  to_region text,
+  from_district text,
+  to_district text,
+  depart_at timestamptz,
+  seat_price_uzs bigint,
+  seats_total int,
+  seats_available int,
+  status text default 'active',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 create table if not exists public.interprov_trips ( like public.inter_prov_trips including all );
 create table if not exists public.inter_prov_seat_requests (
-  id uuid primary key default gen_random_uuid(), trip_id uuid references public.inter_prov_trips(id) on delete cascade, client_id uuid references public.profiles(id), seats int not null default 1, status text default 'pending', created_at timestamptz not null default now()
+  id uuid primary key default gen_random_uuid(),
+  trip_id uuid references public.inter_prov_trips(id) on delete cascade,
+  user_id uuid references public.profiles(id),
+  seats int not null default 1,
+  notes text,
+  hold_id text,
+  status text default 'pending',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 create table if not exists public.district_trips (
-  id uuid primary key default gen_random_uuid(), driver_id uuid references public.profiles(id), region text, from_district text, to_district text, seat_price_uzs bigint, status text default 'active', created_at timestamptz not null default now()
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.profiles(id),
+  region text,
+  from_district text,
+  to_district text,
+  tariff text,
+  pitak_id uuid,
+  from_point jsonb,
+  to_point jsonb,
+  meeting_points jsonb not null default '[]'::jsonb,
+  route_polyline jsonb not null default '[]'::jsonb,
+  depart_at timestamptz,
+  seats_total int,
+  allow_full_salon boolean not null default false,
+  base_price_uzs bigint,
+  pickup_fee_uzs bigint,
+  dropoff_fee_uzs bigint,
+  waiting_fee_uzs bigint,
+  full_salon_price_uzs bigint,
+  has_ac boolean not null default false,
+  has_trunk boolean not null default false,
+  is_lux boolean not null default false,
+  allow_smoking boolean not null default false,
+  has_delivery boolean not null default false,
+  delivery_price_uzs bigint,
+  notes text,
+  women_only boolean not null default false,
+  booking_mode text,
+  status text default 'active',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 create table if not exists public.district_trip_requests (
-  id uuid primary key default gen_random_uuid(), trip_id uuid references public.district_trips(id) on delete cascade, client_id uuid references public.profiles(id), seats int not null default 1, status text default 'pending', created_at timestamptz not null default now()
+  id uuid primary key default gen_random_uuid(),
+  trip_id uuid references public.district_trips(id) on delete cascade,
+  user_id uuid references public.profiles(id),
+  seats_requested int,
+  wants_full_salon boolean not null default false,
+  pickup_address text,
+  dropoff_address text,
+  pickup_point jsonb,
+  dropoff_point jsonb,
+  meeting_point_id uuid,
+  is_delivery boolean not null default false,
+  delivery_notes text,
+  weight_category text,
+  payment_method text,
+  final_price bigint,
+  selected_seats jsonb not null default '[]'::jsonb,
+  status text default 'pending',
+  accepted_at timestamptz,
+  rejected_at timestamptz,
+  responded_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 create table if not exists public.district_pitaks (
-  id uuid primary key default gen_random_uuid(), trip_id uuid references public.district_trips(id) on delete cascade, title text, created_at timestamptz not null default now()
+  id uuid primary key default gen_random_uuid(),
+  trip_id uuid references public.district_trips(id) on delete cascade,
+  region text,
+  from_district text,
+  to_district text,
+  title text,
+  location_point jsonb,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists public.auto_garaj (

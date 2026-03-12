@@ -12,7 +12,15 @@ import { REGIONS, getDistrictsByRegion } from "../../services/districtData";
  * - Faqat ayollar uchun (Gender) qatnov rejimi
  * - Butun salon va qatnov narxlarini aniq ko'rsatish
  */
-export default function TripCreateModal({ open, onClose, onSuccess }) {
+export default function TripCreateModal({
+  open,
+  onClose,
+  onSuccess,
+  passengerEnabled = true,
+  deliveryEnabled = true,
+  freightEnabled = true,
+  activeVehicle = null,
+}) {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   
@@ -24,6 +32,8 @@ export default function TripCreateModal({ open, onClose, onSuccess }) {
   // Yangi Eltish va Yuk state'lari
   const [hasEltish, setHasEltish] = useState(false);
   const [hasYuk, setHasYuk] = useState(false);
+  const activeMaxWeightKg = useMemo(() => Number(activeVehicle?.maxWeightKg || 0), [activeVehicle]);
+  const activeMaxVolumeM3 = useMemo(() => Number(activeVehicle?.maxVolumeM3 || 0), [activeVehicle]);
 
   // Tumanlar ro'yxatini regionga qarab olish
   const districts = useMemo(() => getDistrictsByRegion(regionId), [regionId]);
@@ -58,6 +68,19 @@ export default function TripCreateModal({ open, onClose, onSuccess }) {
   const handleSubmit = async (values) => {
     setLoading(true);
     try {
+      if (!passengerEnabled) {
+        message.error("Tumanlararo yo‘lovchi xizmati Sozlamalarda yoqilmagan.");
+        return;
+      }
+      if (values.has_eltish && !deliveryEnabled) {
+        message.error("Tumanlararo eltish xizmati yoqilmagan.");
+        return;
+      }
+      if (values.has_yuk && !freightEnabled) {
+        message.error("Tumanlararo yuk tashish xizmati yoqilmagan.");
+        return;
+      }
+
       // Sana va vaqtni bitta ISO string holatiga keltirish
       const departDateStr = values.departDate.format("YYYY-MM-DD");
       const departTimeStr = values.departTime.format("HH:mm");
@@ -87,6 +110,9 @@ export default function TripCreateModal({ open, onClose, onSuccess }) {
         has_trunk: values.has_trunk,
         is_lux: values.is_lux,
         notes: values.notes || "",
+        active_vehicle_id: activeVehicle?.id || null,
+        active_vehicle_max_weight_kg: activeMaxWeightKg || null,
+        active_vehicle_max_volume_m3: activeMaxVolumeM3 || null,
       };
 
       // Bu yerda sizning api call funksiyangiz ishlaydi
@@ -219,16 +245,18 @@ export default function TripCreateModal({ open, onClose, onSuccess }) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Space align="center">
                 <InboxOutlined style={{ fontSize: 20, color: "#1677ff" }} />
-                <span style={{ fontWeight: 600, color: "#333" }}>Eltish (Pochta) qabul qilaman</span>
+                <span style={{ fontWeight: 600, color: "#333" }}>Eltish (Pochta) qabul qilaman {!deliveryEnabled ? "(Sozlamada o‘chiq)" : ""}</span>
               </Space>
               <Form.Item name="has_eltish" valuePropName="checked" style={{ margin: 0 }}>
-                <Switch checked={hasEltish} onChange={setHasEltish} />
+                <Switch disabled={!deliveryEnabled} checked={hasEltish} onChange={setHasEltish} />
               </Form.Item>
             </div>
             {hasEltish && (
+              <>
               <Form.Item name="eltish_price_uzs" label="Eng kam eltish narxi" style={{ marginTop: 10, marginBottom: 10 }} rules={[{ required: true, message: "Eltish narxini kiriting" }]}>
                 <InputNumber style={{ width: "100%" }} size="large" placeholder="15 000" />
               </Form.Item>
+              </>
             )}
 
             <Divider style={{ margin: "12px 0" }} />
@@ -237,16 +265,19 @@ export default function TripCreateModal({ open, onClose, onSuccess }) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Space align="center">
                 <ReconciliationOutlined style={{ fontSize: 20, color: "#fa8c16" }} />
-                <span style={{ fontWeight: 600, color: "#333" }}>Yuk olaman</span>
+                <span style={{ fontWeight: 600, color: "#333" }}>Yuk olaman {!freightEnabled ? "(Sozlamada o‘chiq)" : ""}</span>
               </Space>
               <Form.Item name="has_yuk" valuePropName="checked" style={{ margin: 0 }}>
-                <Switch checked={hasYuk} onChange={setHasYuk} />
+                <Switch disabled={!freightEnabled} checked={hasYuk} onChange={setHasYuk} />
               </Form.Item>
             </div>
             {hasYuk && (
+              <>
+              <div style={{ fontSize: 12, opacity: 0.7, marginTop: 10 }}>Aktiv mashina limiti: {activeMaxWeightKg || 0}kg • {activeMaxVolumeM3 || 0}m³</div>
               <Form.Item name="yuk_price_uzs" label="Eng kam yuk narxi" style={{ marginTop: 10, marginBottom: 0 }} rules={[{ required: true, message: "Yuk narxini kiriting" }]}>
                 <InputNumber style={{ width: "100%" }} size="large" placeholder="50 000" />
               </Form.Item>
+              </>
             )}
 
           </Space>

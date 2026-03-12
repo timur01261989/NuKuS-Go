@@ -3,6 +3,8 @@ import { getSupabaseAdmin, getAuthedUserId } from '../_shared/supabase.js';
 import { nowIso } from '../_shared/orders/orderEvents.js';
 import { runDispatch } from '../_shared/orders/orderDispatchService.js';
 import { enqueueDispatch } from '../_shared/queue/orderDispatchQueue.js';
+import { enrichTripsWithCorridorScore } from '../../backend/src/trips/corridorMatcher.js';
+import { rankTrips } from '../../backend/src/trips/tripRankingService.js';
 
 async function driverPing(req, res, body) {
   const sb = getSupabaseAdmin();
@@ -32,6 +34,16 @@ async function driverPing(req, res, body) {
   return json(res, 200, { ok: true, presence: row });
 }
 
+
+async function tripSearch(sb, body) {
+  let query = sb.from('inter_prov_trips').select('*').in('status', ['active', 'draft']).order('depart_at', { ascending: true }).limit(50);
+  if (body.from_region) query = query.eq('from_region', body.from_region);
+  if (body.to_region) query = query.eq('to_region', body.to_region);
+  const { data, error } = await query;
+  if (error) throw error;
+  return rankTrips(enrichTripsWithCorridorScore(data || [], { origin: body.from_point, destination: body.to_point }));
+}
+
 async function resolveOrder(sb, order_id) {
   const { data, error } = await sb.from('orders').select('*').eq('id', order_id).maybeSingle();
   if (error) throw error;
@@ -52,6 +64,7 @@ export async function dispatch_handler(req, res) {
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Method not allowed' });
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
     if (body.action === 'driver_ping') return driverPing(req, res, body);
+    if (body.action === 'trip_search') return json(res, 200, { ok: true, trips: await tripSearch(getSupabaseAdmin(), body) });
     const order_id = String(body.order_id || '').trim();
     if (!order_id) return badRequest(res, 'order_id kerak');
     const sb = getSupabaseAdmin();

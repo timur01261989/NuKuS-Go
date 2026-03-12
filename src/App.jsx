@@ -62,6 +62,8 @@ const DriverWalletPage = lazy(() => import("@features/driver/pages/DriverWalletP
 const DriverProfilePage = lazy(() => import("@features/driver/pages/DriverProfilePage"));
 const DriverRegister = lazy(() => import("@features/driver/DriverRegistration/DriverRegister"));
 const DriverModeRedirect = lazy(() => import("@shared/routes/DriverModeRedirect")); // YANGI
+const DriverSettingsPage = lazy(() => import("@features/driver/pages/DriverSettingsPage"));
+const VehiclesPage = lazy(() => import("@features/driver/pages/VehiclesPage"));
 
 // --- SETTINGS ---
 const Settings = lazy(() => import("@features/settings/pages/Settings"));
@@ -267,7 +269,15 @@ export default function App() {
                   path="/driver/settings"
                   element={
                     <RoleGate allow={{ client: false, driver: true, requireDriverApproved: false, allowPending: true }}>
-                      <Settings />
+                      <DriverSettingsPage />
+                    </RoleGate>
+                  }
+                />
+                <Route
+                  path="/driver/vehicles"
+                  element={
+                    <RoleGate allow={{ client: false, driver: true, requireDriverApproved: false, allowPending: true }}>
+                      <VehiclesPage />
                     </RoleGate>
                   }
                 />

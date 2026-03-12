@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { startPresence, stopPresence, syncPresenceService } from "./driverPresenceManager";
 import { startDot, stopDot } from "./useFloatingDot";
+import { canUseMenuService, fetchDriverCapability, syncCapabilityToStorage } from "./driverCapabilityService";
 
 const STORAGE_ONLINE = "driver_online";
 const STORAGE_SERVICE = "driver_active_service";
@@ -10,6 +11,20 @@ const DriverOnlineContext = createContext(null);
 export function DriverOnlineProvider({ children }) {
   const [isOnline, setIsOnline] = useState(false);
   const [activeService, setActiveService] = useState(null);
+  const [serviceTypes, setServiceTypes] = useState(null);
+  const [activeVehicle, setActiveVehicle] = useState(null);
+
+  const refreshCapabilities = useCallback(async () => {
+    try {
+      const capability = await fetchDriverCapability();
+      setServiceTypes(capability?.serviceTypes || null);
+      setActiveVehicle(capability?.activeVehicle || null);
+      syncCapabilityToStorage(capability);
+      return capability;
+    } catch {
+      return null;
+    }
+  }, []);
 
   useEffect(() => {
     try {
@@ -17,6 +32,7 @@ export function DriverOnlineProvider({ children }) {
       const storedService = localStorage.getItem(STORAGE_SERVICE) || null;
       setIsOnline(storedOnline);
       setActiveService(storedService);
+      refreshCapabilities();
       if (storedOnline) {
         Promise.resolve(startPresence(storedService)).catch(() => {});
         startDot();
@@ -24,7 +40,7 @@ export function DriverOnlineProvider({ children }) {
     } catch {
       // ignore
     }
-  }, []);
+  }, [refreshCapabilities]);
 
   useEffect(() => {
     if (!isOnline) return;
@@ -44,13 +60,14 @@ export function DriverOnlineProvider({ children }) {
   const ensureSession = async () => {
     const { data, error } = await supabase.auth.getUser();
     if (error) throw error;
-    if (!data?.user) throw new Error('driver_not_authenticated');
+    if (!data?.user) throw new Error("driver_not_authenticated");
     return data.user;
   };
 
   const setOnline = async (serviceType) => {
     await ensureSession();
     const nextService = serviceType || activeService || null;
+    await refreshCapabilities();
     setIsOnline(true);
     setActiveService(nextService);
     persist(true, nextService);
@@ -68,7 +85,24 @@ export function DriverOnlineProvider({ children }) {
     stopDot();
   };
 
-  const value = useMemo(() => ({ isOnline, activeService, setOnline, setOffline }), [isOnline, activeService]);
+  const canUseService = useCallback(
+    (serviceKey) => canUseMenuService({ serviceTypes, activeVehicle }, serviceKey),
+    [serviceTypes, activeVehicle]
+  );
+
+  const value = useMemo(
+    () => ({
+      isOnline,
+      activeService,
+      serviceTypes,
+      activeVehicle,
+      canUseService,
+      refreshCapabilities,
+      setOnline,
+      setOffline,
+    }),
+    [isOnline, activeService, serviceTypes, activeVehicle, canUseService, refreshCapabilities]
+  );
   return <DriverOnlineContext.Provider value={value}>{children}</DriverOnlineContext.Provider>;
 }
 

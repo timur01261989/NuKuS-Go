@@ -31,7 +31,15 @@ function safeShortId(id) {
 export default function DriverHome({ onLogout }) {
   const navigate = useNavigate();
   const { t, tr } = useLanguage();
-  const { isOnline, activeService, setOnline, setOffline } = useDriverOnline();
+  const {
+    isOnline,
+    activeService,
+    activeVehicle,
+    canUseService,
+    refreshCapabilities,
+    setOnline,
+    setOffline,
+  } = useDriverOnline();
 
   // =========================
   // STATE
@@ -49,6 +57,10 @@ export default function DriverHome({ onLogout }) {
     publicId: "----",
     avatarUrl: "",
   });
+
+  useEffect(() => {
+    refreshCapabilities?.();
+  }, [refreshCapabilities]);
 
   const driveAssistantEnabled = Boolean(isOnline && (activeService || selectedService));
   const { speedKmh, position, heading } = useSpeedometer({ enabled: driveAssistantEnabled });
@@ -95,6 +107,10 @@ export default function DriverHome({ onLogout }) {
   }, [selectedService]);
 
   const selectService = (key) => {
+    if (!canUseService?.(key)) {
+      message.warning(tr("serviceDisabled", "Bu xizmat sizning sozlamalaringizda yoqilmagan"));
+      return;
+    }
     setSelectedService(key);
     if (typeof window !== "undefined") localStorage.setItem("driver_active_service", key);
   };
@@ -111,6 +127,16 @@ const toggleOnline = async (next) => {
   setLoading(true);
   try {
     const targetService = selectedService || activeService || (typeof window !== "undefined" ? localStorage.getItem("driver_active_service") : null) || "taxi";
+    if (next && !canUseService?.(targetService)) {
+      message.warning(tr("serviceDisabled", "Bu xizmat sizning sozlamalaringizda yoqilmagan"));
+      return;
+    }
+
+    if (next && !activeVehicle) {
+      message.warning(tr("activeVehicleRequired", "Avval aktiv mashinani tanlang"));
+      return;
+    }
+
     if (next && !canActivateService(activeService, targetService)) {
       message.warning(tr("goOffline", "Avval boshqa xizmatni offline qiling"));
       return;
@@ -119,8 +145,23 @@ const toggleOnline = async (next) => {
     const { data: u, error: uErr } = await supabase.auth.getUser();
     if (uErr) throw uErr;
     const user = u?.user;
-    if (!user?.id) throw new Error("driver_not_authenticated");
+    if (!user) return;
     userIdRef.current = user.id;
+
+    const driverPayload = {
+      driver_id: user.id,
+      is_online: next,
+      state: next ? 'online' : 'offline',
+      last_seen_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      active_service_type: next ? targetService : null,
+    };
+
+    const { error } = await supabase
+      .from("driver_presence")
+      .upsert([driverPayload], { onConflict: 'driver_id' });
+
+    if (error) throw error;
 
     if (next) {
       await setOnline(targetService);
@@ -297,6 +338,14 @@ useEffect(() => {
   // =========================
   // CONTENT RENDER
   // =========================
+  const visibleServices = useMemo(() => ({
+    taxi: canUseService?.("taxi"),
+    interProv: canUseService?.("interProv"),
+    interDist: canUseService?.("interDist"),
+    freight: canUseService?.("freight"),
+    delivery: canUseService?.("delivery"),
+  }), [canUseService]);
+
   const content = useMemo(() => {
     if (selectedService === "taxi") return <DriverTaxi onBack={backToMenu} />;
     if (selectedService === "interDist") return <DriverInterDistrict onBack={backToMenu} />;
@@ -389,10 +438,29 @@ useEffect(() => {
         </div>
       </div>
 
+      <div className="px-4">
+        <div className="neumorphic-pop rounded-2xl p-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="font-bold text-slate-800">Aktiv mashina</p>
+            <p className="text-sm text-slate-500">
+              {activeVehicle ? `${activeVehicle.brand || ""} ${activeVehicle.model || ""} · ${activeVehicle.plateNumber || "raqamsiz"}`.trim() : "Sozlamalarda aktiv mashina tanlanmagan"}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate("/driver/settings?tab=vehicles")}
+            className="rounded-xl bg-primarySidebar px-4 py-2 text-sm font-semibold text-white shadow"
+          >
+            Mashinalar
+          </button>
+        </div>
+      </div>
+
       {/* Main Content */}
       <main className="p-4 space-y-6 pb-24">
         {/* City taxi big card */}
         <section>
+          {visibleServices.taxi ? (
           <button
             type="button"
             onClick={() => selectService("taxi")}
@@ -412,10 +480,12 @@ useEffect(() => {
               <span className="material-symbols-outlined" data-no-auto-translate="true">arrow_forward</span>
             </div>
           </button>
+          ) : null}
         </section>
 
         {/* Grid categories */}
         <section className="grid grid-cols-2 gap-4">
+          {visibleServices.interProv ? (
           <button
             type="button"
             onClick={() => selectService("interProv")}
@@ -426,7 +496,9 @@ useEffect(() => {
             </div>
             <p className="font-bold text-slate-800">{tr("interProvincial", "Viloyatlar aro")}</p>
           </button>
+          ) : null}
 
+          {visibleServices.interDist ? (
           <button
             type="button"
             onClick={() => selectService("interDist")}
@@ -437,7 +509,9 @@ useEffect(() => {
             </div>
             <p className="font-bold text-slate-800">{tr("interDistrict", "Tumanlar aro")}</p>
           </button>
+          ) : null}
 
+          {visibleServices.freight ? (
           <button
             type="button"
             onClick={() => selectService("freight")}
@@ -448,7 +522,9 @@ useEffect(() => {
             </div>
             <p className="font-bold text-slate-800">{tr("freight", "Yuk tashish")}</p>
           </button>
+          ) : null}
 
+          {visibleServices.delivery ? (
           <button
             type="button"
             onClick={() => selectService("delivery")}
@@ -459,6 +535,13 @@ useEffect(() => {
             </div>
             <p className="font-bold text-slate-800">{tr("delivery", "Eltish xizmati")}</p>
           </button>
+          ) : null}
+
+          {!visibleServices.taxi && !visibleServices.interProv && !visibleServices.interDist && !visibleServices.freight && !visibleServices.delivery ? (
+            <div className="col-span-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-5 text-amber-900">
+              Sozlamalarda kamida bitta xizmatni yoqing. Aktiv mashina bo'lmasa buyurtmalar chiqmaydi.
+            </div>
+          ) : null}
         </section>
       </main>
 

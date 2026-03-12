@@ -24,6 +24,7 @@ export default function UnifiedParcelFeed({
   vehiclePlate,
   deepLinkBase = "myapp://parcel/",
   defaultOpen = false,
+  parcelFilter = {},
 }) {
   const {
     state,
@@ -48,7 +49,7 @@ export default function UnifiedParcelFeed({
   useParcelSocket({
     enabled: state.enabled,
     supabase,
-    filter: {},
+    filter: parcelFilter,
     onSnapshot: (data) => setParcels(data),
     onEvent: (evt) => setRealtimeEvent(evt),
   });

@@ -29,6 +29,7 @@
  *  6. Narxni hisoblaydi va qaytaradi
  */
 import { json, badRequest, serverError } from "../_shared/cors.js";
+import { calculateTripPrice } from '../../backend/src/pricing/surgePricingEngine.js';
 import { getSupabaseAdmin, getAuthedUserId } from "../_shared/supabase.js";
 
 function hasEnv() {
@@ -167,7 +168,34 @@ async function handleGetPricing(sb, searchParams) {
   ]);
 
   const basePrice = Number(tariff.base || 0) + Number(tariff.per_km || 0) * distanceKm + Number(tariff.per_min || 0) * durationMin;
-  const finalPrice = Math.max(Number(tariff.min_fare || 0), Math.round(basePrice * multiplier));
+  const defaultPrice = Math.max(Number(tariff.min_fare || 0), Math.round(basePrice * multiplier));
+
+  let finalPrice = defaultPrice;
+  if (["intercity", "interdistrict", "airport_transfer"].includes(serviceType)) {
+    const amenities = {
+      wifi: searchParams.get("wifi") === "true",
+      charger: searchParams.get("charger") === "true",
+      refreshments: searchParams.get("refreshments") === "true",
+      wheelchair_accessible: searchParams.get("wheelchair_accessible") === "true",
+    };
+    const seats = Number(searchParams.get("seats") || 1);
+    const bookedSeats = Number(searchParams.get("booked_seats") || 0);
+    const totalSeats = Number(searchParams.get("total_seats") || 4);
+    const childSeatTypes = searchParams.getAll("child_seat_type");
+    finalPrice = calculateTripPrice({
+      basePrice: Math.max(Number(tariff.min_fare || 0), Math.round(basePrice)),
+      seats,
+      bookedSeats,
+      totalSeats,
+      amenities,
+      luggageCount: Number(searchParams.get("luggage_count") || 0),
+      childSeatTypes,
+      waitingMinutes: Number(searchParams.get("waiting_minutes") || 0),
+      exactPickup: searchParams.get("exact_pickup") === "true",
+      meetAndGreet: searchParams.get("meet_greet") === "true",
+      isAirportTransfer: serviceType === "airport_transfer",
+    });
+  }
 
   return {
     ok: true,

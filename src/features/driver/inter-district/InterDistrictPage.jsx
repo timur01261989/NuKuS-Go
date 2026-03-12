@@ -32,6 +32,7 @@ import ParcelEntryModal from './components/parcel/ParcelEntryModal';
 import { usePremiumSocket } from './hooks/usePremiumSocket';
 import DriverOnlineToggle from '../components/DriverOnlineToggle';
 import { useDriverOnline } from '../core/useDriverOnline';
+import { canUseOrderTypeInArea } from '../core/driverCapabilityService';
 import { canActivateService } from '../core/serviceGuards';
 
 import './styles/theme.css';
@@ -46,9 +47,12 @@ const { Title, Text } = Typography;
 function Inner() {
   const { cp } = useDriverText();
   const { mode, MODES, upsertPremiumClient, lastError, locateOnce } = useDistrict();
-  const { isOnline, activeService, setOnline, setOffline } = useDriverOnline();
+  const { isOnline, activeService, setOnline, setOffline, serviceTypes, activeVehicle } = useDriverOnline();
   const serviceType = 'interDist';
   const serviceActive = isOnline && activeService === serviceType;
+  const passengerEnabled = useMemo(() => canUseOrderTypeInArea({ serviceTypes }, 'interdistrict', 'passenger'), [serviceTypes]);
+  const deliveryEnabled = useMemo(() => canUseOrderTypeInArea({ serviceTypes }, 'interdistrict', 'delivery'), [serviceTypes]);
+  const freightEnabled = useMemo(() => canUseOrderTypeInArea({ serviceTypes }, 'interdistrict', 'freight'), [serviceTypes]);
 
   // State boshqaruvi
   const [tripCreateOpen, setTripCreateOpen] = useState(false);
@@ -167,7 +171,7 @@ function Inner() {
             <Col xs={24} sm={12} style={{ textAlign: 'right' }}>
               <Space>
                 <Button icon={<ReloadOutlined />} onClick={() => window.location.reload()}>Yangilash</Button>
-                <Button icon={<InboxOutlined />} onClick={() => setParcelOpen(true)}>Eltishlar</Button>
+                <Button icon={<InboxOutlined />} disabled={!deliveryEnabled && !freightEnabled} onClick={() => setParcelOpen(true)}>Eltishlar</Button>
                 <Button icon={<SettingOutlined />} onClick={() => setPitakAdminOpen(true)}>Sozlamalar</Button>
               </Space>
             </Col>
@@ -217,6 +221,9 @@ function Inner() {
         <ParcelEntryModal 
           open={parcelOpen} 
           onClose={() => setParcelOpen(false)} 
+          deliveryEnabled={deliveryEnabled}
+          freightEnabled={freightEnabled}
+          activeVehicle={activeVehicle}
         />
         
         <TripCreateModal 
@@ -224,6 +231,10 @@ function Inner() {
           onClose={() => setTripCreateOpen(false)} 
           isOnline={serviceActive}
           onSuccess={handleTripCreated}
+          passengerEnabled={passengerEnabled}
+          deliveryEnabled={deliveryEnabled}
+          freightEnabled={freightEnabled}
+          activeVehicle={activeVehicle}
         />
         
         <PitakAdminModal 

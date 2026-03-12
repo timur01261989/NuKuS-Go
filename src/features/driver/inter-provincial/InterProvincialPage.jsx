@@ -33,8 +33,9 @@ import { supabase } from "@/lib/supabase";
 // DIQQAT: haversineKm bu yerdan import qilinadi, pastda qayta yozilmaydi
 import { osrmRouteDriving, haversineKm } from "@/shared/services/osrm";
 import { useAuth } from "@/shared/auth/AuthProvider";
-import { useDriverText } from "../shared/i18n_driverLocalize";
 import { getTripSettings, saveTripSettings } from "@/features/client/delivery/services/deliveryStore";
+import { useDriverOnline } from "@/features/driver/core/useDriverOnline";
+import { canUseOrderTypeInArea } from "@/features/driver/core/driverCapabilityService";
 
 import "leaflet/dist/leaflet.css";
 
@@ -126,6 +127,7 @@ function TripRow({ trip, onEdit, onDelete, onShowMap }) {
 export default function InterProvincialPage() {
   const { cp } = useDriverText();
   const { user } = useAuth();
+  const { serviceTypes, activeVehicle } = useDriverOnline();
 
   // Basic Info
   const [from, setFrom] = useState({ region: null, district: "" });
@@ -198,7 +200,28 @@ export default function InterProvincialPage() {
   const [pickerOpen, setPickerOpen] = useState(false); 
   const [savedLocs, setSavedLocs] = useState([]);
 
+  const intercityPassengerEnabled = useMemo(() => canUseOrderTypeInArea({ serviceTypes }, "intercity", "passenger"), [serviceTypes]);
+  const intercityDeliveryEnabled = useMemo(() => canUseOrderTypeInArea({ serviceTypes }, "intercity", "delivery"), [serviceTypes]);
+  const intercityFreightEnabled = useMemo(() => canUseOrderTypeInArea({ serviceTypes }, "intercity", "freight"), [serviceTypes]);
+  const intercityMaxWeightKg = useMemo(() => Number(activeVehicle?.maxWeightKg || 0), [activeVehicle]);
+  const intercityMaxVolumeM3 = useMemo(() => Number(activeVehicle?.maxVolumeM3 || 0), [activeVehicle]);
+
   useEffect(() => { setSavedLocs(loadSavedLocations()); }, []);
+
+  useEffect(() => {
+    if (!intercityDeliveryEnabled && isDelivery) setIsDelivery(false);
+  }, [intercityDeliveryEnabled, isDelivery]);
+
+  useEffect(() => {
+    if (!intercityFreightEnabled && isParcel) setIsParcel(false);
+  }, [intercityFreightEnabled, isParcel]);
+
+  useEffect(() => {
+    if (intercityMaxWeightKg > 0) {
+      setDeliveryMaxKg((prev) => Math.min(Number(prev || 0), intercityMaxWeightKg || Number(prev || 0)));
+      setDeliveryMaxTotalKg((prev) => Math.min(Number(prev || 0), intercityMaxWeightKg || Number(prev || 0)));
+    }
+  }, [intercityMaxWeightKg]);
 
   const loadMyTrips = useCallback(async () => {
     if (!user?.id) return;
@@ -297,6 +320,11 @@ export default function InterProvincialPage() {
         if (!price || price <= 0) return message.error("Narxni kiriting");
     }
 
+    if (!intercityPassengerEnabled) return message.error("Viloyatlararo yo‘lovchi xizmati Sozlamalarda yoqilmagan");
+    if (isDelivery && !intercityDeliveryEnabled) return message.error("Viloyatlararo eltish xizmati yoqilmagan");
+    if (isParcel && !intercityFreightEnabled) return message.error("Viloyatlararo yuk tashish xizmati yoqilmagan");
+    if (isDelivery && intercityMaxWeightKg > 0 && Number(deliveryMaxTotalKg || 0) > intercityMaxWeightKg) return message.error(`Jami eltish limiti aktiv mashina sig‘imidan oshmasin (${intercityMaxWeightKg}kg)`);
+
     setSaving(true);
     
     const payload = {
@@ -323,6 +351,11 @@ export default function InterProvincialPage() {
       price_front: vehicleType === 'car' ? Number(priceFront) : null,
       price_back: vehicleType === 'car' ? Number(priceBack) : null,
       bus_seat_type: vehicleType === 'bus' ? busSeatType : null,
+      active_vehicle_id: activeVehicle?.id || null,
+      allowed_delivery_max_kg: isDelivery ? Number(deliveryMaxKg || 0) : null,
+      allowed_delivery_total_kg: isDelivery ? Number(deliveryMaxTotalKg || 0) : null,
+      active_vehicle_max_weight_kg: intercityMaxWeightKg || null,
+      active_vehicle_max_volume_m3: intercityMaxVolumeM3 || null,
     };
 
     try {
@@ -359,7 +392,7 @@ export default function InterProvincialPage() {
     } finally {
       setSaving(false);
     }
-  }, [user, from, to, travelDate, travelTime, seats, price, priceFront, priceBack, vehicleType, busSeatType, womenOnly, isDelivery, isParcel, hasAC, hasTrunk, note, pickupLL, editingTrip, loadMyTrips, resetForm, deliveryMaxKg, deliveryMaxOrders, deliveryMaxTotalKg, deliveryPrecisePickup, deliveryPreciseDropoff]);
+  }, [user, from, to, travelDate, travelTime, seats, price, priceFront, priceBack, vehicleType, busSeatType, womenOnly, isDelivery, isParcel, hasAC, hasTrunk, note, pickupLL, editingTrip, loadMyTrips, resetForm, deliveryMaxKg, deliveryMaxOrders, deliveryMaxTotalKg, deliveryPrecisePickup, deliveryPreciseDropoff, activeVehicle, intercityPassengerEnabled, intercityDeliveryEnabled, intercityFreightEnabled, intercityMaxWeightKg, intercityMaxVolumeM3]);
 
   const deleteTrip = useCallback(async (trip) => {
     Modal.confirm({
@@ -524,18 +557,20 @@ export default function InterProvincialPage() {
         {/* FEATURES */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           <Checkbox checked={womenOnly} onChange={e => setWomenOnly(e.target.checked)}>Ayollar uchun</Checkbox>
-          <Checkbox checked={isDelivery} onChange={e => setIsDelivery(e.target.checked)}>Pochta / Eltish</Checkbox>
+          <Checkbox disabled={!intercityDeliveryEnabled} checked={isDelivery} onChange={e => setIsDelivery(e.target.checked)}>Pochta / Eltish {!intercityDeliveryEnabled ? "(Sozlamada o‘chiq)" : ""}</Checkbox>
           <Checkbox checked={hasAC} onChange={e => setHasAC(e.target.checked)}>Konditsioner</Checkbox>
+          <Checkbox disabled={!intercityFreightEnabled} checked={isParcel} onChange={e => setIsParcel(e.target.checked)}>Yuk tashish {!intercityFreightEnabled ? "(Sozlamada o‘chiq)" : ""}</Checkbox>
           <Checkbox checked={hasTrunk} onChange={e => setHasTrunk(e.target.checked)}>Yukxona</Checkbox>
         </div>
 
         {isDelivery ? (
           <div style={{ background: "#fff", padding: 12, borderRadius: 8, border: "1px solid #eee" }}>
+            <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>Aktiv mashina limiti: {intercityMaxWeightKg || 0}kg • {intercityMaxVolumeM3 || 0}m³</div>
             <div style={{ fontWeight: 700, marginBottom: 10 }}>Eltish sozlamalari</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <div>
                 <div style={{ fontSize: 12, marginBottom: 4 }}>Bitta buyum max kg</div>
-                <InputNumber style={{ width: "100%" }} min={1} max={20} value={deliveryMaxKg} onChange={setDeliveryMaxKg} />
+                <InputNumber style={{ width: "100%" }} min={1} max={Math.max(1, intercityMaxWeightKg || 20)} value={deliveryMaxKg} onChange={setDeliveryMaxKg} />
               </div>
               <div>
                 <div style={{ fontSize: 12, marginBottom: 4 }}>Maksimal buyurtma soni</div>
@@ -543,7 +578,7 @@ export default function InterProvincialPage() {
               </div>
               <div>
                 <div style={{ fontSize: 12, marginBottom: 4 }}>Jami kg limiti</div>
-                <InputNumber style={{ width: "100%" }} min={1} max={100} value={deliveryMaxTotalKg} onChange={setDeliveryMaxTotalKg} />
+                <InputNumber style={{ width: "100%" }} min={1} max={Math.max(1, intercityMaxWeightKg || 100)} value={deliveryMaxTotalKg} onChange={setDeliveryMaxTotalKg} />
               </div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>

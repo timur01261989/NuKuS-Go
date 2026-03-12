@@ -1,3 +1,5 @@
+import { getDefaultServiceTypes } from "./uploadConfig";
+
 export const initialFormState = {
   lastName: "",
   firstName: "",
@@ -11,8 +13,9 @@ export const initialFormState = {
   year: "",
   color: "",
   seats: 4,
-  cargoKg: 100,
-  cargoM3: null,
+  cargoKg: 80,
+  cargoM3: 0.8,
+  serviceTypes: getDefaultServiceTypes("light_car"),
 };
 
 export const initialFilesState = {

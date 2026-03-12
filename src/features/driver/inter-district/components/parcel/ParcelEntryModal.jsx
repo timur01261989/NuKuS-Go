@@ -2,11 +2,15 @@ import React, { useState } from 'react';
 import { Modal, Form, Input, InputNumber, Upload, Button, message } from 'antd';
 import { InboxOutlined } from '@ant-design/icons';
 
-export default function ParcelEntryModal({ open, onClose }) {
+export default function ParcelEntryModal({ open, onClose, deliveryEnabled = true, freightEnabled = true, activeVehicle = null }) {
   const [form] = Form.useForm();
   const [fileList, setFileList] = useState([]);
 
   const handleOk = async () => {
+    if (!deliveryEnabled && !freightEnabled) {
+      message.error("Bu xizmat aktiv emas. Avval Sozlamalarda eltish yoki yuk tashishni yoqing.");
+      return;
+    }
     const values = await form.validateFields();
     // Bu yerda serverga yuborish logikasini qo'shasiz.
     console.log('Parcel:', { ...values, files: fileList });
@@ -30,6 +34,7 @@ export default function ParcelEntryModal({ open, onClose }) {
         <Form.Item name="receiverPhone" label="Qabul qiluvchi tel" rules={[{ required: true, message: 'Telefon kiriting' }]}>
           <Input placeholder="+998 90 123 45 67" />
         </Form.Item>
+        <div style={{ marginBottom: 12, fontSize: 12, opacity: 0.75 }}>Aktiv mashina: {Number(activeVehicle?.maxWeightKg || 0)}kg • {Number(activeVehicle?.maxVolumeM3 || 0)}m³</div>
         <Form.Item name="note" label="Izoh">
           <Input.TextArea rows={3} placeholder="Masalan: Televizor, sinuvchan" />
         </Form.Item>

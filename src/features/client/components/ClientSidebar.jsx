@@ -32,7 +32,7 @@ export default function ClientSidebar({ open, onClose, profile }) {
         try {
           const { getWalletBalance } = await import('@/services/walletApi.js');
           const j = await getWalletBalance(user.id);
-          const bal = typeof j?.wallet?.balance_uzs === 'number' ? j.wallet.balance_uzs : (typeof j?.balance_uzs === 'number' ? j.balance_uzs : null);
+          const bal = typeof j?.balance_uzs === 'number' ? j.balance_uzs : null;
           if (mounted) setBalanceUZS(bal);
         } catch (err) {
           console.error("Balance fetch error:", err);

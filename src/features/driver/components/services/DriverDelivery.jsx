@@ -1,18 +1,19 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Card, Empty, List, Segmented, Space, Steps, Tag, Typography, message } from "antd";
 import { CheckCircleOutlined, PhoneOutlined } from "@ant-design/icons";
 
 import { useAuth } from "@/shared/auth/AuthProvider";
+import { supabase } from "@/lib/supabase";
 import { getDeliveryStatusSteps } from "@/features/client/delivery/services/deliveryConfig";
-import { appendDeliveryHistory, listDeliveryOrders, updateDeliveryOrder } from "@/features/client/delivery/services/deliveryStore";
 import { useDriverText } from "../../shared/i18n_driverLocalize";
+import { fetchDriverCapability, canDriverSeeOrder } from "../../core/driverCapabilityService";
 
 const { Title, Text } = Typography;
 
 function ActionCard({ order, onAction, cp }) {
   const steps = getDeliveryStatusSteps(order.status);
   const nextAction =
-    order.status === "searching"
+    order.status === "searching" || order.status === "pending"
       ? { key: "accept", label: cp("Qabul qilish") }
       : order.status === "accepted"
       ? { key: "picked_up", label: cp("Buyumni oldim") }
@@ -68,14 +69,42 @@ export default function DriverDelivery() {
   const { user } = useAuth();
   const [orders, setOrders] = useState([]);
   const [serviceMode, setServiceMode] = useState("all");
+  const [capability, setCapability] = useState(null);
 
-  const loadOrders = async () => {
-    setOrders(await listDeliveryOrders());
-  };
+  const loadOrders = useCallback(async () => {
+    const currentCapability = await fetchDriverCapability(user?.id || null);
+    setCapability(currentCapability);
+
+    const { data, error } = await supabase
+      .from("delivery_orders")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    const openOrders = (data || []).filter((item) => {
+      const assignedToCurrentDriver = item.matched_driver_user_id === user?.id || item.driver_user_id === user?.id;
+      if (assignedToCurrentDriver) return item.status !== "delivered";
+      return item.status === "searching" || item.status === "pending";
+    });
+
+    const filteredByCapability = openOrders.filter((item) =>
+      canDriverSeeOrder(currentCapability, {
+        serviceArea: item.service_mode === "region" ? "intercity" : item.service_mode === "district" ? "interdistrict" : "city",
+        orderType: "delivery",
+        weightKg: item.weight_kg || 0,
+        volumeM3: item.volume_m3 || 0,
+      })
+    );
+
+    setOrders(filteredByCapability);
+  }, [user?.id]);
 
   useEffect(() => {
-    loadOrders();
-  }, []);
+    loadOrders().catch((error) => {
+      message.error(error?.message || cp("Eltish buyurtmalarini yuklashda xato"));
+    });
+  }, [loadOrders, cp]);
 
   const filtered = useMemo(() => {
     let items = orders.filter((item) => item.status !== "delivered");
@@ -84,24 +113,34 @@ export default function DriverDelivery() {
   }, [orders, serviceMode]);
 
   const handleAction = async (order, action) => {
-    const patch = {};
+    const patch = { updated_at: new Date().toISOString() };
+    const history = Array.isArray(order.history) ? [...order.history] : [];
+
     if (action === "accept") {
       patch.status = "accepted";
-      patch.matched_driver_id = user?.id || order.matched_driver_id || null;
+      patch.matched_driver_user_id = user?.id || order.matched_driver_user_id || null;
+      patch.driver_user_id = user?.id || order.driver_user_id || null;
       patch.matched_driver_name = user?.phone || user?.email || cp("Haydovchi");
-      await appendDeliveryHistory(order.id, { type: "accepted", by: patch.matched_driver_name });
+      history.push({ id: `evt_${Date.now()}`, type: "accepted", at: patch.updated_at, by: patch.matched_driver_name });
     }
     if (action === "picked_up") {
       patch.status = "picked_up";
-      await appendDeliveryHistory(order.id, { type: "picked_up" });
+      history.push({ id: `evt_${Date.now()}`, type: "picked_up", at: patch.updated_at });
     }
     if (action === "delivered") {
       patch.status = "delivered";
-      await appendDeliveryHistory(order.id, { type: "delivered" });
+      history.push({ id: `evt_${Date.now()}`, type: "delivered", at: patch.updated_at });
     }
-    await updateDeliveryOrder(order.id, patch);
+
+    patch.history = history;
+
+    let query = supabase.from("delivery_orders").update(patch).eq("id", order.id);
+    if (action === "accept") query = query.in("status", ["searching", "pending"]);
+    const { error } = await query;
+    if (error) throw error;
+
     message.success(cp("Eltish holati yangilandi"));
-    loadOrders();
+    await loadOrders();
   };
 
   return (
@@ -109,7 +148,7 @@ export default function DriverDelivery() {
       <Card style={{ borderRadius: 18, marginBottom: 14 }} bodyStyle={{ padding: 16 }}>
         <Space direction="vertical" size={8} style={{ width: "100%" }}>
           <Title level={4} style={{ margin: 0 }}>{cp("Haydovchi — Eltish paneli")}</Title>
-          <Text type="secondary">{cp("Shahar, tumanlar aro va viloyatlar aro eltish buyurtmalarini shu yerdan qabul qilasiz.")}</Text>
+          <Text type="secondary">{cp("Shahar, tumanlar aro va viloyatlar aro eltish buyurtmalarini shu yerdan qabul qilasiz.")} {capability?.activeVehicle ? `${capability.activeVehicle.maxWeightKg}kg / ${capability.activeVehicle.maxVolumeM3}m³` : cp("Aktiv mashina tanlanmagan")}</Text>
           <Segmented
             value={serviceMode}
             onChange={setServiceMode}

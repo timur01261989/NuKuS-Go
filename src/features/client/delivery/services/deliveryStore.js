@@ -1,6 +1,5 @@
 import { supabase } from "@/lib/supabase";
 
-const LS_KEY = "unigo_delivery_orders_v2";
 const TRIP_SETTINGS_KEY = "unigo_delivery_trip_settings_v1";
 
 function uid(prefix = "id") {
@@ -15,22 +14,22 @@ function safeParse(value, fallback) {
   }
 }
 
-function lsRead() {
-  if (typeof window === "undefined") return [];
-  return safeParse(localStorage.getItem(LS_KEY), []);
+async function requireUserId() {
+  const { data, error } = await supabase.auth.getUser();
+  if (error) throw error;
+  const userId = data?.user?.id || null;
+  if (!userId) throw new Error("Login qiling");
+  return userId;
 }
 
-function lsWrite(items) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(LS_KEY, JSON.stringify(items || []));
-}
-
-function normalizeOrder(input = {}) {
+function normalizeOrder(input = {}, userId) {
   return {
     id: input.id || uid("delivery"),
+    user_id: input.user_id || userId,
+    driver_user_id: input.driver_user_id || null,
     created_at: input.created_at || new Date().toISOString(),
     updated_at: new Date().toISOString(),
-    created_by: input.created_by || null,
+    created_by: input.created_by || userId,
     service_mode: input.service_mode || "city",
     status: input.status || "searching",
     parcel_type: input.parcel_type || "document",
@@ -57,84 +56,49 @@ function normalizeOrder(input = {}) {
     dropoff_lng: input.dropoff_lng ?? null,
     matched_trip_id: input.matched_trip_id || null,
     matched_trip_title: input.matched_trip_title || "",
-    matched_driver_id: input.matched_driver_id || null,
+    matched_driver_user_id: input.matched_driver_user_id || null,
     matched_driver_name: input.matched_driver_name || "",
     history: Array.isArray(input.history) ? input.history : [],
   };
 }
 
-async function trySupabaseSelect() {
-  try {
-    const { data, error } = await supabase.from("delivery_orders").select("*").order("created_at", { ascending: false });
-    if (error) throw error;
-    return data || [];
-  } catch {
-    return null;
-  }
-}
-
-async function trySupabaseInsert(order) {
-  try {
-    const { data, error } = await supabase.from("delivery_orders").insert(order).select("*").single();
-    if (error) throw error;
-    return data;
-  } catch {
-    return null;
-  }
-}
-
-async function trySupabaseUpdate(id, patch) {
-  try {
-    const { data, error } = await supabase.from("delivery_orders").update(patch).eq("id", id).select("*").single();
-    if (error) throw error;
-    return data;
-  } catch {
-    return null;
-  }
-}
-
-async function trySupabaseDelete(id) {
-  try {
-    const { error } = await supabase.from("delivery_orders").delete().eq("id", id);
-    if (error) throw error;
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export async function listDeliveryOrders() {
-  const remote = await trySupabaseSelect();
-  if (Array.isArray(remote)) return remote;
-  return lsRead();
+  const userId = await requireUserId();
+  const { data, error } = await supabase
+    .from("delivery_orders")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data || [];
 }
 
 export async function createDeliveryOrder(payload) {
-  const order = normalizeOrder(payload);
-  const remote = await trySupabaseInsert(order);
-  if (remote) return remote;
-  const items = lsRead();
-  items.unshift(order);
-  lsWrite(items);
-  return order;
+  const userId = await requireUserId();
+  const order = normalizeOrder(payload, userId);
+  const { data, error } = await supabase.from("delivery_orders").insert(order).select("*").single();
+  if (error) throw error;
+  return data;
 }
 
 export async function updateDeliveryOrder(id, patch) {
+  const userId = await requireUserId();
   const nextPatch = { ...patch, updated_at: new Date().toISOString() };
-  const remote = await trySupabaseUpdate(id, nextPatch);
-  if (remote) return remote;
-  const items = lsRead();
-  const updated = items.map((item) => (item.id === id ? { ...item, ...nextPatch } : item));
-  lsWrite(updated);
-  return updated.find((item) => item.id === id) || null;
+  const { data, error } = await supabase
+    .from("delivery_orders")
+    .update(nextPatch)
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data;
 }
 
 export async function deleteDeliveryOrder(id) {
-  const deleted = await trySupabaseDelete(id);
-  if (deleted) return true;
-  const items = lsRead();
-  const next = items.filter((item) => item.id !== id);
-  lsWrite(next);
+  const userId = await requireUserId();
+  const { error } = await supabase.from("delivery_orders").delete().eq("id", id).eq("user_id", userId);
+  if (error) throw error;
   return true;
 }
 

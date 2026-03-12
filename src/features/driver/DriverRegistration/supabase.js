@@ -1,29 +1,21 @@
 import { supabase } from "@/lib/supabase";
-import { DRIVER_DOCUMENT_FIELDS, DRIVER_DOCUMENT_FIELD_MAP } from "./uploadConfig";
+import {
+  DRIVER_DOCUMENT_FIELDS,
+  DRIVER_DOCUMENT_FIELD_MAP,
+  getDefaultServiceTypes,
+  toLegacyTransportType,
+} from "./uploadConfig";
 
-/**
- * Storage Bucket nomi
- */
 const DOCUMENT_BUCKET = "driver-documents";
 
-/**
- * DriverRegister.jsx ushbu mapni shu fayldan import qiladi.
- * Shuning uchun uni qayta eksport qilish shart.
- */
 export { DRIVER_DOCUMENT_FIELD_MAP };
 
-/**
- * Fayl yo'llari uchun xavfsiz segmentlar yaratish.
- */
 function sanitizeSegment(value) {
   return String(value || "")
     .trim()
     .replace(/[^a-zA-Z0-9_-]/g, "_");
 }
 
-/**
- * Fayl kengaytmasini aniqlash (Fallback bilan).
- */
 function getFileExtension(file) {
   const name = String(file?.name || "");
   if (name.includes(".")) {
@@ -37,34 +29,22 @@ function getFileExtension(file) {
   return "jpg";
 }
 
-/**
- * Fayl nomi yo'q bo'lsa xavfsiz fallback nom yaratish.
- */
 function buildFallbackFileName(docType, extension) {
   return `${sanitizeSegment(docType)}_${Date.now()}.${extension}`;
 }
 
-/**
- * Number parse helper. Bo'sh yoki noto'g'ri qiymat kelsa null qaytaradi.
- */
 function toNullableInt(value) {
   if (value === null || value === undefined || value === "") return null;
   const parsed = parseInt(value, 10);
   return Number.isNaN(parsed) ? null : parsed;
 }
 
-/**
- * Float parse helper. Bo'sh yoki noto'g'ri qiymat kelsa null qaytaradi.
- */
 function toNullableFloat(value) {
   if (value === null || value === undefined || value === "") return null;
   const parsed = parseFloat(value);
   return Number.isNaN(parsed) ? null : parsed;
 }
 
-/**
- * Hujjatlarni doc_type bo'yicha Map ko'rinishiga o'tkazish.
- */
 function buildDocumentRowMap(rows = []) {
   return (rows || []).reduce((acc, row) => {
     if (row?.doc_type) {
@@ -74,9 +54,77 @@ function buildDocumentRowMap(rows = []) {
   }, {});
 }
 
-/**
- * Autentifikatsiyadan o'tgan foydalanuvchini olish.
- */
+function normalizeServiceTypes(rawValue, fallbackVehicleType = "light_car") {
+  if (!rawValue) return getDefaultServiceTypes(fallbackVehicleType);
+
+  if (typeof rawValue === "string") {
+    try {
+      return normalizeServiceTypes(JSON.parse(rawValue), fallbackVehicleType);
+    } catch (_error) {
+      return getDefaultServiceTypes(fallbackVehicleType);
+    }
+  }
+
+  return {
+    city: {
+      passenger: !!rawValue?.city?.passenger,
+      delivery: !!rawValue?.city?.delivery,
+      freight: !!rawValue?.city?.freight,
+    },
+    intercity: {
+      passenger: !!rawValue?.intercity?.passenger,
+      delivery: !!rawValue?.intercity?.delivery,
+      freight: !!rawValue?.intercity?.freight,
+    },
+    interdistrict: {
+      passenger: !!rawValue?.interdistrict?.passenger,
+      delivery: !!rawValue?.interdistrict?.delivery,
+      freight: !!rawValue?.interdistrict?.freight,
+    },
+  };
+}
+
+function isMissingColumnError(error) {
+  const text = String(error?.message || error?.details || "").toLowerCase();
+  return text.includes("column") && text.includes("does not exist");
+}
+
+function buildApplicationPayload(formData) {
+  const vehicleType = formData.vehicleType || "light_car";
+  const serviceTypes = normalizeServiceTypes(formData.serviceTypes, vehicleType);
+
+  return {
+    last_name: String(formData.lastName || "").toUpperCase().trim() || null,
+    first_name: String(formData.firstName || "").toUpperCase().trim() || null,
+    middle_name: String(formData.middleName || "").toUpperCase().trim() || null,
+    father_name: String(formData.middleName || "").toUpperCase().trim() || null,
+    phone: String(formData.phone || "").replace(/\D/g, "") || null,
+    passport_number:
+      String(formData.passportNumber || "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "") || null,
+    requested_vehicle_type: vehicleType,
+    requested_service_types: serviceTypes,
+    transport_type: toLegacyTransportType(vehicleType),
+    vehicle_brand: formData.brand || null,
+    vehicle_model: formData.model || null,
+    vehicle_plate:
+      String(formData.plateNumber || "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "") || null,
+    vehicle_year: toNullableInt(formData.year),
+    vehicle_color: formData.color || null,
+    seat_count: toNullableInt(formData.seats),
+    requested_max_freight_weight_kg: toNullableFloat(formData.cargoKg),
+    requested_payload_volume_m3: toNullableFloat(formData.cargoM3),
+  };
+}
+
+function stripExtendedColumns(payload) {
+  const { requested_vehicle_type, requested_service_types, ...legacyPayload } = payload;
+  return legacyPayload;
+}
+
 export async function getAuthenticatedUser() {
   const {
     data: { user },
@@ -94,13 +142,9 @@ export async function getAuthenticatedUser() {
   return user;
 }
 
-/**
- * Haydovchining arizasi va barcha hujjatlarini yuklash.
- */
 export async function getMyDriverApplicationWithDocuments() {
   const user = await getAuthenticatedUser();
 
-  // 1. Arizani olish
   const { data: application, error: appError } = await supabase
     .from("driver_applications")
     .select("*")
@@ -116,7 +160,6 @@ export async function getMyDriverApplicationWithDocuments() {
     return { application: null, documents: [] };
   }
 
-  // 2. Hujjatlarni olish
   const { data: documents, error: docsError } = await supabase
     .from("driver_documents")
     .select("*")
@@ -135,23 +178,21 @@ export async function getMyDriverApplicationWithDocuments() {
   };
 }
 
-/**
- * Bazadagi application obyektini form uchun mos ko'rinishga o'tkazish.
- * DriverRegister.jsx bootstrap vaqtida aynan shu funksiyani ishlatadi.
- */
 export function buildFormDataFromApplication(application) {
   if (!application) {
     return {};
   }
 
+  const vehicleType = application.requested_vehicle_type || application.transport_type || "light_car";
+  const serviceTypes = normalizeServiceTypes(application.requested_service_types, vehicleType);
+
   return {
     lastName: application.last_name || "",
     firstName: application.first_name || "",
-    middleName: application.middle_name || "",
+    middleName: application.middle_name || application.father_name || "",
     phone: String(application.phone || "").replace(/\D/g, ""),
     passportNumber: application.passport_number || "",
-
-    vehicleType: application.transport_type || "light_car",
+    vehicleType,
     brand: application.vehicle_brand || "",
     model: application.vehicle_model || "",
     plateNumber: application.vehicle_plate || "",
@@ -160,47 +201,13 @@ export function buildFormDataFromApplication(application) {
     seats: application.seat_count ?? 0,
     cargoKg: application.requested_max_freight_weight_kg ?? 0,
     cargoM3: application.requested_payload_volume_m3 ?? 0,
-
+    serviceTypes,
     status: application.status || "pending",
     rejectionReason: application.rejection_reason || "",
     adminNote: application.admin_note || "",
   };
 }
 
-/**
- * Formadan kelgan ma'lumotlarni bazaga mos payload ko'rinishiga o'tkazish.
- * MUHIM: schema nomlari driver_applications jadvalidagi real ustunlarga mos.
- */
-function buildApplicationPayload(formData) {
-  return {
-    last_name: String(formData.lastName || "").toUpperCase().trim() || null,
-    first_name: String(formData.firstName || "").toUpperCase().trim() || null,
-    middle_name: String(formData.middleName || "").toUpperCase().trim() || null,
-    phone: String(formData.phone || "").replace(/\D/g, "") || null,
-    passport_number:
-      String(formData.passportNumber || "")
-        .toUpperCase()
-        .replace(/[^A-Z0-9]/g, "") || null,
-
-    transport_type: formData.vehicleType || null,
-    vehicle_brand: formData.brand || null,
-    vehicle_model: formData.model || null,
-    vehicle_plate:
-      String(formData.plateNumber || "")
-        .toUpperCase()
-        .replace(/[^A-Z0-9]/g, "") || null,
-    vehicle_year: toNullableInt(formData.year),
-    vehicle_color: formData.color || null,
-    seat_count: toNullableInt(formData.seats),
-
-    requested_max_freight_weight_kg: toNullableFloat(formData.cargoKg),
-    requested_payload_volume_m3: toNullableFloat(formData.cargoM3),
-  };
-}
-
-/**
- * Arizani saqlash yoki yangilash (Upsert).
- */
 export async function upsertDriverApplication(formData) {
   const user = await getAuthenticatedUser();
   const baseData = buildApplicationPayload(formData);
@@ -222,35 +229,44 @@ export async function upsertDriverApplication(formData) {
     throw new Error(`Mavjud arizani tekshirishda xato: ${existingError.message}`);
   }
 
+  async function executeWithFallback(operation) {
+    let result = await operation(payload);
+    if (result.error && isMissingColumnError(result.error)) {
+      result = await operation(stripExtendedColumns(payload));
+    }
+    return result;
+  }
+
   if (existingApp?.id) {
-    const { data, error } = await supabase
-      .from("driver_applications")
-      .update(payload)
-      .eq("id", existingApp.id)
-      .select()
-      .single();
+    const { data, error } = await executeWithFallback((nextPayload) =>
+      supabase
+        .from("driver_applications")
+        .update(nextPayload)
+        .eq("id", existingApp.id)
+        .select()
+        .single()
+    );
 
     if (error) throw new Error(`Arizani yangilashda xato: ${error.message}`);
     return data;
-  } else {
-    const { data, error } = await supabase
+  }
+
+  const { data, error } = await executeWithFallback((nextPayload) =>
+    supabase
       .from("driver_applications")
       .insert({
-        ...payload,
+        ...nextPayload,
         created_at: new Date().toISOString(),
         submitted_at: new Date().toISOString(),
       })
       .select()
-      .single();
+      .single()
+  );
 
-    if (error) throw new Error(`Arizani saqlashda xato: ${error.message}`);
-    return data;
-  }
+  if (error) throw new Error(`Arizani saqlashda xato: ${error.message}`);
+  return data;
 }
 
-/**
- * Hujjatlarni yuklash jarayoni.
- */
 export async function uploadDriverDocuments(applicationId, files = {}) {
   const user = await getAuthenticatedUser();
 
@@ -289,7 +305,6 @@ export async function uploadDriverDocuments(applicationId, files = {}) {
     const timestamp = Date.now();
     const path = `${sanitizeSegment(user.id)}/${sanitizeSegment(applicationId)}/${sanitizeSegment(field.docType)}_${timestamp}.${extension}`;
 
-    // 1. Faylni Storage ga yuklash
     const { error: uploadError } = await supabase.storage
       .from(DOCUMENT_BUCKET)
       .upload(path, file, {
@@ -301,7 +316,6 @@ export async function uploadDriverDocuments(applicationId, files = {}) {
       throw new Error(`${field.label} yuklashda xato: ${uploadError.message}`);
     }
 
-    // 2. Public URL olish
     const { data: publicUrlData } = supabase.storage
       .from(DOCUMENT_BUCKET)
       .getPublicUrl(path);
@@ -326,7 +340,6 @@ export async function uploadDriverDocuments(applicationId, files = {}) {
     const existing = existingMap[field.docType];
 
     if (existing?.id) {
-      // Mavjud hujjatni yangilash
       const { error } = await supabase
         .from("driver_documents")
         .update(documentPayload)
@@ -334,7 +347,6 @@ export async function uploadDriverDocuments(applicationId, files = {}) {
 
       if (error) throw new Error(`${field.label} yangilanishda xato: ${error.message}`);
     } else {
-      // Yangi hujjat qo'shish
       const { error } = await supabase
         .from("driver_documents")
         .insert({
@@ -342,53 +354,26 @@ export async function uploadDriverDocuments(applicationId, files = {}) {
           created_at: new Date().toISOString(),
         });
 
-      if (error) throw new Error(`${field.label} saqlanishda xato: ${error.message}`);
+      if (error) throw new Error(`${field.label} saqlashda xato: ${error.message}`);
     }
   }
+
+  const { data: freshDocuments, error: freshError } = await supabase
+    .from("driver_documents")
+    .select("*")
+    .eq("application_id", applicationId)
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true });
+
+  if (freshError) {
+    throw new Error(`Yangi hujjatlarni olishda xato: ${freshError.message}`);
+  }
+
+  return freshDocuments || [];
 }
 
-/**
- * Umumiy ariza topshirish mantiqi.
- */
 export async function submitDriverApplication(formData, files = {}) {
-  try {
-    const application = await upsertDriverApplication(formData);
-
-    if (Object.keys(files).length > 0) {
-      await uploadDriverDocuments(application.id, files);
-    }
-
-    return await getMyDriverApplicationWithDocuments();
-  } catch (error) {
-    console.error("submitDriverApplication Error:", error);
-    throw error;
-  }
-}
-
-/**
- * Bazadagi ma'lumotlarni form uchun map ko'rinishiga o'tkazish.
- * Kesilib qolgan return/qavs muammosi tuzatildi.
- */
-export function mapExistingDocumentsToForm(records = []) {
-  if (!records || records.length === 0) return {};
-
-  const byDocType = buildDocumentRowMap(records);
-
-  return Object.values(DRIVER_DOCUMENT_FIELD_MAP).reduce((acc, field) => {
-    const record = byDocType[field.docType];
-    if (record) {
-      acc[field.key] = {
-        uid: record.id,
-        name: record.file_name || buildFallbackFileName(field.docType, "jpg"),
-        status: "done",
-        url: record.file_url || "",
-        docType: record.doc_type,
-        file_path: record.file_path || "",
-        file_size: record.file_size || 0,
-        mime_type: record.mime_type || "image/jpeg",
-        source: "remote",
-      };
-    }
-    return acc;
-  }, {});
+  const application = await upsertDriverApplication(formData);
+  const documents = await uploadDriverDocuments(application.id, files);
+  return { application, documents };
 }

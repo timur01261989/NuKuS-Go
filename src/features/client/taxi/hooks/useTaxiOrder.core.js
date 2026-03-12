@@ -401,46 +401,20 @@ export function useTaxiOrderCore() {
     speak,
   });
 
-  // Simulate nearby cars during search
+  // Production mode: do NOT render fake nearby cars.
+  // Nearby cars must come only from real approved online drivers.
   useEffect(() => {
-    if (step !== "searching") return;
-    if (!pickup.latlng) return;
+    if (step !== "searching") {
+      setNearCars([]);
+      setDispatchLine([]);
+      setDispatchIdx(0);
+      return;
+    }
 
-    const baseLat = pickup.latlng[0];
-    const baseLng = pickup.latlng[1];
-
-    const cars = Array.from({ length: 6 }).map((_, i) => {
-      const ang = (i / 6) * Math.PI * 2;
-      const r = 0.006 + Math.random() * 0.01;
-      return {
-        id: "c" + i,
-        lat: baseLat + Math.cos(ang) * r,
-        lng: baseLng + Math.sin(ang) * r,
-        bearing: Math.random() * 360,
-      };
-    });
-
-    setNearCars(cars);
+    setNearCars([]);
+    setDispatchLine([]);
     setDispatchIdx(0);
-
-    let t = null;
-    t = setInterval(() => {
-      setDispatchIdx((x) => (x + 1) % cars.length);
-    }, 1800);
-
-    return () => {
-      if (t) clearInterval(t);
-    };
-  }, [step, pickup.latlng]);
-
-  useEffect(() => {
-    if (step !== "searching") return;
-    if (!pickup.latlng) return;
-    if (!nearCars.length) return;
-    const c = nearCars[dispatchIdx];
-    if (!c) return;
-    setDispatchLine([[c.lat, c.lng], pickup.latlng]);
-  }, [step, dispatchIdx, nearCars, pickup.latlng]);
+  }, [step, pickup.latlng, setNearCars, setDispatchLine]);
 
   const {
     isSearching,

@@ -1,123 +1,91 @@
-let api = null;
-try {
-  // eslint-disable-next-line import/no-unresolved
-  api = require("@/utils/apiHelper").default;
-} catch (e) {
-  api = null;
-}
-
-let supabase = null;
-try {
-  // eslint-disable-next-line import/no-unresolved
-  supabase = require("@/lib/supabase").supabase;
-} catch (e) {
-  supabase = null;
-}
+import api from "@/utils/apiHelper";
+import { supabase } from "@/lib/supabase";
 
 async function post(path, body) {
-  if (api?.post) return api.post(path, body);
-  const res = await fetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.message || "Server error");
-  return data;
+  try {
+    const res = await api.post(path, body);
+    return res?.data ?? res;
+  } catch (error) {
+    throw error;
+  }
 }
 
 export const interProvincialApi = {
-  // Trip create/update
   async createTrip(payload) {
-    // preferred: backend
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError) throw authError;
+    const userId = authData?.user?.id || null;
+    if (!userId) throw new Error('Login qiling');
+
+    const enriched = {
+      ...payload,
+      user_id: payload.user_id || userId,
+      amenities: payload.amenities || {},
+      child_seat_types: payload.child_seat_types || [],
+      waiting_policy: payload.waiting_policy || {},
+      recurring_rule: payload.recurring_rule || null,
+      booking_mode: payload.booking_mode || 'approval',
+    };
     try {
-      return await post("/api/order", { action: "interprov_trip_create", ...payload });
+      return await post('/api/order', { action: 'interprov_trip_create', ...enriched });
     } catch (e) {
-      // fallback: supabase direct (agar siz ruxsat bergan bo'lsangiz)
-      if (supabase) {
-        const { data, error } = await supabase.from("inter_prov_trips").insert([payload]).select("*").single();
-        if (error) throw error;
-        return { data };
-      }
-      // demo
-      return { data: { id: `trip_${Date.now()}`, ...payload } };
+      const { data, error } = await supabase.from('inter_prov_trips').insert([enriched]).select('*').single();
+      if (error) throw error;
+      return { data };
     }
   },
 
   async updateTrip(tripId, patch) {
     try {
-      return await post("/api/order", { action: "interprov_trip_update", tripId, patch });
+      return await post('/api/order', { action: 'interprov_trip_update', tripId, patch });
     } catch (e) {
-      if (supabase && tripId) {
-        const { data, error } = await supabase.from("inter_prov_trips").update(patch).eq("id", tripId).select("*").single();
-        if (error) throw error;
-        return { data };
-      }
-      return { data: { id: tripId, ...patch } };
+      const { data, error } = await supabase.from('inter_prov_trips').update(patch).eq('id', tripId).select('*').single();
+      if (error) throw error;
+      return { data };
     }
   },
 
-  // Seat requests
   async listSeatRequests(tripId) {
     try {
-      const r = await post("/api/order", { action: "interprov_seat_requests", tripId });
+      const r = await post('/api/order', { action: 'interprov_seat_requests', tripId });
       return r?.data || r?.requests || [];
     } catch (e) {
-      if (supabase && tripId) {
-        const { data } = await supabase.from("inter_prov_seat_requests").select("*").eq("trip_id", tripId).order("created_at", { ascending: true });
-        return data || [];
-      }
-      return [];
+      const { data } = await supabase.from('inter_prov_seat_requests').select('*').eq('trip_id', tripId).order('created_at', { ascending: true });
+      return data || [];
     }
   },
 
   async respondSeatRequest({ requestId, accept }) {
     try {
-      return await post("/api/order", { action: "interprov_seat_request_respond", requestId, accept });
+      return await post('/api/order', { action: 'interprov_seat_request_respond', requestId, accept });
     } catch (e) {
-      if (supabase && requestId) {
-        const { data, error } = await supabase
-          .from("inter_prov_seat_requests")
-          .update({ status: accept ? "accepted" : "declined" })
-          .eq("id", requestId)
-          .select("*")
-          .single();
-        if (error) throw error;
-        return { data };
-      }
-      return { ok: true };
+      const { data, error } = await supabase.from('inter_prov_seat_requests').update({ status: accept ? 'accepted' : 'declined' }).eq('id', requestId).select('*').single();
+      if (error) throw error;
+      return { data };
     }
   },
 
-  // Parcel photo upload (optional: Supabase Storage)
+  async saveRecurringTemplate(template) {
+    return post('/api/intercity', { action: 'save_recurring_template', template });
+  },
+
+  async listRecurringTemplates() {
+    return post('/api/intercity', { action: 'list_recurring_templates' });
+  },
+
   async uploadParcelPhoto(file, tripId) {
     if (!file) return null;
-    // try apiHelper
-    if (api?.upload) {
-      const r = await api.upload("/api/upload", file, { tripId, folder: "parcels" });
-      return r?.url || null;
-    }
-    // try supabase storage
-    if (supabase) {
-      const path = `parcels/${tripId || "no_trip"}/${Date.now()}_${file.name}`;
-      const { error } = await supabase.storage.from("public").upload(path, file, { upsert: true });
-      if (error) throw error;
-      const { data } = supabase.storage.from("public").getPublicUrl(path);
-      return data?.publicUrl || null;
-    }
-    // fallback: base64 in memory (not recommended for production)
-    return await new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.readAsDataURL(file);
-    });
+    const path = `parcels/${tripId || 'no_trip'}/${Date.now()}_${file.name}`;
+    const { error } = await supabase.storage.from('public').upload(path, file, { upsert: true });
+    if (error) throw error;
+    const { data } = supabase.storage.from('public').getPublicUrl(path);
+    return data?.publicUrl || null;
   },
 
   async sendParcelSms(payload) {
-    // payload: { phone, text, imageUrl, carPlate }
     try {
-      return await post("/api/sms", { action: "send", ...payload });
-    } catch (e) {
+      return await post('/api/sms', { action: 'send', ...payload });
+    } catch {
       return { ok: true };
     }
   },

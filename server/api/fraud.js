@@ -80,6 +80,15 @@ export default async function handler(req, res) {
       return json(res, 200, { ok: true });
     }
 
+
+    if (action === "trip_risk") {
+      const cancellations = Number(body.cancellations || 0);
+      const noShows = Number(body.no_shows || 0);
+      const repeatedDevices = Number(body.repeated_devices || 0);
+      const score = Math.min(100, cancellations * 12 + noShows * 25 + repeatedDevices * 10);
+      return json(res, 200, { ok: true, risk_score: score, risk_level: score >= 70 ? 'high' : score >= 35 ? 'medium' : 'low' });
+    }
+
     if (action === "flag") {
       const entity_type = String(body.entity_type || "").trim();
       const entity_id = body.entity_id;

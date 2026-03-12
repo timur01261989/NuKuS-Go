@@ -5,6 +5,25 @@ import { getLatestTrackingPosition, startTracking } from "@/features/driver/comp
 let currentService = null;
 let currentDriverId = null;
 
+function getActiveVehicleIdFromStorage() {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem("driver_active_vehicle_id") || null;
+  } catch {
+    return null;
+  }
+}
+
+function getCachedServiceTypes() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem("driver_service_types_cache");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 function getApiBase() {
   return (import.meta?.env?.VITE_API_BASE || "").replace(/\/$/, "");
 }
@@ -46,6 +65,8 @@ export async function syncPresenceService(serviceType) {
   await postPresenceState({
     is_online: true,
     service_type: currentService || 'taxi',
+    active_vehicle_id: getActiveVehicleIdFromStorage(),
+    service_types: getCachedServiceTypes(),
   });
 }
 
@@ -63,11 +84,18 @@ export async function startPresence(serviceType) {
   await postPresenceState({
     is_online: true,
     service_type: currentService || 'taxi',
+    active_vehicle_id: getActiveVehicleIdFromStorage(),
+    service_types: getCachedServiceTypes(),
   });
 }
 
 export async function stopPresence() {
   stopHeartbeat();
   if (!currentDriverId) return;
-  await postPresenceState({ is_online: false, service_type: currentService || null });
+  await postPresenceState({
+    is_online: false,
+    service_type: currentService || null,
+    active_vehicle_id: getActiveVehicleIdFromStorage(),
+    service_types: getCachedServiceTypes(),
+  });
 }
