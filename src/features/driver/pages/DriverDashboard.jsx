@@ -157,27 +157,53 @@ function LegacyDriverDashboard() {
           return;
         }
 
-        const { data: driverData, error } = await supabase
-          .from("drivers")
-          // Multiple schema variants exist (status text / approved boolean / etc.).
-          // Selecting missing columns causes PostgREST errors.
-          .select("*")
-          .eq("user_id", user.id)
-          .maybeSingle();
+        const [profileRes, appRes, presenceRes] = await Promise.all([
+          supabase
+            .from("profiles")
+            .select("full_name, phone")
+            .eq("id", user.id)
+            .maybeSingle(),
+          supabase
+            .from("driver_applications")
+            .select("first_name, last_name, phone")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from("driver_presence")
+            .select("is_online")
+            .eq("driver_id", user.id)
+            .maybeSingle(),
+        ]);
 
-        if (error) {
-          console.error("Profil yuklashda xato:", error);
-          return;
+        if (profileRes.error) {
+          console.error("Profile yuklashda xato:", profileRes.error);
+        }
+        if (appRes.error) {
+          console.error("Driver application yuklashda xato:", appRes.error);
+        }
+        if (presenceRes.error) {
+          console.error("Driver presence yuklashda xato:", presenceRes.error);
         }
 
-        if (mounted && driverData) {
+        const profileData = profileRes.data || {};
+        const appData = appRes.data || {};
+        const presenceData = presenceRes.data || {};
+
+        if (mounted) {
+          const fullName = String(
+            profileData.full_name || `${appData.first_name || ""} ${appData.last_name || ""}`.trim()
+          ).trim();
+          const phone = profileData.phone || appData.phone || "";
+
           setProfile({
-            fullName: `${driverData.first_name || ""} ${driverData.last_name || ""}`.trim(),
-            phone: driverData.phone,
+            fullName,
+            phone,
             avatarUrl: "",
           });
 
-          const onlineStatus = driverData.is_online === true;
+          const onlineStatus = presenceData.is_online === true;
           setIsOnline(onlineStatus);
           localStorage.setItem("driverOnline", onlineStatus ? "1" : "0");
 
@@ -211,12 +237,13 @@ function LegacyDriverDashboard() {
       // DIQQAT: Faqat 'is_online' va 'last_seen_at' o'zgaradi.
       // 'status' ustuniga tegmaymiz (u 'active' bo'lib qolishi shart).
       const { error } = await supabase
-        .from("drivers")
-        .update({
+        .from("driver_presence")
+        .upsert({
+          driver_id: user.id,
           is_online: checked,
+          updated_at: new Date().toISOString(),
           last_seen_at: new Date().toISOString(),
-        })
-        .eq("user_id", user.id);
+        }, { onConflict: "driver_id" });
 
       if (error) throw error;
 
