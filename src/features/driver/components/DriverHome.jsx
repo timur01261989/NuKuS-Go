@@ -157,6 +157,11 @@ export default function DriverHome({ onLogout }) {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
+  const backToMenu = useCallback(() => {
+    setSelectedService(null);
+    if (typeof window !== "undefined") localStorage.removeItem("driver_active_service");
+  }, []);
+
   useEffect(() => {
     if (!selectedService) return;
     try {
@@ -168,7 +173,7 @@ export default function DriverHome({ onLogout }) {
     } catch {
       // ignore
     }
-  }, [selectedService, backToMenu]);
+  }, [selectedService]);
 
   const selectService = useCallback((key) => {
     if (!canUseService?.(key)) {
@@ -178,11 +183,6 @@ export default function DriverHome({ onLogout }) {
     setSelectedService(key);
     if (typeof window !== "undefined") localStorage.setItem("driver_active_service", key);
   }, [canUseService, tr]);
-
-  const backToMenu = useCallback(() => {
-    setSelectedService(null);
-    if (typeof window !== "undefined") localStorage.removeItem("driver_active_service");
-  }, []);
 
   // =========================
   // HEADER DATA
