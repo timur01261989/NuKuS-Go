@@ -47,16 +47,53 @@ async function getAuthToken() {
   }
 }
 
+async function fallbackPresenceSync(driverId, body) {
+  const now = new Date().toISOString();
+  try {
+    await supabase.from('driver_presence').upsert({
+      driver_id: driverId,
+      is_online: !!body?.is_online,
+      state: body?.is_online === false ? 'offline' : 'online',
+      active_service_type: body?.service_type || null,
+      updated_at: now,
+      last_seen_at: now,
+    }, { onConflict: 'driver_id' });
+  } catch (error) {
+    console.warn('driver_presence fallback failed', error?.message || error);
+  }
+
+  try {
+    await supabase.from('drivers').update({
+      is_online: !!body?.is_online,
+      last_seen_at: now,
+      updated_at: now,
+    }).eq('user_id', driverId);
+  } catch (error) {
+    console.warn('drivers fallback failed', error?.message || error);
+  }
+}
+
 async function postPresenceState(body) {
   const driverId = await resolveDriverId();
   const token = await getAuthToken();
   const headers = { 'content-type': 'application/json' };
   if (token) headers.authorization = `Bearer ${token}`;
-  await fetch(`${getApiBase()}/api/driver-state`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-  }).catch(() => {});
+  try {
+    const res = await fetch(`${getApiBase()}/api/driver-state`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const payload = await res.text().catch(() => '');
+      throw new Error(payload || `HTTP ${res.status}`);
+    }
+    return true;
+  } catch (error) {
+    console.warn('driver-state api failed, using fallback sync:', error?.message || error);
+    await fallbackPresenceSync(driverId, body);
+    return false;
+  }
 }
 
 export async function syncPresenceService(serviceType) {

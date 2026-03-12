@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Drawer, message, Switch } from "antd";
 
@@ -25,6 +25,70 @@ function safeShortId(id) {
   const s = String(id || "");
   if (!s) return "----";
   return s.length > 6 ? s.slice(-6) : s;
+}
+
+function getServiceLabel(key) {
+  return ({
+    taxi: "Shahar taksi",
+    interProv: "Viloyatlar aro",
+    interDist: "Tumanlar aro",
+    delivery: "Eltish",
+    freight: "Yuk tashish",
+  }[key] || key || "");
+}
+
+function getPreferredServiceKey(serviceTypes) {
+  const checks = [
+    ["taxi", serviceTypes?.city?.passenger || serviceTypes?.city?.delivery || serviceTypes?.city?.freight],
+    ["interProv", serviceTypes?.intercity?.passenger || serviceTypes?.intercity?.delivery || serviceTypes?.intercity?.freight],
+    ["interDist", serviceTypes?.interdistrict?.passenger || serviceTypes?.interdistrict?.delivery || serviceTypes?.interdistrict?.freight],
+    ["delivery", serviceTypes?.city?.delivery || serviceTypes?.intercity?.delivery || serviceTypes?.interdistrict?.delivery],
+    ["freight", serviceTypes?.city?.freight || serviceTypes?.intercity?.freight || serviceTypes?.interdistrict?.freight],
+  ];
+  const found = checks.find((item) => item[1]);
+  return found?.[0] || null;
+}
+
+class DriverServiceErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, errorMessage: "" };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, errorMessage: error?.message || "Service crash" };
+  }
+
+  componentDidCatch(error) {
+    console.error("Driver service render error:", error);
+  }
+
+  componentDidUpdate(prevProps) {
+    if (prevProps.resetKey !== this.props.resetKey && this.state.hasError) {
+      this.setState({ hasError: false, errorMessage: "" });
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-backgroundLightDriver p-4">
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700">
+            <div className="text-lg font-bold">Xizmat sahifasida xato</div>
+            <div className="mt-2 text-sm">{this.state.errorMessage || "Noma'lum xato"}</div>
+            <button
+              type="button"
+              onClick={this.props.onBack}
+              className="mt-4 rounded-xl bg-primarySidebar px-4 py-2 font-semibold text-white"
+            >
+              Orqaga qaytish
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 export default function DriverHome({ onLogout }) {
@@ -103,64 +167,21 @@ export default function DriverHome({ onLogout }) {
     } catch {
       // ignore
     }
-  }, [selectedService]);
+  }, [selectedService, backToMenu]);
 
-  const selectService = (key) => {
+  const selectService = useCallback((key) => {
     if (!canUseService?.(key)) {
       message.warning(tr("serviceDisabled", "Bu xizmat sizning sozlamalaringizda yoqilmagan"));
       return;
     }
     setSelectedService(key);
     if (typeof window !== "undefined") localStorage.setItem("driver_active_service", key);
-  };
+  }, [canUseService, tr]);
 
-  const backToMenu = () => {
+  const backToMenu = useCallback(() => {
     setSelectedService(null);
     if (typeof window !== "undefined") localStorage.removeItem("driver_active_service");
-  };
-
-  const userIdRef = useRef(null);
-
-// ✅ Toggle online/offline (global context)
-const toggleOnline = async (next) => {
-  setLoading(true);
-  try {
-    const targetService = selectedService || activeService || (typeof window !== "undefined" ? localStorage.getItem("driver_active_service") : null) || "taxi";
-    if (next && !canUseService?.(targetService)) {
-      message.warning(tr("serviceDisabled", "Bu xizmat sizning sozlamalaringizda yoqilmagan"));
-      return;
-    }
-
-    if (next && !activeVehicle) {
-      message.warning(tr("activeVehicleRequired", "Avval aktiv mashinani tanlang"));
-      return;
-    }
-
-    if (next && !canActivateService(activeService, targetService)) {
-      message.warning(tr("goOffline", "Avval boshqa xizmatni offline qiling"));
-      return;
-    }
-
-    const { data: u, error: uErr } = await supabase.auth.getUser();
-    if (uErr) throw uErr;
-    const user = u?.user;
-    if (!user) return;
-    userIdRef.current = user.id;
-
-    if (next) {
-      await setOnline(targetService);
-    } else {
-      await setOffline();
-    }
-
-    message.success(next ? tr("driverOnline", "Siz Online rejimdasiz") : tr("driverOffline", "Siz Offline rejimdasiz"));
-  } catch (err) {
-    console.error("Status update error:", err);
-    message.error(err?.message || tr("errorChangingStatus", "Statusni o'zgartirishda xatolik!"));
-  } finally {
-    setLoading(false);
-  }
-};
+  }, []);
 
   // =========================
   // HEADER DATA
@@ -315,13 +336,16 @@ const toggleOnline = async (next) => {
   // =========================
   // CONTENT RENDER
   // =========================
-  const visibleServices = useMemo(() => ({
-    taxi: canUseService?.("taxi"),
-    interProv: canUseService?.("interProv"),
-    interDist: canUseService?.("interDist"),
-    freight: canUseService?.("freight"),
-    delivery: canUseService?.("delivery"),
-  }), [canUseService]);
+  const visibleServices = useMemo(
+    () => ({
+      taxi: canUseService?.("taxi"),
+      interProv: canUseService?.("interProv"),
+      interDist: canUseService?.("interDist"),
+      freight: canUseService?.("freight"),
+      delivery: canUseService?.("delivery"),
+    }),
+    [canUseService]
+  );
 
   const content = useMemo(() => {
     if (selectedService === "taxi") return <DriverTaxi onBack={backToMenu} />;
@@ -330,16 +354,21 @@ const toggleOnline = async (next) => {
     if (selectedService === "freight") return <DriverFreight onBack={backToMenu} />;
     if (selectedService === "delivery") return <DriverDelivery onBack={backToMenu} />;
     return null;
-  }, [selectedService]);
+  }, [selectedService, backToMenu]);
 
-  // =========================
-  // MENU UI (Tailwind design)
-  // =========================
+  const serviceContent = useMemo(() => {
+    if (!content) return null;
+    return (
+      <DriverServiceErrorBoundary resetKey={selectedService} onBack={backToMenu}>
+        {content}
+      </DriverServiceErrorBoundary>
+    );
+  }, [content, selectedService, backToMenu]);
+
   const menuUi = (
     <div className="min-h-screen bg-backgroundLightDriver font-display text-slate-900">
-
       <DriverSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} onLogout={onLogout} />
-      {/* Header */}
+
       <header className="flex items-center justify-between p-4 bg-transparent">
         <div className="flex items-center gap-4">
           <button
@@ -367,11 +396,7 @@ const toggleOnline = async (next) => {
 
           <div className="w-12 h-12 rounded-full neumorphic-pop p-1">
             {driverHeader?.avatarUrl ? (
-              <img
-                alt="Driver Profile"
-                className="w-full h-full rounded-full object-cover"
-                src={driverHeader.avatarUrl}
-              />
+              <img alt="Driver Profile" className="w-full h-full rounded-full object-cover" src={driverHeader.avatarUrl} />
             ) : (
               <div className="w-full h-full rounded-full bg-white flex items-center justify-center text-primarySidebar">
                 <span className="material-symbols-outlined" data-no-auto-translate="true">person</span>
@@ -381,7 +406,6 @@ const toggleOnline = async (next) => {
         </button>
       </header>
 
-      {/* Status Toggle */}
       <div className="px-4 py-2">
         <div className="neumorphic-pop rounded-2xl p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -389,28 +413,16 @@ const toggleOnline = async (next) => {
             <div>
               <p className="font-bold text-slate-800">{tr("driverStatus", "Haydovchi holati")}</p>
               <p className="text-sm text-slate-500">
-                {tr("currentStatus", "Siz hozir")} {isOnline ? `${tr("online", "onlayn")}${activeService ? ` (${({taxi:"Shahar taksi",interProv:"Viloyatlar aro",interDist:"Tumanlar aro",delivery:"Eltish",freight:"Yuk tashish"}[activeService] || activeService)})` : ""}` : tr("offline", "oflayn")}
+                {tr("currentStatus", "Siz hozir")} {isOnline ? `${tr("online", "onlayn")}${activeService ? ` (${getServiceLabel(activeService)})` : ""}` : tr("offline", "oflayn")}
               </p>
             </div>
           </div>
 
           <label
-            className={`relative flex h-8 w-14 items-center rounded-full p-1 transition-colors ${
-              isOnline ? "bg-primarySidebar" : "bg-slate-200"
-            } ${loading ? "opacity-60" : "cursor-pointer"}`}
+            className={`relative flex h-8 w-14 items-center rounded-full p-1 transition-colors ${isOnline ? "bg-primarySidebar" : "bg-slate-200"} ${loading ? "opacity-60" : "cursor-pointer"}`}
           >
-            <input
-              type="checkbox"
-              className="sr-only"
-              checked={isOnline}
-              disabled={loading}
-              onChange={(e) => toggleOnline(e.target.checked)}
-            />
-            <div
-              className={`h-6 w-6 rounded-full bg-white shadow-md transition-transform ${
-                isOnline ? "translate-x-6" : "translate-x-0"
-              }`}
-            />
+            <input type="checkbox" className="sr-only" checked={isOnline} disabled={loading} onChange={(e) => toggleOnline(e.target.checked)} />
+            <div className={`h-6 w-6 rounded-full bg-white shadow-md transition-transform ${isOnline ? "translate-x-6" : "translate-x-0"}`} />
           </label>
         </div>
       </div>
@@ -433,85 +445,65 @@ const toggleOnline = async (next) => {
         </div>
       </div>
 
-      {/* Main Content */}
       <main className="p-4 space-y-6 pb-24">
-        {/* City taxi big card */}
         <section>
           {visibleServices.taxi ? (
-          <button
-            type="button"
-            onClick={() => selectService("taxi")}
-            className="w-full text-left neumorphic-pop rounded-2xl p-6 flex items-center justify-between border-2 border-primarySidebar/20"
-          >
-            <div className="flex items-center gap-5">
-              <div className="w-16 h-16 rounded-2xl bg-orange-100 flex items-center justify-center text-primarySidebar">
-                <span className="material-symbols-outlined text-4xl" data-no-auto-translate="true">local_taxi</span>
+            <button
+              type="button"
+              onClick={() => selectService("taxi")}
+              className="w-full text-left neumorphic-pop rounded-2xl p-6 flex items-center justify-between border-2 border-primarySidebar/20"
+            >
+              <div className="flex items-center gap-5">
+                <div className="w-16 h-16 rounded-2xl bg-orange-100 flex items-center justify-center text-primarySidebar">
+                  <span className="material-symbols-outlined text-4xl" data-no-auto-translate="true">local_taxi</span>
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-slate-900">{tr("taxi", "Shahar ichida taksi")}</h3>
+                  <p className="text-slate-500 text-sm">{tr("cityTaxiHint", "Eng tezkor va qulay narxlar")}</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-2xl font-bold text-slate-900">{tr("taxi", "Shahar ichida taksi")}</h3>
-                <p className="text-slate-500 text-sm">{tr("cityTaxiHint", "Eng tezkor va qulay narxlar")}</p>
+              <div className="bg-primarySidebar text-white h-12 w-12 rounded-xl flex items-center justify-center shadow-lg">
+                <span className="material-symbols-outlined" data-no-auto-translate="true">arrow_forward</span>
               </div>
-            </div>
-
-            <div className="bg-primarySidebar text-white h-12 w-12 rounded-xl flex items-center justify-center shadow-lg">
-              <span className="material-symbols-outlined" data-no-auto-translate="true">arrow_forward</span>
-            </div>
-          </button>
+            </button>
           ) : null}
         </section>
 
-        {/* Grid categories */}
         <section className="grid grid-cols-2 gap-4">
           {visibleServices.interProv ? (
-          <button
-            type="button"
-            onClick={() => selectService("interProv")}
-            className="neumorphic-pop rounded-2xl p-6 flex flex-col items-center text-center gap-4 border border-white/50"
-          >
-            <div className="w-14 h-14 rounded-2xl bg-orange-100 flex items-center justify-center text-primarySidebar">
-              <span className="material-symbols-outlined text-4xl" data-no-auto-translate="true">map</span>
-            </div>
-            <p className="font-bold text-slate-800">{tr("interProvincial", "Viloyatlar aro")}</p>
-          </button>
+            <button type="button" onClick={() => selectService("interProv")} className="neumorphic-pop rounded-2xl p-6 flex flex-col items-center text-center gap-4 border border-white/50">
+              <div className="w-14 h-14 rounded-2xl bg-orange-100 flex items-center justify-center text-primarySidebar">
+                <span className="material-symbols-outlined text-4xl" data-no-auto-translate="true">map</span>
+              </div>
+              <p className="font-bold text-slate-800">{tr("interProvincial", "Viloyatlar aro")}</p>
+            </button>
           ) : null}
 
           {visibleServices.interDist ? (
-          <button
-            type="button"
-            onClick={() => selectService("interDist")}
-            className="neumorphic-pop rounded-2xl p-6 flex flex-col items-center text-center gap-4 border border-white/50"
-          >
-            <div className="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center text-blue-600">
-              <span className="material-symbols-outlined text-4xl" data-no-auto-translate="true">distance</span>
-            </div>
-            <p className="font-bold text-slate-800">{tr("interDistrict", "Tumanlar aro")}</p>
-          </button>
+            <button type="button" onClick={() => selectService("interDist")} className="neumorphic-pop rounded-2xl p-6 flex flex-col items-center text-center gap-4 border border-white/50">
+              <div className="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center text-blue-600">
+                <span className="material-symbols-outlined text-4xl" data-no-auto-translate="true">distance</span>
+              </div>
+              <p className="font-bold text-slate-800">{tr("interDistrict", "Tumanlar aro")}</p>
+            </button>
           ) : null}
 
           {visibleServices.freight ? (
-          <button
-            type="button"
-            onClick={() => selectService("freight")}
-            className="neumorphic-pop rounded-2xl p-6 flex flex-col items-center text-center gap-4 border border-white/50"
-          >
-            <div className="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600">
-              <span className="material-symbols-outlined text-4xl" data-no-auto-translate="true">local_shipping</span>
-            </div>
-            <p className="font-bold text-slate-800">{tr("freight", "Yuk tashish")}</p>
-          </button>
+            <button type="button" onClick={() => selectService("freight")} className="neumorphic-pop rounded-2xl p-6 flex flex-col items-center text-center gap-4 border border-white/50">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+                <span className="material-symbols-outlined text-4xl" data-no-auto-translate="true">local_shipping</span>
+              </div>
+              <p className="font-bold text-slate-800">{tr("freight", "Yuk tashish")}</p>
+            </button>
           ) : null}
 
           {visibleServices.delivery ? (
-          <button
-            type="button"
-            onClick={() => selectService("delivery")}
-            className="neumorphic-pop rounded-2xl p-6 flex flex-col items-center text-center gap-4 border border-white/50"
-          >
-            <div className="w-14 h-14 rounded-2xl bg-purple-100 flex items-center justify-center text-purple-600">
-              <span className="material-symbols-outlined text-4xl" data-no-auto-translate="true">inventory_2</span>
-            </div>
-            <p className="font-bold text-slate-800">{tr("delivery", "Eltish xizmati")}</p>
-          </button>
+            <button type="button" onClick={() => selectService("delivery")} className="neumorphic-pop rounded-2xl p-6 flex flex-col items-center text-center gap-4 border border-white/50">
+              <div className="w-14 h-14 rounded-2xl bg-purple-100 flex items-center justify-center text-purple-600">
+                <span className="material-symbols-outlined text-4xl" data-no-auto-translate="true">inventory_2</span>
+              </div>
+              <p className="font-bold text-slate-800">{tr("delivery", "Eltish xizmati")}</p>
+            </button>
           ) : null}
 
           {!visibleServices.taxi && !visibleServices.interProv && !visibleServices.interDist && !visibleServices.freight && !visibleServices.delivery ? (
@@ -522,67 +514,24 @@ const toggleOnline = async (next) => {
         </section>
       </main>
 
-      {/* Bottom Navigation Bar (no big +, no profile) */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-slate-200 px-6 py-2 flex justify-around items-center z-50">
-        <button
-          type="button"
-          onClick={() => {
-            backToMenu();
-            navigate("/driver/dashboard");
-          }}
-          className="flex flex-col items-center gap-1 text-primarySidebar"
-        >
+        <button type="button" onClick={() => { backToMenu(); navigate("/driver/dashboard"); }} className="flex flex-col items-center gap-1 text-primarySidebar">
           <span className="material-symbols-outlined" data-no-auto-translate="true">home</span>
           <span className="text-[10px] font-bold">{tr("home", "Asosiy")}</span>
         </button>
-
-        <button
-          type="button"
-          onClick={() => navigate("/driver/orders")}
-          className="flex flex-col items-center gap-1 text-slate-400"
-        >
+        <button type="button" onClick={() => navigate("/driver/orders")} className="flex flex-col items-center gap-1 text-slate-400">
           <span className="material-symbols-outlined" data-no-auto-translate="true">history</span>
           <span className="text-[10px] font-medium">{tr("orderHistoryDriver", tr("orders", "Buyurtmalar tarixi"))}</span>
         </button>
-
-        <button
-          type="button"
-          onClick={() => navigate("/settings")}
-          className="flex flex-col items-center gap-1 text-slate-400"
-        >
+        <button type="button" onClick={() => navigate("/settings")} className="flex flex-col items-center gap-1 text-slate-400">
           <span className="material-symbols-outlined" data-no-auto-translate="true">settings</span>
           <span className="text-[10px] font-medium">{tr("settingsTitle", "Sozlamalar")}</span>
         </button>
       </nav>
 
-      {/* Profile drawer (right) - existing flow kept */}
-      <Drawer
-        placement="right"
-        width="100%"
-        closable={false}
-        onClose={() => setProfileOpen(false)}
-        open={profileOpen}
-        styles={{ body: { padding: 0 } }}
-        maskClosable
-      >
-        <div
-          ref={drawerInnerRef}
-          style={{ height: "100%", background: "#fff", willChange: "transform", touchAction: "pan-y" }}
-          onTouchStart={onProfileTouchStart}
-          onTouchMove={onProfileTouchMove}
-          onTouchEnd={onProfileTouchEnd}
-        >
-          <div
-            style={{
-              padding: 12,
-              background: "#111",
-              color: "white",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 12,
-            }}
-          >
+      <Drawer placement="right" width="100%" closable={false} onClose={() => setProfileOpen(false)} open={profileOpen} styles={{ body: { padding: 0 } }} maskClosable>
+        <div ref={drawerInnerRef} style={{ height: "100%", background: "#fff", willChange: "transform", touchAction: "pan-y" }} onTouchStart={onProfileTouchStart} onTouchMove={onProfileTouchMove} onTouchEnd={onProfileTouchEnd}>
+          <div style={{ padding: 12, background: "#111", color: "white", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
             <div style={{ fontWeight: 900 }}>Profil</div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div style={{ fontSize: 12, opacity: 0.9 }}>{isOnline ? tr("online", "Online") : tr("offline", "Offline")}</div>
@@ -590,28 +539,16 @@ const toggleOnline = async (next) => {
             </div>
           </div>
 
-          <DriverProfile
-            onBack={() => setProfileOpen(false)}
-            onLogout={() => {
-              setProfileOpen(false);
-              onLogout?.();
-            }}
-          />
+          <DriverProfile onBack={() => setProfileOpen(false)} onLogout={() => { setProfileOpen(false); onLogout?.(); }} />
         </div>
       </Drawer>
-
     </div>
   );
 
   return (
     <div style={{ minHeight: "100vh" }}>
-      {content ? content : menuUi}
-      <RadarMiniOverlay
-        online={driveAssistantEnabled}
-        speedKmh={speedKmh}
-        radar={nearestRadar}
-        severity={radarSeverity}
-      />
+      {serviceContent ? serviceContent : menuUi}
+      <RadarMiniOverlay online={driveAssistantEnabled} speedKmh={speedKmh} radar={nearestRadar} severity={radarSeverity} />
     </div>
   );
 }

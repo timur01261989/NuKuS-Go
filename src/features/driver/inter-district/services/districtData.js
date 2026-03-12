@@ -274,3 +274,5 @@ export function getDistrictsByRegion(regionId) {
   if (!regionId) return [];
   return DISTRICTS_BY_REGION[regionId] || [];
 }
+
+export const districtData = { REGIONS, DISTRICTS_BY_REGION };

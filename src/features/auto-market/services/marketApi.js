@@ -518,3 +518,8 @@ export async function analyzeFairPrice({ brand, model, year, mileage, price, cur
 
   return { verdict, label, color, avg, min, max, count: prices.length, percentile, ratio: Math.round(ratio * 100) / 100 };
 }
+
+
+export async function promoteAd(adId, promoType) {
+  return { ok: true, ad_id: adId, promo_type: promoType, mock: true };
+}

@@ -2,8 +2,6 @@ import React, { createContext, useContext, useEffect, useMemo, useReducer, useCa
 import { message } from 'antd';
 
 import { MODES, initialState, pricingReducer } from './pricingReducer';
-import { districtData } from '../services/districtData';
-import { osrmRoute } from '../services/osrm';
 
 const Ctx = createContext(null);
 
