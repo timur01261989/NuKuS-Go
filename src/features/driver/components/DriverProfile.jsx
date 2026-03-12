@@ -14,6 +14,7 @@ import {
   TrophyFilled,
 } from "@ant-design/icons";
 import { supabase } from "@/lib/supabase";
+import { fetchDriverCore } from "@/shared/auth/driverCoreAccess";
 import DriverWallet from "./DriverWallet";
 import ActivityChart from "./ActivityChart";
 import Leaderboard from "./Leaderboard";
@@ -39,9 +40,7 @@ function DriverProfile({ onBack, onLogout }) {
         error: authError,
       } = await supabase.auth.getUser();
 
-      if (authError) {
-        throw authError;
-      }
+      if (authError) throw authError;
 
       if (!user?.id) {
         setUserId(null);
@@ -52,31 +51,34 @@ function DriverProfile({ onBack, onLogout }) {
 
       setUserId(user.id);
 
-      const [{ data: driver, error: driverError }, { count, error: tripError }] = await Promise.all([
-        supabase
-          .from("drivers")
-          .select("first_name, car_model, car_color, plate_number, avatar_url, average_rating, rating_count")
-          .eq("user_id", user.id)
-          .maybeSingle(),
+      const [core, { count, error: tripError }] = await Promise.all([
+        fetchDriverCore(user.id),
         supabase
           .from("orders")
           .select("id", { count: "exact", head: true })
-          .eq("driver_id", user.id)
+          .eq("assigned_driver_user_id", user.id)
           .eq("status", "completed"),
       ]);
 
-      if (driverError && driverError.code !== "PGRST116") {
-        throw driverError;
-      }
+      if (tripError) throw tripError;
 
-      if (tripError) {
-        throw tripError;
-      }
+      const fullName = core?.profile?.full_name || [core?.application?.first_name, core?.application?.last_name].filter(Boolean).join(" ");
+      const vehicleName = [core?.activeVehicle?.brand, core?.activeVehicle?.model].filter(Boolean).join(" ");
+      const driver = {
+        first_name: fullName,
+        car_model: vehicleName,
+        car_color: core?.activeVehicle?.color || "",
+        plate_number: core?.activeVehicle?.plate_number || "",
+        avatar_url: core?.profile?.avatar_url || "",
+        average_rating: 5,
+        rating_count: 0,
+      };
 
-      setDriverData(driver || null);
+      setDriverData(driver);
       setStats({
-        total_trips: count || 0,
-        rating: typeof driver?.average_rating === "number" ? driver.average_rating : 5.0,
+        total_trips: Number(count || 0),
+        rating: Number(driver.average_rating || 5),
+        rating_count: Number(driver.rating_count || 0),
       });
     } catch (error) {
       console.error("DriverProfile fetchProfileData error:", error);

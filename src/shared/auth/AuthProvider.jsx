@@ -8,6 +8,7 @@ import React, {
   useState,
 } from "react";
 import { supabase } from "@/lib/supabase";
+import { fetchDriverCore } from "@/shared/auth/driverCoreAccess";
 
 const AuthCtx = createContext(null);
 
@@ -168,16 +169,9 @@ export function AuthProvider({ children }) {
       const userId = user.id;
       const fingerprint = sessionFingerprint(requestedSession);
 
-      const [profileRes, driverRes, appRes] = await Promise.all([
+      const [profileRes, core] = await Promise.all([
         fetchProfileByUserId(userId),
-        supabase.from("drivers").select("*").eq("user_id", userId).maybeSingle(),
-        supabase
-          .from("driver_applications")
-          .select("*")
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
+        fetchDriverCore(userId),
       ]);
 
       let profile = profileRes.data ?? null;
@@ -192,12 +186,18 @@ export function AuthProvider({ children }) {
         }
       }
 
-      const driver = driverRes.error ? null : driverRes.data ?? null;
-      const driverApp = appRes.error ? null : appRes.data ?? null;
+      const driver = core ? {
+        user_id: userId,
+        approved: !!core.driverApproved,
+        is_verified: !!core.driverApproved,
+        allowed_services: core.allowedServices || [],
+        transport_type: core.activeVehicle?.vehicle_type || core.application?.requested_vehicle_type || null,
+      } : null;
+      const driverApp = core?.application ?? null;
 
-      const role = normalizeRole(profile?.role || (driver || driverApp ? "driver" : "client"));
+      const role = normalizeRole(profile?.role || (driverApp ? "driver" : "client"));
       const isAdmin = !!profile?.is_admin;
-      const driverApproved = deriveDriverApproved(driver) || normalizeStatus(driverApp?.status) === "approved";
+      const driverApproved = !!core?.driverApproved;
       const applicationStatus = normalizeStatus(driverApp?.status);
 
       commit((prev) => ({
@@ -219,7 +219,7 @@ export function AuthProvider({ children }) {
         isAuthed: true,
         lastResolvedUserId: userId,
         lastSessionFingerprint: fingerprint,
-        error: profileError || driverRes.error || appRes.error || null,
+        error: profileError || null,
         lastReason: reason,
       }));
     } catch (error) {

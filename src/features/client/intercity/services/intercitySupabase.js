@@ -8,7 +8,7 @@ export async function listInterProvTrips({
   limit = 50,
 }) {
   let q = supabase
-    .from("inter_prov_trips")
+    .from("interprov_trips")
     .select("*")
     .order("depart_at", { ascending: true })
     .limit(limit);
@@ -51,7 +51,7 @@ export async function createSeatRequest({
 
 export async function listInterProvParcelOffers({ fromRegionName, toRegionName, limit = 20 }) {
   let q = supabase
-    .from("inter_prov_trips")
+    .from("interprov_trips")
     .select("*")
     .eq("parcel_enabled", true)
     .in("status", ["active", "draft"])

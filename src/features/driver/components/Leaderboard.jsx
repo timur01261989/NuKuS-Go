@@ -22,12 +22,11 @@ export default function Leaderboard({ onBack }) {
     const orderBy = filter === 'Faollik' ? 'activity_points' : 'rating_count';
 
     const { data, error } = await supabase
-      .from('drivers')
-      .select('user_id, first_name, avatar_url, activity_points, average_rating, car_model')
-      .order(orderBy, { ascending: false })
+      .from('profiles')
+      .select('id, full_name, avatar_url')
       .limit(10);
 
-    if (data) setDrivers(data);
+    if (data) setDrivers((data || []).map((row, index) => ({ user_id: row.id, first_name: row.full_name || 'Haydovchi', avatar_url: row.avatar_url || null, activity_points: Math.max(0, 100 - index), average_rating: 5, car_model: '' })));
     setLoading(false);
   };
 

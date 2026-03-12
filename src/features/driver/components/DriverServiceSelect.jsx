@@ -3,6 +3,7 @@ import { Card, Typography, ConfigProvider, Row, Col, Button, Switch, message, Ba
 import { CarOutlined, DropboxOutlined, RocketOutlined, GlobalOutlined, EnvironmentOutlined, ArrowLeftOutlined, PoweroffOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
+import { fetchDriverCore } from '@/shared/auth/driverCoreAccess';
 import { useLanguage } from '@shared/i18n/useLanguage';
 import { safeBack } from '@/shared/navigation/safeBack';
 
@@ -31,13 +32,13 @@ export default function DriverServiceSelect({ onSelectService }) {
         const userId = auth?.user?.id;
         if (!userId) return;
 
-        const [{ data: driver }, { data: presence }] = await Promise.all([
-          supabase.from('drivers').select('allowed_services,max_freight_weight_kg').eq('user_id', userId).maybeSingle(),
+        const [core, { data: presence }] = await Promise.all([
+          fetchDriverCore(userId),
           supabase.from('driver_presence').select('is_online').eq('driver_id', userId).maybeSingle(),
         ]);
 
-        setAllowedServices(Array.isArray(driver?.allowed_services) ? driver.allowed_services : []);
-        setMaxFreight(Number(driver?.max_freight_weight_kg || 0));
+        setAllowedServices(Array.isArray(core?.allowedServices) ? core.allowedServices : []);
+        setMaxFreight(Number(core?.activeVehicle?.max_weight_kg || 0));
         setIsOnline(!!presence?.is_online);
       } finally {
         setLoading(false);

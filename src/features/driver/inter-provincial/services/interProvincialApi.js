@@ -29,7 +29,7 @@ export const interProvincialApi = {
     try {
       return await post('/api/order', { action: 'interprov_trip_create', ...enriched });
     } catch (e) {
-      const { data, error } = await supabase.from('inter_prov_trips').insert([enriched]).select('*').single();
+      const { data, error } = await supabase.from('interprov_trips').insert([enriched]).select('*').single();
       if (error) throw error;
       return { data };
     }
@@ -39,7 +39,7 @@ export const interProvincialApi = {
     try {
       return await post('/api/order', { action: 'interprov_trip_update', tripId, patch });
     } catch (e) {
-      const { data, error } = await supabase.from('inter_prov_trips').update(patch).eq('id', tripId).select('*').single();
+      const { data, error } = await supabase.from('interprov_trips').update(patch).eq('id', tripId).select('*').single();
       if (error) throw error;
       return { data };
     }

@@ -39,9 +39,7 @@ export default function RedirectByRole() {
       }
 
       if (role === "driver") {
-        // Variant A: driver access is controlled by drivers table
         if (!driverExists) {
-          // If they have a pending application, keep them on pending
           if (applicationStatus === "pending") {
             if (isMounted) setTarget("/driver/pending");
             return;

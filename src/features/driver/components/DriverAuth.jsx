@@ -53,12 +53,7 @@ export default function DriverAuth({ onBack }) {
 
       // 2. Bazadan haydovchini qidiramiz
       const { data, error } = await supabase
-        .from("drivers")
-        // Multiple schema variants exist (status text / approved boolean / etc.).
-        // Selecting missing columns causes PostgREST errors and redirect loops.
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
+        .from("driver_applications").select("status").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
 
       if (error) {
         console.error("Baza xatosi:", error);
@@ -67,15 +62,12 @@ export default function DriverAuth({ onBack }) {
 
       // 3. Statusni aniqlash
       if (!data) {
-        setStatus("none"); // Bazada yo'q -> Ro'yxatdan o'tishga
+        setStatus("none");
       } else {
-        const approved = typeof data.approved === "boolean" ? data.approved : null;
         const statusText = typeof data.status === "string" ? data.status : null;
-
-        // Prefer explicit boolean if available; else fall back to status text.
-        if (approved === true) setStatus("active");
-        else if (approved === false) setStatus("pending");
-        else setStatus(normalizeDriverStatus(statusText));
+        const normalized = normalizeDriverStatus(statusText);
+        if (normalized === "approved") setStatus("active");
+        else setStatus(normalized === "active" ? "active" : normalized);
       }
     } catch (err) {
       console.error("Tarmoq xatosi:", err);

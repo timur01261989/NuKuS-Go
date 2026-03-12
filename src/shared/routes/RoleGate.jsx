@@ -22,6 +22,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { Spin } from "antd";
 import { supabase } from "@/lib/supabase";
 import { useAppMode } from "@/providers/AppModeProvider";
+import { fetchDriverCore } from "@/shared/auth/driverCoreAccess";
 
 // Shared helper: role → home route (exported for RootRedirect)
 // Keep it deterministic: only uses already-fetched records.
@@ -189,13 +190,11 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
         ).catch(() => ({ data: null, error: null }));
 
         const drvPromise = a.driver
-          ? withTimeout(
-              supabase.from("drivers").select("*").eq("user_id", userId).maybeSingle()
-            ).catch(() => ({ data: null, error: null }))
-          : Promise.resolve({ data: null, error: null });
+          ? withTimeout(fetchDriverCore(userId)).catch(() => null)
+          : Promise.resolve(null);
 
         // Barcha so'rovlarni parallel yuborish
-        const [profileRes, appRes, drvRes] = await Promise.all([profilePromise, appPromise, drvPromise]);
+        const [profileRes, appRes, drvCore] = await Promise.all([profilePromise, appPromise, drvPromise]);
 
         // Profile
         let profileRole = null;
@@ -216,12 +215,12 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
           }
         }
 
-        // Driver row
+        // Driver core
         let driverRowExists = false;
         let approved = false;
-        if (!drvRes.error && drvRes.data) {
-          driverRowExists = true;
-          approved = deriveDriverApproved(drvRes.data);
+        if (drvCore) {
+          driverRowExists = !!drvCore.driverExists;
+          approved = !!drvCore.driverApproved;
         }
 
         // 3) Derive effective role

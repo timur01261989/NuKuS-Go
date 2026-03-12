@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo, memo, Suspense, lazy } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Button,
   Card,
@@ -7,8 +7,7 @@ import {
   Divider,
   Switch as AntSwitch,
   message,
-  Avatar,
-  Spin
+  Avatar
 } from "antd";
 import {
   MenuOutlined,
@@ -25,62 +24,144 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../../../lib/supabase";
 import { useLanguage } from "../../../shared/i18n/useLanguage";
 import { startTracking } from "../components/services/locationService";
+import DriverHome from "../components/DriverHome";
 import { DriverOnlineProvider } from "../core/DriverOnlineContext";
-
-/**
- * ARCHITECT NOTE: 
- * TDZ (Temporal Dead Zone) va Circular Dependency xatolarini 100% yo'q qilish uchun
- * 'DriverHome' komponentini 'lazy' orqali yuklaymiz. Bu build jarayonida ziddiyatlarni echadi.
- */
-const DriverHome = lazy(() => import("../components/DriverHome"));
 
 const { Title, Text } = Typography;
 
-/**
- * INITIALS HELPER - Optimallashtirilgan
- */
-function getInitials(name) {
+function initials(name) {
   const s = String(name || "").trim();
   if (!s) return "D";
   const parts = s.split(/\s+/).slice(0, 2);
   return parts.map((p) => p[0]?.toUpperCase()).join("") || "D";
 }
 
+export default function DriverDashboard() {
+  const navigate = useNavigate();
+
+  // Gate: driver must have an application before accessing dashboard
+  const [gateLoading, setGateLoading] = useState(false);
+  const [gateAllowed, setGateAllowed] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    // RoleGate already enforces driver access.
+    // Dashboard should not perform extra redirects (prevents redirect loops).
+    const run = async () => {
+      try {
+        const { data: authData, error: authErr } = await supabase.auth.getUser();
+        if (authErr) throw authErr;
+
+        const userId = authData?.user?.id;
+        if (!userId) {
+          // NOTE: RoleGate handles auth redirects. Avoid redirect loops here.
+          // navigate("/login", { replace: true });
+          return;
+        }
+
+        if (isMounted) setGateAllowed(true);
+      } catch (e) {
+        console.error("Driver dashboard gate error:", e);
+        // NOTE: RoleGate handles auth redirects. Avoid redirect loops here.
+        // navigate("/login", { replace: true });
+      } finally {
+        if (isMounted) setGateLoading(false);
+      }
+    };
+
+    run();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [navigate]);
+
+  /**
+   * Driver bosh sahifada xizmatlar (Shahar ichida / Viloyatlar aro / Tumanlar aro / Eltish / Yuk tashish)
+   * ko‘rinishi kerak. Hozirgi oqimda Drawer-menu asosidagi dashboard o‘rniga
+   * DriverHome (xizmatlar menyusi) ko‘rsatiladi.
+   *
+   * Eski dashboard kodi pastda qoldirilgan (o‘chirilmadi) — keyin qayta yoqish mumkin.
+   */
+  const onLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      // Logoutdan keyin client home'ga yuborish "rol aralashuvi" va redirect loop keltirib chiqarishi mumkin.
+      // Eng toza oqim: login sahifasiga qaytish.
+      // NOTE: RoleGate handles auth redirects. Avoid redirect loops here.
+      // navigate("/login", { replace: true });
+    }
+  };
+
+  if (gateLoading) {
+    return (
+      <div style={{ padding: 24, textAlign: "center" }}>
+        Yuklanmoqda...
+      </div>
+    );
+  }
+
+  if (!gateAllowed) {
+    // Redirect is in progress
+    return null;
+  }
+
+  return (
+    <DriverOnlineProvider>
+      <DriverHome onLogout={onLogout} />
+    </DriverOnlineProvider>
+  );
+}
+
 /**
- * LEGACY DRIVER DASHBOARD
- * Rasmda ko'rsatilgan 't' xatoligi ushbu qismda tuzatildi.
+ * LegacyDriverDashboard
+ * Old dashboard implementation preserved for reference.
+ * Not used by default to avoid hook/TDZ issues and runtime crashes.
  */
-const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
+function LegacyDriverDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  
-  // Xatolikni oldini olish: useLanguage() null qaytarishi ehtimoli uchun fallback
-  const langContext = useLanguage();
-  const t = useMemo(() => langContext?.t || ((key) => key), [langContext]);
+  const { t } = useLanguage();
 
-  // Build optimizatsiyasi uchun location reference
+  // keep location referenced so linter/build optimizers don't rewrite unexpectedly
   void location;
 
+  // =========================
+  // STATE
+  // =========================
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profile, setProfile] = useState({ fullName: "", avatarUrl: "", phone: "" });
   const [loading, setLoading] = useState(false);
+
   const [isOnline, setIsOnline] = useState(() => {
     const v = localStorage.getItem("driverOnline");
     return v === "1";
   });
 
-  // Profil ma'lumotlarini yuklash (Memory leak protection bilan)
+  // =========================
+  // 1. MA'LUMOTLARNI YUKLASH
+  // =========================
   useEffect(() => {
     let mounted = true;
 
     const fetchProfile = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) {
+          // NOTE: RoleGate handles auth redirects. Avoid redirect loops here.
+          // navigate("/login", { replace: true });
+          return;
+        }
 
         const { data: driverData, error } = await supabase
           .from("drivers")
-          .select("first_name, last_name, phone, is_online, avatar_url")
+          // Multiple schema variants exist (status text / approved boolean / etc.).
+          // Selecting missing columns causes PostgREST errors.
+          .select("*")
           .eq("user_id", user.id)
           .maybeSingle();
 
@@ -93,7 +174,7 @@ const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
           setProfile({
             fullName: `${driverData.first_name || ""} ${driverData.last_name || ""}`.trim(),
             phone: driverData.phone,
-            avatarUrl: driverData.avatar_url || "",
+            avatarUrl: "",
           });
 
           const onlineStatus = driverData.is_online === true;
@@ -110,15 +191,25 @@ const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
     };
 
     fetchProfile();
-    return () => { mounted = false; };
-  }, []);
 
-  const toggleOnline = useCallback(async (checked) => {
+    return () => {
+      mounted = false;
+    };
+  }, [navigate]);
+
+  // =========================
+  // 2. ONLINE / OFFLINE TUGMASI (TUZATILDI)
+  // =========================
+  const toggleOnline = async (checked) => {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error("Foydalanuvchi topilmadi");
 
+      // DIQQAT: Faqat 'is_online' va 'last_seen_at' o'zgaradi.
+      // 'status' ustuniga tegmaymiz (u 'active' bo'lib qolishi shart).
       const { error } = await supabase
         .from("drivers")
         .update({
@@ -133,37 +224,37 @@ const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
       localStorage.setItem("driverOnline", checked ? "1" : "0");
 
       if (checked) {
-        message.success(t("Siz Online bo'ldingiz."));
+        message.success("Siz Online bo'ldingiz.");
         startTracking();
       } else {
-        message.warning(t("Siz Offline bo'ldingiz."));
+        message.warning("Siz Offline bo'ldingiz.");
       }
     } catch (err) {
       console.error("Xatolik:", err);
-      message.error(t("Statusni o'zgartirishda xatolik!"));
-      setIsOnline(!checked);
+      message.error("Statusni o'zgartirishda xatolik!");
+      setIsOnline(!checked); // Xato bo'lsa qaytarib qo'yamiz
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  };
 
-  const go = useCallback((path) => {
+  // =========================
+  // 3. SAHIFA OTISH
+  // =========================
+  const go = (path) => {
     setDrawerOpen(false);
     navigate(path);
-  }, [navigate]);
+  };
 
-  const handleLogout = useCallback(async () => {
-    try {
-      await supabase.auth.signOut();
-      localStorage.clear();
-      navigate("/login");
-    } catch (e) {
-      console.error(e);
-    }
-  }, [navigate]);
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    localStorage.clear();
+    // navigate("/login");
+  };
 
-  const initialsStr = useMemo(() => getInitials(profile.fullName), [profile.fullName]);
-
+  // =========================
+  // 4. RENDER
+  // =========================
   return (
     <div style={{ background: "#f5f5f5", minHeight: "100vh", paddingBottom: 80 }}>
       {/* HEADER */}
@@ -187,7 +278,7 @@ const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
             icon={<UserOutlined />}
             src={profile.avatarUrl}
           >
-            {initialsStr}
+            {initials(profile.fullName)}
           </Avatar>
           <div>
             <Text strong style={{ fontSize: 16, display: "block", lineHeight: 1.2 }}>
@@ -238,10 +329,10 @@ const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
               </div>
               <div>
                 <Text strong style={{ fontSize: 16, display: "block" }}>
-                  {isOnline ? t("online") || "Siz Onlaynsiz" : t("offline") || "Siz Offlaynsiz"}
+                  {isOnline ? t?.online || "Siz Onlaynsiz" : t?.offline || "Siz Offlaynsiz"}
                 </Text>
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  {isOnline ? t("Buyurtmalar qabul qilinmoqda") : t("Hozir dam olish rejimi")}
+                  {isOnline ? "Buyurtmalar qabul qilinmoqda" : "Hozir dam olish rejimi"}
                 </Text>
               </div>
             </div>
@@ -275,7 +366,7 @@ const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
           }}
           onClick={() => go("/driver/orders")}
         >
-          {t("orderHistoryDriver") || "Buyurtmalar tarixi"}
+          {t?.orderHistoryDriver || "Buyurtmalar tarixi"}
         </Button>
 
         <Button
@@ -293,7 +384,7 @@ const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
           }}
           onClick={() => go("/driver/settings")}
         >
-          {t("settings") || "Sozlamalar"}
+          {t?.settings || "Sozlamalar"}
         </Button>
 
         <Button
@@ -311,7 +402,7 @@ const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
           }}
           onClick={() => go("/support")}
         >
-          {t("support") || "Qo‘llab-quvvatlash"}
+          {t?.support || "Qo‘llab-quvvatlash"}
         </Button>
 
         <Button
@@ -330,13 +421,13 @@ const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
           }}
           onClick={handleLogout}
         >
-          {t("logout") || "Chiqish"}
+          {t?.logout || "Chiqish"}
         </Button>
       </div>
 
       {/* DRAWER */}
       <Drawer
-        title={t("Menu") || "Menu"}
+        title="Menu"
         placement="left"
         onClose={() => setDrawerOpen(false)}
         open={drawerOpen}
@@ -351,83 +442,15 @@ const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
         </div>
         <Divider />
         <Button type="text" block style={{ textAlign: "left", height: 40 }} icon={<CarOutlined />} onClick={() => go("/driver/home")}>
-          {t("Asosiy")}
+          Asosiy
         </Button>
         <Button type="text" block style={{ textAlign: "left", height: 40 }} icon={<HistoryOutlined />} onClick={() => go("/driver/orders")}>
-          {t("Tarix")}
+          Tarix
         </Button>
         <Button type="text" block style={{ textAlign: "left", height: 40 }} icon={<SettingOutlined />} onClick={() => go("/driver/settings")}>
-          {t("Sozlamalar")}
+          Sozlamalar
         </Button>
       </Drawer>
     </div>
   );
-});
-
-/**
- * MAIN DRIVER DASHBOARD ENTRY
- * TDZ xatolariga qarshi 'function' deklaratsiyasi ishlatildi.
- */
-function DriverDashboard() {
-  const navigate = useNavigate();
-
-  const [gateLoading, setGateLoading] = useState(true);
-  const [gateAllowed, setGateAllowed] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-    const runGate = async () => {
-      try {
-        const { data: { user }, error } = await supabase.auth.getUser();
-        if (error || !user) {
-          navigate("/login", { replace: true });
-          return;
-        }
-        if (isMounted) setGateAllowed(true);
-      } catch (e) {
-        console.error("Gate Error:", e);
-      } finally {
-        if (isMounted) setGateLoading(false);
-      }
-    };
-    runGate();
-    return () => { isMounted = false; };
-  }, [navigate]);
-
-  const onLogout = useCallback(async () => {
-    try {
-      await supabase.auth.signOut();
-      navigate("/login", { replace: true });
-    } catch (e) {
-      console.error("Logout error:", e);
-    }
-  }, [navigate]);
-
-  if (gateLoading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f0f2f5' }}>
-        <Spin size="large" tip="UniGo yuklanmoqda..." />
-      </div>
-    );
-  }
-
-  if (!gateAllowed) return null;
-
-  return (
-    <DriverOnlineProvider>
-      <Suspense fallback={
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-          <Spin size="large" />
-        </div>
-      }>
-        <DriverHome onLogout={onLogout} />
-      </Suspense>
-    </DriverOnlineProvider>
-  );
 }
-
-// React.memo bilan o'rash (Production Build TDZ xatosi uchun zarur)
-const MemoizedDriverDashboard = memo(DriverDashboard);
-
-export { LegacyDriverDashboard };
-export default MemoizedDriverDashboard;

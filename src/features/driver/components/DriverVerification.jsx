@@ -54,13 +54,17 @@ export default function DriverVerification({ userId, onFinish }) {
       const publicUrl = urlData?.publicUrl;
       if (!publicUrl) throw new Error("Public URL olinmadi");
 
-      // 4) update drivers table (IMPORTANT: user_id key)
-      const updateData = { [`${type}_url`]: publicUrl };
-
       const { error: updateError } = await supabase
-        .from("drivers")
-        .update(updateData)
-        .eq("user_id", userId);
+        .from("driver_documents")
+        .insert({
+          user_id: userId,
+          doc_type: type,
+          file_url: publicUrl,
+          file_path: filePath,
+          mime_type: optimizedFile?.type || "image/jpeg",
+          file_size: optimizedFile?.size || null,
+          status: "pending",
+        });
 
       if (updateError) throw updateError;
 

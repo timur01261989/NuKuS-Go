@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { fetchDriverCore } from "@/shared/auth/driverCoreAccess";
 
 function normalizeProfile(row) {
   if (!row) return null;
@@ -112,35 +113,25 @@ export function useSessionProfile(options = {}) {
           .eq("id", uid)
           .maybeSingle();
 
-        const driverPromise = includeDriver
-          ? supabase.from("drivers").select("*").eq("user_id", uid).maybeSingle()
-          : Promise.resolve({ data: null, error: null });
+        const corePromise = includeDriver || includeApplication
+          ? fetchDriverCore(uid)
+          : Promise.resolve(null);
 
-        const appPromise = includeApplication
-          ? supabase
-              .from("driver_applications")
-              .select("*")
-              .eq("user_id", uid)
-              .order("submitted_at", { ascending: false })
-              .limit(1)
-              .maybeSingle()
-          : Promise.resolve({ data: null, error: null });
-
-        const [profileRes, driverRes, appRes] = await Promise.all([
-          profilePromise,
-          driverPromise,
-          appPromise,
-        ]);
+        const [profileRes, core] = await Promise.all([profilePromise, corePromise]);
 
         if (profileRes.error) throw profileRes.error;
-        if (driverRes.error) throw driverRes.error;
-        if (appRes.error) throw appRes.error;
 
         if (mounted.current) {
           setSession(nextSession ?? null);
-          setProfile(normalizeProfile(profileRes.data || null));
-          setDriverRow(normalizeDriver(driverRes.data || null));
-          setApplication(normalizeApplication(appRes.data || null));
+          setProfile(normalizeProfile(profileRes.data || core?.profile || null));
+          setDriverRow(core ? {
+            user_id: uid,
+            approved: !!core.driverApproved,
+            is_verified: !!core.driverApproved,
+            allowed_services: core.allowedServices || [],
+            transport_type: core.activeVehicle?.vehicle_type || core.application?.requested_vehicle_type || null,
+          } : null);
+          setApplication(normalizeApplication(core?.application || null));
           setError(null);
           setLoading(false);
         }
@@ -211,7 +202,7 @@ export function useSessionProfile(options = {}) {
   const driverExists = !!driverRow;
   const driverApproved = !!driverRow?.is_verified;
   const applicationStatus = application?.status ?? null;
-  const transportType = driverRow?.transport_type || application?.transport_type || null;
+  const transportType = driverRow?.transport_type || application?.requested_vehicle_type || application?.transport_type || null;
   const allowedServices = driverRow?.allowed_services ?? [];
 
   const refetch = useCallback(() => fetchAll(session, "refetch"), [fetchAll, session]);

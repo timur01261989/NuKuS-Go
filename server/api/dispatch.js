@@ -5,6 +5,7 @@ import { runDispatch } from '../_shared/orders/orderDispatchService.js';
 import { enqueueDispatch } from '../_shared/queue/orderDispatchQueue.js';
 import { enrichTripsWithCorridorScore } from '../../backend/src/trips/corridorMatcher.js';
 import { rankTrips } from '../../backend/src/trips/tripRankingService.js';
+import { getApprovedDriverCore } from '../_shared/drivers/driverCoreAccess.js';
 
 async function driverPing(req, res, body) {
   const sb = getSupabaseAdmin();
@@ -14,8 +15,11 @@ async function driverPing(req, res, body) {
   if (!driver_id) return badRequest(res, 'Auth driver kerak');
   if (authedUserId && explicitDriverId && authedUserId !== explicitDriverId) return json(res, 403, { ok: false, error: 'driver_id token user_id bilan mos emas' });
 
-  const { data: driver } = await sb.from('drivers').select('user_id,is_verified').eq('user_id', driver_id).maybeSingle();
-  if (!driver?.is_verified) return json(res, 403, { ok: false, error: 'Tasdiqlangan driver kerak' });
+  try {
+    await getApprovedDriverCore(sb, driver_id);
+  } catch {
+    return json(res, 403, { ok: false, error: 'Tasdiqlangan driver kerak' });
+  }
 
   const row = {
     driver_id,
@@ -36,7 +40,7 @@ async function driverPing(req, res, body) {
 
 
 async function tripSearch(sb, body) {
-  let query = sb.from('inter_prov_trips').select('*').in('status', ['active', 'draft']).order('depart_at', { ascending: true }).limit(50);
+  let query = sb.from('interprov_trips').select('*').in('status', ['active', 'draft']).order('depart_at', { ascending: true }).limit(50);
   if (body.from_region) query = query.eq('from_region', body.from_region);
   if (body.to_region) query = query.eq('to_region', body.to_region);
   const { data, error } = await query;

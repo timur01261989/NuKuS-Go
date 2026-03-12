@@ -22,7 +22,7 @@ async function listOffers(sb, body) {
   const departDate = String(body.date || body.depart_date || '').trim();
 
   let query = sb
-    .from('inter_prov_trips')
+    .from('interprov_trips')
     .select('*')
     .in('status', ['active', 'draft'])
     .order('depart_at', { ascending: true })
@@ -64,7 +64,7 @@ async function requestBooking(req, sb, body) {
   const offerId = String(body.offer_id || body.trip_id || '').trim();
   if (!offerId) return { ok: false, error: 'offer_id kerak' };
 
-  const { data: trip, error } = await sb.from('inter_prov_trips').select('*').eq('id', offerId).maybeSingle();
+  const { data: trip, error } = await sb.from('interprov_trips').select('*').eq('id', offerId).maybeSingle();
   if (error) throw error;
   if (!trip) return { ok: false, error: 'Trip topilmadi' };
 
@@ -77,7 +77,7 @@ async function requestBooking(req, sb, body) {
 
   const payload = {
     trip_id: offerId,
-    user_id: userId,
+    client_user_id: userId,
     seats,
     status: 'held',
     hold_id: holdResult.hold.holdId,
@@ -97,7 +97,7 @@ async function requestBooking(req, sb, body) {
 async function myBookings(req, sb) {
   const userId = await getAuthedUserId(req, sb);
   if (!userId) return { ok: true, bookings: [] };
-  const { data, error } = await sb.from('inter_prov_seat_requests').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+  const { data, error } = await sb.from('inter_prov_seat_requests').select('*').eq('client_user_id', userId).order('created_at', { ascending: false });
   if (error) throw error;
   return { ok: true, bookings: data || [] };
 }
@@ -112,7 +112,7 @@ async function cancelBooking(req, sb, body) {
     .from('inter_prov_seat_requests')
     .select('*')
     .eq('id', bookingId)
-    .eq('user_id', userId)
+    .eq('client_user_id', userId)
     .maybeSingle();
 
   if (error) throw error;

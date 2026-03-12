@@ -62,15 +62,6 @@ async function fallbackPresenceSync(driverId, body) {
     console.warn('driver_presence fallback failed', error?.message || error);
   }
 
-  try {
-    await supabase.from('drivers').update({
-      is_online: !!body?.is_online,
-      last_seen_at: now,
-      updated_at: now,
-    }).eq('user_id', driverId);
-  } catch (error) {
-    console.warn('drivers fallback failed', error?.message || error);
-  }
 }
 
 async function postPresenceState(body) {
