@@ -41,6 +41,9 @@ import {
   TRANSPORT_OPTIONS,
   toLegacyTransportType,
 } from "@/features/driver/DriverRegistration/uploadConfig";
+import CircleGuideHint from "@/shared/components/guide/CircleGuideHint";
+import { vehicleTypeGuide } from "@/guides/driverRegistration/vehicleTypeGuide";
+import { serviceTypesGuide } from "@/guides/driverRegistration/serviceTypesGuide";
 
 const { Title, Text } = Typography;
 
@@ -255,7 +258,12 @@ const VehicleRequestModal = memo(function VehicleRequestModal({
           <Col xs={24} md={12}>
             <Form.Item
               name="vehicleType"
-              label="Mashina turi"
+              label={
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                  <span>Mashina turi</span>
+                  <CircleGuideHint guide={vehicleTypeGuide} />
+                </span>
+              }
               rules={[{ required: true, message: "Mashina turini tanlang" }]}
             >
               <Select options={TRANSPORT_OPTIONS} />
@@ -315,6 +323,10 @@ const VehicleRequestModal = memo(function VehicleRequestModal({
 const ServiceTypesEditor = memo(function ServiceTypesEditor({ value, onChange }) {
   return (
     <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <Text style={{ color: "#f8fafc", fontWeight: 700 }}>Xizmat turlari</Text>
+        <CircleGuideHint guide={serviceTypesGuide} />
+      </div>
       {SERVICE_AREA_OPTIONS.map((area) => (
         <Card key={area.key} style={{ ...CARD_STYLE, marginBottom: 12 }} bodyStyle={{ padding: 16 }}>
           <Text style={{ color: "#f8fafc", fontWeight: 700, display: "block", marginBottom: 12 }}>

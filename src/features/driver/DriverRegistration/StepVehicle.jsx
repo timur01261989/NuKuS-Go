@@ -17,6 +17,9 @@ import {
   TRANSPORT_OPTIONS,
 } from "./uploadConfig";
 import { normalizePlateNumber } from "./helpers";
+import CircleGuideHint from "@/shared/components/guide/CircleGuideHint";
+import { vehicleTypeGuide } from "@/guides/driverRegistration/vehicleTypeGuide";
+import { serviceTypesGuide } from "@/guides/driverRegistration/serviceTypesGuide";
 
 const { Text, Title } = Typography;
 
@@ -57,9 +60,12 @@ function ServiceTypeGrid() {
         padding: 16,
       }}
     >
-      <Text style={{ color: "#f8fafc", fontWeight: 700, display: "block", marginBottom: 8 }}>
-        Xizmat turlari
-      </Text>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <Text style={{ color: "#f8fafc", fontWeight: 700, display: "block", marginBottom: 0 }}>
+          Xizmat turlari
+        </Text>
+        <CircleGuideHint guide={serviceTypesGuide} />
+      </div>
       <Text style={{ color: "#94a3b8", display: "block", marginBottom: 14 }}>
         Haydovchi qaysi xizmatlarda ishlashini shu yerda belgilang. Keyin buni Sozlamalar sahifasida o'zgartira oladi.
       </Text>
@@ -158,7 +164,12 @@ function StepVehicleComponent({ currentYear }) {
         <Col xs={24} md={12}>
           <Form.Item
             name="vehicleType"
-            label={<span style={labelStyle}>Mashina turi</span>}
+            label={
+              <span style={{ ...labelStyle, display: "inline-flex", alignItems: "center", gap: 8 }}>
+                <span>Mashina turi</span>
+                <CircleGuideHint guide={vehicleTypeGuide} />
+              </span>
+            }
             rules={[{ required: true, message: "Mashina turini tanlang" }]}
           >
             <Select
