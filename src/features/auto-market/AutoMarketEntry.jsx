@@ -7,6 +7,7 @@
 import React from "react";
 import { useLanguage } from "@/shared/i18n/useLanguage";
 import { Routes, Route, Navigate } from "react-router-dom";
+import { useAutoMarketTab } from "./hooks/useAutoMarketTab";
 import AppProviders from "./context/AppProviders";
 
 // Asl sahifalar (o'zgarishsiz)
@@ -30,6 +31,7 @@ import TopUpPage          from "./pages/TopUpPage";
 
 export default function AutoMarketEntry() {
   const { language } = useLanguage();
+  useAutoMarketTab();
   return (
     <AppProviders key={language}>
       <Routes>
@@ -52,7 +54,7 @@ export default function AutoMarketEntry() {
         <Route path="/service-book" element={<ServiceBookPage />} />
         <Route path="/topup"        element={<TopUpPage />} />
 
-        <Route path="*" element={<Navigate to="/auto-market" replace />} />
+        <Route path="*" element={<Navigate to="." replace />} />
       </Routes>
     </AppProviders>
   );

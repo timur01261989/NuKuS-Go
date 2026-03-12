@@ -7,11 +7,9 @@ export async function getMarketConfig() {
 export async function listMarketCars() {
   const base = API_BASE || '';
   if (!base) return [];
-
   try {
     const r = await fetch(`${base}/api/market-listings`, { cache: 'no-cache' });
     if (!r.ok) return [];
-
     const j = await r.json().catch(() => ({}));
     return Array.isArray(j.items) ? j.items : [];
   } catch {
@@ -21,6 +19,6 @@ export async function listMarketCars() {
 
 export function formatPriceUZS(v) {
   const n = Number(v);
-  if (!Number.isFinite(n)) return "0 so'm";
+  if (!Number.isFinite(n)) return '0 so'm';
   return `${Math.round(n).toLocaleString('ru-RU')} so'm`;
 }
