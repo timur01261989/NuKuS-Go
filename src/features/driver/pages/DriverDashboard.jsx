@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, memo } from "react";
 import {
   Button,
   Card,
@@ -29,7 +29,7 @@ import { DriverOnlineProvider } from "../core/DriverOnlineContext";
 
 const { Title, Text } = Typography;
 
-// Performance: Yordamchi funksiya tashqariga olingan, har renderda qayta yozilmaydi.
+// Yordamchi funksiya global scope'da qoldirildi, render cycle'ga kirmasligi uchun
 const getInitials = (name) => {
   const s = String(name || "").trim();
   if (!s) return "D";
@@ -37,12 +37,14 @@ const getInitials = (name) => {
   return parts.map((p) => p[0]?.toUpperCase()).join("") || "D";
 };
 
-export default function DriverDashboard() {
+// ==========================================
+// ASOSIY COMPONENT - React.memo orqali himoyalangan
+// ==========================================
+const DriverDashboard = memo(function DriverDashboard() {
   const navigate = useNavigate();
 
-  // Asl holat qoldirildi, render bloki kechikib xato bermasligi uchun
-  const [gateLoading, setGateLoading] = useState(false);
-  const [gateAllowed, setGateAllowed] = useState(true);
+  const [gateLoading, setGateLoading] = useState(true);
+  const [gateAllowed, setGateAllowed] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -72,7 +74,6 @@ export default function DriverDashboard() {
     };
   }, [navigate]);
 
-  // Performance: useCallback orqali keraksiz renderlarning oldi olindi
   const onLogout = useCallback(async () => {
     try {
       await supabase.auth.signOut();
@@ -98,24 +99,20 @@ export default function DriverDashboard() {
       <DriverHome onLogout={onLogout} />
     </DriverOnlineProvider>
   );
-}
+});
 
-/**
- * LegacyDriverDashboard
- * Old dashboard implementation preserved for reference.
- * Not used by default to avoid hook/TDZ issues and runtime crashes.
- */
-export function LegacyDriverDashboard() {
+DriverDashboard.displayName = "DriverDashboard";
+
+// ==========================================
+// LEGACY COMPONENT - React.memo orqali himoyalangan
+// ==========================================
+const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useLanguage();
 
-  // keep location referenced
   void location;
 
-  // =========================
-  // STATE
-  // =========================
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profile, setProfile] = useState({ fullName: "", avatarUrl: "", phone: "" });
   const [loading, setLoading] = useState(false);
@@ -125,9 +122,6 @@ export function LegacyDriverDashboard() {
     return v === "1";
   });
 
-  // =========================
-  // 1. MA'LUMOTLARNI YUKLASH
-  // =========================
   useEffect(() => {
     let mounted = true;
 
@@ -136,11 +130,9 @@ export function LegacyDriverDashboard() {
         const {
           data: { user },
         } = await supabase.auth.getUser();
-        if (!user) {
-          return;
-        }
+        if (!user) return;
 
-        // Database optimization: Faqat kerakli ustunlar yuklanadi
+        // DB Optimization: qat'iy ravishda faqat kerakli ustunlar yuklanmoqda
         const { data: driverData, error } = await supabase
           .from("drivers")
           .select("first_name, last_name, phone, is_online")
@@ -179,9 +171,6 @@ export function LegacyDriverDashboard() {
     };
   }, [navigate]);
 
-  // =========================
-  // 2. ONLINE / OFFLINE TUGMASI 
-  // =========================
   const toggleOnline = useCallback(async (checked) => {
     setLoading(true);
     try {
@@ -218,9 +207,6 @@ export function LegacyDriverDashboard() {
     }
   }, [t]);
 
-  // =========================
-  // 3. SAHIFA OTISH (Memoized)
-  // =========================
   const go = useCallback((path) => {
     setDrawerOpen(false);
     navigate(path);
@@ -235,12 +221,8 @@ export function LegacyDriverDashboard() {
     }
   }, []);
 
-  // Performance: Avatar harf logikasi keshlanadi
   const userInitials = useMemo(() => getInitials(profile.fullName), [profile.fullName]);
 
-  // =========================
-  // 4. RENDER
-  // =========================
   return (
     <div style={{ background: "#f5f5f5", minHeight: "100vh", paddingBottom: 80 }}>
       {/* HEADER */}
@@ -439,4 +421,12 @@ export function LegacyDriverDashboard() {
       </Drawer>
     </div>
   );
-}
+});
+
+LegacyDriverDashboard.displayName = "LegacyDriverDashboard";
+
+// ==========================================
+// EXPORTS - Vite hoisting muammosini oldini olish uchun fayl oxirida joylashtirildi
+// ==========================================
+export { LegacyDriverDashboard };
+export default DriverDashboard;
