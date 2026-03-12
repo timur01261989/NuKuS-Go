@@ -21,9 +21,41 @@ import { useRadar } from "../radar/useRadar";
 import RadarMiniOverlay from "./RadarMiniOverlay";
 import { useLanguage } from "@/shared/i18n/useLanguage";
 
-/**
- * Xizmat xatolarini ushlash uchun Error Boundary komponenti
- */
+// =========================
+// HELPER FUNCTIONS (Outside Component for Performance)
+// =========================
+function safeShortId(id) {
+  const s = String(id || "");
+  if (!s) return "----";
+  return s.length > 6 ? s.slice(-6) : s;
+}
+
+function getServiceLabel(key) {
+  const labels = {
+    taxi: "Shahar taksi",
+    interProv: "Viloyatlar aro",
+    interDist: "Tumanlar aro",
+    delivery: "Eltish",
+    freight: "Yuk tashish",
+  };
+  return labels[key] || key || "";
+}
+
+function getPreferredServiceKey(serviceTypes) {
+  const checks = [
+    ["taxi", serviceTypes?.city?.passenger || serviceTypes?.city?.delivery || serviceTypes?.city?.freight],
+    ["interProv", serviceTypes?.intercity?.passenger || serviceTypes?.intercity?.delivery || serviceTypes?.intercity?.freight],
+    ["interDist", serviceTypes?.interdistrict?.passenger || serviceTypes?.interdistrict?.delivery || serviceTypes?.interdistrict?.freight],
+    ["delivery", serviceTypes?.city?.delivery || serviceTypes?.intercity?.delivery || serviceTypes?.interdistrict?.delivery],
+    ["freight", serviceTypes?.city?.freight || serviceTypes?.intercity?.freight || serviceTypes?.interdistrict?.freight],
+  ];
+  const found = checks.find((item) => item[1]);
+  return found?.[0] || null;
+}
+
+// =========================
+// ERROR BOUNDARY
+// =========================
 class DriverServiceErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -66,9 +98,9 @@ class DriverServiceErrorBoundary extends React.Component {
   }
 }
 
-/**
- * Haydovchi asosiy dashboard sahifasi
- */
+// =========================
+// MAIN COMPONENT
+// =========================
 const DriverHome = React.memo(({ onLogout }) => {
   const navigate = useNavigate();
   const { t, tr } = useLanguage();
@@ -93,33 +125,13 @@ const DriverHome = React.memo(({ onLogout }) => {
   const [loading, setLoading] = useState(false);
 
   const [driverHeader, setDriverHeader] = useState({
-    name: "",
+    name: t.driverTitle,
     publicId: "----",
     avatarUrl: "",
   });
 
   // =========================
-  // UTILS
-  // =========================
-  const safeShortId = useCallback((id) => {
-    const s = String(id || "");
-    if (!s) return "----";
-    return s.length > 6 ? s.slice(-6) : s;
-  }, []);
-
-  const getServiceLabel = useCallback((key) => {
-    const labels = {
-      taxi: tr("taxi", "Shahar taksi"),
-      interProv: tr("interProvincial", "Viloyatlar aro"),
-      interDist: tr("interDistrict", "Tumanlar aro"),
-      delivery: tr("delivery", "Eltish"),
-      freight: tr("freight", "Yuk tashish"),
-    };
-    return labels[key] || key || "";
-  }, [tr]);
-
-  // =========================
-  // HANDLERS (Memoized)
+  // HANDLERS (useCallback for high performance)
   // =========================
   const backToMenu = useCallback(() => {
     setSelectedService(null);
@@ -140,6 +152,7 @@ const DriverHome = React.memo(({ onLogout }) => {
   }, [canUseService, tr]);
 
   const toggleOnline = useCallback(async (checked) => {
+    if (loading) return;
     setLoading(true);
     try {
       if (checked) {
@@ -148,34 +161,32 @@ const DriverHome = React.memo(({ onLogout }) => {
         await setOffline();
       }
     } catch (err) {
-      message.error(tr("statusUpdateError", "Holatni yangilashda xato"));
+      console.error("Status toggle error:", err);
+      message.error(tr("statusError", "Holatni o'zgartirishda xato yuz berdi"));
     } finally {
       setLoading(false);
     }
-  }, [setOnline, setOffline, tr]);
+  }, [loading, setOnline, setOffline, tr]);
 
   const toggleSidebar = useCallback((val) => setSidebarOpen(val), []);
   const toggleProfile = useCallback((val) => setProfileOpen(val), []);
 
   // =========================
-  // EFFECTS
+  // EFFECTS (Positioned after handler definitions)
   // =========================
   useEffect(() => {
     refreshCapabilities?.();
   }, [refreshCapabilities]);
 
-  // Back handling (Android/Browser)
   useEffect(() => {
-    const onPopState = (e) => {
+    const onPopState = () => {
       if (selectedService) {
-        setSelectedService(null);
-        localStorage.removeItem("driver_active_service");
+        backToMenu();
       }
     };
-
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, [selectedService]);
+  }, [selectedService, backToMenu]);
 
   useEffect(() => {
     if (!selectedService) return;
@@ -186,20 +197,18 @@ const DriverHome = React.memo(({ onLogout }) => {
         window.location.href
       );
     } catch (e) {
-      console.error("History push error", e);
+      // silent fail
     }
   }, [selectedService]);
 
-  // Fetch Driver Header Data
   useEffect(() => {
     let alive = true;
-
-    const loadDriverData = async () => {
+    (async () => {
       try {
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (authError || !user) return;
+        const { data: { user }, error: uErr } = await supabase.auth.getUser();
+        if (uErr || !user || !alive) return;
 
-        const { data: d, error: dError } = await supabase
+        const { data: d } = await supabase
           .from("drivers")
           .select("id, first_name, avatar_url")
           .eq("user_id", user.id)
@@ -207,30 +216,20 @@ const DriverHome = React.memo(({ onLogout }) => {
 
         if (!alive) return;
 
-        if (d) {
-          setDriverHeader({
-            name: d.first_name || tr("driverTitle", "Haydovchi"),
-            publicId: String(d.id),
-            avatarUrl: d.avatar_url || "",
-          });
-        } else {
-          setDriverHeader((prev) => ({
-            ...prev,
-            name: tr("driverTitle", "Haydovchi"),
-            publicId: safeShortId(user.id),
-          }));
-        }
+        setDriverHeader({
+          name: d?.first_name || tr("driverTitle", "Haydovchi"),
+          publicId: d?.id ? String(d.id) : safeShortId(user.id),
+          avatarUrl: d?.avatar_url || "",
+        });
       } catch (err) {
-        console.error("Driver header load error", err);
+        console.error("Header data fetch error:", err);
       }
-    };
-
-    loadDriverData();
+    })();
     return () => { alive = false; };
-  }, [tr, safeShortId]);
+  }, [tr]);
 
   // =========================
-  // PERFORMANCE MONITORING (Radar & Speed)
+  // ASSISTANT & RADAR
   // =========================
   const driveAssistantEnabled = useMemo(
     () => Boolean(isOnline && (activeService || selectedService)),
@@ -246,7 +245,7 @@ const DriverHome = React.memo(({ onLogout }) => {
   });
 
   // =========================
-  // DRAWER SWIPE LOGIC
+  // RIGHT DRAWER SWIPE LOGIC
   // =========================
   const drawerInnerRef = useRef(null);
   const rafRef = useRef(0);
@@ -300,11 +299,11 @@ const DriverHome = React.memo(({ onLogout }) => {
 
     if (shouldClose) {
       setDrawerTranslate(drawerWidthPxRef.current, true);
-      setTimeout(() => setProfileOpen(false), 220);
+      setTimeout(() => toggleProfile(false), 220);
     } else {
       setDrawerTranslate(0, true);
     }
-  }, [setDrawerTranslate]);
+  }, [setDrawerTranslate, toggleProfile]);
 
   useEffect(() => {
     if (!profileOpen && drawerInnerRef.current) {
@@ -324,18 +323,21 @@ const DriverHome = React.memo(({ onLogout }) => {
     delivery: canUseService?.("delivery"),
   }), [canUseService]);
 
-  const serviceComponent = useMemo(() => {
+  const serviceContent = useMemo(() => {
     if (!selectedService) return null;
-    const components = {
-      taxi: <DriverTaxi onBack={backToMenu} />,
-      interDist: <DriverInterDistrict onBack={backToMenu} />,
-      interProv: <DriverInterProvincial onBack={backToMenu} />,
-      freight: <DriverFreight onBack={backToMenu} />,
-      delivery: <DriverDelivery onBack={backToMenu} />,
+    const Services = {
+      taxi: DriverTaxi,
+      interDist: DriverInterDistrict,
+      interProv: DriverInterProvincial,
+      freight: DriverFreight,
+      delivery: DriverDelivery,
     };
+    const ActiveComp = Services[selectedService];
+    if (!ActiveComp) return null;
+
     return (
       <DriverServiceErrorBoundary resetKey={selectedService} onBack={backToMenu}>
-        {components[selectedService]}
+        <ActiveComp onBack={backToMenu} />
       </DriverServiceErrorBoundary>
     );
   }, [selectedService, backToMenu]);
@@ -364,12 +366,12 @@ const DriverHome = React.memo(({ onLogout }) => {
           aria-label="Profil"
         >
           <div className="text-right">
-            <p className="text-sm font-bold leading-tight">{driverHeader.name || tr("driverTitle", "Haydovchi")}</p>
+            <p className="text-sm font-bold leading-tight">{driverHeader.name}</p>
             <p className="text-xs text-slate-500">ID: {driverHeader.publicId}</p>
           </div>
           <div className="w-12 h-12 rounded-full neumorphic-pop p-1">
             {driverHeader.avatarUrl ? (
-              <img alt="Profile" className="w-full h-full rounded-full object-cover" src={driverHeader.avatarUrl} />
+              <img alt="Driver" className="w-full h-full rounded-full object-cover" src={driverHeader.avatarUrl} />
             ) : (
               <div className="w-full h-full rounded-full bg-white flex items-center justify-center text-primarySidebar">
                 <span className="material-symbols-outlined">person</span>
@@ -505,7 +507,7 @@ const DriverHome = React.memo(({ onLogout }) => {
 
   return (
     <div style={{ minHeight: "100vh" }}>
-      {serviceComponent || menuUi}
+      {serviceContent || menuUi}
       <RadarMiniOverlay online={driveAssistantEnabled} speedKmh={speedKmh} radar={nearestRadar} severity={radarSeverity} />
     </div>
   );
