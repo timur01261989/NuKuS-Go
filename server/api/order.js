@@ -422,13 +422,10 @@ async function handleCreateOrder(supabase, body, authedUserId = null) {
   const canonicalUserId = normalizeUuid(authedUserId ?? payloadUserId);
 
   if (authedUserId && payloadUserId && canonicalUserId !== payloadUserId) {
-    return {
-      status: 403,
-      payload: {
-        ok: false,
-        error: "token user_id payload user_id bilan mos emas",
-      },
-    };
+    console.warn("order create user_id mismatch; auth token user_id ishlatiladi", {
+      authedUserId,
+      payloadUserId,
+    });
   }
 
   if (!canonicalUserId) {

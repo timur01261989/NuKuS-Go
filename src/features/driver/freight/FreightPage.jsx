@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { useDriverOnline } from "../core/useDriverOnline";
 import { canActivateService } from "../core/serviceGuards";
 import UnifiedParcelFeed from "../delivery-integration/feed/UnifiedParcelFeed";
+import { IntegrationProvider } from "../delivery-integration/context/IntegrationContext";
 import {
   canUseOrderTypeInArea,
   clampLoadToVehicle,
@@ -680,18 +681,20 @@ const onlineUiDisabled = useMemo(() => loading || saving || togglingOnline, [loa
         <div className="text-xs opacity-70">Bu sahifa endi haydovchi sozlamalari va aktiv mashina sig‘imi bilan bog‘langan. Sig‘imdan katta yuklar feedga chiqmaydi.</div>
       </div>
 
-      <UnifiedParcelFeed
-        supabase={supabase}
-        driverId={vehicleId || activeVehicle?.id || null}
-        driverMode="CITY"
-        vehiclePlate={plateNumber || activeVehicle?.plateNumber || ""}
-        parcelFilter={{
-          serviceArea: "city",
-          orderType: "freight",
-          maxWeightKg: Number(vehicleLimits.maxWeightKg || 0),
-          maxVolumeM3: Number(vehicleLimits.maxVolumeM3 || 0),
-        }}
-      />
+      <IntegrationProvider initialState={{ enabled: isOnline, driverMode: "CITY", capacity: { maxWeightKg: Number(vehicleLimits.maxWeightKg || 0), maxVolumeM3: Number(vehicleLimits.maxVolumeM3 || 0) } }}>
+        <UnifiedParcelFeed
+          supabase={supabase}
+          driverId={vehicleId || activeVehicle?.id || null}
+          driverMode="CITY"
+          vehiclePlate={plateNumber || activeVehicle?.plateNumber || ""}
+          parcelFilter={{
+            serviceArea: "city",
+            orderType: "freight",
+            maxWeightKg: Number(vehicleLimits.maxWeightKg || 0),
+            maxVolumeM3: Number(vehicleLimits.maxVolumeM3 || 0),
+          }}
+        />
+      </IntegrationProvider>
 
       <LocationPickerModal
         open={pickerOpen}
