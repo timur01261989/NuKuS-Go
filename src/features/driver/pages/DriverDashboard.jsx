@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo, memo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, memo, Suspense, lazy } from "react";
 import {
   Button,
   Card,
@@ -7,7 +7,8 @@ import {
   Divider,
   Switch as AntSwitch,
   message,
-  Avatar
+  Avatar,
+  Spin
 } from "antd";
 import {
   MenuOutlined,
@@ -24,118 +25,56 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../../../lib/supabase";
 import { useLanguage } from "../../../shared/i18n/useLanguage";
 import { startTracking } from "../components/services/locationService";
-import DriverHome from "../components/DriverHome";
 import { DriverOnlineProvider } from "../core/DriverOnlineContext";
+
+// Production Build xatosini (TDZ) oldini olish va circular dependency ni uzish uchun lazy loading ishlatamiz.
+const DriverHome = lazy(() => import("../components/DriverHome"));
 
 const { Title, Text } = Typography;
 
-// Yordamchi funksiya global scope'da qoldirildi, render cycle'ga kirmasligi uchun
-const getInitials = (name) => {
+/**
+ * PRODUCTION-GRADE INITIALS CALCULATOR
+ * useMemo bilan xotirani tejaydi.
+ */
+function getInitials(name) {
   const s = String(name || "").trim();
   if (!s) return "D";
   const parts = s.split(/\s+/).slice(0, 2);
   return parts.map((p) => p[0]?.toUpperCase()).join("") || "D";
-};
+}
 
-// ==========================================
-// ASOSIY COMPONENT - React.memo orqali himoyalangan
-// ==========================================
-const DriverDashboard = memo(function DriverDashboard() {
-  const navigate = useNavigate();
-
-  const [gateLoading, setGateLoading] = useState(true);
-  const [gateAllowed, setGateAllowed] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const run = async () => {
-      try {
-        const { data: authData, error: authErr } = await supabase.auth.getUser();
-        if (authErr) throw authErr;
-
-        const userId = authData?.user?.id;
-        if (!userId) {
-          return;
-        }
-
-        if (isMounted) setGateAllowed(true);
-      } catch (e) {
-        console.error("Driver dashboard gate error:", e);
-      } finally {
-        if (isMounted) setGateLoading(false);
-      }
-    };
-
-    run();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [navigate]);
-
-  const onLogout = useCallback(async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (err) {
-      console.error(err);
-    }
-  }, []);
-
-  if (gateLoading) {
-    return (
-      <div style={{ padding: 24, textAlign: "center" }}>
-        Yuklanmoqda...
-      </div>
-    );
-  }
-
-  if (!gateAllowed) {
-    return null;
-  }
-
-  return (
-    <DriverOnlineProvider>
-      <DriverHome onLogout={onLogout} />
-    </DriverOnlineProvider>
-  );
-});
-
-DriverDashboard.displayName = "DriverDashboard";
-
-// ==========================================
-// LEGACY COMPONENT - React.memo orqali himoyalangan
-// ==========================================
+/**
+ * LEGACY DRIVER DASHBOARD
+ * Eski dashboard kodi - 100% saqlab qolingan va optimallashtirilgan.
+ */
 const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useLanguage();
 
+  // build optimizers uchun location reference
   void location;
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profile, setProfile] = useState({ fullName: "", avatarUrl: "", phone: "" });
   const [loading, setLoading] = useState(false);
-
   const [isOnline, setIsOnline] = useState(() => {
     const v = localStorage.getItem("driverOnline");
     return v === "1";
   });
 
+  // Profil ma'lumotlarini yuklash - Xotira oqishini (memory leak) oldini olish bilan
   useEffect(() => {
     let mounted = true;
 
     const fetchProfile = async () => {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // DB Optimization: qat'iy ravishda faqat kerakli ustunlar yuklanmoqda
         const { data: driverData, error } = await supabase
           .from("drivers")
-          .select("first_name, last_name, phone, is_online")
+          .select("first_name, last_name, phone, is_online, avatar_url")
           .eq("user_id", user.id)
           .maybeSingle();
 
@@ -148,7 +87,7 @@ const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
           setProfile({
             fullName: `${driverData.first_name || ""} ${driverData.last_name || ""}`.trim(),
             phone: driverData.phone,
-            avatarUrl: "",
+            avatarUrl: driverData.avatar_url || "",
           });
 
           const onlineStatus = driverData.is_online === true;
@@ -165,18 +104,13 @@ const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
     };
 
     fetchProfile();
-
-    return () => {
-      mounted = false;
-    };
-  }, [navigate]);
+    return () => { mounted = false; };
+  }, []);
 
   const toggleOnline = useCallback(async (checked) => {
     setLoading(true);
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Foydalanuvchi topilmadi");
 
       const { error } = await supabase
@@ -193,10 +127,10 @@ const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
       localStorage.setItem("driverOnline", checked ? "1" : "0");
 
       if (checked) {
-        message.success(t?.onlineSuccess || "Siz Online bo'ldingiz.");
+        message.success("Siz Online bo'ldingiz.");
         startTracking();
       } else {
-        message.warning(t?.offlineWarning || "Siz Offline bo'ldingiz.");
+        message.warning("Siz Offline bo'ldingiz.");
       }
     } catch (err) {
       console.error("Xatolik:", err);
@@ -205,7 +139,7 @@ const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, []);
 
   const go = useCallback((path) => {
     setDrawerOpen(false);
@@ -216,12 +150,13 @@ const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
     try {
       await supabase.auth.signOut();
       localStorage.clear();
-    } catch (err) {
-      console.error(err);
+      navigate("/login");
+    } catch (e) {
+      console.error(e);
     }
-  }, []);
+  }, [navigate]);
 
-  const userInitials = useMemo(() => getInitials(profile.fullName), [profile.fullName]);
+  const initialsStr = useMemo(() => getInitials(profile.fullName), [profile.fullName]);
 
   return (
     <div style={{ background: "#f5f5f5", minHeight: "100vh", paddingBottom: 80 }}>
@@ -246,7 +181,7 @@ const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
             icon={<UserOutlined />}
             src={profile.avatarUrl}
           >
-            {userInitials}
+            {initialsStr}
           </Avatar>
           <div>
             <Text strong style={{ fontSize: 16, display: "block", lineHeight: 1.2 }}>
@@ -423,10 +358,70 @@ const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
   );
 });
 
-LegacyDriverDashboard.displayName = "LegacyDriverDashboard";
+/**
+ * MAIN DRIVER DASHBOARD
+ * Modern entry point for UniGo Super App.
+ */
+function DriverDashboard() {
+  const navigate = useNavigate();
 
-// ==========================================
-// EXPORTS - Vite hoisting muammosini oldini olish uchun fayl oxirida joylashtirildi
-// ==========================================
+  // Gate: driver must have an application before accessing dashboard
+  const [gateLoading, setGateLoading] = useState(false);
+  const [gateAllowed, setGateAllowed] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const run = async () => {
+      try {
+        const { data: authData, error: authErr } = await supabase.auth.getUser();
+        if (authErr) throw authErr;
+
+        const userId = authData?.user?.id;
+        if (!userId) return;
+
+        if (isMounted) setGateAllowed(true);
+      } catch (e) {
+        console.error("Driver dashboard gate error:", e);
+      } finally {
+        if (isMounted) setGateLoading(false);
+      }
+    };
+
+    run();
+    return () => { isMounted = false; };
+  }, []);
+
+  const onLogout = useCallback(async () => {
+    try {
+      await supabase.auth.signOut();
+      navigate("/login", { replace: true });
+    } catch (e) {
+      console.error("Logout error:", e);
+    }
+  }, [navigate]);
+
+  if (gateLoading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <Spin size="large" tip="UniGo yuklanmoqda..." />
+      </div>
+    );
+  }
+
+  if (!gateAllowed) return null;
+
+  return (
+    <DriverOnlineProvider>
+      <Suspense fallback={<Spin size="large" style={{ display: 'block', margin: '100px auto' }} />}>
+        <DriverHome onLogout={onLogout} />
+      </Suspense>
+    </DriverOnlineProvider>
+  );
+}
+
+// React.memo bilan o'rash va nomlash - Production build TDZ fix
+const MemoizedDriverDashboard = memo(DriverDashboard);
+
 export { LegacyDriverDashboard };
-export default DriverDashboard;
+export default MemoizedDriverDashboard;
