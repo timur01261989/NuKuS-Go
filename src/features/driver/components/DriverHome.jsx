@@ -184,6 +184,38 @@ export default function DriverHome({ onLogout }) {
     if (typeof window !== "undefined") localStorage.setItem("driver_active_service", key);
   }, [canUseService, tr]);
 
+  const toggleOnline = useCallback(async (checked) => {
+    const nextOnline = typeof checked === "boolean" ? checked : !isOnline;
+    setLoading(true);
+    try {
+      if (nextOnline) {
+        const serviceToUse = selectedService || activeService || getPreferredServiceKey(serviceTypes);
+        if (!serviceToUse) {
+          message.warning("Sozlamalarda kamida bitta xizmatni yoqing");
+          return;
+        }
+        if (!canUseService?.(serviceToUse)) {
+          message.warning(tr("serviceDisabled", "Bu xizmat sizning sozlamalaringizda yoqilmagan"));
+          return;
+        }
+        if (!activeVehicle?.id) {
+          message.warning("Aktiv mashina tanlanmagan");
+          return;
+        }
+        await setOnline(serviceToUse);
+        message.success(tr("online", "Onlayn"));
+      } else {
+        await setOffline();
+        message.success(tr("offline", "Oflayn"));
+      }
+    } catch (error) {
+      console.error("DriverHome toggleOnline error:", error);
+      message.error("Statusni o‘zgartirishda xatolik!");
+    } finally {
+      setLoading(false);
+    }
+  }, [isOnline, selectedService, activeService, serviceTypes, canUseService, activeVehicle?.id, setOnline, setOffline, tr]);
+
   // =========================
   // HEADER DATA
   // =========================
