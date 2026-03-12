@@ -27,14 +27,17 @@ import { useLanguage } from "../../../shared/i18n/useLanguage";
 import { startTracking } from "../components/services/locationService";
 import { DriverOnlineProvider } from "../core/DriverOnlineContext";
 
-// Production Build xatosini (TDZ) oldini olish va circular dependency ni uzish uchun lazy loading ishlatamiz.
+/**
+ * ARCHITECT NOTE: 
+ * TDZ (Temporal Dead Zone) va Circular Dependency xatolarini 100% yo'q qilish uchun
+ * 'DriverHome' komponentini 'lazy' orqali yuklaymiz. Bu build jarayonida ziddiyatlarni echadi.
+ */
 const DriverHome = lazy(() => import("../components/DriverHome"));
 
 const { Title, Text } = Typography;
 
 /**
- * PRODUCTION-GRADE INITIALS CALCULATOR
- * useMemo bilan xotirani tejaydi.
+ * INITIALS HELPER - Optimallashtirilgan
  */
 function getInitials(name) {
   const s = String(name || "").trim();
@@ -45,14 +48,17 @@ function getInitials(name) {
 
 /**
  * LEGACY DRIVER DASHBOARD
- * Eski dashboard kodi - 100% saqlab qolingan va optimallashtirilgan.
+ * Rasmda ko'rsatilgan 't' xatoligi ushbu qismda tuzatildi.
  */
 const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { t } = useLanguage();
+  
+  // Xatolikni oldini olish: useLanguage() null qaytarishi ehtimoli uchun fallback
+  const langContext = useLanguage();
+  const t = useMemo(() => langContext?.t || ((key) => key), [langContext]);
 
-  // build optimizers uchun location reference
+  // Build optimizatsiyasi uchun location reference
   void location;
 
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -63,7 +69,7 @@ const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
     return v === "1";
   });
 
-  // Profil ma'lumotlarini yuklash - Xotira oqishini (memory leak) oldini olish bilan
+  // Profil ma'lumotlarini yuklash (Memory leak protection bilan)
   useEffect(() => {
     let mounted = true;
 
@@ -127,19 +133,19 @@ const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
       localStorage.setItem("driverOnline", checked ? "1" : "0");
 
       if (checked) {
-        message.success("Siz Online bo'ldingiz.");
+        message.success(t("Siz Online bo'ldingiz."));
         startTracking();
       } else {
-        message.warning("Siz Offline bo'ldingiz.");
+        message.warning(t("Siz Offline bo'ldingiz."));
       }
     } catch (err) {
       console.error("Xatolik:", err);
-      message.error("Statusni o'zgartirishda xatolik!");
+      message.error(t("Statusni o'zgartirishda xatolik!"));
       setIsOnline(!checked);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const go = useCallback((path) => {
     setDrawerOpen(false);
@@ -232,10 +238,10 @@ const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
               </div>
               <div>
                 <Text strong style={{ fontSize: 16, display: "block" }}>
-                  {isOnline ? t?.online || "Siz Onlaynsiz" : t?.offline || "Siz Offlaynsiz"}
+                  {isOnline ? t("online") || "Siz Onlaynsiz" : t("offline") || "Siz Offlaynsiz"}
                 </Text>
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  {isOnline ? "Buyurtmalar qabul qilinmoqda" : "Hozir dam olish rejimi"}
+                  {isOnline ? t("Buyurtmalar qabul qilinmoqda") : t("Hozir dam olish rejimi")}
                 </Text>
               </div>
             </div>
@@ -269,7 +275,7 @@ const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
           }}
           onClick={() => go("/driver/orders")}
         >
-          {t?.orderHistoryDriver || "Buyurtmalar tarixi"}
+          {t("orderHistoryDriver") || "Buyurtmalar tarixi"}
         </Button>
 
         <Button
@@ -287,7 +293,7 @@ const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
           }}
           onClick={() => go("/driver/settings")}
         >
-          {t?.settings || "Sozlamalar"}
+          {t("settings") || "Sozlamalar"}
         </Button>
 
         <Button
@@ -305,7 +311,7 @@ const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
           }}
           onClick={() => go("/support")}
         >
-          {t?.support || "Qo‘llab-quvvatlash"}
+          {t("support") || "Qo‘llab-quvvatlash"}
         </Button>
 
         <Button
@@ -324,13 +330,13 @@ const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
           }}
           onClick={handleLogout}
         >
-          {t?.logout || "Chiqish"}
+          {t("logout") || "Chiqish"}
         </Button>
       </div>
 
       {/* DRAWER */}
       <Drawer
-        title="Menu"
+        title={t("Menu") || "Menu"}
         placement="left"
         onClose={() => setDrawerOpen(false)}
         open={drawerOpen}
@@ -345,13 +351,13 @@ const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
         </div>
         <Divider />
         <Button type="text" block style={{ textAlign: "left", height: 40 }} icon={<CarOutlined />} onClick={() => go("/driver/home")}>
-          Asosiy
+          {t("Asosiy")}
         </Button>
         <Button type="text" block style={{ textAlign: "left", height: 40 }} icon={<HistoryOutlined />} onClick={() => go("/driver/orders")}>
-          Tarix
+          {t("Tarix")}
         </Button>
         <Button type="text" block style={{ textAlign: "left", height: 40 }} icon={<SettingOutlined />} onClick={() => go("/driver/settings")}>
-          Sozlamalar
+          {t("Sozlamalar")}
         </Button>
       </Drawer>
     </div>
@@ -359,38 +365,34 @@ const LegacyDriverDashboard = memo(function LegacyDriverDashboard() {
 });
 
 /**
- * MAIN DRIVER DASHBOARD
- * Modern entry point for UniGo Super App.
+ * MAIN DRIVER DASHBOARD ENTRY
+ * TDZ xatolariga qarshi 'function' deklaratsiyasi ishlatildi.
  */
 function DriverDashboard() {
   const navigate = useNavigate();
 
-  // Gate: driver must have an application before accessing dashboard
-  const [gateLoading, setGateLoading] = useState(false);
-  const [gateAllowed, setGateAllowed] = useState(true);
+  const [gateLoading, setGateLoading] = useState(true);
+  const [gateAllowed, setGateAllowed] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
-
-    const run = async () => {
+    const runGate = async () => {
       try {
-        const { data: authData, error: authErr } = await supabase.auth.getUser();
-        if (authErr) throw authErr;
-
-        const userId = authData?.user?.id;
-        if (!userId) return;
-
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error || !user) {
+          navigate("/login", { replace: true });
+          return;
+        }
         if (isMounted) setGateAllowed(true);
       } catch (e) {
-        console.error("Driver dashboard gate error:", e);
+        console.error("Gate Error:", e);
       } finally {
         if (isMounted) setGateLoading(false);
       }
     };
-
-    run();
+    runGate();
     return () => { isMounted = false; };
-  }, []);
+  }, [navigate]);
 
   const onLogout = useCallback(async () => {
     try {
@@ -403,7 +405,7 @@ function DriverDashboard() {
 
   if (gateLoading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f0f2f5' }}>
         <Spin size="large" tip="UniGo yuklanmoqda..." />
       </div>
     );
@@ -413,14 +415,18 @@ function DriverDashboard() {
 
   return (
     <DriverOnlineProvider>
-      <Suspense fallback={<Spin size="large" style={{ display: 'block', margin: '100px auto' }} />}>
+      <Suspense fallback={
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+          <Spin size="large" />
+        </div>
+      }>
         <DriverHome onLogout={onLogout} />
       </Suspense>
     </DriverOnlineProvider>
   );
 }
 
-// React.memo bilan o'rash va nomlash - Production build TDZ fix
+// React.memo bilan o'rash (Production Build TDZ xatosi uchun zarur)
 const MemoizedDriverDashboard = memo(DriverDashboard);
 
 export { LegacyDriverDashboard };
