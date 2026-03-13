@@ -312,22 +312,27 @@ export default function ClientTaxiPage() {
   const requestLocateNow = useCallback(() => {
     if (!navigator.geolocation) {
       message.error(cp("Geolokatsiya mavjud emas"));
-      return;
+      return Promise.resolve(null);
     }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const ll = [pos.coords.latitude, pos.coords.longitude];
-        setUserLoc(ll);
-        setPickup((p) => ({ ...p, latlng: ll }));
-        const map = mapRef.current;
-        if (map) map.flyTo(ll, 16, { duration: 0.6 });
-      },
-      () => {
-        message.error(cp("Joylashuvni aniqlab bo'lmadi"));
-      },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-    );
-  }, []);
+
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const ll = [pos.coords.latitude, pos.coords.longitude];
+          setUserLoc(ll);
+          setPickup((p) => ({ ...p, latlng: ll }));
+          const map = mapRef.current;
+          if (map) map.flyTo(ll, 16, { duration: 0.6 });
+          resolve(ll);
+        },
+        () => {
+          message.error(cp("Joylashuvni aniqlab bo'lmadi"));
+          resolve(null);
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+      );
+    });
+  }, [cp, message]);
 
   // Suggestions callbacks
   const setPickupFromSuggestionHandler = useCallback(
@@ -471,7 +476,22 @@ export default function ClientTaxiPage() {
 
   const Header = (
     <div className="yg-header">
-      <div style={{ width: 40, height: 40 }} />
+      <Button
+        type="default"
+        shape="circle"
+        icon={<ArrowLeftOutlined />}
+        onClick={() => {
+          if (window.history.length > 1) navigate(-1);
+          else navigate("/", { replace: true });
+        }}
+        style={{
+          width: 40,
+          height: 40,
+          border: "none",
+          boxShadow: "0 6px 16px rgba(0,0,0,.18)",
+          background: "#fff",
+        }}
+      />
       <div style={{ flex: 1 }} />
       {headerRight}
     </div>
@@ -1116,25 +1136,6 @@ export default function ClientTaxiPage() {
     </>
   ) : null;
 
-  const BackButton = (
-    <Button
-      type="default"
-      shape="circle"
-      icon={<ArrowLeftOutlined />}
-      onClick={() => navigate(-1)}
-      style={{
-        position: "fixed",
-        top: 16,
-        left: 16,
-        zIndex: 2200,
-        width: 42,
-        height: 42,
-        border: "none",
-        boxShadow: "0 6px 18px rgba(0,0,0,0.16)",
-        background: "#fff",
-      }}
-    />
-  );
 
   // Map UI
   const mapCenter = useMemo(() => {

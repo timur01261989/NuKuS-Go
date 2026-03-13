@@ -125,7 +125,7 @@ export default function ClientNavigatorPage() {
           gap: 10,
         }}
       >
-        <Button icon={<ArrowLeftOutlined />} onClick={() => nav(-1)} />
+        <Button icon={<ArrowLeftOutlined />} onClick={() => { if (window.history.length > 1) nav(-1); else nav("/taxi", { replace: true }); }} />
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 800, lineHeight: 1.1 }}>Navigator</div>
           <div style={{ fontSize: 12, opacity: 0.7 }}>

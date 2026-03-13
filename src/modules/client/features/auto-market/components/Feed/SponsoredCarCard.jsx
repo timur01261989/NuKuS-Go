@@ -11,6 +11,7 @@
 import React from "react";
 import { Tag } from "antd";
 import { StarFilled, RightOutlined } from "@ant-design/icons";
+import { useAutoMarketI18n } from "../../utils/useAutoMarketI18n";
 
 export const DEFAULT_SPONSORS = [
   {
