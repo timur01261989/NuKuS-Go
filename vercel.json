@@ -15,7 +15,7 @@
       "destination": "/api/index.js?path=$1"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!api/|assets/|icons/|sounds/|map/|manifest.webmanifest|sw.js|vite.svg).*)",
       "destination": "/index.html"
     }
   ]
