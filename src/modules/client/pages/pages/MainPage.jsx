@@ -26,7 +26,7 @@ import CenterPin from "@/modules/client/features/map/components/CenterPin.jsx";
 import TargetMarker from "@/modules/client/features/map/components/TargetMarker.jsx";
 
 import RouteLine from "@/modules/client/features/map/components/RouteLine.jsx";
-import { buildRoute } from "@/providers/route/index.js";
+import { buildRoute } from "../providers/route/index.js";
 
 import useRealtimeDrivers from "@/modules/driver/legacy/hooks/useRealtimeDrivers.js";
 import DriverMarker from "@/modules/driver/legacy/components/DriverMarker.jsx";

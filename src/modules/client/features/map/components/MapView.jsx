@@ -10,7 +10,7 @@ import UserMarker from "./UserMarker";
 import MapCenterPicker from "./MapCenterPicker";
 import SearchRadar from "./SearchRadar";
 import RouteLine from "./RouteLine";
-import { buildRoute } from "@/providers/route/index.js";
+import { buildRoute } from "../../../providers/route/index.js";
 
 export default function MapView({
   userLoc,
