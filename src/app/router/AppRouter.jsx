@@ -26,7 +26,7 @@ function AppRouterComponent({ appRole }) {
 
         <Route element={<AuthGuard />}>
           <Route element={<ClientLayout />}>
-            {ClientRoutes()}
+            <ClientRoutes />
           </Route>
         </Route>
 
@@ -35,7 +35,7 @@ function AppRouterComponent({ appRole }) {
 
         <Route element={<DriverGuard />}>
           <Route element={<DriverLayout />}>
-            {DriverRoutes()}
+            <DriverRoutes />
           </Route>
         </Route>
 

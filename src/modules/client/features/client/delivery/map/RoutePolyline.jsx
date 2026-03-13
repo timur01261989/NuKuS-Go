@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Polyline, useMap } from "react-leaflet";
 import { haversineKm } from "../../shared/geo/haversine";
-import { osrmRoute } from "../../shared/geo/osrmClient";
+import { osrmRoute } from "../../shared/geo/osrm";
 
 
 

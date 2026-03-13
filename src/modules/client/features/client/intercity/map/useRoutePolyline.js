@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { haversineKm } from "../../shared/geo/haversine";
-import { osrmRoute } from "../../shared/geo/osrmClient";
+import { osrmRoute } from "../../shared/geo/osrm";
 
 
 

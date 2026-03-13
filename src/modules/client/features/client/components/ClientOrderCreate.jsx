@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useClientText } from '../shared/i18n_clientLocalize';
-import { osrmRoute } from "../../shared/geo/osrmClient";
+import { osrmRoute } from "../shared/geo/osrm";
 import { haversineKm } from "../shared/geo/haversine";
 import { nominatimReverse as _nominatimReverse } from "../shared/geo/nominatim";
 
