@@ -23,7 +23,7 @@ import { Spin } from "antd";
 
 import { supabase } from "@/services/supabase/supabaseClient";
 import { useAppMode } from "@/app/providers/AppModeProvider";
-import { useSessionProfile } from "@/modules/shared/auth/useSessionProfile.js";
+import { useSessionProfile } from "../shared/auth/useSessionProfile";
 // NOTE: keep helper close to routing guards.
 // RootRedirect and RoleGate must agree on the same role → home mapping.
 import { pickHomeForRole } from "../shared/routes/RoleGate";

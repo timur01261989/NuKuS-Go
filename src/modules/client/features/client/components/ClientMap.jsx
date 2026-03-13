@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import SearchRadar from '../../map/components/SearchRadar';
 import RatingCelebration from '../../ui/components/RatingCelebration';
 import { playSound } from '../../../utils/audioHelper';
-import { playAliceVoice } from '@/modules/shared/utils/AudioPlayer.js';
+import { playAliceVoice } from '../../../utils/AudioPlayer';
 
 const ClientMap = ({ status }) => { // 'status' props yoki context orqali keladi
   useEffect(() => {
