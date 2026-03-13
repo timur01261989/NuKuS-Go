@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { haversineKm as _haversineKm } from "../../shared/geo/haversine";
-import { osrmRoute as _osrmRoute } from "../../shared/geo/osrm";
+import { osrmRoute as _osrmRoute } from "../../shared/geo/osrmClient";
 
 // Backward-compatible exports (keep old call signatures)
 export function haversineKm(a, b) {
