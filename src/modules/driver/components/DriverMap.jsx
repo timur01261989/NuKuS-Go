@@ -1,7 +1,8 @@
 import React from "react";
+import LegacyComponent from "@/modules/driver/legacy/components/DriverMap.jsx";
 
-function DriverMap() {
-  return <div className="min-h-40 rounded-xl border border-slate-200 bg-slate-50 p-4">Driver Map</div>;
+function DriverMapComponent(props) {
+  return <LegacyComponent {...props} />;
 }
 
-export default React.memo(DriverMap);
+export default React.memo(DriverMapComponent);

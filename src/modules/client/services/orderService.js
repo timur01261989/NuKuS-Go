@@ -1,4 +1,2 @@
-import * as ordersApi from "@/services/ordersApi";
-
-export { ordersApi };
-export default ordersApi;
+export * from "./clientOrderService.js";
+export { default } from "./clientOrderService.js";

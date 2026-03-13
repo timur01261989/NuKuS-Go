@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Card, Button, Typography, Space, Tag, Modal } from "antd";
 import { getCategories, searchPoi } from "../../services/poiService.js";
-import { useLanguage } from "@/shared/i18n/useLanguage";
+import { useLanguage } from "@/modules/shared/i18n/useLanguage";
 
 const { Text } = Typography;
 

@@ -1,6 +1,14 @@
-// Optional env validator (not wired by default)
-export function requireEnv(name) {
-  const v = import.meta.env[name];
-  if (!v) throw new Error(`Missing env: ${name}`);
-  return v;
-}
+export {
+  APP_ENV,
+  API_BASE_URL,
+  APP_NAME,
+  APP_VERSION,
+  MAP_TILE_URL,
+  SUPABASE_ANON_KEY,
+  SUPABASE_URL,
+  appConfig,
+  getOptionalEnv,
+  getPublicEnv,
+  requireEnv,
+  syncFeaturesFromUiConfig,
+} from "./appConfig.js";

@@ -1,6 +1,6 @@
 import React from "react";
 import { Card, Button, Space, Typography } from "antd";
-import { useLanguage } from "@/shared/i18n/useLanguage";
+import { useLanguage } from "@/modules/shared/i18n/useLanguage";
 
 const { Text } = Typography;
 

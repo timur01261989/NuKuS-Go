@@ -49,8 +49,8 @@ import TaxiSearchSheet from "./TaxiSearchSheet";
 import DestinationPicker from "./DestinationPicker";
 import { haversineKm } from "../shared/geo/haversine";
 import ClientTaxiScreen from "./containers/ClientTaxiScreen";
-import RatingModal from "@features/shared/components/RatingModal";
-import ClientBonusWidget from "@/features/client/components/ClientBonusWidget";
+import RatingModal from "@/modules/client/features/shared/components/RatingModal.jsx";
+import ClientBonusWidget from "@/modules/client/features/client/components/ClientBonusWidget.jsx";
 import TaxiOrderTimeline from "./components/TaxiOrderTimeline";
 import { useOrderTimeline } from "./hooks/useOrderTimeline";
 import {

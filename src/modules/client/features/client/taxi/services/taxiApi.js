@@ -1,4 +1,4 @@
-import api from "@/utils/apiHelper";
+import api from "@/modules/shared/utils/apiHelper";
 
 /** Thin wrapper around apiHelper for taxi */
 export const taxiApi = {

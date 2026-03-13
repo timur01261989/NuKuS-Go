@@ -1,4 +1,2 @@
-import * as walletApi from "@/services/walletApi";
-
-export { walletApi };
-export default walletApi;
+export * from "../payments/walletService.js";
+export { default } from "../payments/walletService.js";

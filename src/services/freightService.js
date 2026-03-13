@@ -17,8 +17,8 @@
  *      - calculate_quick_offer_price(p_distance_km numeric, p_weight_kg int)  (ixtiyoriy)
  */
 
-import api from "@/utils/apiHelper";
-import { supabase } from "@/lib/supabase";
+import api from "@/modules/shared/utils/apiHelper";
+import { supabase } from "@/services/supabase/supabaseClient";
 
 /** ---------- utils ---------- */
 function noop() {}

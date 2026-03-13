@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/services/supabase/supabaseClient";
 
 const TRIP_SETTINGS_KEY = "unigo_delivery_trip_settings_v1";
 

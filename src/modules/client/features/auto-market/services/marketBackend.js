@@ -9,7 +9,7 @@
  *  - Bu fayl faqat auto-market ichida ishlatiladi (boshqa xizmatlarga tegilmagan).
  */
 
-import { supabase } from "../../../lib/supabase";
+import { supabase } from "@/services/supabase/supabaseClient.js";
 import * as mock from "./marketApi";
 import { axiosClient } from "../api/axiosClient";
 

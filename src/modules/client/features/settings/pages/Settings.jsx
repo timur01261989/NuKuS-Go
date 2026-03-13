@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Divider, Select, Switch, Typography, message, Segmented } from 'antd';
-import { useLanguage } from '@shared/i18n/useLanguage';
-import { getLocalizedLanguages, getLocalizedLanguageLabel } from '@shared/i18n/languages';
-import PageBackButton from '@/shared/components/PageBackButton';
+import { useLanguage } from '@/modules/shared/i18n/useLanguage.js';
+import { getLocalizedLanguages, getLocalizedLanguageLabel } from '@/modules/shared/i18n/languages.js';
+import PageBackButton from '@/modules/shared/components/PageBackButton';
 import { useLocation } from 'react-router-dom';
 
 const { Title, Text } = Typography;

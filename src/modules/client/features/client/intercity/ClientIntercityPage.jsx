@@ -27,13 +27,13 @@ import {
 import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import { useNavigate } from "react-router-dom"; 
-import { useLanguage } from "@/shared/i18n/useLanguage";
+import { useLanguage } from "@/modules/shared/i18n/useLanguage";
 import { useClientText } from "../shared/i18n_clientLocalize";
 
-import RegionDistrictSelect from "@/shared/components/RegionDistrictSelect";
-import { UZ_REGIONS } from "@/shared/constants/uzRegions";
-import { supabase } from "@/lib/supabase";
-import { osrmRouteDriving, haversineKm } from "@/shared/services/osrm"; 
+import RegionDistrictSelect from "@/modules/shared/components/RegionDistrictSelect";
+import { UZ_REGIONS } from "@/modules/shared/constants/uzRegions";
+import { supabase } from "@/services/supabase/supabaseClient";
+import { osrmRouteDriving, haversineKm } from "@/modules/shared/services/osrm"; 
 
 import AutoMarketAdsPanel from "../taxi/components/AutoMarketAdsPanel"; 
 import { listMarketCars } from "../../../services/marketService.js";

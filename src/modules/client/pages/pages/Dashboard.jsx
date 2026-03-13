@@ -12,18 +12,18 @@ import {
 } from "@ant-design/icons";
 
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
-import ClientDashboard from "../features/client/components/ClientDashboard";
+import { supabase } from "@/services/supabase/supabaseClient";
+import ClientDashboard from "@/modules/client/features/client/components/ClientDashboard.jsx";
 
 import { usePageI18n } from "./pageI18n";
 
 // --- KOMPONENTLAR ---
-import DriverAuth from "../features/driver/components/DriverAuth";
-import ClientInterProvincial from "../features/client/intercity/ClientIntercityPage";
-import ClientInterDistrict from "../features/client/interDistrict/ClientInterDistrictPage";
-import ClientFreight from "../features/client/freight/ClientFreightPage";
-import ClientDelivery from "../features/client/delivery/DeliveryPage";
-import ClientOrderCreate from "../features/client/components/ClientOrderCreate";
+import DriverAuth from "@/modules/driver/legacy/components/DriverAuth.jsx";
+import ClientInterProvincial from "@/modules/client/features/client/intercity/ClientIntercityPage.jsx";
+import ClientInterDistrict from "@/modules/client/features/client/interDistrict/ClientInterDistrictPage.jsx";
+import ClientFreight from "@/modules/client/features/client/freight/ClientFreightPage.jsx";
+import ClientDelivery from "@/modules/client/features/client/delivery/DeliveryPage.jsx";
+import ClientOrderCreate from "@/modules/client/features/client/components/ClientOrderCreate.jsx";
 
 // --- RASMLAR ---
 import taxiImg from "../assets/taxi.jpg";

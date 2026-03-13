@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Drawer, Input, Button, List, Typography, Badge, Space } from 'antd';
 import { SendOutlined, CheckOutlined, MessageOutlined } from '@ant-design/icons';
-import { supabase } from '@/lib/supabase';
-import { useLanguage } from '@/shared/i18n/useLanguage';
+import { supabase } from '@/services/supabase/supabaseClient';
+import { useLanguage } from '@/modules/shared/i18n/useLanguage';
 
 const { Text } = Typography;
 

@@ -1,15 +1,8 @@
-import React, { useCallback } from "react";
+import React from "react";
+import LegacyComponent from "@/modules/driver/legacy/components/DriverOnlineToggle.jsx";
 
-function OnlineToggle({ checked = false, onChange }) {
-  const handleClick = useCallback(() => {
-    onChange?.(!checked);
-  }, [checked, onChange]);
-
-  return (
-    <button type="button" onClick={handleClick}>
-      {checked ? "Online" : "Offline"}
-    </button>
-  );
+function OnlineToggleComponent(props) {
+  return <LegacyComponent {...props} />;
 }
 
-export default React.memo(OnlineToggle);
+export default React.memo(OnlineToggleComponent);

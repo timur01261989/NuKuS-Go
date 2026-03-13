@@ -1,53 +1,57 @@
 import { useMemo } from 'react';
-import { useLanguage } from '@/shared/i18n/useLanguage';
-import { localizeGeoLabel } from '@/shared/i18n/geo';
-import { translatePhrase } from '@/shared/i18n/domPhraseTranslations';
+import { useLanguage } from '@/modules/shared/i18n/useLanguage.js';
 
-function normalizeLanguageKey(key) {
-  const v = String(key || '').toLowerCase();
-  if (v === 'uz') return 'uz_lotin';
-  if (v === 'qq' || v === 'qq_latin') return 'qq_lotin';
-  if (v === 'qq_kir' || v === 'qq_kiril') return 'qq_kirill';
-  if (v === 'uz_kiril') return 'uz_kirill';
-  return v || 'uz_lotin';
+const numberFormatters = new Map();
+
+function getCurrencyFormatter(language) {
+  const locale = String(language || 'uz_lotin').replaceAll('_', '-');
+  const key = `currency:${locale}`;
+  if (!numberFormatters.has(key)) {
+    numberFormatters.set(
+      key,
+      new Intl.NumberFormat(locale, {
+        maximumFractionDigits: 0,
+      }),
+    );
+  }
+  return numberFormatters.get(key);
 }
 
-export function translateClientGeo(language, text) {
-  return localizeGeoLabel(text, normalizeLanguageKey(language));
+export function formatClientMoney(language, amount) {
+  const numeric = Number(amount);
+  if (!Number.isFinite(numeric)) {
+    return '—';
+  }
+  try {
+    return `${getCurrencyFormatter(language).format(numeric)} so'm`;
+  } catch {
+    return `${Math.round(numeric)} so'm`;
+  }
 }
 
-export function translateClientPhrase(language, text, key = '') {
-  const lang = normalizeLanguageKey(language);
-  if (!text && key) return key;
-  const geo = translateClientGeo(lang, text);
-  if (geo && geo !== text) return geo;
-  return translatePhrase(lang, text);
-}
+export function translateClientPhrase(languageOrTranslator, phrase, key) {
+  const fallback = typeof phrase === 'string' && phrase.trim() ? phrase : key || '';
 
-export function formatClientMoney(language, value) {
-  if (!Number.isFinite(Number(value))) return '—';
-  const lang = normalizeLanguageKey(language);
-  const localeMap = {
-    uz_lotin: 'uz-UZ',
-    uz_kirill: 'uz-Cyrl-UZ',
-    qq_lotin: 'uz-UZ',
-    qq_kirill: 'kk-Cyrl-KZ',
-    ru: 'ru-RU',
-    en: 'en-US',
-  };
-  const unit = translateClientPhrase(lang, "so'm");
-  return `${new Intl.NumberFormat(localeMap[lang] || 'uz-UZ').format(Number(value))} ${unit}`;
+  if (languageOrTranslator && typeof languageOrTranslator === 'function') {
+    const resolved = languageOrTranslator(key || fallback, fallback);
+    return typeof resolved === 'string' && resolved.trim() ? resolved : fallback;
+  }
+
+  return fallback;
 }
 
 export function useClientText() {
-  const langCtx = useLanguage() || {};
-  const language = normalizeLanguageKey(langCtx.language || langCtx.langKey || 'uz_lotin');
-  const tr = langCtx.tr;
-  const t = langCtx.t || {};
-  const cp = useMemo(() => (fallback, key) => {
-    const translatedByKey = key && typeof tr === 'function' ? tr(key, '') : '';
-    if (translatedByKey && translatedByKey !== key) return translatedByKey;
-    return translateClientPhrase(language, fallback, key);
-  }, [language, tr]);
-  return { ...langCtx, language, t, cp };
+  const { language, t, tr } = useLanguage();
+
+  return useMemo(() => {
+    const cp = (phrase, key) => translateClientPhrase(tr, phrase, key);
+    return {
+      language,
+      t,
+      tr,
+      cp,
+    };
+  }, [language, t, tr]);
 }
+
+export default useClientText;

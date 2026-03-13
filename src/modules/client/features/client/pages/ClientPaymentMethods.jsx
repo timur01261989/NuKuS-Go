@@ -1,8 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useLanguage } from '@shared/i18n/useLanguage';
+import { useLanguage } from '@/modules/shared/i18n/useLanguage.js';
 import { useClientText } from '../shared/i18n_clientLocalize';
-import { safeBack } from '@/shared/navigation/safeBack';
+import { safeBack } from '@/modules/shared/navigation/safeBack';
 
 export default function ClientPaymentMethods() {
   const navigate = useNavigate();

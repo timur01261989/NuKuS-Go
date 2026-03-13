@@ -1,1 +1,1 @@
-export { AuthProvider, useAuth } from "@/shared/auth/AuthProvider";
+export { AuthProvider, useAuth } from "../../modules/shared/auth/AuthProvider.jsx";

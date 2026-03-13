@@ -3,7 +3,7 @@
  * setupNotifications() wrapper + Supabase Realtime notification listener
  */
 import { setupNotifications as _setup, showLocalNotification } from "./fcmService";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/services/supabase/supabaseClient";
 
 export { showLocalNotification };
 

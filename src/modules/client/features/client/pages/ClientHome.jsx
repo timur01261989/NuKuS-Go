@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { prefetch } from "@/lib/prefetch";
-import { supabase } from "@/lib/supabase";
+import { prefetch } from "@/services/platform/prefetchService";
+import { supabase } from "@/services/supabase/supabaseClient";
 import { listMarketCars, formatPriceUZS } from "@services/marketService";
-import { useLanguage } from "@shared/i18n/useLanguage";
+import { useLanguage } from "@/modules/shared/i18n/useLanguage.js";
 import ClientSidebar from "../components/ClientSidebar";
 
 function initials(name) {

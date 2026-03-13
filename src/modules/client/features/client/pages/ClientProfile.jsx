@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
-import { useLanguage } from '@shared/i18n/useLanguage';
+import { supabase } from '@/services/supabase/supabaseClient';
+import { useLanguage } from '@/modules/shared/i18n/useLanguage.js';
 
 export default function ClientProfile() {
   const navigate = useNavigate();

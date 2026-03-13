@@ -1,4 +1,4 @@
-import { UZ_REGIONS } from "@/shared/constants/uzRegions";
+import { UZ_REGIONS } from "@/modules/shared/constants/uzRegions";
 
 export const DELIVERY_SERVICE_MODES = [
   { key: "city", label: "Shahar ichida eltish" },

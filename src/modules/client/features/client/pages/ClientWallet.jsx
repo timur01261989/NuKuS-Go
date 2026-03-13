@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/services/supabase/supabaseClient";
 import { demoTopup, getWalletBalance } from "@/services/walletApi";
 import { useClientText, formatClientMoney } from "../shared/i18n_clientLocalize";
 

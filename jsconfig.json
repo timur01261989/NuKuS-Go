@@ -5,14 +5,9 @@
       "@/*": [
         "src/*"
       ],
-      "@shared/*": [
-        "src/shared/*"
-      ],
-      "@lib/*": [
-        "src/lib/*"
-      ],
       "@i18n/*": [
-        "src/shared/i18n/*"
+        "src/i18n/*",
+        "src/modules/shared/i18n/*"
       ]
     }
   },

@@ -1,4 +1,4 @@
-import { supabase, assertSupabase } from '@/lib/supabase';
+import { supabase, assertSupabase } from '@/services/supabase/supabaseClient';
 
 export function subscribeMessages(orderId, onChange) {
   assertSupabase();

@@ -2,9 +2,9 @@ import React, { useState, useEffect } from "react";
 import { List, Card, Typography, Tag, Button, Skeleton, Empty } from "antd";
 import { ArrowLeftOutlined, ClockCircleOutlined, CarOutlined, CustomerServiceOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
-import { useLanguage } from "@/shared/i18n/useLanguage";
-import { safeBack } from "@/shared/navigation/safeBack";
+import { supabase } from "@/services/supabase/supabaseClient";
+import { useLanguage } from "@/modules/shared/i18n/useLanguage";
+import { safeBack } from "@/modules/shared/navigation/safeBack";
 
 const { Text, Title } = Typography;
 

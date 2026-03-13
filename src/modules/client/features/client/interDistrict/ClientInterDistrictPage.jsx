@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useLanguage } from "@/shared/i18n/useLanguage";
+import { useLanguage } from "@/modules/shared/i18n/useLanguage";
 import { useClientText } from "../shared/i18n_clientLocalize";
 import { Button, Divider, Drawer, message, Typography, Card, Popconfirm } from "antd"; // Card va Popconfirm qo'shildi
 import DistrictHeader from "./components/Header/DistrictHeader";
@@ -13,7 +13,7 @@ import { DistrictProvider, useDistrict } from "./context/DistrictContext";
 import { useDistrictRoute } from "./map/useDistrictRoute";
 import TripCard from "./components/Trips/TripCard";
 import RequestTripDrawer from "./components/Trips/RequestTripDrawer";
-import { searchTrips, requestTrip, listPitaks } from "@/features/shared/interDistrictTrips";
+import { searchTrips, requestTrip, listPitaks } from "@/modules/client/features/shared/interDistrictTrips.js";
 import { nominatimReverse } from "../shared/geo/nominatim";
 
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";

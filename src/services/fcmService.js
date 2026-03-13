@@ -15,7 +15,7 @@
  *   VAPID_PRIVATE_KEY=your_private_key   (faqat server tomonida)
  */
 
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/services/supabase/supabaseClient";
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || "";
 

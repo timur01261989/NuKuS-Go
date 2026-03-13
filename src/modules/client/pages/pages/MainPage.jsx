@@ -18,18 +18,18 @@ import { setupNotifications } from "../services/notifications";
 import { usePageI18n } from "./pageI18n";
 
 // ✅ Sizdagi real map components (screenshotdagi papka)
-import MapCenterPicker from "../features/map/components/MapCenterPicker";
-import UserMarker from "../features/map/components/UserMarker";
-import SearchRadar from "../features/map/components/SearchRadar";
+import MapCenterPicker from "@/modules/client/features/map/components/MapCenterPicker.jsx";
+import UserMarker from "@/modules/client/features/map/components/UserMarker.jsx";
+import SearchRadar from "@/modules/client/features/map/components/SearchRadar.jsx";
 
-import CenterPin from "../features/map/components/CenterPin";
-import TargetMarker from "../features/map/components/TargetMarker";
+import CenterPin from "@/modules/client/features/map/components/CenterPin.jsx";
+import TargetMarker from "@/modules/client/features/map/components/TargetMarker.jsx";
 
-import RouteLine from "../features/map/components/RouteLine";
+import RouteLine from "@/modules/client/features/map/components/RouteLine.jsx";
 import { buildRoute } from "../providers/route/index.js";
 
-import useRealtimeDrivers from "../features/driver/hooks/useRealtimeDrivers";
-import DriverMarker from "../features/driver/components/DriverMarker";
+import useRealtimeDrivers from "@/modules/driver/legacy/hooks/useRealtimeDrivers.js";
+import DriverMarker from "@/modules/driver/legacy/components/DriverMarker.jsx";
 
 const { Title, Text } = Typography;
 

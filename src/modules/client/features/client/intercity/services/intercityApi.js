@@ -1,4 +1,4 @@
-import api from '@/utils/apiHelper';
+import api from '@/modules/shared/utils/apiHelper';
 
 async function post(payload) {
   const res = await api.post('/api/intercity', payload);

@@ -39,9 +39,9 @@ import { MapContainer, Marker, Polyline, TileLayer, useMap } from "react-leaflet
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-import api from "@/utils/apiHelper";
-import { supabase } from "@/lib/supabase";
-import { playAliceVoice } from "@/utils/AudioPlayer";
+import api from "@/modules/shared/utils/apiHelper";
+import { supabase } from "@/services/supabase/supabaseClient";
+import { playAliceVoice } from "@/modules/shared/utils/AudioPlayer";
 
 // Backward-compatible signature (lat, lng, signal)
 async function nominatimReverse(lat, lng, signal) {

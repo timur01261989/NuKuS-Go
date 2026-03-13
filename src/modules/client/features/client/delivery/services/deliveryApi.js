@@ -1,6 +1,6 @@
 import { nominatimReverse as _nominatimReverse } from "../../shared/geo/nominatim";
 // deliveryApi.js — frontend API
-import api from "@/utils/apiHelper";
+import api from "@/modules/shared/utils/apiHelper";
 
 /**
  * Actions (backendga moslab o'zgartirasiz):

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useLanguage } from '@/shared/i18n/useLanguage';
+import { useLanguage } from '@/modules/shared/i18n/useLanguage';
 import { translations } from '@i18n/translations';
 
 function normalizeLanguageKey(key) {

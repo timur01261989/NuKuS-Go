@@ -2,8 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Card, Input, List, Space, Typography, Alert, Tag } from "antd";
 import { useLocation, useParams } from "react-router-dom";
 import { createOrFindSupportThread, getSupportThread, sendSupportMessage } from "../../services/supportApi";
-import { supabase } from "../../lib/supabase";
-import { useLanguage } from "@/shared/i18n/useLanguage";
+import { supabase } from "@/services/supabase/supabaseClient.js";
+import { useLanguage } from "@/modules/shared/i18n/useLanguage";
 
 const { Title, Text } = Typography;
 

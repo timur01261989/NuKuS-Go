@@ -29,10 +29,10 @@ import {
 import { MapContainer, Marker, TileLayer, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 
-import { useAuth } from "@/shared/auth/AuthProvider";
-import { useLanguage } from "@/shared/i18n/useLanguage";
+import { useAuth } from "@/modules/shared/auth/AuthProvider";
+import { useLanguage } from "@/modules/shared/i18n/useLanguage";
 import { useClientText } from "../shared/i18n_clientLocalize";
-import RegionDistrictSelect from "@/shared/components/RegionDistrictSelect";
+import RegionDistrictSelect from "@/modules/shared/components/RegionDistrictSelect";
 import { useContacts } from "./hooks/useContacts";
 import {
   DELIVERY_SERVICE_MODES,

@@ -17,8 +17,8 @@
 import React, { useState } from "react";
 import { Modal, Rate, Input, Button, Typography, Space, Tag, message } from "antd";
 import { StarFilled, SmileOutlined, MehOutlined, FrownOutlined } from "@ant-design/icons";
-import { supabase } from "@/lib/supabase";
-import { useLanguage } from "@/shared/i18n/useLanguage";
+import { supabase } from "@/services/supabase/supabaseClient";
+import { useLanguage } from "@/modules/shared/i18n/useLanguage";
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;

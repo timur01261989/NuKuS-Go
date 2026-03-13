@@ -1,28 +1,43 @@
+import { useEffect, useMemo } from "react";
+import { updateDriverPresence } from "../services/driverPresenceService";
 
-import { useEffect } from "react"
-import { updateDriverPresence } from "../services/driverPresenceService"
+export function useDriverPresence(driverId, serviceType, options = {}) {
+  const intervalMs = useMemo(() => {
+    const value = Number(options.intervalMs ?? 5000);
+    return Number.isFinite(value) && value >= 2000 ? value : 5000;
+  }, [options.intervalMs]);
 
-export function useDriverPresence(driverId, serviceType){
+  useEffect(() => {
+    if (!driverId || typeof navigator === "undefined" || !navigator.geolocation) {
+      return undefined;
+    }
 
-  useEffect(()=>{
+    let isMounted = true;
 
-    if(!driverId) return
+    const publish = () => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          if (!isMounted) return;
+          void updateDriverPresence(
+            driverId,
+            position.coords.latitude,
+            position.coords.longitude,
+            serviceType,
+          );
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 4000 },
+      );
+    };
 
-    const interval = setInterval(()=>{
+    publish();
+    const intervalId = window.setInterval(publish, intervalMs);
 
-      navigator.geolocation.getCurrentPosition(pos=>{
-
-        const lat = pos.coords.latitude
-        const lng = pos.coords.longitude
-
-        updateDriverPresence(driverId,lat,lng,serviceType)
-
-      })
-
-    },5000)
-
-    return ()=> clearInterval(interval)
-
-  },[driverId,serviceType])
-
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+    };
+  }, [driverId, intervalMs, serviceType]);
 }
+
+export default useDriverPresence;

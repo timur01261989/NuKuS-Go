@@ -3,7 +3,7 @@ import { Button } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { usePageI18n } from '../pageI18n';
-import { SearchOnRouteModule } from '../../features/searchOnRoute/SearchOnRouteModule.jsx';
+import { SearchOnRouteModule } from '@/modules/client/features/searchOnRoute/SearchOnRouteModule.jsx';
 
 export default function SearchOnRoutePage() {
   const nav = useNavigate();

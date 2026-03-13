@@ -1,12 +1,8 @@
 import React from "react";
+import LegacyComponent from "@/modules/driver/legacy/components/DriverWallet.jsx";
 
-function EarningsCard({ value = 0 }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="text-xs text-slate-500">Earnings</div>
-      <div className="text-lg font-semibold">{value}</div>
-    </div>
-  );
+function EarningsCardComponent(props) {
+  return <LegacyComponent {...props} />;
 }
 
-export default React.memo(EarningsCard);
+export default React.memo(EarningsCardComponent);

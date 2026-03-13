@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { message } from "antd";
-import { supabase } from "@/lib/supabase";
-import { useLanguage } from "@/shared/i18n/useLanguage";
+import { supabase } from "@/services/supabase/supabaseClient";
+import { useLanguage } from "@/modules/shared/i18n/useLanguage";
 
 export default function Register() {
   const navigate = useNavigate();

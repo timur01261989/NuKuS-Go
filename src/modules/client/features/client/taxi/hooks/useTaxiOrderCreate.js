@@ -8,7 +8,7 @@ import {
   isApiOk,
 } from "../../../../utils/apiResponse";
 import { postJson } from "../../../../utils/apiHelper";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/services/supabase/supabaseClient";
 
 const ORDER_ENDPOINT = "/api/order";
 

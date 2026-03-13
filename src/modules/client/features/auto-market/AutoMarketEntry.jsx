@@ -5,7 +5,7 @@
  *   /vikup, /barter, /garaj, /zapchast, /razborka, /battle, /analytics, /service-book
  */
 import React from "react";
-import { useLanguage } from "@/shared/i18n/useLanguage";
+import { useLanguage } from "@/modules/shared/i18n/useLanguage";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAutoMarketTab } from "./hooks/useAutoMarketTab";
 import AppProviders from "./context/AppProviders";

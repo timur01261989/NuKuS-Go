@@ -1,12 +1,8 @@
 import React from "react";
+import LegacyComponent from "@/modules/driver/legacy/components/NewOrderModal.jsx";
 
-function OrderRequestCard({ title = "New Order", children }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="text-sm font-semibold">{title}</div>
-      <div className="mt-2 text-sm">{children}</div>
-    </div>
-  );
+function OrderRequestCardComponent(props) {
+  return <LegacyComponent {...props} />;
 }
 
-export default React.memo(OrderRequestCard);
+export default React.memo(OrderRequestCardComponent);

@@ -1,4 +1,4 @@
-import * as geoService from "@/features/client/taxi/services/geoService";
+import * as geoService from "@/modules/client/features/client/taxi/services/geoService.js";
 import * as poiService from "@/services/poiService";
 
 export { geoService, poiService };

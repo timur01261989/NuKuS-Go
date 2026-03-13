@@ -1,6 +1,6 @@
 // Supabase Storage uploader (fallback: local preview)
 import { useState } from "react";
-import { supabase } from "../../../lib/supabase";
+import { supabase } from "@/services/supabase/supabaseClient.js";
 
 const SB_READY =
   !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_ANON_KEY;

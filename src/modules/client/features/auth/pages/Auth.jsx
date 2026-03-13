@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { message } from 'antd';
-import { useLanguage } from '@shared/i18n/useLanguage';
-import { getLocalizedLanguages, getLocalizedLanguageLabel } from '@shared/i18n/languages';
-import { supabase } from '@/lib/supabase';
-import { useAppMode } from '@/providers/AppModeProvider';
+import { useLanguage } from '@/modules/shared/i18n/useLanguage.js';
+import { getLocalizedLanguages, getLocalizedLanguageLabel } from '@/modules/shared/i18n/languages.js';
+import { supabase } from '@/services/supabase/supabaseClient';
+import { useAppMode } from '@/app/providers/AppModeProvider';
 
 export default function Auth() {
   const navigate = useNavigate();

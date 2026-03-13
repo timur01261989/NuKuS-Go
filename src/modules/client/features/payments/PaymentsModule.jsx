@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, CardHeader, CardContent, Button } from '../../shared/ui/index.js';
-import { useLanguage } from '@/shared/i18n/useLanguage';
+import { useLanguage } from '@/modules/shared/i18n/useLanguage';
 
 export function PaymentsModule() {
   const { tr } = useLanguage();

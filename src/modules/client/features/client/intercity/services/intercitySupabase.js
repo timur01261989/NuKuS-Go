@@ -1,4 +1,4 @@
-import { supabase } from "../../../../lib/supabase";
+import { supabase } from "@/services/supabase/supabaseClient.js";
 
 export async function listInterProvTrips({
   fromRegionName,

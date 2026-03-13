@@ -3,7 +3,7 @@ import { Button } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { usePageI18n } from '../pageI18n';
-import { PaymentsModule } from '../../features/payments/PaymentsModule.jsx';
+import { PaymentsModule } from '@/modules/client/features/payments/PaymentsModule.jsx';
 
 export default function PaymentsPage() {
   const nav = useNavigate();

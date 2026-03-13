@@ -1,40 +1,23 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
-import ErrorBoundary from "./components/ErrorBoundary.jsx";
-import QueryProvider from "./providers/QueryProvider.jsx";
-import { AuthProvider } from "@/shared/auth/AuthProvider";
-import AppErrorBoundary from "@/shared/debug/AppErrorBoundary";
-import { installGlobalDebugRuntime } from "@/shared/debug/debugRuntime";
-import api from "@/utils/apiHelper";
-import { setupNotifications } from "@/services/notifications";
-import { supabase } from "@/lib/supabase";
+import ErrorBoundary from "./modules/shared/components/ErrorBoundary.jsx";
+import AppErrorBoundary from "./modules/shared/debug/AppErrorBoundary.jsx";
+import { installGlobalDebugRuntime } from "./modules/shared/debug/debugRuntime.js";
+import AppProviders from "./app/providers/AppProviders.jsx";
+import { setupNotifications } from "./services/notifications.js";
+import { supabase } from "@/services/supabase/supabaseClient.js";
 
-// ✅ Ant Design reset
 import "antd/dist/reset.css";
-
-// ✅ Theme
-import "./theme/tokens.css";
-import "./theme/theme-overrides.css";
-
-// ✅ Tailwind / global styles
-import "./index.css";
-
-// ✅ Leaflet
 import "leaflet/dist/leaflet.css";
+import "./styles/globals.css";
 
-/**
- * Supabase access token'ni localStorage'dagi sb-...-auth-token dan olish.
- * Vercel deploy'dan keyin eski custom token bo'sh bo'lib qolsa ham ishlaydi.
- */
 function getSupabaseAccessToken() {
   if (typeof window === "undefined") return "";
 
   try {
     const keys = Object.keys(window.localStorage || {});
-    const authKey = keys.find(
-      (key) => key.startsWith("sb-") && key.endsWith("-auth-token")
-    );
+    const authKey = keys.find((key) => key.startsWith("sb-") && key.endsWith("-auth-token"));
 
     if (!authKey) return "";
 
@@ -43,78 +26,41 @@ function getSupabaseAccessToken() {
 
     const parsed = JSON.parse(raw);
 
-    return (
-      parsed?.access_token ||
-      parsed?.currentSession?.access_token ||
-      parsed?.session?.access_token ||
-      ""
-    );
+    return parsed?.access_token || parsed?.currentSession?.access_token || parsed?.session?.access_token || "";
   } catch {
     return "";
   }
 }
 
-/* ============================
-   GLOBAL DEBUG RUNTIME
-============================ */
-installGlobalDebugRuntime();
+function installLegacyAuthTokenBridge() {
+  if (typeof window === "undefined") return;
 
-/* ============================
-   API HELPER CONFIG
-============================ */
-api.configure({
-  getAccessToken: () => {
-    const supabaseToken = getSupabaseAccessToken();
-    if (supabaseToken) return supabaseToken;
-
-    return typeof window !== "undefined"
-      ? window.localStorage.getItem("token") || ""
-      : "";
-  },
-
-  setAccessToken: (token) => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("token", token || "");
+  const syncLegacyToken = () => {
+    const token = getSupabaseAccessToken();
+    if (token) {
+      window.localStorage.setItem("token", token);
+      return;
     }
-  },
+    window.localStorage.removeItem("token");
+  };
 
-  getRefreshToken: () =>
-    typeof window !== "undefined"
-      ? window.localStorage.getItem("refresh_token") || ""
-      : "",
+  syncLegacyToken();
 
-  setRefreshToken: (token) => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("refresh_token", token || "");
-    }
-  },
+  window.addEventListener("storage", syncLegacyToken);
 
-  hooks: {
-    onAuthFail: () => {
-      if (typeof window === "undefined") return;
-
+  supabase.auth.onAuthStateChange((_event, session) => {
+    const token = session?.access_token || getSupabaseAccessToken();
+    if (token) {
+      window.localStorage.setItem("token", token);
+    } else {
       window.localStorage.removeItem("token");
-      window.localStorage.removeItem("refresh_token");
+    }
+  });
+}
 
-      try {
-        const keys = Object.keys(window.localStorage || {});
-        keys
-          .filter((key) => key.startsWith("sb-") && key.endsWith("-auth-token"))
-          .forEach((key) => window.localStorage.removeItem(key));
-      } catch {
-        // localStorage cleanup xatosi ilovani to'xtatmasin
-      }
+installGlobalDebugRuntime();
+installLegacyAuthTokenBridge();
 
-      if (window.location.pathname !== "/login") {
-        window.location.href = "/login";
-      }
-    },
-  },
-});
-
-/* ============================
-   SERVICE WORKER (SAFE)
-============================ */
 if (typeof window !== "undefined" && "serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
@@ -129,10 +75,7 @@ if (typeof window !== "undefined" && "serviceWorker" in navigator) {
         if (!installing) return;
 
         installing.addEventListener("statechange", () => {
-          if (
-            installing.state === "installed" &&
-            navigator.serviceWorker.controller
-          ) {
+          if (installing.state === "installed" && navigator.serviceWorker.controller) {
             registration.waiting?.postMessage({ type: "SKIP_WAITING" });
           }
         });
@@ -147,17 +90,14 @@ if (typeof window !== "undefined" && "serviceWorker" in navigator) {
         const userId = authData?.user?.id || null;
         await setupNotifications(userId);
       } catch {
-        // push setup xatosi asosiy ilovani sindirmasin
+        // Push setup error must not break bootstrap.
       }
     } catch {
-      // service worker xatosi asosiy ilovani sindirmasin
+      // Service worker registration error must not break bootstrap.
     }
   });
 }
 
-/* ============================
-   RENDER
-============================ */
 const rootElement = document.getElementById("root");
 
 if (!rootElement) {
@@ -167,13 +107,11 @@ if (!rootElement) {
 ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     <AppErrorBoundary>
-      <AuthProvider>
-        <QueryProvider>
-          <ErrorBoundary>
-            <App />
-          </ErrorBoundary>
-        </QueryProvider>
-      </AuthProvider>
+      <AppProviders>
+        <ErrorBoundary>
+          <App />
+        </ErrorBoundary>
+      </AppProviders>
     </AppErrorBoundary>
-  </React.StrictMode>
+  </React.StrictMode>,
 );

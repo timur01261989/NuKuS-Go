@@ -1,6 +1,6 @@
 import React from "react";
 import { Button, Typography } from "antd";
-import { useLanguage } from "@/shared/i18n/useLanguage";
+import { useLanguage } from "@/modules/shared/i18n/useLanguage";
 
 const { Title, Text } = Typography;
 

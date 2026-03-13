@@ -1,25 +1,26 @@
+import { useCallback, useEffect, useState } from "react";
+import { subscribeDriverOrders } from "@/services/dispatch/dispatchRealtime";
 
-import { useEffect, useState } from "react"
-import { subscribeDriverOrders } from "../../../services/dispatch/dispatchRealtime"
+export function useDispatchFeed(driverId) {
+  const [orders, setOrders] = useState([]);
 
-export function useDispatchFeed(driverId){
+  const handleOrder = useCallback((order) => {
+    setOrders((prev) => [order, ...prev]);
+  }, []);
 
-  const [orders,setOrders] = useState([])
+  useEffect(() => {
+    if (!driverId) {
+      setOrders([]);
+      return undefined;
+    }
 
-  useEffect(()=>{
+    const unsubscribe = subscribeDriverOrders(driverId, handleOrder);
+    return () => {
+      unsubscribe?.();
+    };
+  }, [driverId, handleOrder]);
 
-    if(!driverId) return
-
-    const unsubscribe = subscribeDriverOrders(driverId,(order)=>{
-
-      setOrders(prev => [order,...prev])
-
-    })
-
-    return ()=> unsubscribe()
-
-  },[driverId])
-
-  return orders
-
+  return orders;
 }
+
+export default useDispatchFeed;

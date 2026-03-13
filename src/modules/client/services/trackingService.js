@@ -1,5 +1,13 @@
-import * as ordersRealtime from "@/services/ordersRealtime";
-import * as ordersApi from "@/services/ordersApi";
+import clientOrderService from "./clientOrderService.js";
 
-export { ordersRealtime, ordersApi };
-export default { ...ordersRealtime, ...ordersApi };
+export const subscribeOrder = clientOrderService.subscribeOrder;
+export const subscribeOrders = clientOrderService.subscribeOrders;
+export const getOrderById = clientOrderService.getOrderById;
+export const listOrders = clientOrderService.listOrders;
+
+export default {
+  subscribeOrder,
+  subscribeOrders,
+  getOrderById,
+  listOrders,
+};

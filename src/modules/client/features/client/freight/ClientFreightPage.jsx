@@ -12,8 +12,8 @@ import CargoForm from "./components/Details/CargoForm";
 
 import { createCargo, cancelCargo, cargoStatus, matchVehicles, listOffers, acceptOffer } from "./services/freightApi";
 import { formatUZS } from "./services/truckData";
-import { useAuth } from "@/shared/auth/AuthProvider";
-import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/modules/shared/auth/AuthProvider";
+import { supabase } from "@/services/supabase/supabaseClient";
 import { subscribeClientCargo } from "@/services/freightService";
 
 const { Title, Text } = Typography;

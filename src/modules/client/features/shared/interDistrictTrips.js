@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/services/supabase/supabaseClient";
 
 export async function listPitaks({ region, from_district, to_district, activeOnly = true } = {}) {
   let q = supabase.from("district_pitaks").select("*").order("updated_at", { ascending: false });

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/services/supabase/supabaseClient';
 
 function normalizeEvent(row) {
   if (!row || typeof row !== 'object') return null;

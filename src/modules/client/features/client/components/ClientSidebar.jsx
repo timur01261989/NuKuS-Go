@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
-import { useLanguage } from '@shared/i18n/useLanguage';
+import { supabase } from '@/services/supabase/supabaseClient';
+import { useLanguage } from '@/modules/shared/i18n/useLanguage.js';
 import { formatClientMoney } from '../shared/i18n_clientLocalize';
 
 function cx(...xs) {

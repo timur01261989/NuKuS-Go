@@ -3,7 +3,7 @@ import { Button } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { usePageI18n } from '../pageI18n';
-import { GarageModule } from '../../features/garage/GarageModule.jsx';
+import { GarageModule } from '@/modules/client/features/garage/GarageModule.jsx';
 
 export default function GaragePage() {
   const nav = useNavigate();
