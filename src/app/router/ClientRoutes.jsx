@@ -10,6 +10,7 @@ import Wallet from "../../modules/client/pages/Wallet.jsx";
 import Profile from "../../modules/client/pages/Profile.jsx";
 import Settings from "../../modules/client/pages/Settings.jsx";
 import AutoMarket from "../../modules/client/pages/AutoMarket.jsx";
+import ClientNavigator from "../../modules/client/pages/ClientNavigator.jsx";
 
 function ClientRoutes() {
   return (
@@ -25,6 +26,8 @@ function ClientRoutes() {
       <Route path="/profile" element={<Profile />} />
       <Route path="/settings" element={<Settings />} />
       <Route path="/auto-market/*" element={<AutoMarket />} />
+      <Route path="/client/navigator" element={<ClientNavigator />} />
+      <Route path="/navigator" element={<Navigate replace to="/client/navigator" />} />
       <Route path="/client/home" element={<Navigate replace to="/" />} />
       <Route path="/client/taxi" element={<Navigate replace to="/taxi" />} />
       <Route path="/client/delivery" element={<Navigate replace to="/delivery" />} />

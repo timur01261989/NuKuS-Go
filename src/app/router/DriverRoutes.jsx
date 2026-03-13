@@ -7,6 +7,7 @@ import DriverProfile from "../../modules/driver/pages/DriverProfile.jsx";
 import DriverActiveOrder from "../../modules/driver/pages/DriverActiveOrder.jsx";
 import DriverSettings from "../../modules/driver/pages/DriverSettings.jsx";
 import DriverVehicles from "../../modules/driver/pages/DriverVehicles.jsx";
+import DriverInsights from "../../modules/driver/pages/DriverInsights.jsx";
 
 function DriverRoutes() {
   return (
@@ -18,6 +19,7 @@ function DriverRoutes() {
       <Route path="/driver/profile" element={<DriverProfile />} />
       <Route path="/driver/settings" element={<DriverSettings />} />
       <Route path="/driver/vehicles" element={<DriverVehicles />} />
+      <Route path="/driver/insights" element={<DriverInsights />} />
       <Route path="/driver/home" element={<Navigate replace to="/driver" />} />
     </>
   );
