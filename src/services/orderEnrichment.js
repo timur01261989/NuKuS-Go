@@ -1,4 +1,4 @@
-import { buildRoute } from '../providers/route/index.js';
+import { buildRoute } from '@/providers/route/index.js';
 import { buildOrderRoute } from './orderModel.js';
 
 export async function enrichOrderRoute({ pickup, dropoff }) {

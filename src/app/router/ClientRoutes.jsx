@@ -33,4 +33,4 @@ function ClientRoutes() {
   );
 }
 
-export default React.memo(ClientRoutes);
+export default ClientRoutes;

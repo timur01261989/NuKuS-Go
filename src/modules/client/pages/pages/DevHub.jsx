@@ -173,7 +173,7 @@ export default function DevHub() {
       { key: "NukusPlaces", kind: "module", title: "NukusPlaces", load: () => import("../utils/NukusPlaces.js") },
       { key: "audioHelper", kind: "module", title: "audioHelper", load: () => import("../utils/audioHelper.js") },
       { key: "geo", kind: "module", title: "geo", load: () => import("../utils/geo.js") },
-      { key: "imageUtils", kind: "module", title: "imageUtils", load: () => import("../utils/imageUtils.js") },
+      { key: "imageUtils", kind: "module", title: "imageUtils", load: () => import('@/modules/shared/utils/imageUtils.js') },
       { key: "locationSmoothing", kind: "module", title: "locationSmoothing", load: () => import("../utils/locationSmoothing.js") },
       { key: "navigatorSync", kind: "module", title: "navigatorSync", load: () => import("../utils/navigatorSync.js") },
 

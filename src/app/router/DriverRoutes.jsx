@@ -19,4 +19,4 @@ function DriverRoutes() {
   );
 }
 
-export default React.memo(DriverRoutes);
+export default DriverRoutes;

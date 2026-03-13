@@ -7,7 +7,7 @@ import {
   DollarCircleOutlined,
   CarOutlined 
 } from "@ant-design/icons";
-import { playAliceVoice } from "../../../utils/AudioPlayer.js";
+import { playAliceVoice } from "@/modules/shared/utils/AudioPlayer.js";
 
 const { Title, Text } = Typography;
 
