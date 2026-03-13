@@ -1,7 +1,15 @@
-// Central routes registry (gradual migration).
-// NOTE: App.jsx still owns the real routing; this file exists for future refactors.
-// We keep it exported + imported to avoid dead code drift.
-
 export const routes = [
-  { path: "/__dev", label: "DevHub (hidden)", hidden: true },
+  { path: "/", scope: "public" },
+  { path: "/login", scope: "public" },
+  { path: "/register", scope: "public" },
+  { path: "/client/home", scope: "client" },
+  { path: "/client/taxi", scope: "client" },
+  { path: "/client/delivery", scope: "client" },
+  { path: "/client/freight", scope: "client" },
+  { path: "/client/inter-provincial", scope: "client" },
+  { path: "/client/inter-district", scope: "client" },
+  { path: "/driver/home", scope: "driver" },
+  { path: "/driver/orders", scope: "driver" },
+  { path: "/driver/wallet", scope: "driver" },
+  { path: "/driver/profile", scope: "driver" },
 ];

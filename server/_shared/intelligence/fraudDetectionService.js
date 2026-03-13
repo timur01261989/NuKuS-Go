@@ -1,7 +1,9 @@
-export function detectOrderFraudSignals({ distanceKm = 0, priceUzs = 0, cancelCount24h = 0, createCount10m = 0 }) {
-  const flags = [];
-  if (Number(createCount10m) >= 5) flags.push('rapid_recreate');
-  if (Number(cancelCount24h) >= 5) flags.push('high_cancellation');
-  if (Number(distanceKm) <= 0.2 && Number(priceUzs) >= 50000) flags.push('anomalous_short_trip_price');
-  return { suspicious: flags.length > 0, flags };
+
+export function detectFraud(order){
+ const dist=Number(order?.distance_km||0)
+ const fare=Number(order?.fare||0)
+ if(dist>0 && fare/dist>10){
+   return {flag:true,reason:"fare_distance_anomaly"}
+ }
+ return {flag:false}
 }

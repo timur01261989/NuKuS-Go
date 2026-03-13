@@ -1,0 +1,18 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unigo-dispatch-workers
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: unigo-workers
+  template:
+    metadata:
+      labels:
+        app: unigo-workers
+    spec:
+      containers:
+      - name: worker
+        image: unigo/worker:latest

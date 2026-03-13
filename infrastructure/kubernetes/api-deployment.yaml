@@ -1,0 +1,20 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unigo-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: unigo-api
+  template:
+    metadata:
+      labels:
+        app: unigo-api
+    spec:
+      containers:
+      - name: api
+        image: unigo/api:latest
+        ports:
+        - containerPort: 3000

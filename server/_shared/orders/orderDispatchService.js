@@ -3,6 +3,7 @@ import { createOrderOffers } from './orderOfferService.js';
 import { buildSmartDispatchBatch } from '../dispatch/smartDispatchEngine.js';
 import { buildDispatchRetryState, markDispatchRetryQueued } from './orderDispatchRetry.js';
 import { buildDemandSnapshot } from '../ai/demandPredictionService.js';
+import { snapshotDemandPrediction, createDriverRepositionTasks } from '../dispatch/aiDispatchPredictionService.js';
 
 export async function runDispatch({ supabase, order, radiusMeters = 2500, limit = 10 }) {
   if (!supabase || !order?.id) {
@@ -19,7 +20,7 @@ export async function runDispatch({ supabase, order, radiusMeters = 2500, limit 
     .maybeSingle();
 
   if (activeOffer?.driver_id) {
-    return { offered: 0, active_offer: activeOffer, demand: null };
+    return { offered: 0, active_offer: activeOffer, demand: null, ai_prediction: null };
   }
 
   const { data: activeOrders } = await supabase
@@ -39,13 +40,46 @@ export async function runDispatch({ supabase, order, radiusMeters = 2500, limit 
     onlineDrivers: onlineDriversCount,
   });
 
+  let aiPrediction = null;
+  try {
+    const { data: completedOrders } = await supabase
+      .from('orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'completed');
+
+    const { data: cancelledOrders } = await supabase
+      .from('orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'cancelled');
+
+    aiPrediction = await snapshotDemandPrediction({
+      supabase,
+      order,
+      serviceType: order.service_type || 'taxi',
+      activeOrders: activeOrdersCount,
+      onlineDrivers: onlineDriversCount,
+      completedOrdersLastHour: completedOrders?.count || 0,
+      cancelledOrdersLastHour: cancelledOrders?.count || 0,
+      avgEtaMinutes: 0,
+    });
+
+    await createDriverRepositionTasks({
+      supabase,
+      serviceType: order.service_type || 'taxi',
+      regionKey: aiPrediction.region_key,
+      predictedDriversNeeded: aiPrediction.snapshot.predicted_drivers_needed,
+    });
+  } catch (predictionError) {
+    console.error('ai demand prediction failed', predictionError);
+  }
+
   const chosen = await buildSmartDispatchBatch({ supabase, order, radiusMeters, limit });
   if (!Array.isArray(chosen) || !chosen.length) {
     const retryState = await buildDispatchRetryState(supabase, order.id);
     if (retryState.shouldRetry) {
       await markDispatchRetryQueued(supabase, order.id, { service_type: order.service_type || 'taxi' });
     }
-    return { offered: 0, retry: retryState.shouldRetry, retry_reason: retryState.reason, demand };
+    return { offered: 0, retry: retryState.shouldRetry, retry_reason: retryState.reason, demand, ai_prediction: aiPrediction };
   }
 
   const offerResult = await createOrderOffers(supabase, { order, drivers: chosen, ttlMs: 15000 });

@@ -14,14 +14,6 @@ DROP FUNCTION IF EXISTS public.sync_driver_presence_ids() CASCADE;
 DROP FUNCTION IF EXISTS public.sync_order_offers_ids() CASCADE;
 DROP FUNCTION IF EXISTS public.find_eligible_drivers(text, numeric, numeric, double precision, double precision, integer, uuid[]) CASCADE;
 DROP FUNCTION IF EXISTS public.find_nearby_drivers(double precision, double precision, double precision, integer, uuid[]) CASCADE;
-DROP FUNCTION IF EXISTS public.dispatch_match_order(uuid, integer, numeric, uuid[]) CASCADE;
-DROP FUNCTION IF EXISTS public.match_order_candidates(double precision, double precision, text, text, integer, numeric, numeric, numeric, integer, uuid[]) CASCADE;
-DROP FUNCTION IF EXISTS public.resolve_matching_order_type(text) CASCADE;
-DROP FUNCTION IF EXISTS public.resolve_matching_service_scope(text, text) CASCADE;
-DROP VIEW IF EXISTS app_meta.v_legacy_cleanup_actions CASCADE;
-DROP VIEW IF EXISTS app_meta.v_legacy_cleanup_plan CASCADE;
-DROP VIEW IF EXISTS app_meta.v_driver_core_matching_snapshot CASCADE;
-DROP TABLE IF EXISTS app_meta.legacy_cleanup_registry CASCADE;
 
 -- Tables (dependency order)
 DROP TABLE IF EXISTS public.order_events CASCADE;
