@@ -267,6 +267,7 @@ const cardBg = "linear-gradient(180deg, #ffffff 0%, #f7fbff 100%)";
 
 export default function DeliveryPage({ onBack }) {
   const { user } = useAuth();
+  const { t, cp } = useClientText();
   const { contacts, loadContacts } = useContacts();
 
   const [serviceMode, setServiceMode] = useState("city");

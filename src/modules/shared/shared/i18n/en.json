@@ -797,5 +797,8 @@
   "searching_driver": "Searching for a driver",
   "pickup_point": "Passenger pickup point",
   "final_point": "Final point",
-  "address_loading": "Resolving address..."
+  "address_loading": "Resolving address...",
+  "driverSettingsTitle": "Driver settings",
+  "driverVehicleManagement": "Vehicles",
+  "vehicleManagement": "Vehicles"
 }

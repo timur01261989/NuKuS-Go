@@ -5,6 +5,8 @@ import DriverOrders from "../../modules/driver/pages/DriverOrders.jsx";
 import DriverWallet from "../../modules/driver/pages/DriverWallet.jsx";
 import DriverProfile from "../../modules/driver/pages/DriverProfile.jsx";
 import DriverActiveOrder from "../../modules/driver/pages/DriverActiveOrder.jsx";
+import DriverSettings from "../../modules/driver/pages/DriverSettings.jsx";
+import DriverVehicles from "../../modules/driver/pages/DriverVehicles.jsx";
 
 function DriverRoutes() {
   return (
@@ -14,6 +16,8 @@ function DriverRoutes() {
       <Route path="/driver/active-order" element={<DriverActiveOrder />} />
       <Route path="/driver/wallet" element={<DriverWallet />} />
       <Route path="/driver/profile" element={<DriverProfile />} />
+      <Route path="/driver/settings" element={<DriverSettings />} />
+      <Route path="/driver/vehicles" element={<DriverVehicles />} />
       <Route path="/driver/home" element={<Navigate replace to="/driver" />} />
     </>
   );

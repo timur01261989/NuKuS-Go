@@ -797,5 +797,8 @@
   "searching_driver": "Ҳайдовчи қидирилмоқда",
   "pickup_point": "Йўловчи олиш нуқтаси",
   "final_point": "Якуний нуқта",
-  "address_loading": "Манзил аниқланмоқда..."
+  "address_loading": "Манзил аниқланмоқда...",
+  "driverSettingsTitle": "Ҳайдовчи созламалари",
+  "driverVehicleManagement": "Машиналар",
+  "vehicleManagement": "Машиналар"
 }

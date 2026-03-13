@@ -797,5 +797,8 @@
   "searching_driver": "Haydovchi qidirilmoqda",
   "pickup_point": "Yo‘lovchi olish nuqtasi",
   "final_point": "Yakuniy nuqta",
-  "address_loading": "Manzil aniqlanmoqda..."
+  "address_loading": "Manzil aniqlanmoqda...",
+  "driverSettingsTitle": "Haydovchi sozlamalari",
+  "driverVehicleManagement": "Mashinalar",
+  "vehicleManagement": "Mashinalar"
 }

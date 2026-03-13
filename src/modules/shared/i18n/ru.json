@@ -797,5 +797,8 @@
   "searching_driver": "Идёт поиск водителя",
   "pickup_point": "Точка посадки пассажира",
   "final_point": "Конечная точка",
-  "address_loading": "Определение адреса..."
+  "address_loading": "Определение адреса...",
+  "driverSettingsTitle": "Настройки водителя",
+  "driverVehicleManagement": "Автомобили",
+  "vehicleManagement": "Автомобили"
 }

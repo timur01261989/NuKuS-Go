@@ -797,5 +797,8 @@
   "searching_driver": "Айдаўшы изленбекте",
   "pickup_point": "Жолаўшыны алыў ноқаты",
   "final_point": "Ақырғы ноқат",
-  "address_loading": "Мәнзил анықланбақта..."
+  "address_loading": "Мәнзил анықланбақта...",
+  "driverSettingsTitle": "Жүргизиўши сазламалары",
+  "driverVehicleManagement": "Машиналар",
+  "vehicleManagement": "Машиналар"
 }

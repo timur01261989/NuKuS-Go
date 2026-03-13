@@ -797,5 +797,8 @@
   "searching_driver": "Aydawshı izlenbekte",
   "pickup_point": "Jolawshını alıw noqatı",
   "final_point": "Aqırǵı noqat",
-  "address_loading": "Mánzil anıqlanbaqta..."
+  "address_loading": "Mánzil anıqlanbaqta...",
+  "driverSettingsTitle": "Jürgiziwshi sazlamalari",
+  "driverVehicleManagement": "Mashinlar",
+  "vehicleManagement": "Mashinlar"
 }
