@@ -1,6 +1,6 @@
 // src/features/map/hooks/useAutoReroute.js
 import { useEffect, useRef } from "react";
-import { buildRoute } from "../../../providers/route/index.js";
+import { buildRoute } from "@/providers/route/index.js";
 
 function distMetersApprox(a, b) {
   const R = 6371000;

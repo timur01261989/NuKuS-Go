@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { playAliceVoice } from '../../../../utils/AudioPlayer';
+import { playAliceVoice } from '@/modules/shared/utils/AudioPlayer.js';
 
 const OrderTracker = ({ orderStatus }) => {
   useEffect(() => {
