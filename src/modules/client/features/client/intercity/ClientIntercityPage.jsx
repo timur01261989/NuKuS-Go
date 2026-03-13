@@ -358,7 +358,7 @@ export default function ClientIntercityPage() {
 
   return (
     <div style={{ padding: 16, maxWidth: 820, margin: "0 auto", paddingBottom: 80 }}>
-      <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 16 }}>{cp("Viloyatlar aro")}</div>
+      <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 16 }}>{t.interProvincial || cp("Viloyatlar aro")}</div>
 
       {/* MAP PREVIEW */}
       <div style={{ borderRadius: 16, overflow: "hidden", border: "1px solid #eee", marginBottom: 16, boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
@@ -387,7 +387,7 @@ export default function ClientIntercityPage() {
       {/* SEARCH FORM */}
       <div style={{ display: "grid", gap: 12 }}>
         <RegionDistrictSelect
-          label={cp("Qayerdan")}
+          label={t.from || cp("Qayerdan")}
           region={from.region}
           district={from.district}
           onChange={(val) => setFrom(val)}
@@ -427,7 +427,7 @@ export default function ClientIntercityPage() {
         </div>
 
         <RegionDistrictSelect
-          label="Qayerga"
+          label={t.to || cp("Qayerga")}
           region={to.region}
           district={to.district}
           onChange={(val) => setTo(val)}
@@ -435,37 +435,37 @@ export default function ClientIntercityPage() {
         />
 
         <DatePicker 
-          placeholder="Ketish sanasi" 
+          placeholder={t.departureDate || cp("Ketish sanasi")} 
           style={{ width: "100%", height: 42, borderRadius: 10 }} 
           onChange={setTravelDate} 
         />
 
         {/* FILTERS */}
         <div style={{ background: "#fff", padding: 12, borderRadius: 12, border: "1px solid #eee" }}>
-          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, opacity: 0.7 }}>Transport va qulayliklar</div>
+          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, opacity: 0.7 }}>{t.transportAndComfort || cp("Transport va qulayliklar")}</div>
           
           <Segmented 
             block 
             value={vehicleType}
             onChange={setVehicleType}
             options={[
-              { label: 'Barchasi', value: 'all' },
-              { label: 'Yengil', value: 'car', icon: <CarOutlined /> },
-              { label: 'Gazel', value: 'gazel' },
-              { label: 'Avtobus', value: 'bus' },
+              { label: t.all || 'Barchasi', value: 'all' },
+              { label: t.lightCar || 'Yengil', value: 'car', icon: <CarOutlined /> },
+              { label: t.gazelle || 'Gazel', value: 'gazel' },
+              { label: t.bus || 'Avtobus', value: 'bus' },
             ]}
             style={{ marginBottom: 12 }}
           />
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <Checkbox checked={womenOnly} onChange={e => setWomenOnly(e.target.checked)}>
-              <WomanOutlined style={{ color: "magenta" }} /> Ayollar uchun
+              <WomanOutlined style={{ color: "magenta" }} /> {t.womenOnly || "Ayollar uchun"}
             </Checkbox>
             <Checkbox checked={hasAC} onChange={e => setHasAC(e.target.checked)}>
-              <ThunderboltOutlined style={{ color: "blue" }} /> Konditsioner
+              <ThunderboltOutlined style={{ color: "blue" }} /> {t.airConditioner || "Konditsioner"}
             </Checkbox>
             <Checkbox checked={hasTrunk} onChange={e => setHasTrunk(e.target.checked)}>
-              <InboxOutlined /> Yukxona
+              <InboxOutlined /> {t.trunk || "Yukxona"}
             </Checkbox>
           </div>
         </div>

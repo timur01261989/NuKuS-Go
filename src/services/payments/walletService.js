@@ -1,7 +1,7 @@
 import { buildQueryString, getJson, postJson } from "./paymentHttp.js";
 
 export function getWalletBalance(userId) {
-  return getJson(`/api/wallet-balance${buildQueryString({ user_id: userId })}`);
+  return getJson(`/api/wallet${buildQueryString({ user_id: userId })}`);
 }
 
 export function getBalance(userId) {
@@ -26,12 +26,12 @@ export function createDriverWalletTopup(payload = {}) {
 export async function getWalletSummary(userId) {
   const balancePayload = await getWalletBalance(userId).catch(() => null);
   const balance = Number(
-    balancePayload?.balance_uzs ?? balancePayload?.balance ?? balancePayload?.data?.balance ?? 0,
+    balancePayload?.wallet?.balance_uzs ?? balancePayload?.balance_uzs ?? balancePayload?.balance ?? balancePayload?.data?.balance ?? 0,
   );
 
   return {
     balance,
-    currency: balancePayload?.currency || "UZS",
+    currency: balancePayload?.currency || balancePayload?.wallet?.currency || "UZS",
     pending: Number(balancePayload?.pending_uzs ?? balancePayload?.pending ?? 0),
     paidOut: Number(balancePayload?.paid_out_uzs ?? balancePayload?.paidOut ?? 0),
     raw: balancePayload,
@@ -43,7 +43,7 @@ export function getDriverWalletSummary(driverId) {
 }
 
 export async function getWalletTransactions(userId) {
-  const payload = await getJson(`/api/wallet-transactions${buildQueryString({ user_id: userId })}`).catch(() => null);
+  const payload = await getJson(`/api/wallet/transactions${buildQueryString({ user_id: userId })}`).catch(() => null);
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload?.rows)) return payload.rows;
   if (Array.isArray(payload?.items)) return payload.items;

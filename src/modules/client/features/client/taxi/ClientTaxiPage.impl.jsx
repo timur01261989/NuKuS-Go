@@ -481,6 +481,12 @@ export default function ClientTaxiPage() {
         shape="circle"
         icon={<ArrowLeftOutlined />}
         onClick={() => {
+          const cur = stepRef.current;
+          if (cur === "stop_map") { setStep("route"); return; }
+          if (cur === "searching" || cur === "coming") { setStep("route"); return; }
+          if (cur === "route") { setStep(dest?.latlng ? "dest_map" : "main"); return; }
+          if (cur === "dest_map") { setStep("search"); return; }
+          if (cur === "search") { setStep("main"); return; }
           if (window.history.length > 1) navigate(-1);
           else navigate("/", { replace: true });
         }}

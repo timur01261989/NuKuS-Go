@@ -117,6 +117,22 @@ export default function DriverHome({ onLogout }) {
   const [loading, setLoading] = useState(false);
 
   // Driver header info (name/avatar/id)
+  const fallbackVisibleServices = useMemo(() => {
+    const raw = typeof window !== "undefined" ? window.localStorage.getItem("driver_service_types_cache") : null;
+    try {
+      const cached = raw ? JSON.parse(raw) : null;
+      return {
+        taxi: Boolean(cached?.city?.passenger || cached?.city?.delivery || cached?.city?.freight),
+        interProv: Boolean(cached?.intercity?.passenger || cached?.intercity?.delivery || cached?.intercity?.freight),
+        interDist: Boolean(cached?.interdistrict?.passenger || cached?.interdistrict?.delivery || cached?.interdistrict?.freight),
+        delivery: Boolean(cached?.city?.delivery || cached?.intercity?.delivery || cached?.interdistrict?.delivery),
+        freight: Boolean(cached?.city?.freight || cached?.intercity?.freight || cached?.interdistrict?.freight),
+      };
+    } catch {
+      return { taxi:false, interProv:false, interDist:false, delivery:false, freight:false };
+    }
+  }, []);
+
   const [driverHeader, setDriverHeader] = useState({
     name: t.driverTitle,
     publicId: "----",

@@ -69,13 +69,26 @@ function getRouteKey(path) {
     return map[sub] || "dispatch";
   }
 
+  if (base === "order-status") return "order-status";
+  if (base === "orders") return "order";
   if (base === "order") {
     const map = { "": "order", status: "order-status", phones: "order-phones" };
     return map[sub] || "order";
   }
   if (base === "auth") return "auth";
   if (base === "offer") return "offer";
-  if (base === "wallet") return "wallet";
+  if (base === "wallet-balance") return "wallet";
+  if (base === "wallet-transactions") return "wallet-transactions";
+  if (base === "wallet-topup-demo") return "wallet-topup-demo";
+  if (base === "wallet") {
+    const map = {
+      "": "wallet",
+      balance: "wallet",
+      transactions: "wallet-transactions",
+      topup: "wallet-topup-demo",
+    };
+    return map[sub] || "wallet";
+  }
   if (base === "support") {
     const map = { "": "support", thread: "support-thread", message: "support-message", list: "support-list" };
     return map[sub] || "support";

@@ -61,42 +61,7 @@ function installLegacyAuthTokenBridge() {
 installGlobalDebugRuntime();
 installLegacyAuthTokenBridge();
 
-if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-  window.addEventListener("load", async () => {
-    try {
-      const registration = await navigator.serviceWorker.register("/sw.js");
-
-      if (typeof registration.update === "function") {
-        registration.update();
-      }
-
-      registration.addEventListener("updatefound", () => {
-        const installing = registration.installing;
-        if (!installing) return;
-
-        installing.addEventListener("statechange", () => {
-          if (installing.state === "installed" && navigator.serviceWorker.controller) {
-            registration.waiting?.postMessage({ type: "SKIP_WAITING" });
-          }
-        });
-      });
-
-      navigator.serviceWorker.addEventListener("controllerchange", () => {
-        window.location.reload();
-      });
-
-      try {
-        const { data: authData } = await supabase.auth.getUser();
-        const userId = authData?.user?.id || null;
-        await setupNotifications(userId);
-      } catch {
-        // Push setup error must not break bootstrap.
-      }
-    } catch {
-      // Service worker registration error must not break bootstrap.
-    }
-  });
-}
+// Service worker bootstrap disabled in web deployment to avoid stale cache/manifest issues.
 
 const rootElement = document.getElementById("root");
 

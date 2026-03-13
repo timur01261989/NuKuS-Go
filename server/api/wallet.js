@@ -69,6 +69,39 @@ export async function wallet_balance_handler(req, res) {
  * body: { amount_uzs: number, user_id?: string }
  * - user_id optional: if provided must match authed user.id
  */
+export async function wallet_transactions_handler(req, res) {
+  try {
+    if (req.method !== 'GET') return json(res, 405, { ok: false, error: 'Method not allowed' });
+    if (!hasSupabaseEnv()) {
+      return serverError(res, "SUPABASE_URL va SUPABASE_SERVICE_ROLE_KEY server env'da yo'q");
+    }
+
+    const auth = await getAuthedUser(req);
+    if (!auth.ok) return json(res, auth.status, { ok: false, error: auth.message });
+
+    const authedUserId = String(auth.user.id);
+    const requestedUserId = String(req.query?.user_id || '').trim();
+    if (requestedUserId && requestedUserId !== authedUserId) {
+      return json(res, 403, { ok: false, error: "Forbidden: boshqa user wallet history sini ko'ra olmaysiz" });
+    }
+
+    const user_id = requestedUserId || authedUserId;
+    const sb = getSupabaseAdmin();
+    const { data, error } = await sb
+      .from('wallet_transactions')
+      .select('*')
+      .eq('user_id', user_id)
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (error) throw error;
+
+    return json(res, 200, { ok: true, rows: data || [] });
+  } catch (e) {
+    return serverError(res, e);
+  }
+}
+
 export async function wallet_topup_demo_handler(req, res) {
   try {
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Method not allowed' });
@@ -180,6 +213,8 @@ export default async function handler(req, res) {
       return await wallet_balance_handler(req, res);
     case 'wallet-topup-demo':
       return await wallet_topup_demo_handler(req, res);
+    case 'wallet-transactions':
+      return await wallet_transactions_handler(req, res);
     case 'cashback-calc':
       return await cashback_calc_handler(req, res);
     case 'seat-hold-calc':

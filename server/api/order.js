@@ -324,7 +324,7 @@ async function handleGetById(supabase, body) {
 async function handleActiveOrder(supabase, body, authedUserId = null) {
   const userId = normalizeUuid(authedUserId ?? body?.user_id ?? body?.userId);
   if (!userId) {
-    return { status: 400, payload: { ok: false, error: "user_id kerak" } };
+    return { status: 200, payload: { ok: true, order: null, id: null, orderId: null, data: null } };
   }
 
   const activeStatuses = ["pending", "searching", "offered", "accepted", "arrived", "in_progress", "in_trip"];
