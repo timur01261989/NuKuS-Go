@@ -1,4 +1,142 @@
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { message } from 'antd';
+import { useLanguage } from '@/modules/shared/i18n/useLanguage.js';
+import { getLocalizedLanguages } from '@/modules/shared/i18n/languages.js';
+import { supabase } from '@/services/supabase/supabaseClient';
+import { useAppMode } from '@/app/providers/AppModeProvider';
+import { otpService } from '@/services/otpService';
+
 /**
+ * UniGo Super App - Authentication Module
+ * Strict Performance Standards: React.memo, useCallback, and useMemo.
+ */
+const Auth = React.memo(function Auth() {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [isOtpSent, setIsOtpSent] = useState(false);
+  const [remember, setRemember] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  const { langKey, setLanguage, t } = useLanguage();
+  const localizedLanguages = useMemo(() => getLocalizedLanguages(langKey), [langKey]);
+  const { appMode } = useAppMode();
+
+  const formatUzPhone = useCallback((rawPhone) => {
+    let digits = String(rawPhone || '').replace(/\D/g, '');
+
+    if (digits.length === 9) {
+      digits = 998${digits};
+    }
+
+    if (!digits.startsWith('998')) {
+      digits = 998${digits};
+    }
+
+    digits = digits.slice(0, 12);
+    return +${digits};
+  }, []);
+
+  const normalizePhoneInput = useCallback((value) => {
+    const digits = String(value || '').replace(/\D/g, '').slice(0, 9);
+
+    if (digits.length <= 2) {
+      return digits;
+    }
+
+    if (digits.length <= 5) {
+      return ${digits.slice(0, 2)} ${digits.slice(2)};
+    }
+
+    if (digits.length <= 7) {
+      return ${digits.slice(0, 2)} ${digits.slice(2, 5)} ${digits.slice(5)};
+    }
+
+    return ${digits.slice(0, 2)} ${digits.slice(2, 5)} ${digits.slice(5, 7)} ${digits.slice(7, 9)};
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const checkSession = async () => {
+      if (!supabase?.auth) {
+        return;
+      }
+
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error) {
+        console.error('Session read failed:', error);
+        return;
+      }
+
+      if (isMounted && data?.session) {
+        navigate('/', { replace: true });
+      }
+    };
+
+    void checkSession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [navigate]);
+
+  useEffect(() => {
+    try {
+      const last = localStorage.getItem('last_phone');
+      if (last) {
+        setPhone((prev) => (prev ? prev : normalizePhoneInput(last)));
+        setRemember(true);
+      }
+    } catch (error) {
+      console.error('Failed to read from localStorage:', error);
+    }
+  }, [normalizePhoneInput]);
+
+  const handlePhoneChange = useCallback(
+    (e) => {
+      setPhone(normalizePhoneInput(e.target.value));
+    },
+    [normalizePhoneInput],
+  );
+
+  const handlePasswordChange = useCallback((e) => {
+    setPassword(e.target.value);
+  }, []);
+
+  const togglePasswordVisibility = useCallback(() => {
+    setShowPassword((prev) => !prev);
+  }, []);
+
+  const handleRememberChange = useCallback((e) => {
+    setRemember(e.target.checked);
+  }, []);
+
+  const handleLanguageChange = useCallback(
+    (e) => {
+      const nextLang = e.target.value;
+      setLanguage(nextLang);
+
+      setTimeout(() => {
+        const selectedLangLabel = getLocalizedLanguages(nextLang).find((item) => item.key === nextLang)?.label;
+        message.success(selectedLangLabel || t.languageChanged);
+      }, 0);
+    },
+    [setLanguage, t],
+  );
+
+  const navigateToReset = useCallback(() => {
+    navigate('/reset-password');
+  }, [navigate]);
+
+  const navigateToRegister = useCallback(() => {
+    navigate('/register');
+  }, [navigate]);
+ /**
    * New functionality: Send OTP via Edge Function
    */
   const handleSendOtp = useCallback(async () => {
@@ -216,7 +354,7 @@
                     type="button"
                     onClick={togglePasswordVisibility}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-unigo-accent"
-                  aria-label="Toggle password visibility"
+                aria-label="Toggle password visibility"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                       <path
