@@ -3650,6 +3650,22 @@ drop table if exists public.driver_bonus cascade;
 drop table if exists public.driver_bonus_ledger cascade;
 
 -- 2) Canonical wallet tx kinds.
+-- Backward-compatible drift guard: some environments have only `metadata`, some have both `metadata` + `meta`.
+alter table if exists public.wallet_transactions
+  add column if not exists metadata jsonb not null default '{}'::jsonb;
+alter table if exists public.wallet_transactions
+  add column if not exists meta jsonb not null default '{}'::jsonb;
+
+update public.wallet_transactions
+set metadata = coalesce(metadata, '{}'::jsonb) || coalesce(meta, '{}'::jsonb)
+where coalesce(metadata, '{}'::jsonb) = '{}'::jsonb
+  and coalesce(meta, '{}'::jsonb) <> '{}'::jsonb;
+
+update public.wallet_transactions
+set meta = coalesce(meta, '{}'::jsonb) || coalesce(metadata, '{}'::jsonb)
+where coalesce(meta, '{}'::jsonb) = '{}'::jsonb
+  and coalesce(metadata, '{}'::jsonb) <> '{}'::jsonb;
+
 alter table if exists public.wallet_transactions
   drop constraint if exists wallet_transactions_kind_check;
 alter table if exists public.wallet_transactions
