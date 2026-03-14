@@ -4,7 +4,6 @@ import { message } from 'antd';
 import { supabase } from '@/services/supabase/supabaseClient';
 import { useLanguage } from '@/modules/shared/i18n/useLanguage';
 import { applyReferralCode, resolveReferralCode } from '@/services/referralApi.js';
-import { otpService } from '@/services/otpService';
 import {
   clearPendingReferralContext,
   getPendingReferralContext,
@@ -14,433 +13,529 @@ import {
   persistPendingReferralContext,
 } from '@/services/referralLinkService.js';
 
-/**
- * HELPER: Phone Normalization logic for Uzbekistan (+998)
- * Optimized for performance using vanilla JS.
- */
 function normalizePhoneInput(value) {
   const digits = String(value || '').replace(/\D/g, '').slice(0, 9);
   let out = digits;
-  if (digits.length > 2) out = ${digits.slice(0, 2)} ${digits.slice(2)};
-  if (digits.length > 5) out = ${out.slice(0, 6)} ${digits.slice(5)};
-  if (digits.length > 7) out = ${out.slice(0, 9)} ${digits.slice(7)};
+  if (digits.length > 2) out = `${digits.slice(0, 2)} ${digits.slice(2)}`;
+  if (digits.length > 5) out = `${out.slice(0, 6)} ${digits.slice(5)}`;
+  if (digits.length > 7) out = `${out.slice(0, 9)} ${digits.slice(7)}`;
   return out;
 }
 
 function toFullPhone(localDigits) {
   const digits = String(localDigits || '').replace(/\D/g, '');
   if (digits.length !== 9) return null;
-  return +998${digits};
+  return `+998${digits}`;
 }
 
-/**
- * UniGo Super App - Production Grade Registration
- * Features: Multi-step OTP, Referral tracking, Full state persistence.
- */
 const Register = memo(function Register() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { t: tr } = useLanguage();
+  const { tr } = useLanguage();
 
-  // --- UI STATE ---
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState(1); // 1: Phone/Referral, 2: OTP, 3: FullName/Password
-  const [showPassword, setShowPassword] = useState(false);
-
-  // --- FORM DATA ---
+  const [step, setStep] = useState(1);
+  const [otp, setOtp] = useState('');
+  const [name, setName] = useState('');
+  const [surname, setSurname] = useState('');
   const [phone, setPhone] = useState('');
-  const [otpCode, setOtpCode] = useState('');
-  const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
   const [referralCode, setReferralCode] = useState('');
   const [referralStatus, setReferralStatus] = useState({
+    checking: false,
     valid: false,
     inviter: null,
     error: '',
+    source: 'manual',
   });
+  const [formData, setFormData] = useState(null);
 
-  /**
-   * MEMOIZED: Referral Helper Text
-   */
-  const referralHelperText = useMemo(() => {
-    if (referralStatus.error) return referralStatus.error;
-    if (referralStatus.valid && referralStatus.inviter) {
-      return ${tr('referral.invitedBy', 'Sizni taklif qildi')}: ${referralStatus.inviter};
-    }
-    return tr('referral.optionalAtRegister', 'Taklif kodi (ixtiyoriy)');
-  }, [referralStatus, tr]);
+  const headerIcon = useMemo(
+    () => (
+      <svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path
+          d="M13.13 2.188c-4.905 4.905-5.12 11.531-1.258 15.393.187.187.457.243.687.147.232-.096.381-.322.381-.572V14h3.13l.412-.412c.118-.118.188-.278.188-.447V10h2.188l.412-.412c.118-.118.188-.278.188-.447V7h1.412c.265 0 .52-.105.707-.293.188-.188.293-.442.293-.707V4.588c0-.53-.43-.96-.96-.96h-1.412c-.265 0-.52.105-.707.293L13.13 2.188z"
+          fill="#ec5b13"
+        />
+        <circle cx="19.5" cy="1.5" r="1.5" fill="#ec5b13" fillOpacity="0.4" />
+        <circle cx="22.5" cy="19.5" r="1.5" fill="#ec5b13" fillOpacity="0.2" />
+        <path
+          d="M21.07 14.232l-4.232-4.232c-.187-.187-.442-.293-.707-.293H14.12l-.412.412c-.118.118-.188.278-.188.447V12h-2.188l-.412.412c-.118.118-.188.278-.188.447v3.13h-3.131c-.25 0-.476.149-.572.381-.096.23-.04.5.147.687 3.862 3.862 10.488 3.647 15.393-1.258l-1.688-1.688c-.187-.187-.293-.442-.293-.707v-1.18z"
+          fill="#ec5b13"
+        />
+      </svg>
+    ),
+    []
+  );
 
-  /**
-   * EFFECT: Initialize Referral Logic from URL or Context
-   */
   useEffect(() => {
-    const initReferral = async () => {
-      try {
-        const queryRef = searchParams.get('ref') || searchParams.get('referral');
-        if (queryRef) {
-          const normalized = normalizeReferralCode(queryRef);
-          setReferralCode(normalized);
-          persistPendingReferralContext(normalized);
-        } else {
-          const stored = getPendingReferralContext();
-          if (stored) setReferralCode(stored);
-        }
-      } catch (err) {
-        console.error('[REFERRAL_INIT_ERR]:', err);
-      }
+    let mounted = true;
+    const queryCode = normalizeReferralCode(searchParams.get('ref') || searchParams.get('referral') || '');
+    const contextFromUrl = hydratePendingReferralFromLocation(window.location, { source: 'register-query' });
+    const pendingContext = contextFromUrl || getPendingReferralContext();
+    const initialCode = queryCode || pendingContext?.code || '';
+
+    if (!mounted || !initialCode) {
+      return () => {
+        mounted = false;
+      };
+    }
+
+    setReferralCode(initialCode);
+    setReferralStatus((current) => ({
+      ...current,
+      source: pendingContext?.source || (queryCode ? 'register-query' : 'manual'),
+    }));
+
+    return () => {
+      mounted = false;
     };
-    void initReferral();
   }, [searchParams]);
 
-  /**
-   * CALLBACK: Referral Validation
-   */
-  const handleReferralBlur = useCallback(async () => {
-    if (!referralCode || referralCode.length < 3) {
-      setReferralStatus({ valid: false, inviter: null, error: '' });
+  const handleVerifyOtp = useCallback(async (otpValue) => {
+    const verificationCode = String(otpValue || '').replace(/\D/g, '').slice(0, 6);
+    if (verificationCode.length !== 6) {
+      message.error(tr('register.codeMustBe6', 'Kod 6 ta raqam bo‘lishi kerak.'));
       return;
     }
-
-    try {
-      const resp = await resolveReferralCode(referralCode);
-      if (resp?.success && resp?.data) {
-        setReferralStatus({
-          valid: true,
-          inviter: resp.data.inviter_name || resp.data.inviter_phone,
-          error: '',
-        });
-        } else {
-        setReferralStatus({
-          valid: false,
-          inviter: null,
-          error: tr('referral.invalidCode', 'Noto‘g‘ri taklif kodi'),
-        });
-      }
-    } catch (err) {
-      setReferralStatus({ valid: false, inviter: null, error: '' });
-    }
-  }, [referralCode, tr]);
-
-  /**
-   * STEP 1: Handle SMS Request
-   */
-  const requestSmsCode = useCallback(async (e) => {
-    e.preventDefault();
-    const digits = phone.replace(/\D/g, '');
-    if (digits.length !== 9) {
-      message.error(tr('phoneRequired', 'Telefon raqamini kiriting'));
+    if (!formData?.fullPhone) {
+      message.error(tr('register.phoneNotFoundRetry', 'Telefon raqam topilmadi. Qaytadan urinib ko‘ring.'));
+      setStep(1);
       return;
     }
 
     setLoading(true);
     try {
-      const fullPhone = toFullPhone(digits);
-      
-      // Check if user exists to prevent double registration
-      const { data: existing } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('phone_e164', fullPhone)
-        .maybeSingle();
-
-      if (existing) {
-        message.warning(tr('userExists', 'Bu raqam allaqachon ro‘yxatdan o‘tgan'));
-        setLoading(false);
-        return;
-      }
-
-      const result = await otpService.sendOtp(fullPhone);
-      if (result.success) {
-        message.success(tr('otpSent', 'Tasdiqlash kodi yuborildi'));
-        setStep(2);
-      } else {
-        throw new Error(result.error || 'SMS yuborishda xatolik');
-      }
-    } catch (err) {
-      message.error(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [phone, tr]);
-
-  /**
-   * STEP 2: Verify OTP
-   */
-  const verifySmsCode = useCallback(async (e) => {
-    e.preventDefault();
-    if (otpCode.length !== 6) {
-      message.error(tr('otpInvalid', '6 xonali kodni kiriting'));
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const fullPhone = toFullPhone(phone);
-      const { error } = await supabase.auth.verifyOtp({
-        phone: fullPhone,
-        token: otpCode,
-        type: 'signup'
+      const { data, error } = await supabase.auth.verifyOtp({
+        phone: formData.fullPhone,
+        token: verificationCode,
+        type: 'sms',
       });
+      if (error) throw error;
 
-      if (error) {
-        // Fallback check: if it's our custom OTP service logic
-        // For now, assume step forward to profile setup
-        setStep(3);
-      } else {
-        setStep(3);
+      const nextUser = data?.user;
+      if (!nextUser?.id) {
+        throw new Error(tr('register.unknownError', 'Noma’lum xatolik'));
       }
-    } catch (err) {
-      message.error(tr('otpError', 'Kod noto‘g‘ri'));
-    } finally {
-      setLoading(false);
-    }
-  }, [otpCode, phone, tr]);
 
-  /**
-   * STEP 3: Final Signup & Profile Creation
-   */
-  const handleFinalRegister = useCallback(async (e) => {
-    e.preventDefault();
-    if (!fullName || fullName.length < 3) {
-      message.error(tr('nameRequired', 'To‘liq ismingizni kiriting'));
-      return;
-    }
-    if (password.length < 6) {
-      message.error(tr('passwordTooShort', 'Parol kamida 6 belgidan iborat bo‘lsin'));
-      return;
-    }
+      const registrationTime = new Date().toISOString();
+      const safeName = String(formData.name || '').trim() || tr('register.unknownName', 'Noma’lum');
+      const safeSurname = String(formData.surname || '').trim() || tr('register.userSurnameFallback', 'Foydalanuvchi');
+      const fullName = `${safeName} ${safeSurname}`.trim();
 
-    setLoading(true);
-    try {
-      const fullPhone = toFullPhone(phone);
-      
-      // 1. Create User in Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        phone: fullPhone,
-        password: password,
-      });
+      const { error: updatePasswordError } = await supabase.auth.updateUser({ password: formData.password });
+      if (updatePasswordError) throw updatePasswordError;
 
-      if (authError) throw authError;
+      const { error: profileError } = await supabase.from('profiles').upsert({
+        id: nextUser.id,
+        full_name: fullName,
+        phone: formData.fullPhone,
+        phone_e164: formData.fullPhone,
+        phone_normalized: formData.fullPhone,
+        phone_verified_at: registrationTime,
+        role: 'client',
+        current_role: 'client',
+        is_test_user: false,
+        created_at: registrationTime,
+        updated_at: registrationTime,
+        last_login: registrationTime,
+      }, { onConflict: 'id' });
+      if (profileError) throw profileError;
 
-      const user = authData?.user;
-      if (user) {
-        // 2. Create Profile
-        const { error: profileError } = await supabase.from('profiles').insert([
-          {
-            id: user.id,
-            full_name: fullName,
-            phone_e164: fullPhone,
-            role: 'client', // Default role for Super App
-            created_at: new Date().toISOString(),
-          }
-        ]);
-
-        if (profileError) throw profileError;
-
-        // 3. Process Referral if exists
-        if (referralStatus.valid && referralCode) {
+      const normalizedReferralCode = normalizeReferralCode(formData.referralCode || '');
+      if (normalizedReferralCode) {
+        try {
           const deviceHash = await getReferralDeviceHash();
-          await applyReferralCode(user.id, referralCode, deviceHash);
+          await applyReferralCode({
+            code: normalizedReferralCode,
+            device_hash: deviceHash,
+          });
           clearPendingReferralContext();
+        } catch (referralError) {
+          message.warning(String(referralError?.message || tr('referral.applyWarning', 'Referral kod saqlanmadi. Keyinroq tekshiring.')));
         }
+      } else {
+        clearPendingReferralContext();
+      }
 
-        message.success(tr('registerSuccess', 'Muvaffaqiyatli ro‘yxatdan o‘tdingiz!'));
-        navigate('/', { replace: true });
-    }
-    } catch (err) {
-      console.error('[REGISTRATION_CRITICAL]:', err);
-      message.error(err.message || tr('registerError', 'Xatolik yuz berdi'));
+      message.success(tr('register.success', 'Muvaffaqiyatli ro‘yxatdan o‘tdingiz!'));
+      navigate('/', { replace: true });
+    } catch (error) {
+      message.error(String(error?.message || tr('register.unknownError', 'Noma’lum xatolik')));
     } finally {
       setLoading(false);
     }
-  }, [fullName, password, phone, referralCode, referralStatus, tr, navigate]);
+  }, [formData, navigate, tr]);
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-orange-50 p-4 font-sans text-slate-900">
-      <div className="w-full max-w-md">
-        <header className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-[#ec5b13] rounded-3xl shadow-xl shadow-orange-200 mb-6 transform -rotate-2">
-            <span className="text-white text-3xl font-black tracking-tighter">UG</span>
+  useEffect(() => {
+    if (!('OTPCredential' in window)) return undefined;
+    if (step !== 2 || !formData?.fullPhone) return undefined;
+
+    const abortController = new AbortController();
+    navigator.credentials
+      .get({
+        otp: { transport: ['sms'] },
+        signal: abortController.signal,
+      })
+      .then((credential) => {
+        if (!credential?.code) return;
+        const nextOtp = String(credential.code).slice(0, 6);
+        setOtp(nextOtp);
+        void handleVerifyOtp(nextOtp);
+      })
+      .catch(() => {});
+
+    return () => abortController.abort();
+  }, [formData?.fullPhone, handleVerifyOtp, step]);
+
+  const validateReferral = useCallback(async (codeValue) => {
+    const normalizedCode = normalizeReferralCode(codeValue);
+
+    if (!normalizedCode) {
+      setReferralStatus({
+        checking: false,
+        valid: false,
+        inviter: null,
+        error: '',
+        source: 'manual',
+      });
+      return null;
+    }
+
+    setReferralStatus((current) => ({
+      ...current,
+      checking: true,
+      error: '',
+    }));
+
+    try {
+      const response = await resolveReferralCode(normalizedCode);
+      persistPendingReferralContext({
+        code: response?.code?.code || normalizedCode,
+        source: referralStatus.source || 'register',
+        inviter: response?.inviter || null,
+      });
+      setReferralStatus({
+        checking: false,
+        valid: true,
+        inviter: response?.inviter || null,
+        error: '',
+        source: referralStatus.source || 'register',
+      });
+      return response;
+    } catch (error) {
+      const errorMessage = String(error?.message || tr('referral.invalidLink', 'Referral kod topilmadi.'));
+      setReferralStatus({
+        checking: false,
+        valid: false,
+        inviter: null,
+        error: errorMessage,
+        source: referralStatus.source || 'manual',
+      });
+      throw new Error(errorMessage);
+    }
+  }, [referralStatus.source, tr]);
+
+  const handleReferralBlur = useCallback(async () => {
+    const normalizedCode = normalizeReferralCode(referralCode);
+    if (!normalizedCode) {
+      setReferralStatus({
+        checking: false,
+        valid: false,
+        inviter: null,
+        error: '',
+        source: 'manual',
+      });
+      clearPendingReferralContext();
+      return;
+    }
+
+    try {
+      await validateReferral(normalizedCode);
+    } catch {
+      // inline error only
+    }
+  }, [referralCode, validateReferral]);
+
+  const handleGetOtp = useCallback(async (event) => {
+    event.preventDefault();
+    if (loading) return;
+
+    const localDigits = phone.replace(/\D/g, '');
+    if (!String(name || '').trim()) {
+      message.error(tr('register.nameRequired', 'Ismingizni kiriting.'));
+      return;
+    }
+    if (!String(surname || '').trim()) {
+      message.error(tr('register.surnameRequired', 'Familiyangizni kiriting.'));
+      return;
+    }
+    if (localDigits.length !== 9) {
+      message.error(tr('phoneRequired', 'Telefon raqamni to‘liq kiriting (9 ta raqam).'));
+      return;
+    }
+    if (!password || password.length < 6) {
+      message.error(tr('register.passwordMinLength', 'Parol kamida 6 ta belgidan iborat bo‘lsin.'));
+      return;
+    }
+
+    const normalizedReferralCode = normalizeReferralCode(referralCode);
+
+    setLoading(true);
+    try {
+      if (normalizedReferralCode && (!referralStatus.valid || normalizedReferralCode !== normalizeReferralCode(getPendingReferralContext()?.code))) {
+        await validateReferral(normalizedReferralCode);
+      }
+
+      const fullPhone = toFullPhone(localDigits);
+      if (!fullPhone) {
+        throw new Error(tr('phoneRequired', 'Telefon raqamni to‘liq kiriting (9 ta raqam).'));
+      }
+
+      const { error } = await supabase.auth.signInWithOtp({
+        phone: fullPhone,
+        options: {
+          shouldCreateUser: true,
+        },
+      });
+      if (error) throw error;
+
+      setFormData({
+        name: String(name || '').trim(),
+        surname: String(surname || '').trim(),
+        password,
+        fullPhone,
+        referralCode: normalizedReferralCode || '',
+      });
+      message.success(tr('smsSent', 'SMS kod yuborildi!'));
+      setStep(2);
+    } catch (error) {
+      message.error(String(error?.message || tr('register.unknownError', 'Noma’lum xatolik')));
+    } finally {
+      setLoading(false);
+    }
+  }, [loading, name, password, phone, referralCode, referralStatus.valid, surname, tr, validateReferral]);
+
+  const handleOtpChange = useCallback((event) => {
+    setOtp(String(event.target.value || '').replace(/\D/g, '').slice(0, 6));
+  }, []);
+
+  const handleNameChange = useCallback((event) => {
+    setName(event.target.value);
+  }, []);
+
+  const handleSurnameChange = useCallback((event) => {
+    setSurname(event.target.value);
+  }, []);
+
+  const handlePhoneChange = useCallback((event) => {
+    setPhone(normalizePhoneInput(event.target.value));
+  }, []);
+
+  const handlePasswordChange = useCallback((event) => {
+    setPassword(event.target.value);
+  }, []);
+
+  const handleReferralChange = useCallback((event) => {
+    const nextCode = normalizeReferralCode(event.target.value);
+    setReferralCode(nextCode);
+    setReferralStatus((current) => ({
+      ...current,
+      valid: false,
+      inviter: null,
+      error: '',
+    }));
+  }, []);
+
+  const handleBackToForm = useCallback(() => {
+    setStep(1);
+    setOtp('');
+  }, []);
+
+  const inviterName = useMemo(() => {
+    return String(referralStatus.inviter?.full_name || '').trim();
+  }, [referralStatus.inviter?.full_name]);
+
+  const referralHelperText = useMemo(() => {
+    if (referralStatus.checking) {
+      return tr('loading', 'Yuklanmoqda...');
+    }
+    if (referralStatus.error) {
+      return referralStatus.error;
+    }
+    if (referralStatus.valid && inviterName) {
+      return `${tr('referral.inviterLabel', 'Taklif qiluvchi')}: ${inviterName}`;
+    }
+    if (referralCode) {
+      return tr('referral.optionalAtRegister', 'Referral kod faqat ro‘yxatdan o‘tish vaqtida qo‘llanadi.');
+    }
+    return tr('referral.optionalAtRegister', 'Referral kod faqat ro‘yxatdan o‘tish vaqtida qo‘llanadi.');
+  }, [inviterName, referralCode, referralStatus.checking, referralStatus.error, referralStatus.valid, tr]);
+
+  if (step === 2) {
+    return (
+      <div className="min-h-screen bg-[#E3EDF7] flex items-center justify-center px-4 py-10">
+        <div className="w-full max-w-md rounded-[32px] p-8 bg-white/80 shadow-[20px_20px_60px_#c5d0da,-20px_-20px_60px_#ffffff] border border-white/60">
+          <div className="flex flex-col items-center text-center mb-8">
+            <div className="mb-5">{headerIcon}</div>
+            <h1 className="text-4xl font-bold text-slate-900">UniGo</h1>
+            <p className="mt-2 text-sm text-slate-500">{tr('register.smsSentInfo', 'SMS kodni kiriting')}</p>
           </div>
-          <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">{tr('register.title', 'UniGo')}</h1>
-          <p className="text-slate-500 font-medium mt-2">{tr('register.subtitle', 'Yagona Yechim – Kelajak transporti')}</p>
-        </header>
 
-        <div className="bg-white/80 backdrop-blur-xl rounded-[40px] p-10 shadow-2xl shadow-slate-200/60 border border-white">
-          
-          {/* STEPPER UI */}
-          <div className="flex justify-between mb-8 px-2">
-            {[1, 2, 3].map((s) => (
-              <div 
-                key={s} 
-                className={h-1.5 w-full mx-1 rounded-full transition-all duration-500 ${step >= s ? 'bg-[#ec5b13]' : 'bg-slate-100'}} 
-              />
-            ))}
-          </div>
-
-          <h2 className="text-2xl font-bold text-slate-800 mb-8">
-            {step === 1 && tr('register.step1', 'Ro‘yxatdan o‘tish')}
-            {step === 2 && tr('register.step2', 'Kodni tasdiqlash')}
-            {step === 3 && tr('register.step3', 'Profilni yakunlash')}
-          </h2>
-
-          {/* STEP 1: PHONE & REFERRAL */}
-          {step === 1 && (
-            <form onSubmit={requestSmsCode} className="space-y-6">
-              <div className="group">
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">
-                  {tr('phoneLabel', 'Telefon raqami')}
-                </label>
-                <div className="relative flex items-center bg-slate-50 rounded-2xl border-2 border-transparent focus-within:border-orange-200 transition-all p-1">
-                  <span className="pl-4 pr-2 text-slate-400 font-bold border-r border-slate-200">+998</span>
-                  <input
-                    type="tel"
-                    required
-                    value={phone}
-                    onChange={(e) => setPhone(normalizePhoneInput(e.target.value))}
-                    className="w-full bg-transparent py-3.5 px-3 outline-none font-bold text-slate-700"
-                    placeholder="00 000 00 00"
-                    inputMode="numeric"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">
-                  {tr('referral.code', 'Referral kod')}
-                </label>
-                <div className="bg-slate-50 rounded-2xl border-2 border-transparent focus-within:border-orange-200 transition-all p-1">
-                  <input
-                    type="text"
-                    value={referralCode}
-                    onChange={(e) => {
-                      const code = normalizeReferralCode(e.target.value);
-                      setReferralCode(code);
-                      setReferralStatus({ valid: false, inviter: null, error: '' });
-                    }}
-                    onBlur={handleReferralBlur}
-                    className="w-full bg-transparent py-3.5 px-4 outline-none font-bold text-slate-700 uppercase"
-                    placeholder={tr('referral.placeholder', 'Ixtiyoriy')}
-                  />
-                </div>
-                <p className={mt-2 text-[11px] font-bold px-2 ${referralStatus.error ? 'text-red-500' : 'text-green-500'}}>
-                  {referralHelperText}
-                </p>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading || phone.replace(/\D/g, '').length !== 9}
-                className="w-full py-4 bg-[#ec5b13] hover:bg-[#d44d0a] text-white rounded-2xl font-bold shadow-lg shadow-orange-200 transition-all active:scale-[0.98] disabled:opacity-50"
-              >
-                {loading ? tr('loading', 'Yuklanmoqda...') : tr('register.getCode', 'SMS kod olish')}
-              </button>
-            </form>
-          )}
-
-          {/* STEP 2: OTP VERIFICATION */}
-          {step === 2 && (
-            <form onSubmit={verifySmsCode} className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-              <div className="text-center mb-4">
-                <p className="text-slate-500 text-sm">
-                  {tr('otpSentTo', 'Kod ushbu raqamga yuborildi')}: <br />
-                  <span className="font-bold text-slate-800">+998 {phone}</span>
-                </p>
-              </div>
-              <div className="group text-center">
+          <div className="space-y-5">
+            <div>
+              <label className="text-xs font-semibold text-slate-500 ml-1">{tr('register.smsCode', 'Tasdiqlash kodi')}</label>
+              <div className="mt-2 rounded-2xl bg-[#E3EDF7] shadow-[inset_8px_8px_16px_#ccd4dc,inset_-8px_-8px_16px_#ffffff] px-4 py-3">
                 <input
-                  type="text"
-                  required
-                  maxLength={6}
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                  className="w-full bg-slate-50 rounded-2xl py-5 text-center text-3xl font-black tracking-[0.5em] text-[#ec5b13] border-2 border-transparent focus:border-orange-200 outline-none"
+                  value={otp}
+                  onChange={handleOtpChange}
+                  className="w-full bg-transparent outline-none text-center tracking-[0.5em] text-xl font-black text-slate-800 placeholder:text-slate-400"
                   placeholder="000000"
                   inputMode="numeric"
-                  autoFocus
+                  autoComplete="one-time-code"
                 />
               </div>
-              <button
-                type="submit"
-                disabled={loading || otpCode.length !== 6}
-                className="w-full py-4 bg-[#ec5b13] text-white rounded-2xl font-bold shadow-lg shadow-orange-200 transition-all active:scale-[0.98] disabled:opacity-50"
-              >
-                {loading ? tr('loading', 'Tasdiqlanmoqda...') : tr('register.verify', 'Kodni tasdiqlash')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="w-full text-slate-400 text-sm font-bold hover:text-slate-600"
-              >
-                {tr('register.changePhone', 'Raqamni o‘zgartirish')}
-              </button>
-            </form>
-          )}
+            </div>
 
-          {/* STEP 3: PROFILE SETUP */}
-          {step === 3 && (
-            <form onSubmit={handleFinalRegister} className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">
-                  {tr('fullNameLabel', 'Ism va Familiya')}
-                </label>
-                <div className="bg-slate-50 rounded-2xl border-2 border-transparent focus-within:border-orange-200 transition-all p-1">
-                  <input
-                    type="text"
-                    required
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="w-full bg-transparent py-3.5 px-4 outline-none font-bold text-slate-700"
-                    placeholder="Ismingizni kiriting"
-                  />
-                </div>
-              </div>
+            <button
+              type="button"
+              onClick={() => void handleVerifyOtp(otp)}
+              disabled={loading}
+              className="w-full rounded-2xl bg-[#ec5b13] text-white font-bold py-4 shadow-lg shadow-[#ec5b13]/20 hover:bg-[#d44d0a] active:scale-[0.99] transition-all disabled:opacity-60"
+            >
+              {loading ? tr('loading', 'Yuklanmoqda...') : tr('register.confirm', 'Tasdiqlash')}
+            </button>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">
-                  {tr('passwordLabel', 'Yangi parol')}
-                 </label>
-                <div className="relative bg-slate-50 rounded-2xl border-2 border-transparent focus-within:border-orange-200 transition-all p-1">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-transparent py-3.5 px-4 outline-none font-bold text-slate-700"
-                    placeholder="••••••••"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
-                  >
-                    {showPassword ? '🙈' : '👁️'}
-                  </button>
-                </div>
-              </div>
+            <button
+              type="button"
+              onClick={handleBackToForm}
+              className="w-full rounded-2xl bg-white text-slate-700 font-semibold py-4 border border-slate-200 hover:bg-slate-50 active:scale-[0.99] transition-all"
+            >
+              {tr('back', 'Orqaga')}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-4 bg-green-500 hover:bg-green-600 text-white rounded-2xl font-bold shadow-lg shadow-green-100 transition-all active:scale-[0.98] disabled:opacity-50"
-              >
-                {loading ? tr('loading', 'Saqlanmoqda...') : tr('register.complete', 'Ro‘yxatdan o‘tishni yakunlash')}
-              </button>
-            </form>
-          )}
+  return (
+    <div className="min-h-screen bg-[#E3EDF7] flex items-center justify-center px-4 py-10">
+      <div className="w-full max-w-md">
+        <div className="flex flex-col items-center mb-10">
+          <div className="mb-6">{headerIcon}</div>
+          <h1 className="text-5xl font-bold text-[#1e293b] tracking-tight">UniGo</h1>
+          <p className="text-[#ec5b13] font-medium mt-1 text-base">{tr('register.createAccountTitle', 'Yangi hisob yaratish')}</p>
         </div>
 
-        <footer className="mt-10 text-center">
-          <p className="text-slate-500 font-medium">
-            {tr('alreadyHaveAccount', 'Akkauntingiz bormi?')}
+        <div className="rounded-[32px] p-8 bg-white/80 shadow-[20px_20px_60px_#c5d0da,-20px_-20px_60px_#ffffff] border border-white/60">
+          <div className="flex items-center justify-between mb-8">
             <button
-              onClick={() => navigate('/auth')}
-              className="ml-2 text-[#ec5b13] font-bold hover:underline"
+              type="button"
+              onClick={() => navigate('/login')}
+              className="w-12 h-12 rounded-2xl bg-[#E3EDF7] shadow-[8px_8px_16px_#ccd4dc,-8px_-8px_16px_#ffffff] flex items-center justify-center active:scale-95 transition-transform"
+              aria-label={tr('back', 'Orqaga')}
             >
-              {tr('login', 'Kirish')}
+              <svg className="w-5 h-5 text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </button>
-          </p>
-        </footer>
+            <h2 className="text-xl font-bold text-slate-800 tracking-wide">{tr('register', 'Ro‘yxatdan o‘tish')}</h2>
+            <div className="w-12 h-12" />
+          </div>
+
+          <form className="space-y-5" onSubmit={handleGetOtp}>
+            <div>
+              <label className="text-xs font-semibold text-slate-500 ml-1">{tr('name', 'Ism')}</label>
+              <div className="mt-2 rounded-2xl bg-[#E3EDF7] shadow-[inset_8px_8px_16px_#ccd4dc,inset_-8px_-8px_16px_#ffffff] px-4 py-3">
+                <input
+                  value={name}
+                  onChange={handleNameChange}
+                  className="w-full bg-transparent outline-none text-slate-800 placeholder:text-slate-400"
+                  placeholder={tr('register.namePlaceholder', 'Ismingiz')}
+                  autoComplete="given-name"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-500 ml-1">{tr('surname', 'Familiya')}</label>
+              <div className="mt-2 rounded-2xl bg-[#E3EDF7] shadow-[inset_8px_8px_16px_#ccd4dc,inset_-8px_-8px_16px_#ffffff] px-4 py-3">
+                <input
+                  value={surname}
+                  onChange={handleSurnameChange}
+                  className="w-full bg-transparent outline-none text-slate-800 placeholder:text-slate-400"
+                  placeholder={tr('register.surnamePlaceholder', 'Familiyangiz')}
+                  autoComplete="family-name"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-500 ml-1">{tr('phoneLabel', 'Telefon raqam')}</label>
+              <div className="mt-2 rounded-2xl bg-[#E3EDF7] shadow-[inset_8px_8px_16px_#ccd4dc,inset_-8px_-8px_16px_#ffffff] px-4 py-3 flex items-center">
+                <span className="text-slate-600 font-semibold mr-2">+998</span>
+                <input
+                  value={phone}
+                  onChange={handlePhoneChange}
+                  className="w-full bg-transparent outline-none text-slate-800 placeholder:text-slate-400"
+                  placeholder={tr('phonePlaceholder', '90 123 45 67')}
+                  inputMode="numeric"
+                  autoComplete="tel"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-500 ml-1">{tr('password', 'Parol')}</label>
+              <div className="mt-2 rounded-2xl bg-[#E3EDF7] shadow-[inset_8px_8px_16px_#ccd4dc,inset_-8px_-8px_16px_#ffffff] px-4 py-3">
+                <input
+                  type="password"
+                  value={password}
+                  onChange={handlePasswordChange}
+                  className="w-full bg-transparent outline-none text-slate-800 placeholder:text-slate-400"
+                  placeholder={tr('register.passwordPlaceholder', 'Parol yarating')}
+                  autoComplete="new-password"
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between gap-3">
+                <label className="text-xs font-semibold text-slate-500 ml-1">{tr('referralCode', 'Taklif kodi')}</label>
+                <button
+                  type="button"
+                  onClick={() => void handleReferralBlur()}
+                  disabled={referralStatus.checking || !referralCode}
+                  className="text-xs font-semibold text-[#ec5b13] disabled:opacity-50"
+                >
+                  {tr('checkPromo', 'Tekshirish')}
+                </button>
+              </div>
+              <div className="mt-2 rounded-2xl bg-[#E3EDF7] shadow-[inset_8px_8px_16px_#ccd4dc,inset_-8px_-8px_16px_#ffffff] px-4 py-3">
+                <input
+                  value={referralCode}
+                  onChange={handleReferralChange}
+                  onBlur={() => void handleReferralBlur()}
+                  className="w-full bg-transparent outline-none text-slate-800 placeholder:text-slate-400 uppercase"
+                  placeholder={tr('referral.optionalAtRegisterPlaceholder', 'Agar sizda taklif kodi bo‘lsa kiriting')}
+                  autoComplete="off"
+                />
+              </div>
+              <p className={`mt-2 text-xs ${referralStatus.error ? 'text-red-500' : referralStatus.valid ? 'text-green-600' : 'text-slate-500'}`}>
+                {referralHelperText}
+              </p>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-2xl bg-[#ec5b13] text-white font-bold py-4 shadow-lg shadow-[#ec5b13]/20 hover:bg-[#d44d0a] active:scale-[0.99] transition-all disabled:opacity-60"
+            >
+              {loading ? tr('loading', 'Yuklanmoqda...') : tr('register.getCode', 'SMS kod olish')}
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );
