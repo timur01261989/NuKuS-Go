@@ -3620,7 +3620,7 @@ insert into public.bonus_campaigns (
   is_active,
   metadata
 )
-select 'Default Referral Bonus', 'referral', 'both', 'fixed_amount', 5000, 20000, true, '{"system":true}'::jsonb
+select 'Default Referral Bonus', 'referral', 'both', 'fixed_amount', 3000, 20000, true, '{"system":true}'::jsonb
 where not exists (
   select 1 from public.bonus_campaigns where campaign_type = 'referral' and name = 'Default Referral Bonus'
 );

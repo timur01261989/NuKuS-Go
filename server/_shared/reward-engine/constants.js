@@ -67,7 +67,7 @@ export const CANCELLED_STATUSES = Object.freeze([
 
 export const DEFAULT_REWARD_CONFIG = Object.freeze({
   firstRideRewardUzs: 10000,
-  referralRewardUzs: 5000,
+  referralRewardUzs: 3000,
   referralMinOrderUzs: 20000,
   fraudBlockThreshold: 70,
 });

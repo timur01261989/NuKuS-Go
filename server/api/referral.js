@@ -57,6 +57,40 @@ function buildShareUrl(req, code) {
   return `/r/${normalizedCode}`;
 }
 
+async function loadInviterProfile(sb, inviterUserId) {
+  if (!inviterUserId) return null;
+
+  const primaryResult = await sb
+    .from('profiles')
+    .select('id,phone,full_name,avatar_url')
+    .eq('id', inviterUserId)
+    .maybeSingle();
+
+  if (!primaryResult.error) {
+    return primaryResult.data || null;
+  }
+
+  const message = String(primaryResult.error?.message || '').toLowerCase();
+  if (!message.includes('column')) {
+    throw primaryResult.error;
+  }
+
+  const fallbackResult = await sb
+    .from('profiles')
+    .select('id,phone')
+    .eq('id', inviterUserId)
+    .maybeSingle();
+  if (fallbackResult.error) throw fallbackResult.error;
+
+  return fallbackResult.data
+    ? {
+        ...fallbackResult.data,
+        full_name: null,
+        avatar_url: null,
+      }
+    : null;
+}
+
 async function logReferralBonusEvent(sb, payload) {
   try {
     await sb.from('bonus_events').insert({
@@ -100,15 +134,7 @@ async function resolveReferralPublic(sb, req, res, url) {
     });
   }
 
-  const { data: inviterProfile, error: inviterProfileError } = await sb
-    .from('profiles')
-    .select('id,full_name,avatar_url,phone')
-    .eq('id', codeRow.user_id)
-    .maybeSingle();
-
-  if (inviterProfileError) {
-    throw inviterProfileError;
-  }
+  const inviterProfile = await loadInviterProfile(sb, codeRow.user_id);
 
   await logReferralBonusEvent(sb, {
     related_user_id: codeRow.user_id,
@@ -168,16 +194,47 @@ export default async function handler(req, res) {
     );
 
     if (req.method === 'GET' || action === 'summary' || action === 'bootstrap') {
-      const [summary, wallet] = await Promise.all([
-        rewardService.repositories.referrals.listSummary(userId),
-        rewardService.repositories.wallets.ensureWallet(userId),
-      ]);
+      let summary = {
+        referrals: [],
+        rewards: [],
+        totals: {
+          invited_count: 0,
+          qualified_count: 0,
+          rewarded_count: 0,
+          earned_uzs: 0,
+        },
+      };
+      let wallet = {
+        user_id: userId,
+        balance_uzs: 0,
+        bonus_balance_uzs: 0,
+        reserved_uzs: 0,
+        total_topup_uzs: 0,
+        total_spent_uzs: 0,
+        total_earned_uzs: 0,
+        is_frozen: false,
+      };
+      const warnings = [];
+
+      try {
+        summary = await rewardService.repositories.referrals.listSummary(userId);
+      } catch (error) {
+        warnings.push(`summary:${String(error?.message || error)}`);
+      }
+
+      try {
+        wallet = await rewardService.repositories.wallets.ensureWallet(userId);
+      } catch (error) {
+        warnings.push(`wallet:${String(error?.message || error)}`);
+      }
+
       return json(res, 200, {
         ok: true,
         code: myCode,
         share_url: buildShareUrl(req, myCode?.code || ''),
         wallet,
         summary,
+        warnings,
       });
     }
 

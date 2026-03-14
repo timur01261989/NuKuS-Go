@@ -170,3 +170,37 @@ Bu paket shunchaki kod yig'indisi emas.
 Repo ichida reward/referral foundation real SQL tekshiruvlari bilan verifikatsiya qilingan, schema drift muammolari tozalangan, `metadata` canonical qilingan va referral invite flow app oqimiga ulangan.
 
 Production release uchun qolgan asosiy ish — tashqi verified deep link konfiguratsiyasi va umumiy loyiha bo'ylab keyingi performance pass.
+
+
+## Referral audit remediatsiya statusi
+
+`unigo_referral_analysis.md` dagi kritik bandlar bo'yicha ushbu paketda quyidagilar tuzatildi:
+
+- ESLint 8 bilan ishlaydigan flat config qayta yozildi. Endi `npm run lint` ishga tushadi va real xatolarni ko'rsatadi.
+- Referral reward canonical qiymati `3000` ga tushirildi:
+  - `server/_shared/rewards.js`
+  - `server/_shared/reward-engine/constants.js`
+  - `sql/00_unigo_unified_id_full_schema.sql`
+- Public referral resolve endpoint inviter uchun kerakli maydonlarni qaytaradi:
+  - `id`
+  - `phone`
+  - `full_name`
+  - `avatar_url`
+  va schema drift bo'lsa minimal fallback bilan ishlaydi.
+- Referral code click paytida emas, auth/session init vaqtida bootstrap qilinadi.
+- Referral sahifasi cached referral snapshot bilan ochiladi; kod bo'lmasa `Taklif kodingiz tayyorlanmoqda...` holati ko'rsatiladi.
+- Share button endi kod yo'q paytda qattiq disable holatga o'tadi.
+- Desktop fallback uchun single-button share sheet qo'shildi: native share yo'q bo'lsa Telegram / WhatsApp / VK / Nusxa olish modal ochiladi.
+- Referral summary endpoint degrade-safe qilindi: summary yoki wallet query yiqilsa ham referral code va share URL qaytarilishi davom etadi.
+
+### Build/Lint current status
+
+Real tekshiruv:
+
+- `npm run build` — **muvaffaqiyatli o'tdi**
+- `npm run lint` — **ishga tushadi**, lekin repo bo'ylab oldindan mavjud bo'lgan ko'p lint xatolarini ko'rsatadi
+
+Bu shuni anglatadi:
+- tooling pipeline endi singan emas
+- referral/remediation patch compile bo'ladi
+- lekin butun repo bo'ylab lint debt hali alohida pass talab qiladi

@@ -20,7 +20,7 @@ select
   'referral',
   'both',
   null,
-  'fixed',
+  'fixed_amount',
   3000,
   20000,
   1,
@@ -41,6 +41,8 @@ where not exists (
 
 update public.bonus_campaigns
 set
+  audience_type = 'both',
+  reward_type = 'fixed_amount',
   reward_amount_uzs = 3000,
   min_order_amount_uzs = 20000,
   metadata = coalesce(metadata, '{}'::jsonb) || jsonb_build_object(
@@ -68,9 +70,9 @@ insert into public.bonus_campaigns (
 select
   'Driver Referral First 5 Trips Reward',
   'driver_milestone',
-  'referrer',
+  'both',
   null,
-  'fixed',
+  'fixed_amount',
   10000,
   0,
   1,
@@ -92,6 +94,8 @@ where not exists (
 
 update public.bonus_campaigns
 set
+  audience_type = 'both',
+  reward_type = 'fixed_amount',
   reward_amount_uzs = 10000,
   metadata = coalesce(metadata, '{}'::jsonb) || jsonb_build_object(
     'program_key', 'driver_referral_first_5_trips',

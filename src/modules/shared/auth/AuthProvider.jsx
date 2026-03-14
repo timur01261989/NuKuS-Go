@@ -1,4 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { bootstrapReferralSummary } from "@/services/referralApi.js";
+import { clearOwnReferralSnapshot, persistOwnReferralSnapshot } from "@/services/referralLinkService.js";
 import {
   buildSessionFingerprint,
   getSession,
@@ -119,6 +121,7 @@ export function AuthProvider({ children }) {
   }, [commit, resolveSession]);
 
   const signOut = useCallback(async () => {
+    clearOwnReferralSnapshot();
     await signOutRequest();
   }, []);
 
@@ -179,6 +182,36 @@ export function AuthProvider({ children }) {
       authSubscription?.subscription?.unsubscribe?.();
     };
   }, [commit, resolveSession]);
+
+  useEffect(() => {
+    if (!state.authReady) {
+      return;
+    }
+
+    if (!state.isAuthed || !state.user?.id) {
+      clearOwnReferralSnapshot();
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const response = await bootstrapReferralSummary();
+        if (!cancelled) {
+          persistOwnReferralSnapshot(response);
+        }
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          console.warn('[AuthProvider] referral bootstrap skipped', error?.message || error);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [state.authReady, state.isAuthed, state.user?.id]);
 
   const contextValue = useMemo(
     () => ({

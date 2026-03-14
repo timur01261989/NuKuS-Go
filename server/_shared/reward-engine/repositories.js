@@ -21,13 +21,36 @@ export class ProfileRepository {
 
   async getByUserId(userId) {
     if (!userId) return null;
-    const { data, error } = await this.sb
+
+    const primaryResult = await this.sb
       .from('profiles')
       .select('id,phone,phone_normalized,role,current_role,is_test_user,full_name,avatar_url')
       .eq('id', userId)
       .maybeSingle();
-    if (error) throw error;
-    return data || null;
+
+    if (!primaryResult.error) {
+      return primaryResult.data || null;
+    }
+
+    const fallbackMessage = String(primaryResult.error?.message || '').toLowerCase();
+    if (!fallbackMessage.includes('column')) {
+      throw primaryResult.error;
+    }
+
+    const fallbackResult = await this.sb
+      .from('profiles')
+      .select('id,phone,phone_normalized,role,current_role,is_test_user')
+      .eq('id', userId)
+      .maybeSingle();
+    if (fallbackResult.error) throw fallbackResult.error;
+
+    return fallbackResult.data
+      ? {
+          ...fallbackResult.data,
+          full_name: null,
+          avatar_url: null,
+        }
+      : null;
   }
 
   async ensureProfile(user) {
@@ -38,24 +61,34 @@ export class ProfileRepository {
     if (existing) return existing;
 
     const phone = String(user?.phone || user?.user_metadata?.phone || user?.raw_user_meta_data?.phone || '').trim() || null;
-    const fullName = String(user?.user_metadata?.full_name || user?.raw_user_meta_data?.full_name || user?.user_metadata?.name || user?.raw_user_meta_data?.name || '').trim() || null;
 
     const payload = {
       id: userId,
       phone,
-      full_name: fullName,
       role: 'client',
       current_role: 'client',
-      metadata: {
-        bootstrap_source: 'referral.ensureProfile',
-      },
     };
 
-    const { error } = await this.sb
+    const primaryResult = await this.sb
       .from('profiles')
       .upsert(payload, { onConflict: 'id' });
 
-    if (error && !isDuplicateError(error)) throw error;
+    if (primaryResult.error && !isDuplicateError(primaryResult.error)) {
+      const message = String(primaryResult.error?.message || '').toLowerCase();
+      if (!message.includes('column')) {
+        throw primaryResult.error;
+      }
+
+      const fallbackPayload = {
+        id: userId,
+        phone,
+      };
+      const fallbackResult = await this.sb
+        .from('profiles')
+        .upsert(fallbackPayload, { onConflict: 'id' });
+      if (fallbackResult.error && !isDuplicateError(fallbackResult.error)) throw fallbackResult.error;
+    }
+
     return await this.getByUserId(userId);
   }
 
@@ -441,7 +474,6 @@ export class ReferralRepository {
       .select('id,user_id,code,is_active,created_at,updated_at')
       .eq('user_id', userId)
       .order('is_active', { ascending: false })
-      .order('updated_at', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(10);
     if (error) throw error;
@@ -457,7 +489,6 @@ export class ReferralRepository {
       .select('id,user_id,code,is_active,created_at,updated_at')
       .eq('code', normalizedCode)
       .eq('is_active', true)
-      .order('updated_at', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(5);
     if (error) throw error;

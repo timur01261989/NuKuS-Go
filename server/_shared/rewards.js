@@ -3,7 +3,7 @@ import { getRewardService } from './reward-engine/factory.js';
 import { REWARD_EVENT_TYPES } from './reward-engine/constants.js';
 
 export const DEFAULT_REFERRAL_MIN_ORDER_UZS = 20000;
-export const DEFAULT_REFERRAL_REWARD_UZS = 5000;
+export const DEFAULT_REFERRAL_REWARD_UZS = 3000;
 export const DEFAULT_FIRST_RIDE_REWARD_UZS = 10000;
 
 export function normalizePhone(phone) {

@@ -1,5 +1,6 @@
 const PENDING_REFERRAL_STORAGE_KEY = 'unigo_pending_referral_context_v1';
 const BROWSER_DEVICE_SEED_KEY = 'unigo_browser_device_seed_v1';
+const OWN_REFERRAL_SNAPSHOT_STORAGE_KEY = 'unigo_own_referral_snapshot_v1';
 
 function getSafeWindow() {
   return typeof window !== 'undefined' ? window : null;
@@ -115,6 +116,45 @@ export function clearPendingReferralContext() {
   storage.removeItem(PENDING_REFERRAL_STORAGE_KEY);
 }
 
+export function persistOwnReferralSnapshot(snapshot) {
+  const storage = getSafeLocalStorage();
+  if (!storage) return null;
+
+  const normalizedCode = normalizeReferralCode(snapshot?.code?.code || snapshot?.code || snapshot?.referral_code || '');
+  if (!normalizedCode) return null;
+
+  const normalized = {
+    code: normalizedCode,
+    share_url: String(snapshot?.share_url || buildReferralShareUrl(normalizedCode)).trim(),
+    wallet: snapshot?.wallet && typeof snapshot.wallet === 'object' ? snapshot.wallet : null,
+    summary: snapshot?.summary && typeof snapshot.summary === 'object' ? snapshot.summary : null,
+    saved_at: new Date().toISOString(),
+  };
+
+  storage.setItem(OWN_REFERRAL_SNAPSHOT_STORAGE_KEY, JSON.stringify(normalized));
+  return normalized;
+}
+
+export function getOwnReferralSnapshot() {
+  const storage = getSafeLocalStorage();
+  if (!storage) return null;
+
+  try {
+    const rawValue = storage.getItem(OWN_REFERRAL_SNAPSHOT_STORAGE_KEY);
+    if (!rawValue) return null;
+    const parsed = JSON.parse(rawValue);
+    return persistOwnReferralSnapshot(parsed) || null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearOwnReferralSnapshot() {
+  const storage = getSafeLocalStorage();
+  if (!storage) return;
+  storage.removeItem(OWN_REFERRAL_SNAPSHOT_STORAGE_KEY);
+}
+
 export function extractReferralCodeFromLocation(inputLocation) {
   const safeWindow = getSafeWindow();
   const currentLocation = inputLocation || safeWindow?.location;
@@ -164,6 +204,20 @@ export function buildReferralSharePayload({ code, inviterName = '', appName = 'U
     url: shareUrl,
     title: `${appName} — Do‘stingiz taklifi`,
     text,
+  };
+}
+
+
+export function buildReferralExternalShareTargets({ code, inviterName = '', appName = 'UniGo' } = {}) {
+  const payload = buildReferralSharePayload({ code, inviterName, appName });
+  const encodedUrl = encodeURIComponent(payload.url || '');
+  const encodedText = encodeURIComponent(payload.text || '');
+
+  return {
+    payload,
+    telegram: payload.url ? `https://t.me/share/url?url=${encodedUrl}&text=${encodedText}` : '',
+    whatsapp: payload.url ? `https://wa.me/?text=${encodedText}` : '',
+    vk: payload.url ? `https://vk.com/share.php?url=${encodedUrl}&title=${encodeURIComponent(payload.title || '')}&comment=${encodedText}` : '',
   };
 }
 
@@ -307,8 +361,12 @@ const referralLinkService = {
   extractReferralCodeFromLocation,
   hydratePendingReferralFromLocation,
   buildReferralSharePayload,
+  buildReferralExternalShareTargets,
   shareReferralLink,
   getReferralDeviceHash,
+  persistOwnReferralSnapshot,
+  getOwnReferralSnapshot,
+  clearOwnReferralSnapshot,
 };
 
 export default referralLinkService;
