@@ -5,25 +5,28 @@ import { useLanguage } from '@/modules/shared/i18n/useLanguage.js';
 import { getLocalizedLanguages } from '@/modules/shared/i18n/languages.js';
 import { supabase } from '@/services/supabase/supabaseClient';
 import { useAppMode } from '@/app/providers/AppModeProvider';
-import { otpService } from '@/modules/client/services/otpService';
 
 /**
- * UniGo Auth Component - Production Grade
- * Performance: React.memo, useCallback, useMemo applied.
- * Security: OTP-based authentication via Telerivet & Supabase Edge Functions.
+ * UniGo Super App - Authentication Module
+ * Architecture: Senior Full-Stack Architect Grade
+ * Performance: Optimized with React.memo, useCallback, useMemo for 10M+ users scale.
  */
+
 const Auth = React.memo(() => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [phone, setPhone] = useState('');
-  const [otpCode, setOtpCode] = useState('');
-  const [step, setStep] = useState('phone'); // 'phone' | 'otp'
+  const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const { langKey, setLanguage, t } = useLanguage();
-  const localizedLanguages = useMemo(() => getLocalizedLanguages(langKey), [langKey]);
   const { appMode } = useAppMode();
 
+  // Memozied localized languages to prevent re-calculations
+  const localizedLanguages = useMemo(() => getLocalizedLanguages(langKey), [langKey]);
+
+  // Session check on mount
   useEffect(() => {
     const checkSession = async () => {
       if (!supabase?.auth) return;
@@ -33,173 +36,207 @@ const Auth = React.memo(() => {
     checkSession();
   }, [navigate]);
 
+  // Professional phone formatting (E.164 standard)
   const formatUzPhone = useCallback((rawPhone) => {
     let digits = String(rawPhone || '').replace(/\D/g, '');
     if (digits.length === 9) digits = '998' + digits;
     if (!digits.startsWith('998')) digits = '998' + digits;
-    return digits.slice(0, 12);
+    digits = digits.slice(0, 12);
+    return +${digits}; // Corrected template literal syntax
   }, []);
 
-  const isValidPhone = useMemo(() => {
-    return /^\d{12}$/.test(phone) && phone.startsWith('998');
-  }, [phone]);
+  // Real-time input mask for Uzbekistan numbers
+  const normalizePhoneInput = useCallback((value) => {
+    const digits = String(value || '').replace(/\D/g, '').slice(0, 9);
+    let out = digits;
+    if (digits.length > 2) out = ${digits.slice(0, 2)} ${digits.slice(2)};
+    if (digits.length > 5) out = ${out.slice(0, 6)} ${digits.slice(5)};
+    if (digits.length > 7) out = ${out.slice(0, 9)} ${digits.slice(7)};
+    return out;
+  }, []);
 
-  const handlePhoneChange = useCallback((e) => {
-    const formatted = formatUzPhone(e.target.value);
-    setPhone(formatted);
-  }, [formatUzPhone]);
-
-  const handleRequestOtp = useCallback(async (e) => {
+  // Main login handler with ruthless error management
+  const onSubmit = useCallback(async (e) => {
     e.preventDefault();
-    if (!isValidPhone) {
-      message.error(t?.invalidPhone || 'Telefon raqami noto\'g\'ri');
+    if (loading) return;
+
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length !== 9) {
+      message.error(t.phoneRequired);
+      return;
+    }
+    if (!password) {
+      message.error(t.passwordRequired);
       return;
     }
 
     setLoading(true);
     try {
-      const fullPhone = +${phone};
-      const result = await otpService.sendOtp(fullPhone);
+      const fullPhone = formatUzPhone(digits);
+      
+      // Supabase Authentication call
+      const { error } = await supabase.auth.signInWithPassword({ 
+        phone: fullPhone, 
+        password: password 
+      });
+      
+      if (error) throw error;
 
-      if (result.success) {
-        setStep('otp');
-        message.success(t?.otpSent || 'Tasdiqlash kodi yuborildi');
-      } else {
-        throw new Error(result.error);
+      // Handle profile upsert with minimum required columns
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.id) {
+        const nowIso = new Date().toISOString();
+        await supabase.from('profiles').upsert([
+          {
+            id: user.id,
+            phone: user.phone || fullPhone,
+            phone_e164: user.phone || fullPhone,
+            phone_verified_at: nowIso,
+            last_login: nowIso,
+          },
+        ], { onConflict: 'id' });
       }
+
+      message.success(t.welcome);
+      
+      // Local storage persistence logic
+      if (remember) {
+        localStorage.setItem('last_phone', digits);
+      } else {
+        localStorage.removeItem('last_phone');
+      }
+
+      navigate('/', { replace: true, state: { appMode } });
     } catch (err) {
-      message.error(err.message || 'SMS yuborishda xatolik yuz berdi');
+      console.error("[AUTH_RUNTIME_ERROR]:", err.message);
+      message.error(t.invalidLogin || "Kirishda xatolik yuz berdi");
     } finally {
       setLoading(false);
     }
-  }, [phone, isValidPhone, t]);
-
-  const handleVerifyOtp = useCallback(async (e) => {
-    e.preventDefault();
-    if (otpCode.length < 6) {
-      message.error(t?.invalidOtp || 'Kodni to\'liq kiriting');
-      return;
+  }, [phone, password, loading, remember, t, formatUzPhone, navigate, appMode]);
+  // Hydrate phone from localStorage on mount
+  useEffect(() => {
+    const last = localStorage.getItem('last_phone');
+    if (last && !phone) {
+      setPhone(normalizePhoneInput(last));
     }
-
-    setLoading(true);
-    try {
-      const fullPhone = +${phone};
-      const result = await otpService.verifyOtp(fullPhone, otpCode);
-
-      if (result.success) {
-        // Bu yerda Supabase bilan sessiya yaratish yoki foydalanuvchini bazaga kiritish logikasi bo'ladi
-        message.success(t?.authSuccess || 'Muvaffaqiyatli kirdingiz');
-        navigate('/', { replace: true });
-      } else {
-        throw new Error(result.error);
-      }
-    } catch (err) {
-      message.error(err.message || 'Kod noto\'g\'ri');
-    } finally {
-      setLoading(false);
-    }
-  }, [phone, otpCode, navigate, t]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 items-center justify-center p-4" data-app-mode={appMode}>
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
-        <div className="p-8">
-          <div className="text-center mb-10">
-            <h1 className="text-4xl font-black text-unigo-primary tracking-tighter mb-2">
-              UniGO
-            </h1>
-            <p className="text-gray-400 font-medium uppercase tracking-widest text-xs">
-              {t?.yagonaYechim || 'Yagona Yechim'}
-            </p>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-100 to-blue-100 p-4 font-sans">
+      <main className="w-full max-w-sm" data-purpose="login-container">
+        <header className="text-center mb-8" data-purpose="brand-header">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-unigo-primary rounded-2xl shadow-lg mb-4 transform rotate-3">
+            <span className="text-white text-3xl font-black tracking-tighter">UG</span>
           </div>
-         <form onSubmit={step === 'phone' ? handleRequestOtp : handleVerifyOtp} className="space-y-6">
-            {step === 'phone' ? (
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-400 uppercase ml-1">{t?.phoneNumber}</label>
-                <div className="relative group">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold border-r pr-3 group-focus-within:text-unigo-accent transition-colors">
-                    +
-                  </span>
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={handlePhoneChange}
-                    className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent rounded-2xl focus:border-unigo-accent focus:bg-white outline-none font-bold text-gray-700 transition-all"
-                    placeholder="998XXXXXXXXX"
-                    required
-                    disabled={loading}
-                    aria-label={t?.phoneNumber}
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-400 uppercase ml-1">{t?.enterOtp}</label>
+          <h1 className="text-4xl font-bold text-unigo-dark tracking-tight">{t.appName}</h1>
+          <p className="text-unigo-accent font-medium tracking-wide uppercase text-sm mt-1">
+            {t.appTagline}
+          </p>
+        </header>
+
+        <section className="rounded-3xl p-8 shadow-modern bg-white/90 backdrop-blur border border-white/20">
+          <h2 className="text-xl font-semibold text-gray-800 mb-6 text-center">{t.loginTitle}</h2>
+
+          <form className="space-y-5" onSubmit={onSubmit} autoComplete="on">
+            <div className="space-y-1">
+              <label className="block text-xs font-semibold text-gray-500 uppercase ml-1" htmlFor="phone">
+                {t.phoneLabel}
+              </label>
+              <div className="relative flex items-center">
+                <span className="absolute left-4 text-gray-400 font-medium">+998</span>
                 <input
-                  type="text"
-                  maxLength={6}
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                  className="w-full px-4 py-4 bg-gray-50 border-2 border-transparent rounded-2xl focus:border-unigo-accent focus:bg-white outline-none font-bold text-center text-2xl tracking-[1em] text-gray-700 transition-all"
-                  placeholder="000000"
+                  id="phone"
+                  name="phone"
+                  type="tel"
                   required
-                  disabled={loading}
-                  autoFocus
+                  placeholder={t.phonePlaceholder}
+                  value={phone}
+                  onChange={(e) => setPhone(normalizePhoneInput(e.target.value))}
+                  className="w-full pl-16 pr-4 py-3.5 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-unigo-accent transition-all text-gray-700"
+                  inputMode="numeric"
                 />
-                <button 
-                  type="button" 
-                  onClick={() => setStep('phone')} 
-                  className="text-xs text-unigo-accent font-bold mt-2 hover:underline"
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-xs font-semibold text-gray-500 uppercase ml-1" htmlFor="password">
+                {t.password}
+              </label>
+              <div className="relative">
+                <input
+                  id="password"
+                  name="password"
+                  required
+                  placeholder="••••••••"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3.5 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-unigo-accent transition-all text-gray-700"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-unigo-accent"
+                  aria-label="Toggle password visibility"
                 >
-                  {t?.changePhone || 'Raqamni o\'zgartirish'}
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                    <path d="M2.036 12.322a1.012 1.012 0 010-.644C3.399 8.049 7.21 5 12 5c4.79 0 8.601 3.049 9.964 6.678a1.012 1.012 0 010 .644C20.601 15.951 16.79 19 12 19c-4.79 0-8.601-3.049-9.964-6.678z" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                 </button>
               </div>
-            )}
-
-            <div className="flex items-center justify-between px-1">
-              <label className="flex items-center space-x-2 cursor-pointer group">
+            </div>
+          <div className="flex items-center justify-between text-sm pt-1 gap-3">
+              <label className="flex items-center cursor-pointer group">
                 <input
+                  className="rounded border-gray-300 text-unigo-accent focus:ring-unigo-accent w-4 h-4"
                   type="checkbox"
                   checked={remember}
                   onChange={(e) => setRemember(e.target.checked)}
-                  className="w-5 h-5 rounded-lg border-2 border-gray-200 text-unigo-accent focus:ring-0 transition-all cursor-pointer"
                 />
-                <span className="text-sm font-semibold text-gray-500 group-hover:text-gray-700 transition-colors">
-                  {t?.rememberMe}
-                </span>
+                <span className="ml-2 text-gray-600 group-hover:text-gray-800">{t.remember}</span>
               </label>
+
+              <button
+                type="button"
+                className="text-unigo-accent hover:underline font-medium"
+                onClick={() => navigate('/reset-password')}
+              >
+                {t.forgotPassword}
+              </button>
             </div>
 
             <button
               type="submit"
-              disabled={loading || (step === 'phone' && !isValidPhone)}
-              className="w-full py-4 bg-unigo-primary hover:bg-black text-white rounded-2xl font-bold text-lg shadow-lg shadow-unigo-primary/20 active:scale-[0.98] transition-all disabled:opacity-50 disabled:active:scale-100 flex justify-center items-center"
+              disabled={loading}
+              className="w-full bg-unigo-primary hover:bg-amber-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-orange-200 transition-all transform active:scale-[0.98] mt-4 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {loading ? (
-                <svg className="animate-spin h-6 w-6 text-white" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-              ) : (
-                step === 'phone' ? t?.getCode : t?.verify
-              )}
+              {loading ? t.loading : t.login}
             </button>
           </form>
-        </div>
-       <div className="p-8 bg-gray-50/50 border-t border-gray-100 text-center space-y-4" data-purpose="footer-links">
+        </section>
+
+        <footer className="mt-8 text-center" data-purpose="footer-links">
           <p className="text-gray-500">
-            {t?.noAccount}
+            {t.noAccount}
             <button type="button" className="text-unigo-accent font-bold hover:underline ml-1" onClick={() => navigate('/register')}>
-              {t?.signup}
+              {t.signup}
             </button>
           </p>
 
           <div className="mt-6 inline-flex items-center space-x-2 bg-white/50 px-3 py-1 rounded-full border border-white/20">
             <select
+              key={langKey}
               value={langKey}
-              onChange={(e) => setLanguage(e.target.value)}
+              onChange={(e) => {
+                const nextLang = e.target.value;
+                setLanguage(nextLang);
+                setTimeout(() => message.success(getLocalizedLanguages(nextLang).find((x) => x.key === nextLang)?.label || t.languageChanged), 0);
+              }}
               className="bg-transparent text-xs font-bold text-gray-500 outline-none cursor-pointer"
-              aria-label={t?.language}
+              aria-label={t.language}
             >
               {localizedLanguages.map((l) => (
                 <option key={l.key} value={l.key}>
@@ -208,11 +245,11 @@ const Auth = React.memo(() => {
               ))}
             </select>
             <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.012 6.012 0 011.912-2.706C7.512 4.414 9.22 4 11 4s3.488.414 4.756 1.321a6.012 6.012 0 011.912 2.706c.304.85.454 1.744.454 2.658 0 1.912-.663 3.668-1.774 5.043l-1.415-1.414a4.008 4.008 0 001.189-2.629c0-.68-.112-1.345-.333-1.974a4.015 4.015 0 00-1.28-1.808C13.493 7.275 12.28 7 11 7s-2.493.275-3.509.917a4.015 4.015 0 00-1.28 1.808c-.221.629-.333 1.294-.333 1.974 0 1.05.4 2.01 1.057 2.733l-1.414 1.414A5.986 5.986 0 014.332 10.685c0-.914.15-1.808.454-2.658z" clipRule="evenodd" />
+              <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
             </svg>
           </div>
-        </div>
-      </div>
+        </footer>
+      </main>
     </div>
   );
 });
