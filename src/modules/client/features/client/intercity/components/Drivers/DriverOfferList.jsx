@@ -9,8 +9,8 @@ import intercityApi from "../../services/intercityApi";
 const { Text } = Typography;
 
 export default function DriverOfferList() {
+  const cp = useClientText();
   const { fromCity, toCity, travelDate, passengers, selectedOffer, setSelectedOffer } = useIntercity();
-
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [offers, setOffers] = useState([]);
@@ -26,8 +26,8 @@ export default function DriverOfferList() {
         passengers,
       });
       setOffers(Array.isArray(data) ? data : []);
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error(error);
       message.error(cp("Reyslar ro'yxatini olishda xatolik"));
       setOffers([]);
     } finally {
@@ -37,16 +37,15 @@ export default function DriverOfferList() {
 
   useEffect(() => {
     if (!open) return;
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    void load();
   }, [open]);
 
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
     if (!qq) return offers;
-    return offers.filter((x) => {
-      const s = `${x.driver_name || ""} ${x.car_model || ""} ${x.car_plate || ""}`.toLowerCase();
-      return s.includes(qq);
+    return offers.filter((item) => {
+      const haystack = `${item.driver_name || ""} ${item.car_model || ""} ${item.car_plate || ""}`.toLowerCase();
+      return haystack.includes(qq);
     });
   }, [offers, q]);
 
@@ -61,7 +60,7 @@ export default function DriverOfferList() {
       </Button>
 
       <Drawer
-        title=cp("Haydovchilar reyslari")
+        title={cp("Haydovchilar reyslari")}
         placement="bottom"
         height="86vh"
         open={open}
@@ -71,8 +70,8 @@ export default function DriverOfferList() {
         <div style={{ display: "grid", gap: 12 }}>
           <Input
             value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder=cp("Haydovchi / mashina bo'yicha qidirish...")
+            onChange={(event) => setQ(event.target.value)}
+            placeholder={cp("Haydovchi / mashina bo'yicha qidirish...")}
             style={{ height: 46, borderRadius: 14 }}
             allowClear
           />
@@ -81,7 +80,7 @@ export default function DriverOfferList() {
             <Text type="secondary" style={{ fontSize: 12 }}>
               {fromCity?.title} ➝ {toCity?.title} • {travelDate?.format("DD MMM")} • {passengers} yo'lovchi
             </Text>
-            <Button onClick={load} disabled={loading} style={{ borderRadius: 12 }}>
+            <Button onClick={() => void load()} disabled={loading} style={{ borderRadius: 12 }}>
               Yangilash
             </Button>
           </div>
@@ -92,9 +91,7 @@ export default function DriverOfferList() {
               <Skeleton active />
             </div>
           ) : filtered.length === 0 ? (
-            <div style={{ padding: 20, textAlign: "center", color: "#888" }}>
-              Hozircha mos reyslar topilmadi.
-            </div>
+            <div style={{ padding: 20, textAlign: "center", color: "#888" }}>Hozircha mos reyslar topilmadi.</div>
           ) : (
             <div style={{ display: "grid", gap: 10 }}>
               {filtered.map((offer) => (

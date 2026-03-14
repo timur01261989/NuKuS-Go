@@ -1,14 +1,15 @@
-import React from "react";
+import React, { lazy } from "react";
 import { Navigate, Route } from "react-router-dom";
-import DriverHome from "../../modules/driver/pages/DriverHome.jsx";
-import DriverOrders from "../../modules/driver/pages/DriverOrders.jsx";
-import DriverWallet from "../../modules/driver/pages/DriverWallet.jsx";
-import DriverProfile from "../../modules/driver/pages/DriverProfile.jsx";
-import DriverActiveOrder from "../../modules/driver/pages/DriverActiveOrder.jsx";
-import DriverSettings from "../../modules/driver/pages/DriverSettings.jsx";
-import DriverVehicles from "../../modules/driver/pages/DriverVehicles.jsx";
-import DriverInsights from "../../modules/driver/pages/DriverInsights.jsx";
-import DriverReferral from "../../modules/driver/pages/DriverReferral.jsx";
+
+const DriverHome = lazy(() => import("../../modules/driver/pages/DriverHome.jsx"));
+const DriverOrders = lazy(() => import("../../modules/driver/pages/DriverOrders.jsx"));
+const DriverWallet = lazy(() => import("../../modules/driver/pages/DriverWallet.jsx"));
+const DriverProfile = lazy(() => import("../../modules/driver/pages/DriverProfile.jsx"));
+const DriverActiveOrder = lazy(() => import("../../modules/driver/pages/DriverActiveOrder.jsx"));
+const DriverSettings = lazy(() => import("../../modules/driver/pages/DriverSettings.jsx"));
+const DriverVehicles = lazy(() => import("../../modules/driver/pages/DriverVehicles.jsx"));
+const DriverInsights = lazy(() => import("../../modules/driver/pages/DriverInsights.jsx"));
+const DriverReferral = lazy(() => import("../../modules/driver/pages/DriverReferral.jsx"));
 
 function DriverRoutes() {
   return (

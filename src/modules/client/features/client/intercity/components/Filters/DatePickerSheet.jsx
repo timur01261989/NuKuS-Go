@@ -8,6 +8,7 @@ import { useIntercity } from "../../context/IntercityContext";
 const { Text } = Typography;
 
 export default function DatePickerSheet() {
+  const cp = useClientText();
   const { travelDate, setTravelDate } = useIntercity();
   const [open, setOpen] = React.useState(false);
 
@@ -22,7 +23,7 @@ export default function DatePickerSheet() {
       </Button>
 
       <Drawer
-        title=cp("Sana tanlash")
+        title={cp("Sana tanlash")}
         placement="bottom"
         height={320}
         open={open}
@@ -33,8 +34,8 @@ export default function DatePickerSheet() {
           <Text type="secondary">Qachon yo'lga chiqasiz?</Text>
           <DatePicker
             value={travelDate}
-            onChange={(v) => v && setTravelDate(v)}
-            disabledDate={(d) => d && d.isBefore(dayjs().startOf("day"))}
+            onChange={(value) => value && setTravelDate(value)}
+            disabledDate={(dateValue) => dateValue && dateValue.isBefore(dayjs().startOf("day"))}
             style={{ width: "100%", height: 46, borderRadius: 14 }}
           />
           <Button type="primary" onClick={() => setOpen(false)} style={{ height: 46, borderRadius: 14 }}>

@@ -4,8 +4,7 @@ import { fileURLToPath, URL } from "node:url";
 
 export default defineConfig({
   plugins: [react()],
-  base: "/", // MUHIM! Vercel uchun
-
+  base: "/",
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
@@ -13,16 +12,11 @@ export default defineConfig({
       "@i18n": fileURLToPath(new URL("./src/i18n", import.meta.url)),
     },
   },
-
   server: {
     host: "0.0.0.0",
     allowedHosts: true,
     port: 5173,
   },
-
-  // optimizeDeps.force: true olib tashlandi — har build sekinlashtirardi
-  // Faqat kerak bo'lganda (yangi dependency qo'shilganda) qo'lda ishlatiladi:
-  // vite --force
   optimizeDeps: {
     include: [
       "react",
@@ -38,14 +32,10 @@ export default defineConfig({
       "axios",
     ],
   },
-
   build: {
-    // console.log larni production builddan olib tashlash
     minify: "esbuild",
     rollupOptions: {
       output: {
-        // Katta kutubxonalarni alohida chunk'larga ajratish
-        // — birinchi sahifa yuklanishi ~40% tez bo'ladi
         manualChunks: {
           "vendor-react": ["react", "react-dom", "react-router-dom"],
           "vendor-antd": ["antd", "@ant-design/icons"],

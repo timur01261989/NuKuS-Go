@@ -1,23 +1,16 @@
 import { useEffect, useRef } from "react";
 import { interProvincialApi } from "../services/interProvincialApi";
-
-let supabase = null;
-try {
-  // eslint-disable-next-line import/no-unresolved
-  supabase = require("@/services/supabase/supabaseClient").supabase;
-} catch (e) {
-  supabase = null;
-}
+import { supabase } from "@/services/supabase/supabaseClient";
 
 /**
  * Realtime: inter_prov_seat_requests INSERT eventlarni tinglaydi.
- * Agar supabase yo'q bo'lsa: polling fallback.
+ * Agar realtime client ishlamasa: polling fallback.
  */
 export function useTripSocket({ tripId, dispatch }) {
   const pollRef = useRef(null);
 
   useEffect(() => {
-    if (!tripId) return;
+    if (!tripId) return undefined;
 
     let mounted = true;
 
@@ -26,11 +19,9 @@ export function useTripSocket({ tripId, dispatch }) {
       if (mounted) dispatch({ type: "SET_SEAT_REQUESTS", requests: list });
     };
 
-    // 1) initial load
-    setRequests();
+    void setRequests();
 
-    // 2) realtime
-    if (supabase) {
+    if (supabase?.channel) {
       const channel = supabase
         .channel(`interprov_seat_requests:${tripId}`)
         .on(
@@ -44,8 +35,7 @@ export function useTripSocket({ tripId, dispatch }) {
           "postgres_changes",
           { event: "UPDATE", schema: "public", table: "inter_prov_seat_requests", filter: `trip_id=eq.${tripId}` },
           () => {
-            // yangilangan bo'lsa listni sync qilib olamiz
-            setRequests();
+            void setRequests();
           }
         )
         .subscribe();
@@ -56,8 +46,9 @@ export function useTripSocket({ tripId, dispatch }) {
       };
     }
 
-    // 3) polling fallback
-    pollRef.current = setInterval(setRequests, 8000);
+    pollRef.current = setInterval(() => {
+      void setRequests();
+    }, 8000);
 
     return () => {
       mounted = false;

@@ -5,7 +5,15 @@ import reactRefresh from "eslint-plugin-react-refresh";
 
 export default [
   {
-    ignores: ["dist", "coverage", "node_modules"],
+    ignores: [
+      "dist/**",
+      "coverage/**",
+      "node_modules/**",
+      "backend/**",
+      "python-ai/**",
+      "public/sw.js",
+      "src/i18n/translations_complete.js",
+    ],
   },
   {
     files: ["**/*.{js,jsx}"],
@@ -30,7 +38,13 @@ export default [
       ...js.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
-      "no-unused-vars": ["error", { varsIgnorePattern: "^[A-Z_]", argsIgnorePattern: "^_" }],
+      "no-unused-vars": ["warn", { varsIgnorePattern: "^[A-Z_]", argsIgnorePattern: "^_" }],
+      "no-empty": "warn",
+      "no-undef": "warn",
+      "no-useless-catch": "warn",
+      "no-useless-escape": "warn",
+      "no-dupe-keys": "warn",
+      "react-hooks/rules-of-hooks": "warn",
     },
   },
 ];

@@ -1,18 +1,19 @@
-import React from "react";
+import React, { lazy } from "react";
 import { Navigate, Route } from "react-router-dom";
-import Home from "../../modules/client/pages/Home.jsx";
-import TaxiOrder from "../../modules/client/pages/TaxiOrder.jsx";
-import DeliveryOrder from "../../modules/client/pages/DeliveryOrder.jsx";
-import FreightOrder from "../../modules/client/pages/FreightOrder.jsx";
-import IntercityOrder from "../../modules/client/pages/IntercityOrder.jsx";
-import InterdistrictOrder from "../../modules/client/pages/InterdistrictOrder.jsx";
-import Wallet from "../../modules/client/pages/Wallet.jsx";
-import Profile from "../../modules/client/pages/Profile.jsx";
-import Referral from "../../modules/client/pages/Referral.jsx";
-import Settings from "../../modules/client/pages/Settings.jsx";
-import AutoMarket from "../../modules/client/pages/AutoMarket.jsx";
-import ClientNavigator from "../../modules/client/pages/ClientNavigator.jsx";
-import ClientPromo from "../../modules/client/features/client/pages/ClientPromo.jsx";
+
+const Home = lazy(() => import("../../modules/client/pages/Home.jsx"));
+const TaxiOrder = lazy(() => import("../../modules/client/pages/TaxiOrder.jsx"));
+const DeliveryOrder = lazy(() => import("../../modules/client/pages/DeliveryOrder.jsx"));
+const FreightOrder = lazy(() => import("../../modules/client/pages/FreightOrder.jsx"));
+const IntercityOrder = lazy(() => import("../../modules/client/pages/IntercityOrder.jsx"));
+const InterdistrictOrder = lazy(() => import("../../modules/client/pages/InterdistrictOrder.jsx"));
+const Wallet = lazy(() => import("../../modules/client/pages/Wallet.jsx"));
+const Profile = lazy(() => import("../../modules/client/pages/Profile.jsx"));
+const Referral = lazy(() => import("../../modules/client/pages/Referral.jsx"));
+const Settings = lazy(() => import("../../modules/client/pages/Settings.jsx"));
+const AutoMarket = lazy(() => import("../../modules/client/pages/AutoMarket.jsx"));
+const ClientNavigator = lazy(() => import("../../modules/client/pages/ClientNavigator.jsx"));
+const ClientPromo = lazy(() => import("../../modules/client/features/client/pages/ClientPromo.jsx"));
 
 function ClientRoutes() {
   return (

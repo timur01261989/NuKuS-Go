@@ -94,7 +94,7 @@ export async function wallet_transactions_handler(req, res) {
     const sb = getSupabaseAdmin();
     const { data, error } = await sb
       .from('wallet_transactions')
-      .select('id,user_id,direction,kind,service_type,amount_uzs,order_id,description,metadata,meta,created_at')
+      .select('id,user_id,direction,kind,service_type,amount_uzs,order_id,description,metadata,created_at')
       .eq('user_id', user_id)
       .order('created_at', { ascending: false })
       .limit(100);

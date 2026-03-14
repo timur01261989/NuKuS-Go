@@ -2,6 +2,46 @@ import { json, serverError, badRequest } from '../_shared/cors.js';
 import { getSupabaseAdmin, getAuthedUserId } from '../_shared/supabase.js';
 import { processCancellationPipeline, processCompletionPipeline } from '../_shared/orders/orderCompletionPipeline.js';
 
+const DELIVERY_ORDER_COLUMNS = [
+  'id',
+  'user_id',
+  'driver_user_id',
+  'created_by',
+  'service_mode',
+  'status',
+  'parcel_type',
+  'parcel_label',
+  'weight_kg',
+  'price',
+  'price_uzs',
+  'commission_amount',
+  'payment_method',
+  'comment',
+  'note',
+  'receiver_name',
+  'receiver_phone',
+  'sender_phone',
+  'pickup_mode',
+  'dropoff_mode',
+  'pickup_region',
+  'pickup_district',
+  'pickup_label',
+  'pickup_lat',
+  'pickup_lng',
+  'dropoff_region',
+  'dropoff_district',
+  'dropoff_label',
+  'dropoff_lat',
+  'dropoff_lng',
+  'matched_trip_id',
+  'matched_trip_title',
+  'matched_driver_user_id',
+  'matched_driver_name',
+  'history',
+  'created_at',
+  'updated_at',
+].join(',');
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -66,13 +106,12 @@ export default async function handler(req, res) {
     const authedUserId = await getAuthedUserId(req, sb);
 
     if (!authedUserId) return json(res, 401, { ok: false, error: 'Unauthorized' });
-
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Method not allowed' });
 
     if (action === 'list_my_orders') {
       const { data, error } = await sb
         .from('delivery_orders')
-        .select('*')
+        .select(DELIVERY_ORDER_COLUMNS)
         .eq('user_id', authedUserId)
         .order('created_at', { ascending: false });
       if (error) throw error;
@@ -82,7 +121,7 @@ export default async function handler(req, res) {
     if (action === 'list_driver_orders') {
       const { data, error } = await sb
         .from('delivery_orders')
-        .select('*')
+        .select(DELIVERY_ORDER_COLUMNS)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return json(res, 200, { ok: true, orders: data || [] });
@@ -90,7 +129,7 @@ export default async function handler(req, res) {
 
     if (action === 'create_order') {
       const row = normalizeOrder(body.payload || body.order || body, authedUserId);
-      const { data, error } = await sb.from('delivery_orders').insert(row).select('*').single();
+      const { data, error } = await sb.from('delivery_orders').insert(row).select(DELIVERY_ORDER_COLUMNS).single();
       if (error) throw error;
       return json(res, 200, { ok: true, order: data });
     }
@@ -104,7 +143,7 @@ export default async function handler(req, res) {
         .update(patch)
         .eq('id', orderId)
         .eq('user_id', authedUserId)
-        .select('*')
+        .select(DELIVERY_ORDER_COLUMNS)
         .single();
       if (error) throw error;
       return json(res, 200, { ok: true, order: data });
@@ -123,7 +162,11 @@ export default async function handler(req, res) {
       const nextStatus = String(body.status || '').trim();
       if (!orderId || !nextStatus) return badRequest(res, 'id va status kerak');
 
-      const { data: order, error: orderError } = await sb.from('delivery_orders').select('*').eq('id', orderId).single();
+      const { data: order, error: orderError } = await sb
+        .from('delivery_orders')
+        .select(DELIVERY_ORDER_COLUMNS)
+        .eq('id', orderId)
+        .single();
       if (orderError) throw orderError;
 
       const patch = { ...(body.patch || {}), status: nextStatus, updated_at: nowIso() };
@@ -133,16 +176,15 @@ export default async function handler(req, res) {
         patch.matched_driver_name = body.driver_name || order.matched_driver_name || 'Haydovchi';
       }
 
-      const history = Array.isArray(body.history)
+      patch.history = Array.isArray(body.history)
         ? body.history
         : Array.isArray(order.history)
-        ? order.history
-        : [];
-      patch.history = history;
+          ? order.history
+          : [];
 
       let query = sb.from('delivery_orders').update(patch).eq('id', orderId);
       if (nextStatus === 'accepted') query = query.in('status', ['searching', 'pending']);
-      const { data, error } = await query.select('*').single();
+      const { data, error } = await query.select(DELIVERY_ORDER_COLUMNS).single();
       if (error) throw error;
 
       let pipeline = null;

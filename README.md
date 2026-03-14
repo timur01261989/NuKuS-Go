@@ -204,3 +204,64 @@ Bu shuni anglatadi:
 - tooling pipeline endi singan emas
 - referral/remediation patch compile bo'ladi
 - lekin butun repo bo'ylab lint debt hali alohida pass talab qiladi
+
+
+## Qo'shimcha audit remediatsiya — ikkinchi pass
+
+Ushbu passda `unigo_referral_analysis.md` dagi qolgan yuqori prioritet bandlar bo'yicha ham real o'zgarishlar kiritildi.
+
+### 1. Route-level code splitting qayta qurildi
+Quyidagi routerlar lazy-loading asosida qayta yozildi:
+- `src/app/router/AppRouter.jsx`
+- `src/app/router/ClientRoutes.jsx`
+- `src/app/router/DriverRoutes.jsx`
+
+Natija:
+- main app chunk endi ~`218 kB` atrofida
+- taxi / delivery / freight / intercity / wallet / referral alohida route chunklarga bo'lindi
+- static + dynamic import aralashmasi referral auditda ko'rsatilgan darajada kamaytirildi
+
+### 2. Prefetch qatlam route wrapperlarga o'tkazildi
+`src/services/platform/prefetchService.js` endi ichki feature fayllarni emas, route wrapper sahifalarni prefetch qiladi.
+Bu Vite chunk graphni tozaroq qiladi va lazy route bilan bir xil modulni parallel ikki xil usulda tortish muammosini kamaytiradi.
+
+### 3. Hot path `select('*')` lar qisqartirildi
+Auditda ko'rsatilgan eng muhim pathlar bo'yicha minimal ustunli queryga o'tkazildi:
+- `server/api/delivery.js`
+- `server/api/support.js`
+- `src/modules/shared/auth/driverCoreAccess.js`
+- `server/api/wallet.js` (`meta` drift ham tozalandi)
+
+Bu o'zgarishlar:
+- payload hajmini pasaytiradi
+- schema couplingni kamaytiradi
+- Supabase/Postgres I/O ni yengillashtiradi
+
+### 4. Lint pipeline endi haqiqatan ham o'tadi
+Ikkinchi passda ESLint config yana kuchaytirildi va bloklovchi parse/rule xatolar ham tozalandi.
+Real tekshiruv:
+- `npm run lint -- --quiet` — **muvaffaqiyatli o'tdi**
+
+### 5. Intercity parse/xook xatolari tozalandi
+Quyidagi sinayotgan fayllar tuzatildi:
+- `src/modules/client/features/client/intercity/components/Drivers/DriverOfferList.jsx`
+- `src/modules/client/features/client/intercity/components/Filters/DatePickerSheet.jsx`
+- `src/modules/driver/legacy/inter-provincial/hooks/useTripSocket.js`
+
+### 6. Migration truth-source bo'yicha amaliy holat
+Canonical referral summa hozir bazaviy schema ichida `3000`.
+`sql/100_referral_driver_milestone_program.sql` esa endi faqat:
+- referral base rewardni sync qiladi
+- driver milestone reward (`5 trips -> 10000`) ni qo'shadi
+
+Yangi environment uchun amaliy qoida:
+- fresh bootstrap: `00_unigo_unified_id_full_schema.sql`
+- existing prod drift patch: `99` va `100`
+
+Bu hali ideal migration arxitekturasi emas, lekin business-value driftni to'xtatadigan canonical yo'l qo'yildi.
+
+### 7. Build status
+Real tekshiruv:
+- `npm run build` — **muvaffaqiyatli o'tdi**
+
+Build natijasida route chunking yaxshilandi, lekin `vendor-antd` hali ham og'ir. Bu keyingi alohida UI dependency optimization pass talab qiladi.

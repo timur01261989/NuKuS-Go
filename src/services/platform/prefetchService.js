@@ -6,7 +6,7 @@ export function makeChunkPrefetcher(loader) {
     started = true;
 
     try {
-      loader();
+      void loader();
     } catch {
       // noop
     }
@@ -14,11 +14,13 @@ export function makeChunkPrefetcher(loader) {
 }
 
 export const prefetch = {
-  taxi: makeChunkPrefetcher(() => import("../../modules/client/features/client/taxi/ClientTaxiPage.jsx")),
-  freight: makeChunkPrefetcher(() => import("../../modules/client/features/client/freight/ClientFreightPage.jsx")),
-  intercity: makeChunkPrefetcher(() => import("../../modules/client/features/client/intercity/ClientIntercityPage.jsx")),
-  interDistrict: makeChunkPrefetcher(() => import("../../modules/client/features/client/interDistrict/ClientInterDistrictPage.jsx")),
-  delivery: makeChunkPrefetcher(() => import("../../modules/client/features/client/delivery/DeliveryPage.jsx")),
+  taxi: makeChunkPrefetcher(() => import("../../modules/client/pages/TaxiOrder.jsx")),
+  freight: makeChunkPrefetcher(() => import("../../modules/client/pages/FreightOrder.jsx")),
+  intercity: makeChunkPrefetcher(() => import("../../modules/client/pages/IntercityOrder.jsx")),
+  interDistrict: makeChunkPrefetcher(() => import("../../modules/client/pages/InterdistrictOrder.jsx")),
+  delivery: makeChunkPrefetcher(() => import("../../modules/client/pages/DeliveryOrder.jsx")),
+  wallet: makeChunkPrefetcher(() => import("../../modules/client/pages/Wallet.jsx")),
+  referral: makeChunkPrefetcher(() => import("../../modules/client/pages/Referral.jsx")),
 };
 
 export default prefetch;
