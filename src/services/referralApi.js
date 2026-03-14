@@ -4,6 +4,14 @@ export function getReferralSummary() {
   return getJson('/api/referral');
 }
 
+export function resolveReferralCode(code) {
+  const normalizedCode = String(code || '').trim().toUpperCase();
+  if (!normalizedCode) {
+    throw new Error('Referral code kerak');
+  }
+  return getJson(`/api/referral?action=resolve&code=${encodeURIComponent(normalizedCode)}`);
+}
+
 export function applyReferralCode({ code, device_hash }) {
   return postJson('/api/referral', {
     action: 'apply',
@@ -14,6 +22,7 @@ export function applyReferralCode({ code, device_hash }) {
 
 const referralApi = {
   getReferralSummary,
+  resolveReferralCode,
   applyReferralCode,
 };
 

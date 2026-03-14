@@ -68,7 +68,7 @@ export async function fetchProfileByUserId(userId) {
     return { data: null, error: null };
   }
 
-  const result = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
+  const result = await supabase.from("profiles").select("id,role,current_role,is_admin,phone,phone_normalized,full_name,avatar_url,updated_at").eq("id", userId).maybeSingle();
 
   return {
     data: result.data ?? null,
@@ -94,7 +94,7 @@ export async function upsertMinimalClientProfile(user) {
   const result = await supabase
     .from("profiles")
     .upsert(payload, { onConflict: "id" })
-    .select("*")
+    .select("id,role,current_role,is_admin,phone,phone_normalized,full_name,avatar_url,updated_at")
     .maybeSingle();
 
   return { data: result.data ?? null, error: result.error ?? null };

@@ -8,9 +8,11 @@ import IntercityOrder from "../../modules/client/pages/IntercityOrder.jsx";
 import InterdistrictOrder from "../../modules/client/pages/InterdistrictOrder.jsx";
 import Wallet from "../../modules/client/pages/Wallet.jsx";
 import Profile from "../../modules/client/pages/Profile.jsx";
+import Referral from "../../modules/client/pages/Referral.jsx";
 import Settings from "../../modules/client/pages/Settings.jsx";
 import AutoMarket from "../../modules/client/pages/AutoMarket.jsx";
 import ClientNavigator from "../../modules/client/pages/ClientNavigator.jsx";
+import ClientPromo from "../../modules/client/features/client/pages/ClientPromo.jsx";
 
 function ClientRoutes() {
   return (
@@ -24,6 +26,8 @@ function ClientRoutes() {
       <Route path="/interdistrict" element={<InterdistrictOrder />} />
       <Route path="/wallet" element={<Wallet />} />
       <Route path="/profile" element={<Profile />} />
+      <Route path="/referral" element={<Referral />} />
+      <Route path="/promo" element={<ClientPromo />} />
       <Route path="/settings" element={<Settings />} />
       <Route path="/auto-market/*" element={<AutoMarket />} />
       <Route path="/client/navigator" element={<ClientNavigator />} />
@@ -36,6 +40,8 @@ function ClientRoutes() {
       <Route path="/client/inter-district" element={<Navigate replace to="/interdistrict" />} />
       <Route path="/client/wallet" element={<Navigate replace to="/wallet" />} />
       <Route path="/client/profile" element={<Navigate replace to="/profile" />} />
+      <Route path="/client/referral" element={<Navigate replace to="/referral" />} />
+      <Route path="/client/promo" element={<Navigate replace to="/promo" />} />
       <Route path="/client/settings" element={<Navigate replace to="/settings" />} />
       <Route path="/market/*" element={<Navigate replace to="/auto-market" />} />
     </>

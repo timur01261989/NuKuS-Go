@@ -8,6 +8,7 @@ import ClientRoutes from "./ClientRoutes.jsx";
 import DriverRoutes from "./DriverRoutes.jsx";
 import AuthPage from "../../modules/client/features/auth/pages/Auth.jsx";
 import RegisterPage from "../../modules/client/features/auth/pages/Register.jsx";
+import ReferralInviteLanding from "../../modules/client/features/auth/pages/ReferralInviteLanding.jsx";
 import DriverRegisterPage from "../../modules/driver/registration/DriverRegister.jsx";
 import DriverPendingPage from "../../modules/driver/registration/DriverPending.jsx";
 
@@ -22,6 +23,8 @@ function AppRouterComponent({ appRole }) {
       <Routes>
         <Route path="/login" element={<AuthPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/r/:code" element={<ReferralInviteLanding />} />
+        <Route path="/invite/:code" element={<ReferralInviteLanding />} />
         <Route path="/reset-password" element={<Navigate replace to="/login" />} />
 
         <Route element={<AuthGuard />}>

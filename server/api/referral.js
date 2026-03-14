@@ -1,6 +1,7 @@
 import { applyCors, json, badRequest, serverError } from '../_shared/cors.js';
-import { getAuthedContext, getProfileByUserId } from '../_shared/rewards.js';
+import { getAuthedContext } from '../_shared/rewards.js';
 import { getRewardService } from '../_shared/reward-engine/factory.js';
+import { getSupabaseAdmin, getBearerToken } from '../_shared/supabase.js';
 
 async function readBody(req) {
   if (req.body && typeof req.body === 'object') return req.body;
@@ -18,20 +19,130 @@ async function readBody(req) {
   }
 }
 
+function getUrl(req) {
+  return new URL(req.url, 'http://localhost');
+}
+
+function normalizeReferralCode(value) {
+  return String(value || '').trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 32);
+}
+
+function getRequestIp(req) {
+  const forwarded = req?.headers?.['x-forwarded-for'] || req?.headers?.['X-Forwarded-For'] || '';
+  if (forwarded) {
+    return String(forwarded).split(',')[0].trim();
+  }
+  return String(req?.socket?.remoteAddress || req?.connection?.remoteAddress || '').trim() || null;
+}
+
+function getUserAgent(req) {
+  return String(req?.headers?.['user-agent'] || '').trim() || null;
+}
+
+async function logReferralBonusEvent(sb, payload) {
+  try {
+    await sb.from('bonus_events').insert({
+      event_type: 'referral_link_opened',
+      user_id: null,
+      related_user_id: payload.related_user_id || null,
+      source_id: payload.source_id || null,
+      source_type: 'referral_link',
+      payload_json: {
+        code: payload.code || null,
+        ip_address: payload.ip_address || null,
+        user_agent: payload.user_agent || null,
+        referer: payload.referer || null,
+        path: payload.path || null,
+      },
+      status: 'done',
+      attempt_count: 0,
+      last_error: null,
+      processed_at: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.warn('[referral] failed to log referral_link_opened bonus_event:', error?.message || error);
+  }
+}
+
+async function resolveReferralPublic(sb, req, res, url) {
+  const rewardService = getRewardService(sb);
+  const referralCodeValue = normalizeReferralCode(url.searchParams.get('code'));
+
+  if (!referralCodeValue) {
+    return badRequest(res, 'referral code kerak');
+  }
+
+  const codeRow = await rewardService.repositories.referrals.getCodeByCode(referralCodeValue);
+  if (!codeRow) {
+    return json(res, 404, {
+      ok: false,
+      valid: false,
+      error: 'Referral code topilmadi',
+      code: referralCodeValue,
+    });
+  }
+
+  const { data: inviterProfile, error: inviterProfileError } = await sb
+    .from('profiles')
+    .select('id,full_name,avatar_url,phone')
+    .eq('id', codeRow.user_id)
+    .maybeSingle();
+
+  if (inviterProfileError) {
+    throw inviterProfileError;
+  }
+
+  await logReferralBonusEvent(sb, {
+    related_user_id: codeRow.user_id,
+    source_id: codeRow.id,
+    code: codeRow.code,
+    ip_address: getRequestIp(req),
+    user_agent: getUserAgent(req),
+    referer: String(req?.headers?.referer || req?.headers?.Referer || '').trim() || null,
+    path: url.pathname,
+  });
+
+  return json(res, 200, {
+    ok: true,
+    valid: true,
+    code: {
+      id: codeRow.id,
+      code: codeRow.code,
+      user_id: codeRow.user_id,
+      is_active: codeRow.is_active,
+      created_at: codeRow.created_at,
+      updated_at: codeRow.updated_at,
+    },
+    inviter: {
+      user_id: inviterProfile?.id || codeRow.user_id,
+      full_name: inviterProfile?.full_name || 'UniGo foydalanuvchisi',
+      avatar_url: inviterProfile?.avatar_url || null,
+      phone: inviterProfile?.phone || null,
+    },
+  });
+}
+
 export default async function handler(req, res) {
   applyCors(req, res);
   if (req.method === 'OPTIONS') return json(res, 204, { ok: true });
 
   try {
-    const { sb, userId, ipAddress } = await getAuthedContext(req);
-    if (!userId) return json(res, 401, { ok: false, error: 'Unauthorized' });
-
-    const rewardService = getRewardService(sb);
     const body = await readBody(req);
-    const url = new URL(req.url, 'http://localhost');
+    const url = getUrl(req);
     const action = String(body.action || url.searchParams.get('action') || 'summary').trim().toLowerCase();
 
-    const profile = await getProfileByUserId(sb, userId);
+    if (req.method === 'GET' && action === 'resolve') {
+      const sb = getSupabaseAdmin();
+      return await resolveReferralPublic(sb, req, res, url);
+    }
+
+    const { sb, userId, ipAddress } = await getAuthedContext(req);
+    if (!userId || !getBearerToken(req)) {
+      return json(res, 401, { ok: false, error: 'Unauthorized' });
+    }
+
+    const rewardService = getRewardService(sb);
+    const profile = await rewardService.repositories.profiles.getByUserId(userId);
     const myCode = await rewardService.getOrCreateReferralCode(
       userId,
       profile?.phone_normalized || profile?.phone || userId,
@@ -51,7 +162,7 @@ export default async function handler(req, res) {
     }
 
     if (action === 'apply') {
-      const referralCodeValue = String(body.code || body.referral_code || '').trim().toUpperCase();
+      const referralCodeValue = normalizeReferralCode(body.code || body.referral_code || '');
       const deviceHash = String(body.device_hash || '').trim() || null;
       if (!referralCodeValue) return badRequest(res, 'referral code kerak');
 
@@ -72,7 +183,12 @@ export default async function handler(req, res) {
       return json(res, 200, {
         ok: true,
         referral,
-        code: codeRow,
+        code: {
+          id: codeRow.id,
+          code: codeRow.code,
+          user_id: codeRow.user_id,
+          is_active: codeRow.is_active,
+        },
       });
     }
 
