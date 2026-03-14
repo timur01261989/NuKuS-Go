@@ -1,11 +1,6 @@
 import { applyCors, json, badRequest, serverError } from '../_shared/cors.js';
-import {
-  ensureReferralApplied,
-  getAuthedContext,
-  getOrCreateReferralCode,
-  getProfileByUserId,
-  getReferralSummary,
-} from '../_shared/rewards.js';
+import { getAuthedContext, getProfileByUserId } from '../_shared/rewards.js';
+import { getRewardService } from '../_shared/reward-engine/factory.js';
 
 async function readBody(req) {
   if (req.body && typeof req.body === 'object') return req.body;
@@ -31,15 +26,19 @@ export default async function handler(req, res) {
     const { sb, userId, ipAddress } = await getAuthedContext(req);
     if (!userId) return json(res, 401, { ok: false, error: 'Unauthorized' });
 
+    const rewardService = getRewardService(sb);
     const body = await readBody(req);
     const url = new URL(req.url, 'http://localhost');
     const action = String(body.action || url.searchParams.get('action') || 'summary').trim().toLowerCase();
 
     const profile = await getProfileByUserId(sb, userId);
-    const myCode = await getOrCreateReferralCode(sb, userId, profile?.phone_normalized || profile?.phone || '');
+    const myCode = await rewardService.getOrCreateReferralCode(
+      userId,
+      profile?.phone_normalized || profile?.phone || userId,
+    );
 
     if (req.method === 'GET' || action === 'summary') {
-      const summary = await getReferralSummary(sb, userId);
+      const summary = await rewardService.repositories.referrals.listSummary(userId);
       return json(res, 200, {
         ok: true,
         code: myCode,
@@ -52,24 +51,17 @@ export default async function handler(req, res) {
     }
 
     if (action === 'apply') {
-      const referralCode = String(body.code || body.referral_code || '').trim().toUpperCase();
+      const referralCodeValue = String(body.code || body.referral_code || '').trim().toUpperCase();
       const deviceHash = String(body.device_hash || '').trim() || null;
-      if (!referralCode) return badRequest(res, 'referral code kerak');
+      if (!referralCodeValue) return badRequest(res, 'referral code kerak');
 
-      const { data: codeRow, error: codeError } = await sb
-        .from('referral_codes')
-        .select('id,user_id,code,is_active')
-        .eq('code', referralCode)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (codeError) throw codeError;
+      const codeRow = await rewardService.repositories.referrals.getCodeByCode(referralCodeValue);
       if (!codeRow) return badRequest(res, 'Referral code topilmadi');
       if (String(codeRow.user_id) === String(userId)) {
         return badRequest(res, 'O\'zingizning referral codingizni ishlata olmaysiz');
       }
 
-      const referral = await ensureReferralApplied(sb, {
+      const referral = await rewardService.applyReferral({
         referrerUserId: codeRow.user_id,
         referredUserId: userId,
         referralCodeId: codeRow.id,

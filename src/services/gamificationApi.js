@@ -34,7 +34,7 @@ export function getDriverStatus(userId) {
 
 /** Mijoz cashback balllar */
 export function getClientBonuses(userId) {
-  return getJson(`/api/gamification?action=client_bonuses&user_id=${encodeURIComponent(userId)}`);
+  return getJson(`/api/gamification?action=wallet_bonuses&user_id=${encodeURIComponent(userId)}`);
 }
 
 /** Barcha darajalar ro'yxati */
@@ -60,7 +60,7 @@ export function useBonusPoints({ userId, points, orderId }) {
 /** Admin: daraja tahrirlash */
 export function adminUpdateLevel(callerUserId, levelId, data) {
   return postJson("/api/gamification", {
-    action: "admin_update_level",
+    action: "update_level",
     level_id: levelId,
     data,
   });
@@ -69,7 +69,7 @@ export function adminUpdateLevel(callerUserId, levelId, data) {
 /** Admin: missiya tahrirlash */
 export function adminUpdateMission(callerUserId, missionId, data) {
   return postJson("/api/gamification", {
-    action: "admin_update_mission",
+    action: "update_mission",
     mission_id: missionId,
     data,
   });
@@ -78,7 +78,7 @@ export function adminUpdateMission(callerUserId, missionId, data) {
 /** Admin: yangi missiya yaratish */
 export function adminCreateMission(callerUserId, data) {
   return postJson("/api/gamification", {
-    action: "admin_create_mission",
+    action: "create_mission",
     data,
   });
 }
@@ -86,7 +86,7 @@ export function adminCreateMission(callerUserId, data) {
 /** Admin: missiya o'chirish */
 export function adminDeleteMission(callerUserId, missionId) {
   return postJson("/api/gamification", {
-    action: "admin_delete_mission",
+    action: "delete_mission",
     mission_id: missionId,
   });
 }
