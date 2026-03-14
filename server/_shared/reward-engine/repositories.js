@@ -19,13 +19,87 @@ export class ProfileRepository {
     this.sb = sb;
   }
 
-  async getByUserId(userId) {
+  async getBasicByUserId(userId) {
     if (!userId) return null;
     const { data, error } = await this.sb
       .from('profiles')
-      .select('id,phone,phone_normalized,role,current_role,is_test_user')
+      .select('id,phone,full_name,role,current_role,created_at,updated_at')
       .eq('id', userId)
-      .maybeSingle();
+      .limit(1);
+    if (error) throw error;
+    return Array.isArray(data) ? (data[0] || null) : (data || null);
+  }
+
+  async getByUserId(userId) {
+    if (!userId) return null;
+
+    const primary = await this.sb
+      .from('profiles')
+      .select('id,phone,phone_normalized,role,current_role,is_test_user,full_name,avatar_url')
+      .eq('id', userId)
+      .limit(1);
+
+    if (!primary.error) {
+      const row = Array.isArray(primary.data) ? (primary.data[0] || null) : (primary.data || null);
+      return row || null;
+    }
+
+    const fallback = await this.sb
+      .from('profiles')
+      .select('id,phone,full_name,avatar_url,role,current_role,created_at,updated_at')
+      .eq('id', userId)
+      .limit(1);
+    if (fallback.error) throw fallback.error;
+
+    const row = Array.isArray(fallback.data) ? (fallback.data[0] || null) : (fallback.data || null);
+    if (!row) return null;
+    return {
+      id: row.id,
+      phone: row.phone || null,
+      phone_normalized: row.phone || null,
+      role: row.role || 'client',
+      current_role: row.current_role || row.role || 'client',
+      is_test_user: false,
+      full_name: row.full_name || null,
+      avatar_url: row.avatar_url || null,
+    };
+  }
+
+  async ensureForAuthUser(authUser, options = {}) {
+    const userId = authUser?.id || options?.userId || null;
+    if (!userId) return null;
+
+    const existing = await this.getBasicByUserId(userId).catch(() => null);
+    if (existing) {
+      return existing;
+    }
+
+    const rawRole = String(options?.role || authUser?.user_metadata?.role || 'client').toLowerCase();
+    const normalizedRole = ['client', 'driver', 'both', 'admin'].includes(rawRole) ? rawRole : 'client';
+    const fullName = String(
+      options?.fullName
+        || authUser?.user_metadata?.full_name
+        || authUser?.user_metadata?.name
+        || authUser?.phone
+        || ''
+    ).trim();
+
+    const insertPayload = {
+      id: userId,
+      phone: authUser?.phone || options?.phone || null,
+      full_name: fullName || null,
+      role: normalizedRole,
+      current_role: normalizedRole,
+      metadata: authUser?.user_metadata && typeof authUser.user_metadata === 'object'
+        ? authUser.user_metadata
+        : {},
+    };
+
+    const { data, error } = await this.sb
+      .from('profiles')
+      .upsert(insertPayload, { onConflict: 'id' })
+      .select('id,phone,full_name,role,current_role,created_at,updated_at')
+      .single();
     if (error) throw error;
     return data || null;
   }
@@ -443,13 +517,15 @@ export class ReferralRepository {
   }
 
   async getCodeByUserId(userId) {
+    if (!userId) return null;
     const { data, error } = await this.sb
       .from('referral_codes')
       .select('id,user_id,code,is_active,created_at,updated_at')
       .eq('user_id', userId)
-      .maybeSingle();
+      .order('created_at', { ascending: false })
+      .limit(1);
     if (error) throw error;
-    return data || null;
+    return Array.isArray(data) ? (data[0] || null) : (data || null);
   }
 
   async getCodeByCode(code) {
@@ -460,15 +536,17 @@ export class ReferralRepository {
       .select('id,user_id,code,is_active,created_at,updated_at')
       .eq('code', normalizedCode)
       .eq('is_active', true)
-      .maybeSingle();
+      .order('created_at', { ascending: false })
+      .limit(1);
     if (error) throw error;
-    return data || null;
+    return Array.isArray(data) ? (data[0] || null) : (data || null);
   }
 
   async createCode(userId, code) {
+    const normalizedCode = String(code || '').trim().toUpperCase();
     const { data, error } = await this.sb
       .from('referral_codes')
-      .insert({ user_id: userId, code: String(code || '').trim().toUpperCase(), is_active: true })
+      .insert({ user_id: userId, code: normalizedCode, is_active: true })
       .select('id,user_id,code,is_active,created_at,updated_at')
       .single();
     if (error) throw error;

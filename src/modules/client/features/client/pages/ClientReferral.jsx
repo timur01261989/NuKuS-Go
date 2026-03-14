@@ -102,7 +102,10 @@ const ClientReferral = memo(function ClientReferral() {
         config: response?.config || null,
       };
       setSummaryState(nextState);
-      if (response?.degraded) {
+      const loadedCode = String(response?.code?.code || '').trim();
+      if (!loadedCode) {
+        setErrorText(tr('referral.codeBootstrapPending', 'Taklif kodingiz hali tayyor bo‘lmadi. Yangilashni bosing yoki qayta kiring.'));
+      } else if (response?.degraded) {
         setErrorText(tr('referral.degradedSummary', 'Referral ma’lumotlari qisman yuklandi. Yangilashni qayta urinib ko‘ring.'));
       }
       return nextState;

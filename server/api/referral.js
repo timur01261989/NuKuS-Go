@@ -138,7 +138,7 @@ export default async function handler(req, res) {
       return await resolveReferralPublic(sb, req, res, url);
     }
 
-    const { sb, userId, ipAddress } = await getAuthedContext(req);
+    const { sb, user, userId, ipAddress } = await getAuthedContext(req);
     if (!userId || !getBearerToken(req)) {
       return json(res, 401, { ok: false, error: 'Unauthorized' });
     }
@@ -157,6 +157,7 @@ export default async function handler(req, res) {
       myCode = await rewardService.getOrCreateReferralCode(
         userId,
         profile?.phone_normalized || profile?.phone || userId,
+        user,
       );
     } catch (error) {
       console.warn('[referral] getOrCreateReferralCode degraded:', error?.message || error);
@@ -210,6 +211,12 @@ export default async function handler(req, res) {
         summary,
         config,
         degraded: Boolean(!myCode || summaryResult.status !== 'fulfilled' || configResult.status !== 'fulfilled' || summary?.degraded),
+        diagnostics: {
+          code_missing: !myCode,
+          summary_status: summaryResult.status,
+          config_status: configResult.status,
+          summary_diagnostics: summary?.diagnostics || null,
+        },
       });
     }
 

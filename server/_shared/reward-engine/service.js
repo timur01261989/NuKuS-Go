@@ -197,29 +197,68 @@ export class RewardService {
     });
   }
 
-  async getOrCreateReferralCode(userId, seedText = '') {
+  async getOrCreateReferralCode(userId, seedText = '', authUser = null) {
+    if (!userId) {
+      throw new Error('referral code userId required');
+    }
+
     const existing = await this.repositories.referrals.getCodeByUserId(userId);
     if (existing) return existing;
+
+    if (authUser?.id) {
+      try {
+        await this.repositories.profiles.ensureForAuthUser(authUser, {
+          userId,
+          phone: authUser?.phone || null,
+          role: authUser?.user_metadata?.role || 'client',
+          fullName: authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || '',
+        });
+      } catch {
+        // continue; createCode will surface the real error if profile bootstrap still fails
+      }
+    }
 
     const baseSeed = String(seedText || userId || 'UNI')
       .replace(/[^A-Za-z0-9]/g, '')
       .toUpperCase()
       .slice(-6) || 'UNI';
 
-    for (let attempt = 0; attempt < 8; attempt += 1) {
+    let lastError = null;
+    for (let attempt = 0; attempt < 12; attempt += 1) {
       const randomChunk = Math.random().toString(36).slice(2, 8).toUpperCase();
       const code = `${baseSeed}${randomChunk}`.slice(0, 12);
       try {
-        return await this.repositories.referrals.createCode(userId, code);
+        const created = await this.repositories.referrals.createCode(userId, code);
+        if (created) return created;
       } catch (error) {
+        lastError = error;
         const message = String(error?.message || '').toLowerCase();
-        if (!message.includes('duplicate') && !message.includes('unique')) {
-          throw error;
+        if (message.includes('duplicate') || message.includes('unique')) {
+          const current = await this.repositories.referrals.getCodeByUserId(userId).catch(() => null);
+          if (current) return current;
+          continue;
         }
+        if ((message.includes('foreign key') || message.includes('violates foreign key')) && authUser?.id) {
+          try {
+            await this.repositories.profiles.ensureForAuthUser(authUser, {
+              userId,
+              phone: authUser?.phone || null,
+              role: authUser?.user_metadata?.role || 'client',
+              fullName: authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || '',
+            });
+            continue;
+          } catch (profileError) {
+            lastError = profileError;
+          }
+        }
+        throw error;
       }
     }
 
-    throw new Error('referral code generation failed');
+    const current = await this.repositories.referrals.getCodeByUserId(userId).catch(() => null);
+    if (current) return current;
+
+    throw lastError || new Error('referral code generation failed');
   }
 
   calculatePromoDiscount(promo, orderTotalUzs) {
