@@ -265,3 +265,12 @@ Real tekshiruv:
 - `npm run build` — **muvaffaqiyatli o'tdi**
 
 Build natijasida route chunking yaxshilandi, lekin `vendor-antd` hali ham og'ir. Bu keyingi alohida UI dependency optimization pass talab qiladi.
+
+
+## Latest stability fixes
+
+- Driver pending approved flow now uses in-app navigation and restores driver mode before redirecting to `/driver`.
+- Client sidebar restored bonus balance card; referral remains only as a menu item.
+- Referral summary/bootstrap endpoint now degrades safely when profile/code bootstrap hits schema drift.
+- Added `sql/101_referral_code_backfill_existing_users.sql` to backfill referral codes for existing users missing a code. Run it before testing `/client/referral` and `/driver/referral`.
+- Auth/profile and driver core fetches now use drift-safe fallback selectors and timeouts to reduce endless loading states on driver pages.

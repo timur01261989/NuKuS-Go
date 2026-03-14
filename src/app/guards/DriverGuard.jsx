@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import Loader from "../../modules/shared/components/Loader.jsx";
 import { useAuth } from "../../modules/shared/auth/AuthProvider.jsx";
@@ -14,9 +14,24 @@ function normalizeStatus(value) {
 function DriverGuardComponent() {
   const location = useLocation();
   const auth = useAuth();
+  const [forceReady, setForceReady] = useState(false);
+
+  useEffect(() => {
+    if (!auth?.loading && auth?.authReady) {
+      setForceReady(false);
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      setForceReady(true);
+      auth?.refetch?.().catch?.(() => {});
+    }, 6000);
+
+    return () => window.clearTimeout(timer);
+  }, [auth?.authReady, auth?.loading, auth?.refetch]);
 
   const decision = useMemo(() => {
-    const isLoading = !auth?.authReady || auth?.loading;
+    const isLoading = !forceReady && (!auth?.authReady || auth?.loading);
     const isAuthed = !!auth?.isAuthed && !!auth?.user;
     const status = normalizeStatus(auth?.applicationStatus);
     const hasApplication = !!auth?.application || !!auth?.driverApp || !!status;
@@ -85,6 +100,7 @@ function DriverGuardComponent() {
     location.hash,
     location.pathname,
     location.search,
+    forceReady,
   ]);
 
   if (decision.mode === "loading") {

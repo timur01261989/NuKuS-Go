@@ -1,6 +1,42 @@
 import { supabase, assertSupabase } from "./supabaseClient.js";
 import { fetchDriverCore } from "../../modules/shared/auth/driverCoreAccess.js";
 
+async function maybeSelectSingle(table, columns, filters = []) {
+  let query = supabase.from(table).select(columns);
+  for (const filter of filters) {
+    if (filter?.op === 'eq') {
+      query = query.eq(filter.column, filter.value);
+    }
+  }
+  return query.maybeSingle();
+}
+
+async function tryProfileSelect(userId, selectors) {
+  let lastError = null;
+  for (const selector of selectors) {
+    const result = await maybeSelectSingle('profiles', selector, [{ op: 'eq', column: 'id', value: userId }]);
+    if (!result.error) {
+      return { data: result.data ?? null, error: null };
+    }
+
+    lastError = result.error;
+    const message = String(result.error?.message || '').toLowerCase();
+    if (!message.includes('column')) {
+      return { data: null, error: result.error };
+    }
+  }
+  return { data: null, error: lastError };
+}
+
+function withTimeout(promise, ms, fallbackFactory) {
+  return Promise.race([
+    promise,
+    new Promise((resolve) => {
+      setTimeout(() => resolve(fallbackFactory()), ms);
+    }),
+  ]);
+}
+
 export function normalizeRole(value) {
   const role = String(value || "client").trim().toLowerCase();
   if (["admin", "driver", "client"].includes(role)) {
@@ -68,10 +104,29 @@ export async function fetchProfileByUserId(userId) {
     return { data: null, error: null };
   }
 
-  const result = await supabase.from("profiles").select("id,role,current_role,is_admin,phone,phone_normalized,full_name,avatar_url,updated_at").eq("id", userId).maybeSingle();
+  const result = await tryProfileSelect(userId, [
+    'id,role,current_role,is_admin,phone,phone_normalized,full_name,avatar_url,updated_at',
+    'id,role,current_role,is_admin,phone,full_name,avatar_url,updated_at',
+    'id,role,current_role,is_admin,phone,updated_at',
+    'id,role,current_role,phone,updated_at',
+    'id,role,current_role,phone',
+  ]);
+
+  if (result.data) {
+    return {
+      data: {
+        phone_normalized: null,
+        full_name: null,
+        avatar_url: null,
+        is_admin: false,
+        ...result.data,
+      },
+      error: null,
+    };
+  }
 
   return {
-    data: result.data ?? null,
+    data: null,
     error: result.error ?? null,
   };
 }
@@ -154,8 +209,8 @@ export async function resolveAuthSession(session, reason = "unknown") {
   const fingerprint = buildSessionFingerprint(requestedSession);
 
   const [profileResult, driverCore] = await Promise.all([
-    fetchProfileByUserId(userId),
-    fetchDriverCore(userId),
+    withTimeout(fetchProfileByUserId(userId), 6000, () => ({ data: null, error: new Error('profile lookup timeout') })),
+    withTimeout(fetchDriverCore(userId), 6000, () => null),
   ]);
 
   let profile = profileResult.data ?? null;

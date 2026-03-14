@@ -30,7 +30,10 @@ const ClientSidebar = memo(function ClientSidebar({ open, onClose, profile }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { t, language, tr } = useLanguage();
-  const [balanceUZS, setBalanceUZS] = useState(null);
+  const [walletState, setWalletState] = useState({
+    balanceUZS: null,
+    bonusBalanceUZS: null,
+  });
 
   const fullName = profile?.fullName || t.userLabel;
   const avatarUrl = profile?.avatarUrl || '';
@@ -51,12 +54,17 @@ const ClientSidebar = memo(function ClientSidebar({ open, onClose, profile }) {
 
         const { getWalletBalance } = await import('@/services/walletApi.js');
         const walletResponse = await getWalletBalance(user.id);
-        const nextBalance = typeof walletResponse?.wallet?.balance_uzs === 'number'
-          ? walletResponse.wallet.balance_uzs
-          : (typeof walletResponse?.balance_uzs === 'number' ? walletResponse.balance_uzs : null);
+        const wallet = walletResponse?.wallet && typeof walletResponse.wallet === 'object'
+          ? walletResponse.wallet
+          : walletResponse;
+        const nextBalance = typeof wallet?.balance_uzs === 'number' ? wallet.balance_uzs : null;
+        const nextBonusBalance = typeof wallet?.bonus_balance_uzs === 'number' ? wallet.bonus_balance_uzs : null;
 
         if (mounted) {
-          setBalanceUZS(nextBalance);
+          setWalletState({
+            balanceUZS: nextBalance,
+            bonusBalanceUZS: nextBonusBalance,
+          });
         }
       } catch (error) {
         console.error('Balance fetch error:', error);
@@ -77,7 +85,8 @@ const ClientSidebar = memo(function ClientSidebar({ open, onClose, profile }) {
     navigate(path, options);
   }, [navigate, onClose]);
 
-  const balanceLabel = useMemo(() => formatClientMoney(language, balanceUZS), [balanceUZS, language]);
+  const balanceLabel = useMemo(() => formatClientMoney(language, walletState.balanceUZS), [walletState.balanceUZS, language]);
+  const bonusBalanceLabel = useMemo(() => formatClientMoney(language, walletState.bonusBalanceUZS), [walletState.bonusBalanceUZS, language]);
 
   const isActive = useCallback((path) => location.pathname === path, [location.pathname]);
 
@@ -146,8 +155,8 @@ const ClientSidebar = memo(function ClientSidebar({ open, onClose, profile }) {
               <p className="text-sm font-bold text-primarySidebar">{balanceLabel}</p>
             </div>
             <div className="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
-              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{tr('referral', 'Taklif')}</p>
-              <p className="text-sm font-bold text-primarySidebar">{tr('inviteFriends', 'Do‘stlarni taklif qilish')}</p>
+              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{tr('bonusBalance', 'Bonus balansi')}</p>
+              <p className="text-sm font-bold text-primarySidebar">{bonusBalanceLabel}</p>
             </div>
           </div>
         </div>

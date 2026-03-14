@@ -186,12 +186,34 @@ export default async function handler(req, res) {
     }
 
     const rewardService = getRewardService(sb);
-    const profile = await rewardService.repositories.profiles.getByUserId(userId);
-    const myCode = await rewardService.getOrCreateReferralCode(
-      userId,
-      profile?.phone_normalized || profile?.phone || userId,
-      { authUser: user },
-    );
+
+    let profile = null;
+    let myCode = null;
+    const warnings = [];
+
+    try {
+      profile = await rewardService.repositories.profiles.getByUserId(userId);
+    } catch (error) {
+      warnings.push(`profile:${String(error?.message || error)}`);
+    }
+
+    try {
+      myCode = await rewardService.getOrCreateReferralCode(
+        userId,
+        profile?.phone_normalized || profile?.phone || userId,
+        { authUser: user },
+      );
+    } catch (error) {
+      warnings.push(`code:${String(error?.message || error)}`);
+      try {
+        if (user?.id) {
+          await rewardService.repositories.profiles.ensureProfile(user);
+          myCode = await rewardService.getOrCreateReferralCode(userId, profile?.phone || userId, { authUser: user });
+        }
+      } catch (retryError) {
+        warnings.push(`code_retry:${String(retryError?.message || retryError)}`);
+      }
+    }
 
     if (req.method === 'GET' || action === 'summary' || action === 'bootstrap') {
       let summary = {
@@ -214,18 +236,18 @@ export default async function handler(req, res) {
         total_earned_uzs: 0,
         is_frozen: false,
       };
-      const warnings = [];
+      const summaryWarnings = [...warnings];
 
       try {
         summary = await rewardService.repositories.referrals.listSummary(userId);
       } catch (error) {
-        warnings.push(`summary:${String(error?.message || error)}`);
+        summaryWarnings.push(`summary:${String(error?.message || error)}`);
       }
 
       try {
         wallet = await rewardService.repositories.wallets.ensureWallet(userId);
       } catch (error) {
-        warnings.push(`wallet:${String(error?.message || error)}`);
+        summaryWarnings.push(`wallet:${String(error?.message || error)}`);
       }
 
       return json(res, 200, {
@@ -234,7 +256,7 @@ export default async function handler(req, res) {
         share_url: buildShareUrl(req, myCode?.code || ''),
         wallet,
         summary,
-        warnings,
+        warnings: summaryWarnings,
       });
     }
 

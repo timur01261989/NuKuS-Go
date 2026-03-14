@@ -1,4 +1,5 @@
 import React, { memo, useCallback, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Alert, Button, Card, ConfigProvider, Result, Space, Typography } from "antd";
 import {
   CheckCircleOutlined,
@@ -48,10 +49,19 @@ function DriverPending({
   rejectionReason = "",
   adminNote = "",
 }) {
+  const navigate = useNavigate();
   useEffect(() => {
     if (status === "approved") {
       const timer = window.setTimeout(() => {
-        window.location.assign("/driver");
+        try {
+          localStorage.setItem("appMode", "driver");
+          localStorage.setItem("currentRole", "driver");
+          localStorage.setItem("selectedRole", "driver");
+          sessionStorage.setItem("appMode", "driver");
+          sessionStorage.setItem("currentRole", "driver");
+          sessionStorage.setItem("selectedRole", "driver");
+        } catch (_error) {}
+        navigate("/driver", { replace: true });
       }, 1500);
 
       return () => window.clearTimeout(timer);
@@ -81,8 +91,8 @@ function DriverPending({
       // storage access blocked bo'lsa ham client route ga o'tish davom etadi
     }
 
-    window.location.assign("/client/home");
-  }, []);
+    navigate("/client/home", { replace: true });
+  }, [navigate]);
 
   const refreshStatus = useCallback(() => {
     window.location.reload();
@@ -222,7 +232,17 @@ function DriverPending({
                   <Button
                     type="primary"
                     icon={<HomeOutlined />}
-                    onClick={() => window.location.assign("/driver")}
+                    onClick={() => {
+                      try {
+                        localStorage.setItem("appMode", "driver");
+                        localStorage.setItem("currentRole", "driver");
+                        localStorage.setItem("selectedRole", "driver");
+                        sessionStorage.setItem("appMode", "driver");
+                        sessionStorage.setItem("currentRole", "driver");
+                        sessionStorage.setItem("selectedRole", "driver");
+                      } catch (_error) {}
+                      navigate("/driver", { replace: true });
+                    }}
                   >
                     Driver kabinetga o'tish
                   </Button>

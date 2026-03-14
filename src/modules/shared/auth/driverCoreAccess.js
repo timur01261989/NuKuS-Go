@@ -1,8 +1,18 @@
 import { supabase } from "../../../services/supabase/supabaseClient.js";
 import { VEHICLE_TYPE_PRESETS } from "../../driver/registration/uploadConfig.js";
 
-const PROFILE_COLUMNS = "id,phone,phone_normalized,role,current_role,active_vehicle_id";
-const DRIVER_APPLICATION_COLUMNS = "id,user_id,status,vehicle_type,brand,model,plate_number,requested_max_weight_kg,requested_max_volume_m3,seat_count,created_at";
+const PROFILE_SELECTORS = [
+  "id,phone,phone_normalized,role,current_role,active_vehicle_id",
+  "id,phone,role,current_role,active_vehicle_id",
+  "id,phone,role,current_role",
+  "id,phone,role",
+];
+const DRIVER_APPLICATION_SELECTORS = [
+  "id,user_id,status,vehicle_type,brand,model,plate_number,requested_max_weight_kg,requested_max_volume_m3,seat_count,created_at",
+  "id,user_id,status,vehicle_type,brand,model,plate_number,seat_count,created_at",
+  "id,user_id,status,transport_type,brand,model,plate_number,created_at",
+  "id,user_id,status,created_at",
+];
 const DRIVER_SETTINGS_COLUMNS = [
   "user_id",
   "city_passenger",
@@ -20,6 +30,38 @@ const PRESENCE_COLUMNS = "driver_id,is_online,last_seen_at,current_order_id,upda
 
 function normalizeStatus(value) {
   return typeof value === "string" ? value.trim().toLowerCase() : null;
+}
+
+async function trySingleQuery(builders) {
+  let lastError = null;
+  for (const build of builders) {
+    const result = await build();
+    if (!result.error) {
+      return { data: result.data || null, error: null };
+    }
+    lastError = result.error;
+    const message = String(result.error?.message || '').toLowerCase();
+    if (!message.includes('column') && !message.includes('relation')) {
+      return { data: null, error: result.error };
+    }
+  }
+  return { data: null, error: lastError };
+}
+
+async function tryListQuery(builders) {
+  let lastError = null;
+  for (const build of builders) {
+    const result = await build();
+    if (!result.error) {
+      return { data: Array.isArray(result.data) ? result.data : [], error: null };
+    }
+    lastError = result.error;
+    const message = String(result.error?.message || '').toLowerCase();
+    if (!message.includes('column') && !message.includes('relation')) {
+      return { data: [], error: result.error };
+    }
+  }
+  return { data: [], error: lastError };
 }
 
 function boolSettingsToServiceTypes(row = {}) {
@@ -75,15 +117,29 @@ export async function fetchDriverCore(userId) {
   if (!userId) return null;
 
   const [profileRes, appRes, settingsRes, vehiclesRes, presenceRes] = await Promise.all([
-    supabase.from("profiles").select(PROFILE_COLUMNS).eq("id", userId).maybeSingle(),
-    supabase.from("driver_applications").select(DRIVER_APPLICATION_COLUMNS).eq("user_id", userId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("driver_service_settings").select(DRIVER_SETTINGS_COLUMNS).eq("user_id", userId).maybeSingle(),
-    supabase.from("vehicles").select(VEHICLE_COLUMNS).eq("user_id", userId).order("is_active", { ascending: false }).order("created_at", { ascending: false }),
-    supabase.from("driver_presence").select(PRESENCE_COLUMNS).eq("driver_id", userId).maybeSingle(),
+    trySingleQuery(PROFILE_SELECTORS.map((columns) => () => supabase.from("profiles").select(columns).eq("id", userId).maybeSingle())),
+    trySingleQuery(DRIVER_APPLICATION_SELECTORS.map((columns) => () => supabase.from("driver_applications").select(columns).eq("user_id", userId).order("created_at", { ascending: false }).limit(1).maybeSingle())),
+    trySingleQuery([
+      () => supabase.from("driver_service_settings").select(DRIVER_SETTINGS_COLUMNS).eq("user_id", userId).maybeSingle(),
+      () => Promise.resolve({ data: null, error: null }),
+    ]),
+    tryListQuery([
+      () => supabase.from("vehicles").select(VEHICLE_COLUMNS).eq("user_id", userId).order("is_active", { ascending: false }).order("created_at", { ascending: false }),
+      () => supabase.from("vehicles").select("id,driver_id,vehicle_type,brand,model,plate_number,seat_count,max_weight_kg,max_volume_m3,approval_status,status,is_active,created_at").eq("driver_id", userId).order("is_active", { ascending: false }).order("created_at", { ascending: false }),
+      () => Promise.resolve({ data: [], error: null }),
+    ]),
+    trySingleQuery([
+      () => supabase.from("driver_presence").select(PRESENCE_COLUMNS).eq("driver_id", userId).maybeSingle(),
+      () => supabase.from("driver_presence").select("driver_id,is_online,last_seen,updated_at").eq("driver_id", userId).maybeSingle(),
+      () => Promise.resolve({ data: null, error: null }),
+    ]),
   ]);
 
   const profile = profileRes.data || null;
-  const application = appRes.data || null;
+  const application = appRes.data ? {
+    ...appRes.data,
+    vehicle_type: appRes.data.vehicle_type || appRes.data.transport_type || null,
+  } : null;
   const serviceSettings = settingsRes.data || null;
   const vehicles = Array.isArray(vehiclesRes.data) ? vehiclesRes.data.map(normalizeVehicle) : [];
 
@@ -98,7 +154,7 @@ export async function fetchDriverCore(userId) {
   const serviceTypes = boolSettingsToServiceTypes(serviceSettings || {});
   const allowedServices = serviceTypesToAllowedServices(serviceTypes);
   const applicationStatus = normalizeStatus(application?.status);
-  const driverApproved = applicationStatus === "approved";
+  const driverApproved = ["approved", "active", "verified", "enabled", "ok"].includes(applicationStatus || '');
 
   return {
     profile,

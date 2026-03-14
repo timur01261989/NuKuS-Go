@@ -1,30 +1,6 @@
 {
-  "appId": "com.unigo.driver",
-  "appName": "UniGo",
+  "appId": "com.nukusgo.driver",
+  "appName": "Nukus Go Driver",
   "webDir": "dist",
-  "bundledWebRuntime": false,
-  "server": {
-    "androidScheme": "https",
-    "cleartext": true,
-    "allowNavigation": [
-      "*.supabase.co",
-      "*.vercel.app"
-    ]
-  },
-  "android": {
-    "allowMixedContent": true,
-    "captureInput": true,
-    "buildCommand": "npm run build"
-  },
-  "plugins": {
-    "SplashScreen": {
-      "launchShowDuration": 2000,
-      "backgroundColor": "#ffffff",
-      "showSpinner": false,
-      "androidScaleType": "CENTER_CROP"
-    },
-    "PushNotifications": {
-      "presentationOptions": ["badge", "sound", "alert"]
-    }
-  }
+  "bundledWebRuntime": false
 }

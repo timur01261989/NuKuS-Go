@@ -71,6 +71,7 @@ const ClientReferral = memo(function ClientReferral() {
   const sharePayload = useMemo(() => buildReferralSharePayload({ code: referralCode, appName: 'UniGo' }), [referralCode]);
   const externalTargets = useMemo(() => buildReferralExternalShareTargets({ code: referralCode, appName: 'UniGo' }), [referralCode]);
   const canShare = useMemo(() => Boolean(referralCode && shareUrl), [referralCode, shareUrl]);
+  const canAttemptShare = useMemo(() => !loading && !sharing, [loading, sharing]);
 
   const totals = useMemo(() => ({
     invitedCount: Number(summaryState?.summary?.totals?.invited_count || 0),
@@ -151,6 +152,18 @@ const ClientReferral = memo(function ClientReferral() {
 
   const handleCopyLink = useCallback(async () => {
     if (!canShare) {
+      try {
+        const response = await bootstrapReferralSummary();
+        applyResponse(response);
+      } catch (bootstrapError) {
+        message.error(String(bootstrapError?.message || tr('referral.shareUnavailable', 'Taklif havolasi hali tayyor emas.')));
+        return;
+      }
+    }
+
+    const latestCode = String(summaryState?.code?.code || summaryState?.code || referralCode || '').trim();
+    const latestShareUrl = String(summaryState?.shareUrl || '').trim() || buildReferralShareUrl(latestCode);
+    if (!latestCode || !latestShareUrl) {
       message.error(tr('referral.shareUnavailable', 'Taklif havolasi hali tayyor emas.'));
       return;
     }
@@ -158,7 +171,7 @@ const ClientReferral = memo(function ClientReferral() {
     setSharing(true);
     try {
       if (window?.navigator?.share) {
-        const result = await shareReferralLink({ code: referralCode, appName: 'UniGo' });
+        const result = await shareReferralLink({ code: latestCode, appName: 'UniGo' });
         if (result.mode === 'native-share') {
           return;
         }
@@ -176,7 +189,7 @@ const ClientReferral = memo(function ClientReferral() {
     } finally {
       setSharing(false);
     }
-  }, [canShare, referralCode, tr]);
+  }, [applyResponse, canShare, referralCode, summaryState?.code, summaryState?.shareUrl, tr]);
 
   const handleRefresh = useCallback(async () => {
     try {
@@ -196,7 +209,7 @@ const ClientReferral = memo(function ClientReferral() {
       return tr('referral.codePreparing', 'Taklif kodingiz tayyorlanmoqda...');
     }
     if (codeStatus === 'error') {
-      return tr('referral.codeUnavailable', 'Taklif havolasi hali tayyor emas. Yangilashni bosing yoki qayta kiring.');
+      return tr('referral.codeUnavailable', 'Taklif kodi hali tayyor emas. Yangilashni bosing. Agar muammo qolsa SQL backfill migrationni ishga tushiring.');
     }
     return tr('referral.registerOnlyInfo', 'Referral kod faqat ro‘yxatdan o‘tish vaqtida bir marta biriktiriladi. Ro‘yxatdan o‘tgandan keyin qayta kiritilmaydi.');
   }, [codeStatus, tr]);
@@ -244,7 +257,7 @@ const ClientReferral = memo(function ClientReferral() {
             type="button"
             className="flex-1 bg-primaryHome hover:bg-primaryHome/90 text-backgroundDark font-bold py-3 rounded-xl active:scale-95 disabled:opacity-50"
             onClick={handleCopyLink}
-            disabled={loading || sharing || !canShare}
+            disabled={!canAttemptShare}
           >
             {sharing ? tr('loading', 'Yuklanmoqda...') : tr('inviteFriends', 'Do‘stlarni taklif qilish')}
           </button>

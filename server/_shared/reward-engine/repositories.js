@@ -14,6 +14,22 @@ function isDuplicateError(error) {
   return message.includes('duplicate') || message.includes('unique constraint') || message.includes('already exists');
 }
 
+async function tryMaybeSingle(sb, table, selectors, userId) {
+  let lastError = null;
+  for (const selector of selectors) {
+    const result = await sb.from(table).select(selector).eq('id', userId).maybeSingle();
+    if (!result.error) {
+      return { data: result.data || null, error: null };
+    }
+    lastError = result.error;
+    const message = String(result.error?.message || '').toLowerCase();
+    if (!message.includes('column')) {
+      return { data: null, error: result.error };
+    }
+  }
+  return { data: null, error: lastError };
+}
+
 export class ProfileRepository {
   constructor(sb) {
     this.sb = sb;
@@ -22,33 +38,24 @@ export class ProfileRepository {
   async getByUserId(userId) {
     if (!userId) return null;
 
-    const primaryResult = await this.sb
-      .from('profiles')
-      .select('id,phone,phone_normalized,role,current_role,is_test_user,full_name,avatar_url')
-      .eq('id', userId)
-      .maybeSingle();
+    const result = await tryMaybeSingle(this.sb, 'profiles', [
+      'id,phone,phone_normalized,role,current_role,is_test_user,full_name,avatar_url',
+      'id,phone,role,current_role,full_name,avatar_url',
+      'id,phone,role,current_role',
+      'id,phone,role',
+      'id,phone',
+    ], userId);
 
-    if (!primaryResult.error) {
-      return primaryResult.data || null;
-    }
-
-    const fallbackMessage = String(primaryResult.error?.message || '').toLowerCase();
-    if (!fallbackMessage.includes('column')) {
-      throw primaryResult.error;
-    }
-
-    const fallbackResult = await this.sb
-      .from('profiles')
-      .select('id,phone,phone_normalized,role,current_role,is_test_user')
-      .eq('id', userId)
-      .maybeSingle();
-    if (fallbackResult.error) throw fallbackResult.error;
-
-    return fallbackResult.data
+    if (result.error) throw result.error;
+    return result.data
       ? {
-          ...fallbackResult.data,
+          phone_normalized: null,
+          role: 'client',
+          current_role: 'client',
+          is_test_user: false,
           full_name: null,
           avatar_url: null,
+          ...result.data,
         }
       : null;
   }
