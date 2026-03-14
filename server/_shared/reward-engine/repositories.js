@@ -19,89 +19,44 @@ export class ProfileRepository {
     this.sb = sb;
   }
 
-  async getBasicByUserId(userId) {
-    if (!userId) return null;
-    const { data, error } = await this.sb
-      .from('profiles')
-      .select('id,phone,full_name,role,current_role,created_at,updated_at')
-      .eq('id', userId)
-      .limit(1);
-    if (error) throw error;
-    return Array.isArray(data) ? (data[0] || null) : (data || null);
-  }
-
   async getByUserId(userId) {
     if (!userId) return null;
-
-    const primary = await this.sb
+    const { data, error } = await this.sb
       .from('profiles')
       .select('id,phone,phone_normalized,role,current_role,is_test_user,full_name,avatar_url')
       .eq('id', userId)
-      .limit(1);
-
-    if (!primary.error) {
-      const row = Array.isArray(primary.data) ? (primary.data[0] || null) : (primary.data || null);
-      return row || null;
-    }
-
-    const fallback = await this.sb
-      .from('profiles')
-      .select('id,phone,full_name,avatar_url,role,current_role,created_at,updated_at')
-      .eq('id', userId)
-      .limit(1);
-    if (fallback.error) throw fallback.error;
-
-    const row = Array.isArray(fallback.data) ? (fallback.data[0] || null) : (fallback.data || null);
-    if (!row) return null;
-    return {
-      id: row.id,
-      phone: row.phone || null,
-      phone_normalized: row.phone || null,
-      role: row.role || 'client',
-      current_role: row.current_role || row.role || 'client',
-      is_test_user: false,
-      full_name: row.full_name || null,
-      avatar_url: row.avatar_url || null,
-    };
-  }
-
-  async ensureForAuthUser(authUser, options = {}) {
-    const userId = authUser?.id || options?.userId || null;
-    if (!userId) return null;
-
-    const existing = await this.getBasicByUserId(userId).catch(() => null);
-    if (existing) {
-      return existing;
-    }
-
-    const rawRole = String(options?.role || authUser?.user_metadata?.role || 'client').toLowerCase();
-    const normalizedRole = ['client', 'driver', 'both', 'admin'].includes(rawRole) ? rawRole : 'client';
-    const fullName = String(
-      options?.fullName
-        || authUser?.user_metadata?.full_name
-        || authUser?.user_metadata?.name
-        || authUser?.phone
-        || ''
-    ).trim();
-
-    const insertPayload = {
-      id: userId,
-      phone: authUser?.phone || options?.phone || null,
-      full_name: fullName || null,
-      role: normalizedRole,
-      current_role: normalizedRole,
-      metadata: authUser?.user_metadata && typeof authUser.user_metadata === 'object'
-        ? authUser.user_metadata
-        : {},
-    };
-
-    const { data, error } = await this.sb
-      .from('profiles')
-      .upsert(insertPayload, { onConflict: 'id' })
-      .select('id,phone,full_name,role,current_role,created_at,updated_at')
-      .single();
+      .maybeSingle();
     if (error) throw error;
     return data || null;
+  }
+
+  async ensureProfile(user) {
+    const userId = String(user?.id || '').trim();
+    if (!userId) return null;
+
+    const existing = await this.getByUserId(userId);
+    if (existing) return existing;
+
+    const phone = String(user?.phone || user?.user_metadata?.phone || user?.raw_user_meta_data?.phone || '').trim() || null;
+    const fullName = String(user?.user_metadata?.full_name || user?.raw_user_meta_data?.full_name || user?.user_metadata?.name || user?.raw_user_meta_data?.name || '').trim() || null;
+
+    const payload = {
+      id: userId,
+      phone,
+      full_name: fullName,
+      role: 'client',
+      current_role: 'client',
+      metadata: {
+        bootstrap_source: 'referral.ensureProfile',
+      },
+    };
+
+    const { error } = await this.sb
+      .from('profiles')
+      .upsert(payload, { onConflict: 'id' });
+
+    if (error && !isDuplicateError(error)) throw error;
+    return await this.getByUserId(userId);
   }
 
   async isAdmin(userId) {
@@ -378,43 +333,6 @@ export class CampaignRepository {
     this.sb = sb;
   }
 
-  async getRewardProgramConfig() {
-    const nowMs = Date.now();
-    const { data, error } = await this.sb
-      .from('bonus_campaigns')
-      .select('id,name,campaign_type,audience_type,service_type,reward_type,reward_amount_uzs,reward_percent,max_discount_uzs,min_order_amount_uzs,usage_limit_total,usage_limit_per_user,stackable,priority,starts_at,ends_at,is_active,metadata')
-      .eq('is_active', true)
-      .in('campaign_type', ['referral', 'driver_milestone'])
-      .order('priority', { ascending: false });
-    if (error) throw error;
-
-    const campaigns = (data || []).filter((item) => {
-      const startsAtMs = item?.starts_at ? Date.parse(item.starts_at) : null;
-      const endsAtMs = item?.ends_at ? Date.parse(item.ends_at) : null;
-      const startsOk = startsAtMs == null || Number.isNaN(startsAtMs) || startsAtMs <= nowMs;
-      const endsOk = endsAtMs == null || Number.isNaN(endsAtMs) || endsAtMs >= nowMs;
-      return startsOk && endsOk;
-    });
-
-    const referralCampaign = campaigns.find((item) => String(item.campaign_type || '').toLowerCase() === 'referral') || null;
-    const driverMilestoneCampaign = campaigns.find((item) => String(item.campaign_type || '').toLowerCase() === 'driver_milestone') || null;
-
-    return {
-      referral: {
-        campaign_id: referralCampaign?.id || null,
-        reward_amount_uzs: toPositiveMoney(referralCampaign?.reward_amount_uzs) || DEFAULT_REWARD_CONFIG.referralRewardUzs,
-        min_order_amount_uzs: toPositiveMoney(referralCampaign?.min_order_amount_uzs) || DEFAULT_REWARD_CONFIG.referralMinOrderUzs,
-        metadata: referralCampaign?.metadata || {},
-      },
-      driver_milestone: {
-        campaign_id: driverMilestoneCampaign?.id || null,
-        reward_amount_uzs: toPositiveMoney(driverMilestoneCampaign?.reward_amount_uzs) || DEFAULT_REWARD_CONFIG.driverReferralMilestoneRewardUzs,
-        milestone_trips: Math.max(1, Math.round(Number(driverMilestoneCampaign?.metadata?.milestone_trips || DEFAULT_REWARD_CONFIG.driverReferralMilestoneTrips))),
-        metadata: driverMilestoneCampaign?.metadata || {},
-      },
-    };
-  }
-
   async listActiveRulesByTrigger(triggerEvent, audienceType, serviceType, amountUzs) {
     const now = safeIsoNow();
     const { data, error } = await this.sb
@@ -522,10 +440,13 @@ export class ReferralRepository {
       .from('referral_codes')
       .select('id,user_id,code,is_active,created_at,updated_at')
       .eq('user_id', userId)
+      .order('is_active', { ascending: false })
+      .order('updated_at', { ascending: false })
       .order('created_at', { ascending: false })
-      .limit(1);
+      .limit(10);
     if (error) throw error;
-    return Array.isArray(data) ? (data[0] || null) : (data || null);
+    const rows = Array.isArray(data) ? data : [];
+    return rows.find((row) => Boolean(row?.is_active)) || rows[0] || null;
   }
 
   async getCodeByCode(code) {
@@ -536,17 +457,18 @@ export class ReferralRepository {
       .select('id,user_id,code,is_active,created_at,updated_at')
       .eq('code', normalizedCode)
       .eq('is_active', true)
+      .order('updated_at', { ascending: false })
       .order('created_at', { ascending: false })
-      .limit(1);
+      .limit(5);
     if (error) throw error;
-    return Array.isArray(data) ? (data[0] || null) : (data || null);
+    const rows = Array.isArray(data) ? data : [];
+    return rows[0] || null;
   }
 
   async createCode(userId, code) {
-    const normalizedCode = String(code || '').trim().toUpperCase();
     const { data, error } = await this.sb
       .from('referral_codes')
-      .insert({ user_id: userId, code: normalizedCode, is_active: true })
+      .insert({ user_id: userId, code: String(code || '').trim().toUpperCase(), is_active: true })
       .select('id,user_id,code,is_active,created_at,updated_at')
       .single();
     if (error) throw error;
@@ -598,7 +520,7 @@ export class ReferralRepository {
   }
 
   async listSummary(userId) {
-    const [referralsResult, rewardsResult, walletResult] = await Promise.allSettled([
+    const [referralsResult, rewardsResult] = await Promise.all([
       this.sb
         .from('referrals')
         .select('id,status,referred_user_id,qualified_order_id,qualified_at,rewarded_at,created_at,metadata')
@@ -611,31 +533,16 @@ export class ReferralRepository {
         .eq('reward_user_id', userId)
         .order('created_at', { ascending: false })
         .limit(100),
-      this.sb
-        .from('wallets')
-        .select('user_id,balance_uzs,bonus_balance_uzs,reserved_uzs,total_topup_uzs,total_spent_uzs,total_earned_uzs,is_frozen,updated_at')
-        .eq('user_id', userId)
-        .maybeSingle(),
     ]);
 
-    const referralsPayload = referralsResult.status === 'fulfilled' ? referralsResult.value : { data: [], error: referralsResult.reason || null };
-    const rewardsPayload = rewardsResult.status === 'fulfilled' ? rewardsResult.value : { data: [], error: rewardsResult.reason || null };
-    const walletPayload = walletResult.status === 'fulfilled' ? walletResult.value : { data: null, error: walletResult.reason || null };
+    if (referralsResult.error) throw referralsResult.error;
+    if (rewardsResult.error) throw rewardsResult.error;
 
-    const referrals = referralsPayload.error ? [] : (referralsPayload.data || []);
-    const rewards = rewardsPayload.error ? [] : (rewardsPayload.data || []);
-    const wallet = walletPayload.error ? null : (walletPayload.data || null);
-
+    const referrals = referralsResult.data || [];
+    const rewards = rewardsResult.data || [];
     return {
       referrals,
       rewards,
-      wallet,
-      degraded: Boolean(referralsPayload.error || rewardsPayload.error || walletPayload.error),
-      diagnostics: {
-        referrals_error: referralsPayload.error ? String(referralsPayload.error.message || referralsPayload.error) : null,
-        rewards_error: rewardsPayload.error ? String(rewardsPayload.error.message || rewardsPayload.error) : null,
-        wallet_error: walletPayload.error ? String(walletPayload.error.message || walletPayload.error) : null,
-      },
       totals: {
         invited_count: referrals.length,
         qualified_count: referrals.filter((item) => ['qualified', 'rewarded'].includes(String(item.status || ''))).length,
@@ -854,26 +761,6 @@ export class ServiceOrderRepository {
     }
 
     throw new Error(`Unsupported source table: ${sourceTable}`);
-  }
-
-  async countCompletedDriverTrips(driverUserId) {
-    const [orders, delivery, cargo, interprov, district] = await Promise.all([
-      this.sb.from('orders').select('id', { count: 'exact', head: true }).eq('driver_id', driverUserId).in('status', COMPLETED_STATUSES_BY_SOURCE[SERVICE_SOURCE_TABLES.ORDERS]),
-      this.sb.from('delivery_orders').select('id', { count: 'exact', head: true }).eq('driver_id', driverUserId).in('status', COMPLETED_STATUSES_BY_SOURCE[SERVICE_SOURCE_TABLES.DELIVERY_ORDERS]),
-      this.sb.from('cargo_orders').select('id', { count: 'exact', head: true }).eq('driver_id', driverUserId).in('status', COMPLETED_STATUSES_BY_SOURCE[SERVICE_SOURCE_TABLES.CARGO_ORDERS]),
-      this.sb.from('interprov_trips').select('id', { count: 'exact', head: true }).eq('user_id', driverUserId).in('status', COMPLETED_STATUSES_BY_SOURCE[SERVICE_SOURCE_TABLES.INTERPROV_TRIPS]),
-      this.sb.from('district_trips').select('id', { count: 'exact', head: true }).eq('user_id', driverUserId).in('status', COMPLETED_STATUSES_BY_SOURCE[SERVICE_SOURCE_TABLES.DISTRICT_TRIPS]),
-    ]);
-    if (orders.error) throw orders.error;
-    if (delivery.error) throw delivery.error;
-    if (cargo.error) throw cargo.error;
-    if (interprov.error) throw interprov.error;
-    if (district.error) throw district.error;
-    return Number(orders.count || 0)
-      + Number(delivery.count || 0)
-      + Number(cargo.count || 0)
-      + Number(interprov.count || 0)
-      + Number(district.count || 0);
   }
 
   async countCompletedUserOrders(userId) {

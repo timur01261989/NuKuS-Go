@@ -83,13 +83,13 @@ export async function createWalletTransaction(sb, payload) {
   const result = await getRewardService(sb).repositories.wallets.applyMutation({
     userId: payload.user_id,
     amountUzs: payload.amount_uzs,
-    balanceField: String(payload.metadata?.wallet_balance_type || 'balance_uzs') === 'bonus_balance_uzs' ? 'bonus_balance_uzs' : 'balance_uzs',
+    balanceField: String(payload.metadata?.wallet_balance_type || payload.meta?.wallet_balance_type || 'balance_uzs') === 'bonus_balance_uzs' ? 'bonus_balance_uzs' : 'balance_uzs',
     direction: payload.direction || 'credit',
     txKind: payload.kind || 'manual_adjustment',
     description: payload.description || null,
     orderId: payload.order_id || null,
     serviceType: payload.service_type || null,
-    metadata: payload.metadata || {},
+    metadata: payload.metadata || payload.meta || {},
   });
   return {
     id: result?.wallet_transaction_id || null,
@@ -98,7 +98,7 @@ export async function createWalletTransaction(sb, payload) {
     kind: payload.kind || 'manual_adjustment',
     amount_uzs: Math.round(Number(payload.amount_uzs || 0)),
     order_id: payload.order_id || null,
-    metadata: payload.metadata || {},
+    metadata: payload.metadata || payload.meta || {},
   };
 }
 

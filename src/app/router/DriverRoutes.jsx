@@ -1,14 +1,14 @@
-import React from 'react';
-import { Navigate, Route } from 'react-router-dom';
-import DriverHome from '../../modules/driver/pages/DriverHome.jsx';
-import DriverOrders from '../../modules/driver/pages/DriverOrders.jsx';
-import DriverWallet from '../../modules/driver/pages/DriverWallet.jsx';
-import DriverProfile from '../../modules/driver/pages/DriverProfile.jsx';
-import DriverActiveOrder from '../../modules/driver/pages/DriverActiveOrder.jsx';
-import DriverSettings from '../../modules/driver/pages/DriverSettings.jsx';
-import DriverVehicles from '../../modules/driver/pages/DriverVehicles.jsx';
-import DriverInsights from '../../modules/driver/pages/DriverInsights.jsx';
-import ReferralPage from '../../modules/client/features/client/pages/ClientReferral.jsx';
+import React from "react";
+import { Navigate, Route } from "react-router-dom";
+import DriverHome from "../../modules/driver/pages/DriverHome.jsx";
+import DriverOrders from "../../modules/driver/pages/DriverOrders.jsx";
+import DriverWallet from "../../modules/driver/pages/DriverWallet.jsx";
+import DriverProfile from "../../modules/driver/pages/DriverProfile.jsx";
+import DriverActiveOrder from "../../modules/driver/pages/DriverActiveOrder.jsx";
+import DriverSettings from "../../modules/driver/pages/DriverSettings.jsx";
+import DriverVehicles from "../../modules/driver/pages/DriverVehicles.jsx";
+import DriverInsights from "../../modules/driver/pages/DriverInsights.jsx";
+import DriverReferral from "../../modules/driver/pages/DriverReferral.jsx";
 
 function DriverRoutes() {
   return (
@@ -21,7 +21,7 @@ function DriverRoutes() {
       <Route path="/driver/settings" element={<DriverSettings />} />
       <Route path="/driver/vehicles" element={<DriverVehicles />} />
       <Route path="/driver/insights" element={<DriverInsights />} />
-      <Route path="/driver/referral" element={<ReferralPage />} />
+      <Route path="/driver/referral" element={<DriverReferral />} />
       <Route path="/driver/home" element={<Navigate replace to="/driver" />} />
     </>
   );

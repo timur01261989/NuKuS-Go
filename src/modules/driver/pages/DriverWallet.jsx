@@ -1,19 +1,8 @@
-import React, { memo } from 'react';
-import UnifiedWalletPage from '@/modules/shared/components/UnifiedWalletPage.jsx';
-import { useLanguage } from '@/modules/shared/i18n/useLanguage.js';
+import React from "react";
+import LegacyScreen from "@/modules/driver/legacy/pages/DriverWalletPage.jsx";
 
-const DriverWalletPage = memo(function DriverWalletPage() {
-  const { tr } = useLanguage();
+function DriverWalletPage(props) {
+  return <LegacyScreen {...props} />;
+}
 
-  return (
-    <UnifiedWalletPage
-      homePath="/driver"
-      title={tr('wallet', 'Hamyon')}
-      roleLabel={tr('workAsDriver', 'Haydovchi')}
-      referralPath="/driver/referral"
-      demoTopupAmount={10000}
-    />
-  );
-});
-
-export default DriverWalletPage;
+export default React.memo(DriverWalletPage);

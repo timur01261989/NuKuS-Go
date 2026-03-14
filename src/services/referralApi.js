@@ -4,8 +4,8 @@ export function getReferralSummary() {
   return getJson('/api/referral');
 }
 
-export function getReferralBootstrap() {
-  return getJson('/api/referral');
+export function bootstrapReferralSummary() {
+  return getJson('/api/referral?action=bootstrap');
 }
 
 export function resolveReferralCode(code) {
@@ -26,7 +26,7 @@ export function applyReferralCode({ code, device_hash }) {
 
 const referralApi = {
   getReferralSummary,
-  getReferralBootstrap,
+  bootstrapReferralSummary,
   resolveReferralCode,
   applyReferralCode,
 };

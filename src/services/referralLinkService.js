@@ -14,10 +14,6 @@ function getSafeLocalStorage() {
   }
 }
 
-function safeEncode(value) {
-  return encodeURIComponent(String(value || '').trim());
-}
-
 export function normalizeReferralCode(rawValue) {
   return String(rawValue || '')
     .trim()
@@ -171,17 +167,6 @@ export function buildReferralSharePayload({ code, inviterName = '', appName = 'U
   };
 }
 
-export function getShareCapabilities() {
-  const safeWindow = getSafeWindow();
-  const navigatorRef = safeWindow?.navigator;
-  return {
-    hasNavigatorShare: Boolean(navigatorRef?.share),
-    hasClipboardWrite: Boolean(navigatorRef?.clipboard?.writeText),
-    isSecureContext: Boolean(safeWindow?.isSecureContext),
-    isMobileLike: /Android|iPhone|iPad|iPod|Mobile/i.test(String(navigatorRef?.userAgent || '')),
-  };
-}
-
 async function copyTextToClipboard(text) {
   const safeWindow = getSafeWindow();
   const normalizedText = String(text || '').trim();
@@ -216,77 +201,6 @@ async function copyTextToClipboard(text) {
   } catch {
     return false;
   }
-}
-
-export function buildReferralShareTargets({ code, inviterName = '', appName = 'UniGo' } = {}) {
-  const payload = buildReferralSharePayload({ code, inviterName, appName });
-  if (!payload.url) {
-    return [];
-  }
-
-  const combinedText = `${payload.text}`.trim();
-  const encodedUrl = safeEncode(payload.url);
-  const encodedText = safeEncode(combinedText);
-  const encodedTitle = safeEncode(payload.title);
-
-  return [
-    {
-      key: 'telegram',
-      label: 'Telegram',
-      href: `https://t.me/share/url?url=${encodedUrl}&text=${encodedText}`,
-      mode: 'popup',
-    },
-    {
-      key: 'whatsapp',
-      label: 'WhatsApp',
-      href: `https://wa.me/?text=${encodedText}`,
-      mode: 'popup',
-    },
-    {
-      key: 'vk',
-      label: 'VK',
-      href: `https://vk.com/share.php?url=${encodedUrl}&title=${encodedTitle}&comment=${encodedText}`,
-      mode: 'popup',
-    },
-    {
-      key: 'copy',
-      label: 'Nusxa olish',
-      href: payload.url,
-      mode: 'clipboard',
-    },
-  ];
-}
-
-export async function openReferralShareTarget(target) {
-  const safeWindow = getSafeWindow();
-  if (!target || !target.mode) {
-    return { mode: 'unsupported' };
-  }
-
-  if (target.mode === 'clipboard') {
-    const copied = await copyTextToClipboard(target.href || '');
-    return {
-      mode: copied ? 'clipboard' : 'unsupported',
-      target,
-    };
-  }
-
-  if (target.mode === 'popup') {
-    try {
-      if (!safeWindow?.open) {
-        return { mode: 'unsupported', target };
-      }
-      safeWindow.open(String(target.href || ''), '_blank', 'noopener,noreferrer');
-      return {
-        mode: 'popup',
-        target,
-      };
-    } catch {
-      return { mode: 'unsupported', target };
-    }
-  }
-
-  return { mode: 'unsupported', target };
 }
 
 export async function shareReferralLink({ code, inviterName = '', appName = 'UniGo' } = {}) {
@@ -393,9 +307,6 @@ const referralLinkService = {
   extractReferralCodeFromLocation,
   hydratePendingReferralFromLocation,
   buildReferralSharePayload,
-  getShareCapabilities,
-  buildReferralShareTargets,
-  openReferralShareTarget,
   shareReferralLink,
   getReferralDeviceHash,
 };

@@ -39,6 +39,24 @@ function getUserAgent(req) {
   return String(req?.headers?.['user-agent'] || '').trim() || null;
 }
 
+function buildShareUrl(req, code) {
+  const normalizedCode = normalizeReferralCode(code);
+  if (!normalizedCode) return '';
+
+  const configuredBase = String(process.env.APP_SHARE_BASE_URL || process.env.WEB_URL || '').trim().replace(/\/$/, '');
+  if (configuredBase) {
+    return `${configuredBase}/r/${normalizedCode}`;
+  }
+
+  const host = String(req?.headers?.['x-forwarded-host'] || req?.headers?.host || '').trim();
+  const proto = String(req?.headers?.['x-forwarded-proto'] || '').trim() || 'https';
+  if (host) {
+    return `${proto}://${host}/r/${normalizedCode}`;
+  }
+
+  return `/r/${normalizedCode}`;
+}
+
 async function logReferralBonusEvent(sb, payload) {
   try {
     await sb.from('bonus_events').insert({
@@ -64,17 +82,6 @@ async function logReferralBonusEvent(sb, payload) {
   }
 }
 
-function buildInviterProfile(profileRow, codeRow) {
-  const phoneFallback = String(profileRow?.phone || '').trim();
-  const fullName = String(profileRow?.full_name || profileRow?.name || profileRow?.first_name || '').trim() || phoneFallback || 'UniGo foydalanuvchisi';
-  return {
-    user_id: profileRow?.id || codeRow.user_id,
-    full_name: fullName,
-    avatar_url: profileRow?.avatar_url || null,
-    phone: phoneFallback || null,
-  };
-}
-
 async function resolveReferralPublic(sb, req, res, url) {
   const rewardService = getRewardService(sb);
   const referralCodeValue = normalizeReferralCode(url.searchParams.get('code'));
@@ -93,11 +100,15 @@ async function resolveReferralPublic(sb, req, res, url) {
     });
   }
 
-  const { data: inviterProfile } = await sb
+  const { data: inviterProfile, error: inviterProfileError } = await sb
     .from('profiles')
-    .select('id,phone')
+    .select('id,full_name,avatar_url,phone')
     .eq('id', codeRow.user_id)
     .maybeSingle();
+
+  if (inviterProfileError) {
+    throw inviterProfileError;
+  }
 
   await logReferralBonusEvent(sb, {
     related_user_id: codeRow.user_id,
@@ -120,7 +131,12 @@ async function resolveReferralPublic(sb, req, res, url) {
       created_at: codeRow.created_at,
       updated_at: codeRow.updated_at,
     },
-    inviter: buildInviterProfile(inviterProfile, codeRow),
+    inviter: {
+      user_id: inviterProfile?.id || codeRow.user_id,
+      full_name: inviterProfile?.full_name || 'UniGo foydalanuvchisi',
+      avatar_url: inviterProfile?.avatar_url || null,
+      phone: inviterProfile?.phone || null,
+    },
   });
 }
 
@@ -144,79 +160,24 @@ export default async function handler(req, res) {
     }
 
     const rewardService = getRewardService(sb);
+    const profile = await rewardService.repositories.profiles.getByUserId(userId);
+    const myCode = await rewardService.getOrCreateReferralCode(
+      userId,
+      profile?.phone_normalized || profile?.phone || userId,
+      { authUser: user },
+    );
 
-    let profile = null;
-    try {
-      profile = await rewardService.repositories.profiles.getByUserId(userId);
-    } catch (error) {
-      console.warn('[referral] profile lookup degraded:', error?.message || error);
-    }
-
-    let myCode = null;
-    try {
-      myCode = await rewardService.getOrCreateReferralCode(
-        userId,
-        profile?.phone_normalized || profile?.phone || userId,
-        user,
-      );
-    } catch (error) {
-      console.warn('[referral] getOrCreateReferralCode degraded:', error?.message || error);
-      try {
-        myCode = await rewardService.repositories.referrals.getCodeByUserId(userId);
-      } catch (fallbackError) {
-        console.warn('[referral] fallback getCodeByUserId failed:', fallbackError?.message || fallbackError);
-      }
-    }
-
-    if (req.method === 'GET' || action === 'summary') {
-      const [summaryResult, configResult] = await Promise.allSettled([
+    if (req.method === 'GET' || action === 'summary' || action === 'bootstrap') {
+      const [summary, wallet] = await Promise.all([
         rewardService.repositories.referrals.listSummary(userId),
-        rewardService.repositories.campaigns.getRewardProgramConfig(),
+        rewardService.repositories.wallets.ensureWallet(userId),
       ]);
-
-      const summary = summaryResult.status === 'fulfilled'
-        ? summaryResult.value
-        : {
-            referrals: [],
-            rewards: [],
-            wallet: null,
-            totals: {
-              invited_count: 0,
-              qualified_count: 0,
-              rewarded_count: 0,
-              earned_uzs: 0,
-            },
-          };
-
-      const config = configResult.status === 'fulfilled'
-        ? configResult.value
-        : {
-            referral: {
-              campaign_id: null,
-              reward_amount_uzs: 3000,
-              min_order_amount_uzs: 20000,
-              metadata: {},
-            },
-            driver_milestone: {
-              campaign_id: null,
-              reward_amount_uzs: 10000,
-              milestone_trips: 5,
-              metadata: {},
-            },
-          };
-
       return json(res, 200, {
         ok: true,
         code: myCode,
+        share_url: buildShareUrl(req, myCode?.code || ''),
+        wallet,
         summary,
-        config,
-        degraded: Boolean(!myCode || summaryResult.status !== 'fulfilled' || configResult.status !== 'fulfilled' || summary?.degraded),
-        diagnostics: {
-          code_missing: !myCode,
-          summary_status: summaryResult.status,
-          config_status: configResult.status,
-          summary_diagnostics: summary?.diagnostics || null,
-        },
       });
     }
 

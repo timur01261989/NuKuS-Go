@@ -197,68 +197,57 @@ export class RewardService {
     });
   }
 
-  async getOrCreateReferralCode(userId, seedText = '', authUser = null) {
-    if (!userId) {
+  async getOrCreateReferralCode(userId, seedText = '', options = {}) {
+    const normalizedUserId = String(userId || '').trim();
+    if (!normalizedUserId) {
       throw new Error('referral code userId required');
     }
 
-    const existing = await this.repositories.referrals.getCodeByUserId(userId);
-    if (existing) return existing;
+    const existing = await this.repositories.referrals.getCodeByUserId(normalizedUserId);
+    if (existing?.code) return existing;
 
-    if (authUser?.id) {
-      try {
-        await this.repositories.profiles.ensureForAuthUser(authUser, {
-          userId,
-          phone: authUser?.phone || null,
-          role: authUser?.user_metadata?.role || 'client',
-          fullName: authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || '',
-        });
-      } catch {
-        // continue; createCode will surface the real error if profile bootstrap still fails
-      }
+    if (options?.authUser) {
+      await this.repositories.profiles.ensureProfile(options.authUser);
+      const afterBootstrap = await this.repositories.referrals.getCodeByUserId(normalizedUserId);
+      if (afterBootstrap?.code) return afterBootstrap;
     }
 
-    const baseSeed = String(seedText || userId || 'UNI')
+    const userSeed = normalizedUserId.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    const baseSeed = String(seedText || userSeed || 'UNI')
       .replace(/[^A-Za-z0-9]/g, '')
       .toUpperCase()
       .slice(-6) || 'UNI';
+    const suffixSeed = userSeed.slice(-4) || Math.random().toString(36).slice(2, 6).toUpperCase();
 
-    let lastError = null;
     for (let attempt = 0; attempt < 12; attempt += 1) {
-      const randomChunk = Math.random().toString(36).slice(2, 8).toUpperCase();
-      const code = `${baseSeed}${randomChunk}`.slice(0, 12);
+      const randomChunk = Math.random().toString(36).slice(2, 6).toUpperCase();
+      const code = `${baseSeed}${suffixSeed}${randomChunk}`.slice(0, 12);
       try {
-        const created = await this.repositories.referrals.createCode(userId, code);
-        if (created) return created;
+        const created = await this.repositories.referrals.createCode(normalizedUserId, code);
+        if (created?.code) return created;
       } catch (error) {
-        lastError = error;
         const message = String(error?.message || '').toLowerCase();
-        if (message.includes('duplicate') || message.includes('unique')) {
-          const current = await this.repositories.referrals.getCodeByUserId(userId).catch(() => null);
-          if (current) return current;
-          continue;
-        }
-        if ((message.includes('foreign key') || message.includes('violates foreign key')) && authUser?.id) {
-          try {
-            await this.repositories.profiles.ensureForAuthUser(authUser, {
-              userId,
-              phone: authUser?.phone || null,
-              role: authUser?.user_metadata?.role || 'client',
-              fullName: authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || '',
-            });
+        if (message.includes('profiles') || message.includes('foreign key')) {
+          if (options?.authUser) {
+            await this.repositories.profiles.ensureProfile(options.authUser);
+            const retryExisting = await this.repositories.referrals.getCodeByUserId(normalizedUserId);
+            if (retryExisting?.code) return retryExisting;
             continue;
-          } catch (profileError) {
-            lastError = profileError;
           }
+          throw error;
+        }
+        if (message.includes('duplicate') || message.includes('unique')) {
+          const retryExisting = await this.repositories.referrals.getCodeByUserId(normalizedUserId);
+          if (retryExisting?.code) return retryExisting;
+          continue;
         }
         throw error;
       }
     }
 
-    const current = await this.repositories.referrals.getCodeByUserId(userId).catch(() => null);
-    if (current) return current;
-
-    throw lastError || new Error('referral code generation failed');
+    const finalExisting = await this.repositories.referrals.getCodeByUserId(normalizedUserId);
+    if (finalExisting?.code) return finalExisting;
+    throw new Error('referral code generation failed');
   }
 
   calculatePromoDiscount(promo, orderTotalUzs) {
@@ -395,7 +384,6 @@ export class RewardService {
 
       await this.issueCampaignRewards(serviceOrder, context);
       await this.processReferralQualification(serviceOrder, context);
-      await this.processDriverReferralMilestones(serviceOrder, context);
 
       await this.repositories.rewardEvents.markDone(context.event.id);
       await this.observers.emit('onEventCompleted', context);
@@ -467,11 +455,7 @@ export class RewardService {
     const referral = await this.repositories.referrals.getReferralForReferredUser(serviceOrder.user_id);
     if (!referral) return;
     if (!['pending', 'qualified'].includes(String(referral.status || '').toLowerCase())) return;
-    const rewardProgramConfig = await this.repositories.campaigns.getRewardProgramConfig();
-    const referralRewardAmount = toPositiveMoney(rewardProgramConfig?.referral?.reward_amount_uzs) || this.config.referralRewardUzs;
-    const referralMinOrderAmount = toPositiveMoney(rewardProgramConfig?.referral?.min_order_amount_uzs) || this.config.referralMinOrderUzs;
-
-    if (toPositiveMoney(serviceOrder.amount_uzs) < referralMinOrderAmount) return;
+    if (toPositiveMoney(serviceOrder.amount_uzs) < this.config.referralMinOrderUzs) return;
 
     const fraudSnapshot = await this.repositories.fraud.getUserFraudSnapshot(
       referral.referred_user_id,
@@ -523,7 +507,7 @@ export class RewardService {
 
     const referredReward = await this.issueWalletReward({
       userId: referral.referred_user_id,
-      amountUzs: referralRewardAmount,
+      amountUzs: this.config.referralRewardUzs,
       rewardType: REWARD_TYPES.REFERRAL_REFERRED,
       txKind: WALLET_TX_KINDS.REFERRAL_BONUS,
       rewardKey: buildRewardKey('reward', 'referral', referral.id, 'referred'),
@@ -539,7 +523,7 @@ export class RewardService {
         referralId: referral.id,
         rewardUserId: referral.referred_user_id,
         rewardType: 'referred',
-        amountUzs: referralRewardAmount,
+        amountUzs: this.config.referralRewardUzs,
         walletTransactionId: referredReward.wallet_transaction_id,
         metadata: {
           order_id: serviceOrder.source_id,
@@ -550,7 +534,7 @@ export class RewardService {
 
     const referrerReward = await this.issueWalletReward({
       userId: referral.referrer_user_id,
-      amountUzs: referralRewardAmount,
+      amountUzs: this.config.referralRewardUzs,
       rewardType: REWARD_TYPES.REFERRAL_REFERRER,
       txKind: WALLET_TX_KINDS.REFERRAL_BONUS,
       rewardKey: buildRewardKey('reward', 'referral', referral.id, 'referrer'),
@@ -566,7 +550,7 @@ export class RewardService {
         referralId: referral.id,
         rewardUserId: referral.referrer_user_id,
         rewardType: 'referrer',
-        amountUzs: referralRewardAmount,
+        amountUzs: this.config.referralRewardUzs,
         walletTransactionId: referrerReward.wallet_transaction_id,
         metadata: {
           order_id: serviceOrder.source_id,
@@ -585,79 +569,6 @@ export class RewardService {
         ...(referral.metadata || {}),
         qualified_source_table: serviceOrder.source_table,
         qualified_order_amount_uzs: serviceOrder.amount_uzs,
-      },
-    });
-  }
-
-  async processDriverReferralMilestones(serviceOrder, context) {
-    const driverUserId = String(serviceOrder?.driver_user_id || '').trim();
-    if (!driverUserId) return;
-
-    const rewardProgramConfig = await this.repositories.campaigns.getRewardProgramConfig();
-    const milestoneTrips = Math.max(1, Math.round(Number(rewardProgramConfig?.driver_milestone?.milestone_trips || this.config.driverReferralMilestoneTrips || 5)));
-    const milestoneRewardAmount = toPositiveMoney(rewardProgramConfig?.driver_milestone?.reward_amount_uzs) || this.config.driverReferralMilestoneRewardUzs;
-    if (milestoneRewardAmount <= 0) return;
-
-    const referral = await this.repositories.referrals.getReferralForReferredUser(driverUserId);
-    if (!referral) return;
-
-    const referralMetadata = referral.metadata || {};
-    if (referralMetadata.driver_milestone_rewarded_at) {
-      return;
-    }
-
-    const completedTrips = await this.repositories.serviceOrders.countCompletedDriverTrips(driverUserId);
-    if (completedTrips < milestoneTrips) {
-      return;
-    }
-
-    const rewardKey = buildRewardKey('reward', 'driver_referral_milestone', referral.id, `trips_${milestoneTrips}`);
-    const rewardResult = await this.issueWalletReward({
-      userId: referral.referrer_user_id,
-      amountUzs: milestoneRewardAmount,
-      rewardType: REWARD_TYPES.DRIVER_REFERRAL_MILESTONE,
-      txKind: WALLET_TX_KINDS.REFERRAL_BONUS,
-      rewardKey,
-      orderId: serviceOrder.source_id,
-      sourceTable: serviceOrder.source_table,
-      serviceType: serviceOrder.service_type,
-      description: `Driver referral milestone bonus (${milestoneTrips} trips)`,
-      referralId: referral.id,
-      campaignId: rewardProgramConfig?.driver_milestone?.campaign_id || null,
-      extraMetadata: {
-        milestone_trips: milestoneTrips,
-        referred_driver_user_id: driverUserId,
-        completed_driver_trips: completedTrips,
-      },
-    }, context);
-
-    if (!rewardResult?.wallet_transaction_id) {
-      return;
-    }
-
-    await this.repositories.referrals.createReferralReward({
-      referralId: referral.id,
-      rewardUserId: referral.referrer_user_id,
-      rewardType: 'driver_milestone_referrer',
-      amountUzs: milestoneRewardAmount,
-      walletTransactionId: rewardResult.wallet_transaction_id,
-      metadata: {
-        order_id: serviceOrder.source_id,
-        source_table: serviceOrder.source_table,
-        milestone_trips: milestoneTrips,
-        referred_driver_user_id: driverUserId,
-        completed_driver_trips: completedTrips,
-      },
-    });
-
-    await this.repositories.referrals.updateReferral(referral.id, {
-      metadata: {
-        ...referralMetadata,
-        driver_milestone_rewarded_at: safeIsoNow(),
-        driver_milestone_trips: milestoneTrips,
-        driver_milestone_reward_amount_uzs: milestoneRewardAmount,
-        driver_milestone_last_source_id: serviceOrder.source_id,
-        driver_milestone_last_source_table: serviceOrder.source_table,
       },
     });
   }
