@@ -5,13 +5,12 @@ import { useLanguage } from '@/modules/shared/i18n/useLanguage.js';
 import { getLocalizedLanguages } from '@/modules/shared/i18n/languages.js';
 import { supabase } from '@/services/supabase/supabaseClient';
 import { useAppMode } from '@/app/providers/AppModeProvider';
+import { otpService } from '@/services/otpService'; // OTP Service ulandi
 
 /**
  * UniGo Super App - Authentication Module
- * Professional Grade: Zero placeholders, absolute completeness.
- * Performance: React.memo, useCallback, useMemo applied for high-load scalability.
+ * Strict Performance standards applied.
  */
-
 const Auth = React.memo(() => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -23,10 +22,8 @@ const Auth = React.memo(() => {
   const { langKey, setLanguage, t } = useLanguage();
   const { appMode } = useAppMode();
 
-  // Memoizing localized languages to avoid unnecessary re-renders
   const localizedLanguages = useMemo(() => getLocalizedLanguages(langKey), [langKey]);
 
-  // Handle existing sessions on mount
   useEffect(() => {
     const checkSession = async () => {
       if (!supabase?.auth) return;
@@ -36,10 +33,7 @@ const Auth = React.memo(() => {
     checkSession();
   }, [navigate]);
 
-  /**
-   * Corrected formatUzPhone: Strictly using backticks for template literals.
-   * This prevents the "Syntax error $" seen in Vercel logs.
-   */
+  // CRITICAL FIX: Backticks ishlatildi
   const formatUzPhone = useCallback((rawPhone) => {
     let digits = String(rawPhone || '').replace(/\D/g, '');
     if (digits.length === 9) {
@@ -52,7 +46,6 @@ const Auth = React.memo(() => {
     return +${digits};
   }, []);
 
-  // Professional input mask logic
   const normalizePhoneInput = useCallback((value) => {
     const digits = String(value || '').replace(/\D/g, '').slice(0, 9);
     let out = digits;
@@ -62,7 +55,6 @@ const Auth = React.memo(() => {
     return out;
   }, []);
 
-  // Main submission handler with Supabase integration
   const onSubmit = useCallback(async (e) => {
     e.preventDefault();
     if (loading) return;
@@ -81,7 +73,7 @@ const Auth = React.memo(() => {
     try {
       const fullPhone = formatUzPhone(digits);
       
-      // Attempting Sign-In
+      // Standart Supabase SignIn
       const { error: authError } = await supabase.auth.signInWithPassword({ 
         phone: fullPhone, 
         password: password 
@@ -89,7 +81,6 @@ const Auth = React.memo(() => {
       
       if (authError) throw authError;
 
-      // Sync user profile data to database with only necessary columns
       const { data: userData } = await supabase.auth.getUser();
       const user = userData?.user;
       
@@ -108,22 +99,21 @@ const Auth = React.memo(() => {
 
       message.success(t.welcome);
       
-      // Persist login state based on "Remember Me"
       if (remember) {
         localStorage.setItem('last_phone', digits);
       } else {
         localStorage.removeItem('last_phone');
       }
-    navigate('/', { replace: true, state: { appMode } });
+
+      navigate('/', { replace: true, state: { appMode } });
     } catch (err) {
-      console.error("[AUTH_EXCEPTION]:", err.message);
+      console.error("[AUTH_ERROR]:", err.message);
       message.error(t.invalidLogin || "Kirishda xatolik yuz berdi");
     } finally {
       setLoading(false);
     }
   }, [phone, password, loading, remember, t, formatUzPhone, navigate, appMode]);
 
-  // Load persisted phone number on startup
   useEffect(() => {
     try {
       const last = localStorage.getItem('last_phone');
@@ -131,12 +121,11 @@ const Auth = React.memo(() => {
         setPhone(normalizePhoneInput(last));
       }
     } catch (e) {
-      console.warn("LocalStorage access failed", e);
+      console.warn("LocalStorage access failed");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  return (
+     return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-100 to-blue-100 p-4 font-sans">
       <main className="w-full max-w-sm" data-purpose="login-container">
         <header className="text-center mb-8" data-purpose="brand-header">
@@ -195,7 +184,7 @@ const Auth = React.memo(() => {
                   aria-label="Toggle password visibility"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-                      <path d="M2.036 12.322a1.012 1.012 0 010-.644C3.399 8.049 7.21 5 12 5c4.79 0 8.601 3.049 9.964 6.678a1.012 1.012 0 010 .644C20.601 15.951 16.79 19 12 19c-4.79 0-8.601-3.049-9.964-6.678z" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M2.036 12.322a1.012 1.012 0 010-.644C3.399 8.049 7.21 5 12 5c4.79 0 8.601 3.049 9.964 6.678a1.012 1.012 0 010 .644C20.601 15.951 16.79 19 12 19c-4.79 0-8.601-3.049-9.964-6.678z" strokeLinecap="round" strokeLinejoin="round" />
                     <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </button>
@@ -206,7 +195,7 @@ const Auth = React.memo(() => {
               <label className="flex items-center cursor-pointer group">
                 <input
                   className="rounded border-gray-300 text-unigo-accent focus:ring-unigo-accent w-4 h-4"
-                  type="checkbox"
+                   type="checkbox"
                   checked={remember}
                   onChange={(e) => setRemember(e.target.checked)}
                 />

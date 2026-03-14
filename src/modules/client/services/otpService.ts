@@ -1,73 +1,52 @@
+import { supabase } from '@/services/supabase/supabaseClient';
+
 /**
- * UniGo OTP Service (Client-side)
- * Role: Acts as a bridge between UI and Supabase Edge Functions.
- * Optimization: Memory-efficient, zero-side effects.
+ * UniGo Super App - Client OTP Service
+ * Handles communication with Supabase Edge Functions for sending OTP.
  */
-import { supabase } from '../../../lib/supabase'; // Supabase client manzilingizga qarab moslang
-
-interface OtpResponse {
-  success: boolean;
-  messageId?: string;
-  error?: string;
-}
-
-export const otpService = {
+class OtpService {
   /**
-   * Telerivet orqali SMS yuborish funksiyasi
-   * @param phone - Format: +998XXXXXXXXX
+   * Sends an OTP via Supabase Edge Function (Telerivet integration)
+   * @param phone The E164 formatted phone number (e.g., +998901234567)
    */
-  sendOtp: async (phone: string): Promise<OtpResponse> => {
+  async sendOtp(phone: string): Promise<boolean> {
     try {
-      // Edge Function nomi: 'send-otp'
       const { data, error } = await supabase.functions.invoke('send-otp', {
         body: { phone },
       });
 
       if (error) {
-        throw new Error(error.message || 'Edge Function execution failed');
+        throw error;
       }
 
-      return {
-        success: data.success,
-        messageId: data.messageId,
-        error: data.error
-      };
-    } catch (err: any) {
-      console.error('[OTP_SERVICE_ERROR]:', err.message);
-      return {
-        success: false,
-        error: err.message
-      };
-    }
-  },
-
-  /**
-   * Foydalanuvchi kiritgan kodni tekshirish (ixtiyoriy, agar Edge Function-da qilsangiz)
-   */
-  verifyOtp: async (phone: string, code: string): Promise<{ success: boolean; error?: string }> => {
-    try {
-      const { data, error } = await supabase
-        .from('otp_verifications')
-        .select('*')
-        .eq('phone_number', phone)
-        .eq('code', code)
-        .eq('is_verified', false)
-        .gt('expires_at', new Date().toISOString())
-        .single();
-
-      if (error || !data) {
-        return { success: false, error: 'Kod noto\'g\'ri yoki muddati o\'tgan' };
-      }
-
-      // Kodni ishlatilgan deb belgilash
-      await supabase
-        .from('otp_verifications')
-        .update({ is_verified: true })
-        .eq('id', data.id);
-
-      return { success: true };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+      return data?.success || false;
+    } catch (error: any) {
+      console.error('[OTP_SERVICE_ERROR]: Failed to send OTP via edge function', error.message);
+      throw error;
     }
   }
-};
+
+  /**
+   * Verifies the OTP code locally using Supabase Auth
+   */
+  async verifyOtp(phone: string, token: string): Promise<any> {
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        phone,
+        token,
+        type: 'sms',
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
+    } catch (error: any) {
+      console.error('[OTP_VERIFY_ERROR]: Validation failed', error.message);
+      throw error;
+    }
+  }
+}
+
+export const otpService = new OtpService();
