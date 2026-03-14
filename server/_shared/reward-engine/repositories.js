@@ -304,6 +304,38 @@ export class CampaignRepository {
     this.sb = sb;
   }
 
+  async getRewardProgramConfig() {
+    const now = safeIsoNow();
+    const { data, error } = await this.sb
+      .from('bonus_campaigns')
+      .select('id,name,campaign_type,audience_type,service_type,reward_type,reward_amount_uzs,reward_percent,max_discount_uzs,min_order_amount_uzs,usage_limit_total,usage_limit_per_user,stackable,priority,starts_at,ends_at,is_active,metadata')
+      .eq('is_active', true)
+      .in('campaign_type', ['referral', 'driver_milestone'])
+      .or(`starts_at.is.null,starts_at.lte.${now}`)
+      .or(`ends_at.is.null,ends_at.gte.${now}`)
+      .order('priority', { ascending: false });
+    if (error) throw error;
+
+    const campaigns = data || [];
+    const referralCampaign = campaigns.find((item) => String(item.campaign_type || '').toLowerCase() === 'referral') || null;
+    const driverMilestoneCampaign = campaigns.find((item) => String(item.campaign_type || '').toLowerCase() === 'driver_milestone') || null;
+
+    return {
+      referral: {
+        campaign_id: referralCampaign?.id || null,
+        reward_amount_uzs: toPositiveMoney(referralCampaign?.reward_amount_uzs) || DEFAULT_REWARD_CONFIG.referralRewardUzs,
+        min_order_amount_uzs: toPositiveMoney(referralCampaign?.min_order_amount_uzs) || DEFAULT_REWARD_CONFIG.referralMinOrderUzs,
+        metadata: referralCampaign?.metadata || {},
+      },
+      driver_milestone: {
+        campaign_id: driverMilestoneCampaign?.id || null,
+        reward_amount_uzs: toPositiveMoney(driverMilestoneCampaign?.reward_amount_uzs) || DEFAULT_REWARD_CONFIG.driverReferralMilestoneRewardUzs,
+        milestone_trips: Math.max(1, Math.round(Number(driverMilestoneCampaign?.metadata?.milestone_trips || DEFAULT_REWARD_CONFIG.driverReferralMilestoneTrips))),
+        metadata: driverMilestoneCampaign?.metadata || {},
+      },
+    };
+  }
+
   async listActiveRulesByTrigger(triggerEvent, audienceType, serviceType, amountUzs) {
     const now = safeIsoNow();
     const { data, error } = await this.sb
@@ -483,7 +515,7 @@ export class ReferralRepository {
   }
 
   async listSummary(userId) {
-    const [referralsResult, rewardsResult] = await Promise.all([
+    const [referralsResult, rewardsResult, walletResult] = await Promise.all([
       this.sb
         .from('referrals')
         .select('id,status,referred_user_id,qualified_order_id,qualified_at,rewarded_at,created_at,metadata')
@@ -496,16 +528,23 @@ export class ReferralRepository {
         .eq('reward_user_id', userId)
         .order('created_at', { ascending: false })
         .limit(100),
+      this.sb
+        .from('wallets')
+        .select('user_id,balance_uzs,bonus_balance_uzs,reserved_uzs,total_topup_uzs,total_spent_uzs,total_earned_uzs,is_frozen,updated_at')
+        .eq('user_id', userId)
+        .maybeSingle(),
     ]);
 
     if (referralsResult.error) throw referralsResult.error;
     if (rewardsResult.error) throw rewardsResult.error;
+    if (walletResult.error) throw walletResult.error;
 
     const referrals = referralsResult.data || [];
     const rewards = rewardsResult.data || [];
     return {
       referrals,
       rewards,
+      wallet: walletResult.data || null,
       totals: {
         invited_count: referrals.length,
         qualified_count: referrals.filter((item) => ['qualified', 'rewarded'].includes(String(item.status || ''))).length,
@@ -724,6 +763,26 @@ export class ServiceOrderRepository {
     }
 
     throw new Error(`Unsupported source table: ${sourceTable}`);
+  }
+
+  async countCompletedDriverTrips(driverUserId) {
+    const [orders, delivery, cargo, interprov, district] = await Promise.all([
+      this.sb.from('orders').select('id', { count: 'exact', head: true }).eq('driver_id', driverUserId).in('status', COMPLETED_STATUSES_BY_SOURCE[SERVICE_SOURCE_TABLES.ORDERS]),
+      this.sb.from('delivery_orders').select('id', { count: 'exact', head: true }).eq('driver_id', driverUserId).in('status', COMPLETED_STATUSES_BY_SOURCE[SERVICE_SOURCE_TABLES.DELIVERY_ORDERS]),
+      this.sb.from('cargo_orders').select('id', { count: 'exact', head: true }).eq('driver_id', driverUserId).in('status', COMPLETED_STATUSES_BY_SOURCE[SERVICE_SOURCE_TABLES.CARGO_ORDERS]),
+      this.sb.from('interprov_trips').select('id', { count: 'exact', head: true }).eq('user_id', driverUserId).in('status', COMPLETED_STATUSES_BY_SOURCE[SERVICE_SOURCE_TABLES.INTERPROV_TRIPS]),
+      this.sb.from('district_trips').select('id', { count: 'exact', head: true }).eq('user_id', driverUserId).in('status', COMPLETED_STATUSES_BY_SOURCE[SERVICE_SOURCE_TABLES.DISTRICT_TRIPS]),
+    ]);
+    if (orders.error) throw orders.error;
+    if (delivery.error) throw delivery.error;
+    if (cargo.error) throw cargo.error;
+    if (interprov.error) throw interprov.error;
+    if (district.error) throw district.error;
+    return Number(orders.count || 0)
+      + Number(delivery.count || 0)
+      + Number(cargo.count || 0)
+      + Number(interprov.count || 0)
+      + Number(district.count || 0);
   }
 
   async countCompletedUserOrders(userId) {

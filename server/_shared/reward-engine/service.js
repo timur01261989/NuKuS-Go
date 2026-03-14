@@ -356,6 +356,7 @@ export class RewardService {
 
       await this.issueCampaignRewards(serviceOrder, context);
       await this.processReferralQualification(serviceOrder, context);
+      await this.processDriverReferralMilestones(serviceOrder, context);
 
       await this.repositories.rewardEvents.markDone(context.event.id);
       await this.observers.emit('onEventCompleted', context);
@@ -427,7 +428,11 @@ export class RewardService {
     const referral = await this.repositories.referrals.getReferralForReferredUser(serviceOrder.user_id);
     if (!referral) return;
     if (!['pending', 'qualified'].includes(String(referral.status || '').toLowerCase())) return;
-    if (toPositiveMoney(serviceOrder.amount_uzs) < this.config.referralMinOrderUzs) return;
+    const rewardProgramConfig = await this.repositories.campaigns.getRewardProgramConfig();
+    const referralRewardAmount = toPositiveMoney(rewardProgramConfig?.referral?.reward_amount_uzs) || this.config.referralRewardUzs;
+    const referralMinOrderAmount = toPositiveMoney(rewardProgramConfig?.referral?.min_order_amount_uzs) || this.config.referralMinOrderUzs;
+
+    if (toPositiveMoney(serviceOrder.amount_uzs) < referralMinOrderAmount) return;
 
     const fraudSnapshot = await this.repositories.fraud.getUserFraudSnapshot(
       referral.referred_user_id,
@@ -479,7 +484,7 @@ export class RewardService {
 
     const referredReward = await this.issueWalletReward({
       userId: referral.referred_user_id,
-      amountUzs: this.config.referralRewardUzs,
+      amountUzs: referralRewardAmount,
       rewardType: REWARD_TYPES.REFERRAL_REFERRED,
       txKind: WALLET_TX_KINDS.REFERRAL_BONUS,
       rewardKey: buildRewardKey('reward', 'referral', referral.id, 'referred'),
@@ -495,7 +500,7 @@ export class RewardService {
         referralId: referral.id,
         rewardUserId: referral.referred_user_id,
         rewardType: 'referred',
-        amountUzs: this.config.referralRewardUzs,
+        amountUzs: referralRewardAmount,
         walletTransactionId: referredReward.wallet_transaction_id,
         metadata: {
           order_id: serviceOrder.source_id,
@@ -506,7 +511,7 @@ export class RewardService {
 
     const referrerReward = await this.issueWalletReward({
       userId: referral.referrer_user_id,
-      amountUzs: this.config.referralRewardUzs,
+      amountUzs: referralRewardAmount,
       rewardType: REWARD_TYPES.REFERRAL_REFERRER,
       txKind: WALLET_TX_KINDS.REFERRAL_BONUS,
       rewardKey: buildRewardKey('reward', 'referral', referral.id, 'referrer'),
@@ -522,7 +527,7 @@ export class RewardService {
         referralId: referral.id,
         rewardUserId: referral.referrer_user_id,
         rewardType: 'referrer',
-        amountUzs: this.config.referralRewardUzs,
+        amountUzs: referralRewardAmount,
         walletTransactionId: referrerReward.wallet_transaction_id,
         metadata: {
           order_id: serviceOrder.source_id,
@@ -541,6 +546,79 @@ export class RewardService {
         ...(referral.metadata || {}),
         qualified_source_table: serviceOrder.source_table,
         qualified_order_amount_uzs: serviceOrder.amount_uzs,
+      },
+    });
+  }
+
+  async processDriverReferralMilestones(serviceOrder, context) {
+    const driverUserId = String(serviceOrder?.driver_user_id || '').trim();
+    if (!driverUserId) return;
+
+    const rewardProgramConfig = await this.repositories.campaigns.getRewardProgramConfig();
+    const milestoneTrips = Math.max(1, Math.round(Number(rewardProgramConfig?.driver_milestone?.milestone_trips || this.config.driverReferralMilestoneTrips || 5)));
+    const milestoneRewardAmount = toPositiveMoney(rewardProgramConfig?.driver_milestone?.reward_amount_uzs) || this.config.driverReferralMilestoneRewardUzs;
+    if (milestoneRewardAmount <= 0) return;
+
+    const referral = await this.repositories.referrals.getReferralForReferredUser(driverUserId);
+    if (!referral) return;
+
+    const referralMetadata = referral.metadata || {};
+    if (referralMetadata.driver_milestone_rewarded_at) {
+      return;
+    }
+
+    const completedTrips = await this.repositories.serviceOrders.countCompletedDriverTrips(driverUserId);
+    if (completedTrips < milestoneTrips) {
+      return;
+    }
+
+    const rewardKey = buildRewardKey('reward', 'driver_referral_milestone', referral.id, `trips_${milestoneTrips}`);
+    const rewardResult = await this.issueWalletReward({
+      userId: referral.referrer_user_id,
+      amountUzs: milestoneRewardAmount,
+      rewardType: REWARD_TYPES.DRIVER_REFERRAL_MILESTONE,
+      txKind: WALLET_TX_KINDS.REFERRAL_BONUS,
+      rewardKey,
+      orderId: serviceOrder.source_id,
+      sourceTable: serviceOrder.source_table,
+      serviceType: serviceOrder.service_type,
+      description: `Driver referral milestone bonus (${milestoneTrips} trips)`,
+      referralId: referral.id,
+      campaignId: rewardProgramConfig?.driver_milestone?.campaign_id || null,
+      extraMetadata: {
+        milestone_trips: milestoneTrips,
+        referred_driver_user_id: driverUserId,
+        completed_driver_trips: completedTrips,
+      },
+    }, context);
+
+    if (!rewardResult?.wallet_transaction_id) {
+      return;
+    }
+
+    await this.repositories.referrals.createReferralReward({
+      referralId: referral.id,
+      rewardUserId: referral.referrer_user_id,
+      rewardType: 'driver_milestone_referrer',
+      amountUzs: milestoneRewardAmount,
+      walletTransactionId: rewardResult.wallet_transaction_id,
+      metadata: {
+        order_id: serviceOrder.source_id,
+        source_table: serviceOrder.source_table,
+        milestone_trips: milestoneTrips,
+        referred_driver_user_id: driverUserId,
+        completed_driver_trips: completedTrips,
+      },
+    });
+
+    await this.repositories.referrals.updateReferral(referral.id, {
+      metadata: {
+        ...referralMetadata,
+        driver_milestone_rewarded_at: safeIsoNow(),
+        driver_milestone_trips: milestoneTrips,
+        driver_milestone_reward_amount_uzs: milestoneRewardAmount,
+        driver_milestone_last_source_id: serviceOrder.source_id,
+        driver_milestone_last_source_table: serviceOrder.source_table,
       },
     });
   }

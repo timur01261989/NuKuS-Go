@@ -1,5 +1,5 @@
 import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '@/services/supabase/supabaseClient';
 import { useLanguage } from '@/modules/shared/i18n/useLanguage.js';
 import { formatClientMoney } from '../shared/i18n_clientLocalize';
@@ -18,9 +18,7 @@ const SidebarItem = memo(function SidebarItem({ icon, label, active, onClick }) 
       )}
       onClick={onClick}
     >
-      <span className={cx('material-symbols-outlined', active ? '' : 'text-slate-400')} data-no-auto-translate="true">
-        {icon}
-      </span>
+      <span className={cx('material-symbols-outlined', active ? '' : 'text-slate-400')} data-no-auto-translate="true">{icon}</span>
       <span className={cx(active ? 'font-semibold' : 'font-medium')}>{label}</span>
     </button>
   );
@@ -30,7 +28,10 @@ const ClientSidebar = memo(function ClientSidebar({ open, onClose, profile }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { t, language, tr } = useLanguage();
-  const [balanceUZS, setBalanceUZS] = useState(null);
+  const [walletState, setWalletState] = useState({
+    balanceUZS: null,
+    bonusBalanceUZS: null,
+  });
 
   const fullName = profile?.fullName || t.userLabel;
   const avatarUrl = profile?.avatarUrl || '';
@@ -51,12 +52,13 @@ const ClientSidebar = memo(function ClientSidebar({ open, onClose, profile }) {
 
         const { getWalletBalance } = await import('@/services/walletApi.js');
         const walletResponse = await getWalletBalance(user.id);
-        const nextBalance = typeof walletResponse?.wallet?.balance_uzs === 'number'
-          ? walletResponse.wallet.balance_uzs
-          : (typeof walletResponse?.balance_uzs === 'number' ? walletResponse.balance_uzs : null);
+        const nextWallet = walletResponse?.wallet || walletResponse || {};
 
         if (mounted) {
-          setBalanceUZS(nextBalance);
+          setWalletState({
+            balanceUZS: typeof nextWallet?.balance_uzs === 'number' ? nextWallet.balance_uzs : 0,
+            bonusBalanceUZS: typeof nextWallet?.bonus_balance_uzs === 'number' ? nextWallet.bonus_balance_uzs : 0,
+          });
         }
       } catch (error) {
         console.error('Balance fetch error:', error);
@@ -77,8 +79,8 @@ const ClientSidebar = memo(function ClientSidebar({ open, onClose, profile }) {
     navigate(path, options);
   }, [navigate, onClose]);
 
-  const balanceLabel = useMemo(() => formatClientMoney(language, balanceUZS), [balanceUZS, language]);
-
+  const balanceLabel = useMemo(() => formatClientMoney(language, walletState.balanceUZS), [walletState.balanceUZS, language]);
+  const bonusLabel = useMemo(() => formatClientMoney(language, walletState.bonusBalanceUZS), [language, walletState.bonusBalanceUZS]);
   const isActive = useCallback((path) => location.pathname === path, [location.pathname]);
 
   const menuItems = useMemo(() => ([
@@ -87,6 +89,12 @@ const ClientSidebar = memo(function ClientSidebar({ open, onClose, profile }) {
       icon: 'person',
       label: t.profileSettings || 'Profil ma‘lumotlari',
       path: '/client/profile',
+    },
+    {
+      key: 'wallet',
+      icon: 'account_balance_wallet',
+      label: tr('wallet', 'Hamyon'),
+      path: '/client/wallet',
     },
     {
       key: 'referral',
@@ -118,11 +126,7 @@ const ClientSidebar = memo(function ClientSidebar({ open, onClose, profile }) {
           <div className="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => go('/client/profile')}>
             <div className="relative group">
               <div className="size-16 rounded-full border-2 border-primarySidebar overflow-hidden bg-white flex items-center justify-center">
-                {avatarUrl ? (
-                  <img className="w-full h-full object-cover" alt="avatar" src={avatarUrl} />
-                ) : (
-                  <span className="text-xl font-bold text-primarySidebar">{initial}</span>
-                )}
+                {avatarUrl ? <img className="w-full h-full object-cover" alt="avatar" src={avatarUrl} /> : <span className="text-xl font-bold text-primarySidebar">{initial}</span>}
               </div>
               <div className="absolute -bottom-1 -right-1 size-6 bg-primarySidebar rounded-full flex items-center justify-center border-2 border-white dark:border-background-dark">
                 <span className="material-symbols-outlined text-white text-[14px]">edit</span>
@@ -133,21 +137,19 @@ const ClientSidebar = memo(function ClientSidebar({ open, onClose, profile }) {
               <h2 className="text-lg font-bold text-slate-900 dark:text-white leading-tight truncate">{fullName}</h2>
               <div className="flex items-center gap-1.5 mt-1">
                 <span className="size-2 rounded-full bg-green-500" />
-                <span className="text-sm font-medium text-slate-500 dark:text-slate-400 italic">
-                  {t.passenger || t.userLabel || 'Yo‘lovchi'}
-                </span>
+                <span className="text-sm font-medium text-slate-500 dark:text-slate-400 italic">{t.passenger || t.userLabel || 'Yo‘lovchi'}</span>
               </div>
             </div>
           </div>
 
           <div className="mt-6 grid grid-cols-2 gap-2">
             <div className="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
-              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{t.balance}</p>
+              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{tr('wallet.mainBalance', 'Asosiy balans')}</p>
               <p className="text-sm font-bold text-primarySidebar">{balanceLabel}</p>
             </div>
             <div className="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
-              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{tr('referral', 'Taklif')}</p>
-              <p className="text-sm font-bold text-primarySidebar">{tr('inviteFriends', 'Do‘stlarni taklif qilish')}</p>
+              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{tr('bonusBalance', 'Bonus balansi')}</p>
+              <p className="text-sm font-bold text-amber-500">{bonusLabel}</p>
             </div>
           </div>
         </div>
@@ -176,11 +178,7 @@ const ClientSidebar = memo(function ClientSidebar({ open, onClose, profile }) {
         </nav>
 
         <div className="p-6 border-t border-slate-100 dark:border-slate-800">
-          <button
-            type="button"
-            className="flex items-center gap-3 w-full text-slate-500 dark:text-slate-400 hover:text-red-500 transition-colors group"
-            onClick={() => go('/logout')}
-          >
+          <button type="button" className="flex items-center gap-3 w-full text-slate-500 dark:text-slate-400 hover:text-red-500 transition-colors group" onClick={() => go('/logout')}>
             <span className="material-symbols-outlined group-hover:rotate-180 transition-transform duration-300">logout</span>
             <span className="font-medium">{t.logout}</span>
           </button>

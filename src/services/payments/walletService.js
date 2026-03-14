@@ -1,4 +1,4 @@
-import { buildQueryString, getJson, postJson } from "./paymentHttp.js";
+import { buildQueryString, getJson, postJson } from './paymentHttp.js';
 
 export function getWalletBalance(userId) {
   return getJson(`/api/wallet${buildQueryString({ user_id: userId })}`);
@@ -9,30 +9,40 @@ export function getBalance(userId) {
 }
 
 export function demoTopup(userId, amountUzs) {
-  return postJson("/api/wallet-topup-demo", {
+  return postJson('/api/wallet-topup-demo', {
     user_id: userId,
     amount_uzs: amountUzs,
   });
 }
 
 export function createWalletTopup(payload = {}) {
-  return postJson("/api/wallet-topup-demo", payload);
+  return postJson('/api/wallet-topup-demo', payload);
 }
 
 export function createDriverWalletTopup(payload = {}) {
-  return postJson("/api/wallet-topup-demo", payload);
+  return postJson('/api/wallet-topup-demo', payload);
+}
+
+export function spendWalletFunds(payload = {}) {
+  return postJson('/api/wallet', {
+    action: 'spend',
+    user_id: payload.user_id,
+    amount_uzs: payload.amount_uzs,
+    spend_mode: payload.spend_mode || 'main',
+    service_type: payload.service_type || null,
+    order_id: payload.order_id || null,
+    description: payload.description || null,
+  });
 }
 
 export async function getWalletSummary(userId) {
   const balancePayload = await getWalletBalance(userId).catch(() => null);
-  const balance = Number(
-    balancePayload?.wallet?.balance_uzs ?? balancePayload?.balance_uzs ?? balancePayload?.balance ?? balancePayload?.data?.balance ?? 0,
-  );
-
+  const wallet = balancePayload?.wallet || balancePayload || {};
   return {
-    balance,
-    currency: balancePayload?.currency || balancePayload?.wallet?.currency || "UZS",
-    pending: Number(balancePayload?.pending_uzs ?? balancePayload?.pending ?? 0),
+    balance: Number(wallet?.balance_uzs || 0),
+    bonusBalance: Number(wallet?.bonus_balance_uzs || 0),
+    currency: balancePayload?.currency || wallet?.currency || 'UZS',
+    pending: Number(wallet?.reserved_uzs || balancePayload?.pending_uzs || balancePayload?.pending || 0),
     paidOut: Number(balancePayload?.paid_out_uzs ?? balancePayload?.paidOut ?? 0),
     raw: balancePayload,
   };
@@ -60,6 +70,7 @@ const walletService = {
   demoTopup,
   createWalletTopup,
   createDriverWalletTopup,
+  spendWalletFunds,
   getWalletSummary,
   getDriverWalletSummary,
   getWalletTransactions,

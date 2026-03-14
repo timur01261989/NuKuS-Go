@@ -64,6 +64,17 @@ async function logReferralBonusEvent(sb, payload) {
   }
 }
 
+function buildInviterProfile(profileRow, codeRow) {
+  const phoneFallback = String(profileRow?.phone || '').trim();
+  const fullName = String(profileRow?.full_name || profileRow?.name || profileRow?.first_name || '').trim() || phoneFallback || 'UniGo foydalanuvchisi';
+  return {
+    user_id: profileRow?.id || codeRow.user_id,
+    full_name: fullName,
+    avatar_url: profileRow?.avatar_url || null,
+    phone: phoneFallback || null,
+  };
+}
+
 async function resolveReferralPublic(sb, req, res, url) {
   const rewardService = getRewardService(sb);
   const referralCodeValue = normalizeReferralCode(url.searchParams.get('code'));
@@ -82,15 +93,11 @@ async function resolveReferralPublic(sb, req, res, url) {
     });
   }
 
-  const { data: inviterProfile, error: inviterProfileError } = await sb
+  const { data: inviterProfile } = await sb
     .from('profiles')
-    .select('id,full_name,avatar_url,phone')
+    .select('id,phone')
     .eq('id', codeRow.user_id)
     .maybeSingle();
-
-  if (inviterProfileError) {
-    throw inviterProfileError;
-  }
 
   await logReferralBonusEvent(sb, {
     related_user_id: codeRow.user_id,
@@ -113,12 +120,7 @@ async function resolveReferralPublic(sb, req, res, url) {
       created_at: codeRow.created_at,
       updated_at: codeRow.updated_at,
     },
-    inviter: {
-      user_id: inviterProfile?.id || codeRow.user_id,
-      full_name: inviterProfile?.full_name || 'UniGo foydalanuvchisi',
-      avatar_url: inviterProfile?.avatar_url || null,
-      phone: inviterProfile?.phone || null,
-    },
+    inviter: buildInviterProfile(inviterProfile, codeRow),
   });
 }
 
@@ -149,11 +151,15 @@ export default async function handler(req, res) {
     );
 
     if (req.method === 'GET' || action === 'summary') {
-      const summary = await rewardService.repositories.referrals.listSummary(userId);
+      const [summary, config] = await Promise.all([
+        rewardService.repositories.referrals.listSummary(userId),
+        rewardService.repositories.campaigns.getRewardProgramConfig(),
+      ]);
       return json(res, 200, {
         ok: true,
         code: myCode,
         summary,
+        config,
       });
     }
 

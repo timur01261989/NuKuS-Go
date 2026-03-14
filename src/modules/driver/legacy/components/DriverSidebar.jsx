@@ -1,26 +1,40 @@
-import React from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/services/supabase/supabaseClient.js";
-import { useLanguage } from "@/modules/shared/i18n/useLanguage";
+import React, { memo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/services/supabase/supabaseClient.js';
+import { useLanguage } from '@/modules/shared/i18n/useLanguage';
 
-export default function DriverSidebar({ open, onClose, onLogout }) {
+const MenuItem = memo(function MenuItem({ icon, title, onClick }) {
+  return (
+    <button type="button" onClick={onClick} className="w-full neumorphic-pop rounded-2xl px-4 py-3 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <span className="material-symbols-outlined text-primarySidebar">{icon}</span>
+        <span className="font-bold text-slate-800">{title}</span>
+      </div>
+      <span className="material-symbols-outlined text-slate-400">chevron_right</span>
+    </button>
+  );
+});
+
+const DriverSidebar = memo(function DriverSidebar({ open, onClose, onLogout }) {
   const navigate = useNavigate();
-  const { t } = useLanguage();
-  const passengerTitle = t.passengerPage || t.passenger || "Foydalanuvchi";
+  const { t, tr } = useLanguage();
+  const passengerTitle = t.passengerPage || t.passenger || 'Foydalanuvchi';
 
-  const go = (path) => {
+  const go = useCallback((path) => {
     onClose?.();
     navigate(path);
-  };
+  }, [navigate, onClose]);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await supabase.auth.signOut();
-    } catch {}
+    } catch {
+      // ignore
+    }
     onClose?.();
     onLogout?.();
-    navigate("/login");
-  };
+    navigate('/login');
+  }, [navigate, onClose, onLogout]);
 
   if (!open) return null;
 
@@ -43,13 +57,14 @@ export default function DriverSidebar({ open, onClose, onLogout }) {
 
           <div className="px-4 pb-4 flex-1 overflow-auto">
             <div className="space-y-3">
-              <MenuItem icon="person" title={passengerTitle} onClick={() => go("/client/home")} />
-              <MenuItem icon="history" title={t.orderHistoryDriver || t.orders} onClick={() => go("/driver/orders")} />
-              <MenuItem icon="account_balance_wallet" title={t.wallet} onClick={() => go("/driver/wallet")} />
-              <MenuItem icon="settings" title={t.settingsTitle || t.settings || "Sozlamalar"} onClick={() => go("/settings")} />
-              <MenuItem icon="tune" title={t.driverSettingsTitle || "Haydovchi sozlamalari"} onClick={() => go("/driver/settings?tab=services")} />
-              <MenuItem icon="directions_car" title={t.driverVehicleManagement || "Mashinalar"} onClick={() => go("/driver/settings?tab=vehicles")} />
-              <MenuItem icon="insights" title={t.insights || "Insights"} onClick={() => go("/driver/insights")} />
+              <MenuItem icon="person" title={passengerTitle} onClick={() => go('/client/home')} />
+              <MenuItem icon="history" title={t.orderHistoryDriver || t.orders} onClick={() => go('/driver/orders')} />
+              <MenuItem icon="account_balance_wallet" title={t.wallet} onClick={() => go('/driver/wallet')} />
+              <MenuItem icon="share" title={tr('inviteFriends', 'Do‘stlarni taklif qilish')} onClick={() => go('/driver/referral')} />
+              <MenuItem icon="settings" title={t.settingsTitle || t.settings || 'Sozlamalar'} onClick={() => go('/settings')} />
+              <MenuItem icon="tune" title={t.driverSettingsTitle || 'Haydovchi sozlamalari'} onClick={() => go('/driver/settings?tab=services')} />
+              <MenuItem icon="directions_car" title={t.driverVehicleManagement || 'Mashinalar'} onClick={() => go('/driver/settings?tab=vehicles')} />
+              <MenuItem icon="insights" title={t.insights || 'Insights'} onClick={() => go('/driver/insights')} />
             </div>
           </div>
 
@@ -70,16 +85,6 @@ export default function DriverSidebar({ open, onClose, onLogout }) {
       </aside>
     </>
   );
-}
+});
 
-function MenuItem({ icon, title, onClick }) {
-  return (
-    <button type="button" onClick={onClick} className="w-full neumorphic-pop rounded-2xl px-4 py-3 flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <span className="material-symbols-outlined text-primarySidebar">{icon}</span>
-        <span className="font-bold text-slate-800">{title}</span>
-      </div>
-      <span className="material-symbols-outlined text-slate-400">chevron_right</span>
-    </button>
-  );
-}
+export default DriverSidebar;

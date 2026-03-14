@@ -10,6 +10,7 @@ export const REWARD_TYPES = Object.freeze({
   REFERRAL_REFERRER: 'referral_referrer_bonus',
   REFERRAL_REFERRED: 'referral_referred_bonus',
   DRIVER_ACTIVATION: 'driver_activation_bonus',
+  DRIVER_REFERRAL_MILESTONE: 'driver_referral_milestone_bonus',
   CAMPAIGN: 'campaign_bonus',
   PROMO: 'promo_bonus',
   WALLET_SPEND: 'wallet_spend',
@@ -67,8 +68,10 @@ export const CANCELLED_STATUSES = Object.freeze([
 
 export const DEFAULT_REWARD_CONFIG = Object.freeze({
   firstRideRewardUzs: 10000,
-  referralRewardUzs: 5000,
+  referralRewardUzs: 3000,
   referralMinOrderUzs: 20000,
+  driverReferralMilestoneTrips: 5,
+  driverReferralMilestoneRewardUzs: 10000,
   fraudBlockThreshold: 70,
 });
 
