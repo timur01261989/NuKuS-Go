@@ -1,5 +1,6 @@
 import { json, badRequest, serverError } from '../_shared/cors.js';
 import { getSupabaseAdmin, getAuthedUserId } from '../_shared/supabase.js';
+import { processCancellationPipeline, processCompletionPipeline } from '../_shared/orders/orderCompletionPipeline.js';
 
 function nowIso() { return new Date().toISOString(); }
 
@@ -15,36 +16,6 @@ const TRANSITIONS = {
 };
 
 function canTransition(from, to) { return (TRANSITIONS[String(from || '').toLowerCase()] || []).includes(String(to || '').toLowerCase()); }
-
-async function ensureWallet(sb, uid) {
-  const { data } = await sb.from('wallets').select('*').eq('user_id', uid).maybeSingle();
-  if (data) return data;
-  const { data: created, error } = await sb.from('wallets').insert([{ user_id: uid }]).select('*').single();
-  if (error) throw error;
-  return created;
-}
-
-async function walletTx(sb, row) {
-  const direction = row.direction || (['topup', 'order_payout', 'refund', 'bonus'].includes(row.kind) ? 'credit' : 'debit');
-  const { error } = await sb.from('wallet_transactions').insert([{ 
-    user_id: row.user_id,
-    direction,
-    kind: row.kind,
-    service_type: row.service_type || null,
-    amount_uzs: Math.abs(Number(row.amount_uzs || 0)),
-    order_id: row.order_id || null,
-    description: row.description || null,
-    metadata: row.metadata || {},
-    meta: row.metadata || {},
-  }]);
-  if (error) throw error;
-}
-
-async function changeBalance(sb, user_id, delta) {
-  const wallet = await ensureWallet(sb, user_id);
-  const { error } = await sb.from('wallets').update({ balance_uzs: Number(wallet.balance_uzs || 0) + Number(delta || 0), updated_at: nowIso() }).eq('user_id', user_id);
-  if (error) throw error;
-}
 
 async function logEvent(sb, order, actorId, toStatus) {
   try {
@@ -65,7 +36,9 @@ export default async function handler(req, res) {
     const { data: order, error } = await sb.from('orders').select('*').eq('id', order_id).maybeSingle();
     if (error) throw error;
     if (!order) return json(res, 404, { ok: false, error: 'Order topilmadi' });
-    if (!canTransition(order.status, next_status) && !(order.status === next_status)) return json(res, 400, { ok: false, error: `Status transition ruxsat etilmagan: ${order.status} -> ${next_status}` });
+    if (!canTransition(order.status, next_status) && !(order.status === next_status)) {
+      return json(res, 400, { ok: false, error: `Status transition ruxsat etilmagan: ${order.status} -> ${next_status}` });
+    }
 
     const patch = { status: next_status, updated_at: nowIso() };
     if (next_status === 'accepted') patch.accepted_at = nowIso();
@@ -77,19 +50,23 @@ export default async function handler(req, res) {
     const { data: updated, error: upErr } = await sb.from('orders').update(patch).eq('id', order_id).select('*').single();
     if (upErr) throw upErr;
 
-    if (next_status === 'completed' && updated.payment_method === 'wallet' && (updated.user_id) && updated.driver_id && Number(updated.price_uzs || 0) > 0) {
-      const amount = Number(updated.price_uzs || 0);
-      await ensureWallet(sb, updated.user_id);
-      await ensureWallet(sb, updated.driver_id);
-      await walletTx(sb, { user_id: updated.user_id, kind: 'order_payment', direction: 'debit', service_type: updated.service_type, amount_uzs: amount, order_id, description: 'Order payment', metadata: { order_id } });
-      await changeBalance(sb, updated.user_id, -amount);
-      await walletTx(sb, { user_id: updated.driver_id, kind: 'order_payout', direction: 'credit', service_type: updated.service_type, amount_uzs: amount, order_id, description: 'Order payout', metadata: { order_id } });
-      await changeBalance(sb, updated.driver_id, amount);
-      await sb.from('driver_presence').update({ state: 'online', current_order_id: null, updated_at: nowIso(), last_seen_at: nowIso() }).eq('driver_id', updated.driver_id);
+    let pipeline = null;
+    if (next_status === 'completed') {
+      pipeline = await processCompletionPipeline(sb, { sourceTable: 'orders', sourceId: updated.id });
+      if (updated.driver_id) {
+        await sb.from('driver_presence').update({ state: 'online', current_order_id: null, updated_at: nowIso(), last_seen_at: nowIso() }).eq('driver_id', updated.driver_id);
+      }
+    }
+
+    if (next_status.startsWith('cancelled') || next_status === 'cancelled') {
+      pipeline = await processCancellationPipeline(sb, { sourceTable: 'orders', sourceId: updated.id });
+      if (updated.driver_id) {
+        await sb.from('driver_presence').update({ state: 'online', current_order_id: null, updated_at: nowIso(), last_seen_at: nowIso() }).eq('driver_id', updated.driver_id);
+      }
     }
 
     await logEvent(sb, order, actor_user_id, next_status);
-    return json(res, 200, { ok: true, order: updated });
+    return json(res, 200, { ok: true, order: updated, pipeline });
   } catch (e) {
     return serverError(res, e);
   }

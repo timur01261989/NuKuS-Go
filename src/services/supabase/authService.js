@@ -68,27 +68,12 @@ export async function fetchProfileByUserId(userId) {
     return { data: null, error: null };
   }
 
-  const attempts = [
-    () => supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
-    () => supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
-  ];
+  const result = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
 
-  for (const attempt of attempts) {
-    const result = await attempt();
-    if (!result.error) {
-      return { data: result.data ?? null, error: null };
-    }
-
-    const message = String(result.error?.message || "");
-    const code = String(result.error?.code || "");
-    const retriableMissingColumn = code === "42703" || /column/i.test(message);
-
-    if (!retriableMissingColumn) {
-      return { data: null, error: result.error };
-    }
-  }
-
-  return { data: null, error: null };
+  return {
+    data: result.data ?? null,
+    error: result.error ?? null,
+  };
 }
 
 export async function upsertMinimalClientProfile(user) {
@@ -106,24 +91,11 @@ export async function upsertMinimalClientProfile(user) {
   if (user.email) payload.email = user.email;
   if (user.phone) payload.phone = user.phone;
 
-  let result = await supabase.from("profiles").upsert(payload, { onConflict: "id" }).select("*").maybeSingle();
-
-  if (result.error && /column\s+"id"\s+does\s+not\s+exist/i.test(String(result.error.message || ""))) {
-    const fallbackPayload = {
-      user_id: user.id,
-      role: "client",
-      updated_at: timestamp,
-    };
-
-    if (user.email) fallbackPayload.email = user.email;
-    if (user.phone) fallbackPayload.phone = user.phone;
-
-    result = await supabase
-      .from("profiles")
-      .upsert(fallbackPayload, { onConflict: "user_id" })
-      .select("*")
-      .maybeSingle();
-  }
+  const result = await supabase
+    .from("profiles")
+    .upsert(payload, { onConflict: "id" })
+    .select("*")
+    .maybeSingle();
 
   return { data: result.data ?? null, error: result.error ?? null };
 }

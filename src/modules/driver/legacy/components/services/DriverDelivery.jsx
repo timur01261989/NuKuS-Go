@@ -3,7 +3,7 @@ import { Button, Card, Empty, List, Segmented, Space, Steps, Tag, Typography, me
 import { CheckCircleOutlined, PhoneOutlined } from "@ant-design/icons";
 
 import { useAuth } from "@/modules/shared/auth/AuthProvider";
-import { supabase } from "@/services/supabase/supabaseClient";
+import { listDriverDeliveryOrders, driverUpdateDeliveryStatusApi } from '@/services/deliveryApi.js';
 import { getDeliveryStatusSteps } from "@/modules/client/features/client/delivery/services/deliveryConfig.js";
 import { useDriverText } from "../../shared/i18n_driverLocalize";
 import { fetchDriverCapability, canDriverSeeOrder } from "../../core/driverCapabilityService";
@@ -75,14 +75,8 @@ export default function DriverDelivery() {
     const currentCapability = await fetchDriverCapability(user?.id || null);
     setCapability(currentCapability);
 
-    const { data, error } = await supabase
-      .from("delivery_orders")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) throw error;
-
-    const openOrders = (data || []).filter((item) => {
+    const response = await listDriverDeliveryOrders();
+    const openOrders = (response.orders || []).filter((item) => {
       const assignedToCurrentDriver = item.matched_driver_user_id === user?.id || item.driver_user_id === user?.id;
       if (assignedToCurrentDriver) return item.status !== "delivered";
       return item.status === "searching" || item.status === "pending";
@@ -134,10 +128,13 @@ export default function DriverDelivery() {
 
     patch.history = history;
 
-    let query = supabase.from("delivery_orders").update(patch).eq("id", order.id);
-    if (action === "accept") query = query.in("status", ["searching", "pending"]);
-    const { error } = await query;
-    if (error) throw error;
+    await driverUpdateDeliveryStatusApi({
+      id: order.id,
+      status: patch.status,
+      patch,
+      history,
+      driverName: patch.matched_driver_name || user?.phone || user?.email || cp('Haydovchi'),
+    });
 
     message.success(cp("Eltish holati yangilandi"));
     await loadOrders();

@@ -27,6 +27,10 @@ import fraudHandler from "../server/api/fraud.js";
 import supportHandler from "../server/api/support.js";
 import voipHandler from "../server/api/voip.js";
 import autoMarketHandler from "../server/api/auto_market.js";
+import promoHandler from "../server/api/promo.js";
+import referralHandler from "../server/api/referral.js";
+import rewardWorkerHandler from "../server/api/reward_worker.js";
+import deliveryHandler from "../server/api/delivery.js";
 
 function normalizePath(rawPath) {
   // Supports both direct path (/api/order) and rewritten query (?path=order)
@@ -272,6 +276,23 @@ export default async function handler(req, res) {
 
     if (path.startsWith("voip")) {
       return await voipHandler(req, res);
+    }
+
+
+    if (path.startsWith("promo-validate") || path.startsWith("order-apply-promo")) {
+      return await promoHandler(req, res);
+    }
+
+    if (path.startsWith("delivery")) {
+      return await deliveryHandler(req, res);
+    }
+
+    if (path.startsWith("referral")) {
+      return await referralHandler(req, res);
+    }
+
+    if (path.startsWith("reward-worker") || path.startsWith("reward_worker")) {
+      return await rewardWorkerHandler(req, res);
     }
 
     if (path.startsWith("auto-market") || path.startsWith("automarket") || path.startsWith("market-auto")) {

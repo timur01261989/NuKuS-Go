@@ -77,7 +77,7 @@ async function requestBooking(req, sb, body) {
 
   const payload = {
     trip_id: offerId,
-    client_user_id: userId,
+    user_id: userId,
     seats,
     status: 'held',
     hold_id: holdResult.hold.holdId,
@@ -97,7 +97,7 @@ async function requestBooking(req, sb, body) {
 async function myBookings(req, sb) {
   const userId = await getAuthedUserId(req, sb);
   if (!userId) return { ok: true, bookings: [] };
-  const { data, error } = await sb.from('inter_prov_seat_requests').select('*').eq('client_user_id', userId).order('created_at', { ascending: false });
+  const { data, error } = await sb.from('inter_prov_seat_requests').select('*').eq('user_id', userId).order('created_at', { ascending: false });
   if (error) throw error;
   return { ok: true, bookings: data || [] };
 }
@@ -112,7 +112,7 @@ async function cancelBooking(req, sb, body) {
     .from('inter_prov_seat_requests')
     .select('*')
     .eq('id', bookingId)
-    .eq('client_user_id', userId)
+    .eq('user_id', userId)
     .maybeSingle();
 
   if (error) throw error;

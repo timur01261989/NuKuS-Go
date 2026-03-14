@@ -14,6 +14,7 @@
 
 import { getSupabaseAdmin, getAuthedUserId } from "../_shared/supabase.js";
 import { haversineKm } from "../_shared/geo.js";
+import { processCancellationPipeline, processCompletionPipeline } from "../_shared/orders/orderCompletionPipeline.js";
 
 
 function calcQuickPriceUZS({ distKm = 0, weightKg = 0 }) {
@@ -248,8 +249,9 @@ export default async function freightHandler(req, res) {
       if (!cargoId) return json(res, 400, { error: "cargoId required" });
       const { data, error } = await sb.from("cargo_orders").update({ status: "cancelled" }).eq("id", cargoId).select("*").single();
       if (error) throw error;
+      const pipeline = await processCancellationPipeline(sb, { sourceTable: 'cargo_orders', sourceId: cargoId });
       await insertStatusEvent(sb, { cargoId, status: "cancelled", actorId, note: "cancel" });
-      return json(res, 200, { ok: true, data });
+      return json(res, 200, { ok: true, data, pipeline });
     }
 
     if (action === "cargo_status") {
@@ -548,8 +550,12 @@ export default async function freightHandler(req, res) {
       if (!cargoId || !allowed.has(status)) return json(res, 400, { error: "cargoId + valid status required" });
       const { data, error } = await sb.from("cargo_orders").update({ status }).eq("id", cargoId).select("*").single();
       if (error) throw error;
+      let pipeline = null;
+      if (status === 'delivered' || status === 'closed') {
+        pipeline = await processCompletionPipeline(sb, { sourceTable: 'cargo_orders', sourceId: cargoId });
+      }
       await insertStatusEvent(sb, { cargoId, status, actorId, note: "driver update" });
-      return json(res, 200, { ok: true, data });
+      return json(res, 200, { ok: true, data, pipeline });
     }
 
     if (action === "track") {

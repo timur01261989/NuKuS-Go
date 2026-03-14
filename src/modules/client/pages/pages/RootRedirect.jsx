@@ -86,7 +86,6 @@ export default function RootRedirect() {
           try {
             const uid = session.user.id;
 
-            // Try both profiles.id and profiles.user_id schema patterns.
             let upd = await supabase.from("profiles").update({ role: "driver" }).eq("id", uid);
             if (upd.error && /column\s+\"id\"\s+does\s+not\s+exist/i.test(upd.error.message || "")) {
               upd = await supabase.from("profiles").update({ role: "driver" }).eq("user_id", uid);
