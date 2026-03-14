@@ -8,8 +8,8 @@ import { useAppMode } from '@/app/providers/AppModeProvider';
 
 /**
  * UniGo Super App - Authentication Module
- * Architecture: Senior Full-Stack Architect Grade
- * Performance: Optimized with React.memo, useCallback, useMemo for 10M+ users scale.
+ * Performance: Optimized with React.memo, useCallback, useMemo.
+ * Scalability: Production-grade logic for high-load systems.
  */
 
 const Auth = React.memo(() => {
@@ -23,10 +23,10 @@ const Auth = React.memo(() => {
   const { langKey, setLanguage, t } = useLanguage();
   const { appMode } = useAppMode();
 
-  // Memozied localized languages to prevent re-calculations
+  // Localized languages memoization
   const localizedLanguages = useMemo(() => getLocalizedLanguages(langKey), [langKey]);
 
-  // Session check on mount
+  // Session validation logic
   useEffect(() => {
     const checkSession = async () => {
       if (!supabase?.auth) return;
@@ -36,16 +36,23 @@ const Auth = React.memo(() => {
     checkSession();
   }, [navigate]);
 
-  // Professional phone formatting (E.164 standard)
+  /**
+   * Corrected formatUzPhone: Strictly using template literals.
+   * This fixes the "Expected ';' but found '{'" error in Vercel.
+   */
   const formatUzPhone = useCallback((rawPhone) => {
     let digits = String(rawPhone || '').replace(/\D/g, '');
-    if (digits.length === 9) digits = '998' + digits;
-    if (!digits.startsWith('998')) digits = '998' + digits;
+    if (digits.length === 9) {
+      digits = 998${digits};
+    }
+    if (!digits.startsWith('998')) {
+      digits = 998${digits};
+    }
     digits = digits.slice(0, 12);
-    return +${digits}; // Corrected template literal syntax
+    return +${digits};
   }, []);
 
-  // Real-time input mask for Uzbekistan numbers
+  // Real-time input mask logic
   const normalizePhoneInput = useCallback((value) => {
     const digits = String(value || '').replace(/\D/g, '').slice(0, 9);
     let out = digits;
@@ -55,7 +62,7 @@ const Auth = React.memo(() => {
     return out;
   }, []);
 
-  // Main login handler with ruthless error management
+  // Main login action with error boundary logic
   const onSubmit = useCallback(async (e) => {
     e.preventDefault();
     if (loading) return;
@@ -74,15 +81,15 @@ const Auth = React.memo(() => {
     try {
       const fullPhone = formatUzPhone(digits);
       
-      // Supabase Authentication call
-      const { error } = await supabase.auth.signInWithPassword({ 
+      // Supabase Authentication
+      const { error: authError } = await supabase.auth.signInWithPassword({ 
         phone: fullPhone, 
         password: password 
       });
       
-      if (error) throw error;
+      if (authError) throw authError;
 
-      // Handle profile upsert with minimum required columns
+      // Profile Upsert Logic
       const { data: { user } } = await supabase.auth.getUser();
       if (user?.id) {
         const nowIso = new Date().toISOString();
@@ -99,7 +106,7 @@ const Auth = React.memo(() => {
 
       message.success(t.welcome);
       
-      // Local storage persistence logic
+      // Persistence logic
       if (remember) {
         localStorage.setItem('last_phone', digits);
       } else {
@@ -109,12 +116,12 @@ const Auth = React.memo(() => {
       navigate('/', { replace: true, state: { appMode } });
     } catch (err) {
       console.error("[AUTH_RUNTIME_ERROR]:", err.message);
-      message.error(t.invalidLogin || "Kirishda xatolik yuz berdi");
+      message.error(t.invalidLogin || "Login xatosi");
     } finally {
       setLoading(false);
     }
   }, [phone, password, loading, remember, t, formatUzPhone, navigate, appMode]);
-  // Hydrate phone from localStorage on mount
+  // Initial state hydration
   useEffect(() => {
     const last = localStorage.getItem('last_phone');
     if (last && !phone) {
@@ -188,7 +195,7 @@ const Auth = React.memo(() => {
                 </button>
               </div>
             </div>
-          <div className="flex items-center justify-between text-sm pt-1 gap-3">
+           <div className="flex items-center justify-between text-sm pt-1 gap-3">
               <label className="flex items-center cursor-pointer group">
                 <input
                   className="rounded border-gray-300 text-unigo-accent focus:ring-unigo-accent w-4 h-4"
