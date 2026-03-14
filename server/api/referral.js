@@ -144,11 +144,28 @@ export default async function handler(req, res) {
     }
 
     const rewardService = getRewardService(sb);
-    const profile = await rewardService.repositories.profiles.getByUserId(userId);
-    const myCode = await rewardService.getOrCreateReferralCode(
-      userId,
-      profile?.phone_normalized || profile?.phone || userId,
-    );
+
+    let profile = null;
+    try {
+      profile = await rewardService.repositories.profiles.getByUserId(userId);
+    } catch (error) {
+      console.warn('[referral] profile lookup degraded:', error?.message || error);
+    }
+
+    let myCode = null;
+    try {
+      myCode = await rewardService.getOrCreateReferralCode(
+        userId,
+        profile?.phone_normalized || profile?.phone || userId,
+      );
+    } catch (error) {
+      console.warn('[referral] getOrCreateReferralCode degraded:', error?.message || error);
+      try {
+        myCode = await rewardService.repositories.referrals.getCodeByUserId(userId);
+      } catch (fallbackError) {
+        console.warn('[referral] fallback getCodeByUserId failed:', fallbackError?.message || fallbackError);
+      }
+    }
 
     if (req.method === 'GET' || action === 'summary') {
       const [summaryResult, configResult] = await Promise.allSettled([
@@ -192,7 +209,7 @@ export default async function handler(req, res) {
         code: myCode,
         summary,
         config,
-        degraded: summaryResult.status !== 'fulfilled' || configResult.status !== 'fulfilled',
+        degraded: Boolean(!myCode || summaryResult.status !== 'fulfilled' || configResult.status !== 'fulfilled' || summary?.degraded),
       });
     }
 

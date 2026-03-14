@@ -4,6 +4,10 @@ export function getReferralSummary() {
   return getJson('/api/referral');
 }
 
+export function getReferralBootstrap() {
+  return getJson('/api/referral');
+}
+
 export function resolveReferralCode(code) {
   const normalizedCode = String(code || '').trim().toUpperCase();
   if (!normalizedCode) {
@@ -22,6 +26,7 @@ export function applyReferralCode({ code, device_hash }) {
 
 const referralApi = {
   getReferralSummary,
+  getReferralBootstrap,
   resolveReferralCode,
   applyReferralCode,
 };

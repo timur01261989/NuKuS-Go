@@ -520,7 +520,7 @@ export class ReferralRepository {
   }
 
   async listSummary(userId) {
-    const [referralsResult, rewardsResult, walletResult] = await Promise.all([
+    const [referralsResult, rewardsResult, walletResult] = await Promise.allSettled([
       this.sb
         .from('referrals')
         .select('id,status,referred_user_id,qualified_order_id,qualified_at,rewarded_at,created_at,metadata')
@@ -540,16 +540,24 @@ export class ReferralRepository {
         .maybeSingle(),
     ]);
 
-    if (referralsResult.error) throw referralsResult.error;
-    if (rewardsResult.error) throw rewardsResult.error;
-    if (walletResult.error) throw walletResult.error;
+    const referralsPayload = referralsResult.status === 'fulfilled' ? referralsResult.value : { data: [], error: referralsResult.reason || null };
+    const rewardsPayload = rewardsResult.status === 'fulfilled' ? rewardsResult.value : { data: [], error: rewardsResult.reason || null };
+    const walletPayload = walletResult.status === 'fulfilled' ? walletResult.value : { data: null, error: walletResult.reason || null };
 
-    const referrals = referralsResult.data || [];
-    const rewards = rewardsResult.data || [];
+    const referrals = referralsPayload.error ? [] : (referralsPayload.data || []);
+    const rewards = rewardsPayload.error ? [] : (rewardsPayload.data || []);
+    const wallet = walletPayload.error ? null : (walletPayload.data || null);
+
     return {
       referrals,
       rewards,
-      wallet: walletResult.data || null,
+      wallet,
+      degraded: Boolean(referralsPayload.error || rewardsPayload.error || walletPayload.error),
+      diagnostics: {
+        referrals_error: referralsPayload.error ? String(referralsPayload.error.message || referralsPayload.error) : null,
+        rewards_error: rewardsPayload.error ? String(rewardsPayload.error.message || rewardsPayload.error) : null,
+        wallet_error: walletPayload.error ? String(walletPayload.error.message || walletPayload.error) : null,
+      },
       totals: {
         invited_count: referrals.length,
         qualified_count: referrals.filter((item) => ['qualified', 'rewarded'].includes(String(item.status || ''))).length,

@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { message } from 'antd';
 import { useLanguage } from '@/modules/shared/i18n/useLanguage.js';
 import { safeBack } from '@/modules/shared/navigation/safeBack.js';
-import { getReferralSummary } from '@/services/referralApi.js';
+import { getReferralBootstrap, getReferralSummary } from '@/services/referralApi.js';
 import {
   buildReferralSharePayload,
   buildReferralShareTargets,
@@ -96,13 +96,19 @@ const ClientReferral = memo(function ClientReferral() {
 
     try {
       const response = await getReferralSummary();
-      setSummaryState({
+      const nextState = {
         code: response?.code || null,
         summary: response?.summary || null,
         config: response?.config || null,
-      });
+      };
+      setSummaryState(nextState);
+      if (response?.degraded) {
+        setErrorText(tr('referral.degradedSummary', 'Referral ma’lumotlari qisman yuklandi. Yangilashni qayta urinib ko‘ring.'));
+      }
+      return nextState;
     } catch (error) {
       setErrorText(String(error?.message || tr('error', 'Xatolik')));
+      return null;
     } finally {
       setLoading(false);
     }
@@ -155,13 +161,39 @@ const ClientReferral = memo(function ClientReferral() {
   }, [sharing]);
 
   const handleShare = useCallback(async () => {
-    if (!shareUrl || !referralCode) {
+    let effectiveCode = referralCode;
+
+    if (!effectiveCode) {
+      const bootstrap = await getReferralBootstrap().catch(() => null);
+      if (bootstrap?.code) {
+        const nextState = {
+          code: bootstrap.code || null,
+          summary: bootstrap.summary || null,
+          config: bootstrap.config || null,
+        };
+        setSummaryState(nextState);
+        effectiveCode = String(nextState?.code?.code || '').trim();
+        if (bootstrap?.degraded) {
+          setErrorText(tr('referral.degradedSummary', 'Referral ma’lumotlari qisman yuklandi. Yangilashni qayta urinib ko‘ring.'));
+        } else {
+          setErrorText('');
+        }
+      }
+    }
+
+    if (!effectiveCode) {
+      const fallbackState = await loadSummary();
+      effectiveCode = String(fallbackState?.code?.code || '').trim();
+    }
+
+    if (!effectiveCode) {
+      setErrorText(tr('referral.shareUnavailable', 'Taklif havolasi hali tayyor emas. Yangilashni bosing yoki qayta kiring.'));
       message.error(tr('referral.shareUnavailable', 'Taklif havolasi hali tayyor emas.'));
       return;
     }
 
     setShareSheetOpen(true);
-  }, [referralCode, shareUrl, tr]);
+  }, [loadSummary, referralCode, tr]);
 
   const handleShareTargetSelect = useCallback(async (target) => {
     setSharing(true);
@@ -256,7 +288,7 @@ const ClientReferral = memo(function ClientReferral() {
             type="button"
             className="flex-1 bg-primaryHome hover:bg-primaryHome/90 text-backgroundDark font-bold py-3 rounded-xl active:scale-95 disabled:opacity-50"
             onClick={handleShare}
-            disabled={loading || !referralCode || sharing}
+            disabled={loading || sharing}
           >
             {sharing ? tr('loading', 'Yuklanmoqda...') : tr('inviteFriends', 'Do‘stlarni taklif qilish')}
           </button>
