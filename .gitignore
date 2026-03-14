@@ -52,6 +52,7 @@ Thumbs.db
 
 # Supabase
 .supabase/
+supabase/.temp
 
 # Production
 .env.production.local
