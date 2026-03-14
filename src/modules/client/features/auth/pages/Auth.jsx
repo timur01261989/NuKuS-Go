@@ -5,12 +5,7 @@ import { useLanguage } from '@/modules/shared/i18n/useLanguage.js';
 import { getLocalizedLanguages } from '@/modules/shared/i18n/languages.js';
 import { supabase } from '@/services/supabase/supabaseClient';
 import { useAppMode } from '@/app/providers/AppModeProvider';
-import { otpService } from '@/services/otpService'; // OTP Service ulandi
 
-/**
- * UniGo Super App - Authentication Module
- * Strict Performance standards applied.
- */
 const Auth = React.memo(() => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -20,9 +15,8 @@ const Auth = React.memo(() => {
   const [showPassword, setShowPassword] = useState(false);
 
   const { langKey, setLanguage, t } = useLanguage();
-  const { appMode } = useAppMode();
-
   const localizedLanguages = useMemo(() => getLocalizedLanguages(langKey), [langKey]);
+  const { appMode } = useAppMode();
 
   useEffect(() => {
     const checkSession = async () => {
@@ -33,15 +27,10 @@ const Auth = React.memo(() => {
     checkSession();
   }, [navigate]);
 
-  // CRITICAL FIX: Backticks ishlatildi
   const formatUzPhone = useCallback((rawPhone) => {
     let digits = String(rawPhone || '').replace(/\D/g, '');
-    if (digits.length === 9) {
-      digits = 998${digits};
-    }
-    if (!digits.startsWith('998')) {
-      digits = 998${digits};
-    }
+    if (digits.length === 9) digits = 998${digits};
+    if (!digits.startsWith('998')) digits = 998${digits};
     digits = digits.slice(0, 12);
     return +${digits};
   }, []);
@@ -53,6 +42,22 @@ const Auth = React.memo(() => {
     if (digits.length > 5) out = ${out.slice(0, 6)} ${digits.slice(5)};
     if (digits.length > 7) out = ${out.slice(0, 9)} ${digits.slice(7)};
     return out;
+  }, []);
+
+  const handlePhoneChange = useCallback((e) => {
+    setPhone(normalizePhoneInput(e.target.value));
+  }, [normalizePhoneInput]);
+
+  const handlePasswordChange = useCallback((e) => {
+    setPassword(e.target.value);
+  }, []);
+
+  const togglePasswordVisibility = useCallback(() => {
+    setShowPassword((prev) => !prev);
+  }, []);
+
+  const handleRememberChange = useCallback((e) => {
+    setRemember(e.target.checked);
   }, []);
 
   const onSubmit = useCallback(async (e) => {
@@ -72,60 +77,74 @@ const Auth = React.memo(() => {
     setLoading(true);
     try {
       const fullPhone = formatUzPhone(digits);
-      
-      // Standart Supabase SignIn
-      const { error: authError } = await supabase.auth.signInWithPassword({ 
-        phone: fullPhone, 
-        password: password 
-      });
-      
-      if (authError) throw authError;
+      const { error } = await supabase.auth.signInWithPassword({ phone: fullPhone, password });
+      if (error) throw error;
 
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData?.user;
-      
-      if (user?.id) {
-        const nowIso = new Date().toISOString();
-        await supabase.from('profiles').upsert([
-          {
-            id: user.id,
-            phone: user.phone || fullPhone,
-            phone_e164: user.phone || fullPhone,
-            phone_verified_at: nowIso,
-            last_login: nowIso,
-          },
-        ], { onConflict: 'id' });
+      try {
+        const { data: u } = await supabase.auth.getUser();
+        const user = u?.user;
+        if (user?.id) {
+          const nowIso = new Date().toISOString();
+          await supabase.from('profiles').upsert([
+            {
+              id: user.id,
+              phone: user.phone || fullPhone,
+              phone_e164: user.phone || fullPhone,
+              phone_verified_at: nowIso,
+              last_login: nowIso,
+            },
+          ]);
+        }
+      } catch (profileError) {
+        console.error('Profile update failed:', profileError);
       }
 
       message.success(t.welcome);
-      
-      if (remember) {
-        localStorage.setItem('last_phone', digits);
-      } else {
-        localStorage.removeItem('last_phone');
+      try {
+        if (remember) {
+          localStorage.setItem('last_phone', digits);
+        } else {
+          localStorage.removeItem('last_phone');
+        }
+      } catch (storageError) {
+        console.error('LocalStorage access failed:', storageError);
       }
 
       navigate('/', { replace: true, state: { appMode } });
-    } catch (err) {
-      console.error("[AUTH_ERROR]:", err.message);
-      message.error(t.invalidLogin || "Kirishda xatolik yuz berdi");
+    } catch (authError) {
+      message.error(t.invalidLogin);
     } finally {
       setLoading(false);
     }
-  }, [phone, password, loading, remember, t, formatUzPhone, navigate, appMode]);
-
-  useEffect(() => {
+  }, [loading, phone, password, formatUzPhone, remember, navigate, appMode, t]);
+    useEffect(() => {
     try {
       const last = localStorage.getItem('last_phone');
-      if (last && !phone) {
-        setPhone(normalizePhoneInput(last));
-      }
-    } catch (e) {
-      console.warn("LocalStorage access failed");
+      if (last && !phone) setPhone(normalizePhoneInput(last));
+    } catch (error) {
+      console.error('Failed to read from localStorage:', error);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-     return (
+
+  const handleLanguageChange = useCallback((e) => {
+    const nextLang = e.target.value;
+    setLanguage(nextLang);
+    setTimeout(() => {
+      const selectedLangLabel = getLocalizedLanguages(nextLang).find((x) => x.key === nextLang)?.label;
+      message.success(selectedLangLabel || t.languageChanged);
+    }, 0);
+  }, [setLanguage, t]);
+
+  const navigateToReset = useCallback(() => {
+    navigate('/reset-password');
+  }, [navigate]);
+
+  const navigateToRegister = useCallback(() => {
+    navigate('/register');
+  }, [navigate]);
+
+  return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-100 to-blue-100 p-4 font-sans">
       <main className="w-full max-w-sm" data-purpose="login-container">
         <header className="text-center mb-8" data-purpose="brand-header">
@@ -155,7 +174,7 @@ const Auth = React.memo(() => {
                   required
                   placeholder={t.phonePlaceholder}
                   value={phone}
-                  onChange={(e) => setPhone(normalizePhoneInput(e.target.value))}
+                  onChange={handlePhoneChange}
                   className="w-full pl-16 pr-4 py-3.5 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-unigo-accent transition-all text-gray-700"
                   inputMode="numeric"
                 />
@@ -174,17 +193,17 @@ const Auth = React.memo(() => {
                   placeholder="••••••••"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={handlePasswordChange}
                   className="w-full px-4 py-3.5 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-unigo-accent transition-all text-gray-700"
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword((s) => !s)}
+                  onClick={togglePasswordVisibility}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-unigo-accent"
                   aria-label="Toggle password visibility"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-                    <path d="M2.036 12.322a1.012 1.012 0 010-.644C3.399 8.049 7.21 5 12 5c4.79 0 8.601 3.049 9.964 6.678a1.012 1.012 0 010 .644C20.601 15.951 16.79 19 12 19c-4.79 0-8.601-3.049-9.964-6.678z" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M2.036 12.322a1.012 1.012 0 010-.644C3.399 8.049 7.21 5 12 5c4.79 0 8.601 3.049 9.964 6.678a1.012 1.012 0 010 .644C20.601 15.951 16.79 19 12 19c-4.79 0-8.601-3.049-9.964-6.678z" strokeLinecap="round" strokeLinejoin="round" />
                     <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </button>
@@ -195,9 +214,9 @@ const Auth = React.memo(() => {
               <label className="flex items-center cursor-pointer group">
                 <input
                   className="rounded border-gray-300 text-unigo-accent focus:ring-unigo-accent w-4 h-4"
-                   type="checkbox"
+                  type="checkbox"
                   checked={remember}
-                  onChange={(e) => setRemember(e.target.checked)}
+                  onChange={handleRememberChange}
                 />
                 <span className="ml-2 text-gray-600 group-hover:text-gray-800">{t.remember}</span>
               </label>
@@ -205,7 +224,7 @@ const Auth = React.memo(() => {
               <button
                 type="button"
                 className="text-unigo-accent hover:underline font-medium"
-                onClick={() => navigate('/reset-password')}
+                onClick={navigateToReset}
               >
                 {t.forgotPassword}
               </button>
@@ -224,7 +243,7 @@ const Auth = React.memo(() => {
         <footer className="mt-8 text-center" data-purpose="footer-links">
           <p className="text-gray-500">
             {t.noAccount}
-            <button type="button" className="text-unigo-accent font-bold hover:underline ml-1" onClick={() => navigate('/register')}>
+            <button type="button" className="text-unigo-accent font-bold hover:underline ml-1" onClick={navigateToRegister}>
               {t.signup}
             </button>
           </p>
@@ -233,11 +252,7 @@ const Auth = React.memo(() => {
             <select
               key={langKey}
               value={langKey}
-              onChange={(e) => {
-                const nextLang = e.target.value;
-                setLanguage(nextLang);
-                setTimeout(() => message.success(getLocalizedLanguages(nextLang).find((x) => x.key === nextLang)?.label || t.languageChanged), 0);
-              }}
+              onChange={handleLanguageChange}
               className="bg-transparent text-xs font-bold text-gray-500 outline-none cursor-pointer"
               aria-label={t.language}
             >
@@ -256,7 +271,5 @@ const Auth = React.memo(() => {
     </div>
   );
 });
-
-Auth.displayName = 'Auth';
 
 export default Auth;
