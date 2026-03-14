@@ -305,18 +305,23 @@ export class CampaignRepository {
   }
 
   async getRewardProgramConfig() {
-    const now = safeIsoNow();
+    const nowMs = Date.now();
     const { data, error } = await this.sb
       .from('bonus_campaigns')
       .select('id,name,campaign_type,audience_type,service_type,reward_type,reward_amount_uzs,reward_percent,max_discount_uzs,min_order_amount_uzs,usage_limit_total,usage_limit_per_user,stackable,priority,starts_at,ends_at,is_active,metadata')
       .eq('is_active', true)
       .in('campaign_type', ['referral', 'driver_milestone'])
-      .or(`starts_at.is.null,starts_at.lte.${now}`)
-      .or(`ends_at.is.null,ends_at.gte.${now}`)
       .order('priority', { ascending: false });
     if (error) throw error;
 
-    const campaigns = data || [];
+    const campaigns = (data || []).filter((item) => {
+      const startsAtMs = item?.starts_at ? Date.parse(item.starts_at) : null;
+      const endsAtMs = item?.ends_at ? Date.parse(item.ends_at) : null;
+      const startsOk = startsAtMs == null || Number.isNaN(startsAtMs) || startsAtMs <= nowMs;
+      const endsOk = endsAtMs == null || Number.isNaN(endsAtMs) || endsAtMs >= nowMs;
+      return startsOk && endsOk;
+    });
+
     const referralCampaign = campaigns.find((item) => String(item.campaign_type || '').toLowerCase() === 'referral') || null;
     const driverMilestoneCampaign = campaigns.find((item) => String(item.campaign_type || '').toLowerCase() === 'driver_milestone') || null;
 

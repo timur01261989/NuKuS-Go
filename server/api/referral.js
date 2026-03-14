@@ -151,15 +151,48 @@ export default async function handler(req, res) {
     );
 
     if (req.method === 'GET' || action === 'summary') {
-      const [summary, config] = await Promise.all([
+      const [summaryResult, configResult] = await Promise.allSettled([
         rewardService.repositories.referrals.listSummary(userId),
         rewardService.repositories.campaigns.getRewardProgramConfig(),
       ]);
+
+      const summary = summaryResult.status === 'fulfilled'
+        ? summaryResult.value
+        : {
+            referrals: [],
+            rewards: [],
+            wallet: null,
+            totals: {
+              invited_count: 0,
+              qualified_count: 0,
+              rewarded_count: 0,
+              earned_uzs: 0,
+            },
+          };
+
+      const config = configResult.status === 'fulfilled'
+        ? configResult.value
+        : {
+            referral: {
+              campaign_id: null,
+              reward_amount_uzs: 3000,
+              min_order_amount_uzs: 20000,
+              metadata: {},
+            },
+            driver_milestone: {
+              campaign_id: null,
+              reward_amount_uzs: 10000,
+              milestone_trips: 5,
+              metadata: {},
+            },
+          };
+
       return json(res, 200, {
         ok: true,
         code: myCode,
         summary,
         config,
+        degraded: summaryResult.status !== 'fulfilled' || configResult.status !== 'fulfilled',
       });
     }
 
