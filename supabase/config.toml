@@ -1,3 +1,5 @@
+project_id = "nukus-go-db"
+
 [functions.send-signup-otp]
 verify_jwt = false
 
@@ -5,4 +7,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.reset-password-with-otp]
+verify_jwt = false
+
+[functions.telerivet-sms-hook]
 verify_jwt = false

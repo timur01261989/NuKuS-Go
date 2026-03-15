@@ -1,39 +1,40 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.4';
 
 type JsonRecord = Record<string, unknown>;
 
-interface ResetPasswordBody {
-  phone: string;
-  otp: string;
-  new_password: string;
-}
+type ResetPasswordRequest = {
+  phone?: string;
+  otp?: string;
+  code?: string;
+  new_password?: string;
+  newPassword?: string;
+};
 
-interface OtpRow {
-  id: string;
-  otp_hash: string;
-  expires_at: string;
-  attempt_count: number;
-  max_attempts: number;
-}
-
-interface ProfileLookupRow {
-  id: string;
-  phone: string | null;
-  phone_normalized: string | null;
-}
+type LookupResponse = {
+  exists_profile: boolean;
+  profile_id: string | null;
+  auth_user_id: string | null;
+  matched_phone: string | null;
+};
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 const OTP_PEPPER = Deno.env.get('OTP_PEPPER') ?? '';
+const OTP_MAX_ATTEMPTS = 5;
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !OTP_PEPPER) {
-  throw new Error('Missing required environment variables');
+  throw new Error('Missing required environment variables.');
 }
 
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: {
     persistSession: false,
     autoRefreshToken: false,
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'unigo-phone-otp/reset-password-with-otp',
+    },
   },
 });
 
@@ -42,202 +43,203 @@ function corsHeaders(): HeadersInit {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Content-Type': 'application/json; charset=utf-8',
   };
 }
 
-function jsonResponse(status: number, body: JsonRecord): Response {
-  return new Response(JSON.stringify(body), {
+function jsonResponse(status: number, payload: JsonRecord): Response {
+  return new Response(JSON.stringify(payload), {
     status,
-    headers: {
-      ...corsHeaders(),
-      'Content-Type': 'application/json',
-      'Cache-Control': 'no-store',
-    },
+    headers: corsHeaders(),
   });
 }
 
-function normalizeUzbekPhone(rawPhone: string): string {
-  const cleaned = String(rawPhone || '').replace(/[^\d+]/g, '');
-  if (/^\+998\d{9}$/.test(cleaned)) return cleaned;
-  if (/^998\d{9}$/.test(cleaned)) return `+${cleaned}`;
-  if (/^\d{9}$/.test(cleaned)) return `+998${cleaned}`;
-  throw new Error('Telefon raqam formati noto‘g‘ri. Masalan: +998901234567');
-}
-
-function normalizePhoneForProfile(phone: string): string {
-  const digits = String(phone || '').replace(/\D/g, '');
-  return digits.startsWith('998') ? `+${digits}` : phone;
-}
-
-function validateOtpFormat(otp: string): string {
-  const normalized = String(otp || '').trim();
-  if (!/^\d{6}$/.test(normalized)) {
-    throw new Error('OTP 6 xonali bo‘lishi kerak');
+function normalizePhone(rawPhone: string): string {
+  const digits = rawPhone.replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('998')) {
+    return `+${digits}`;
   }
-  return normalized;
-}
-
-function validatePassword(password: string): string {
-  const normalized = String(password || '');
-  if (normalized.length < 6) {
-    throw new Error('Parol kamida 6 ta belgidan iborat bo‘lishi kerak.');
+  if (digits.length === 9) {
+    return `+998${digits}`;
   }
-  return normalized;
+  if (rawPhone.startsWith('+') && /^\+\d{10,15}$/.test(rawPhone)) {
+    return rawPhone;
+  }
+  throw new Error('Telefon raqami noto‘g‘ri formatda.');
 }
 
-async function sha256Hex(input: string): Promise<string> {
-  const data = new TextEncoder().encode(input);
-  const digest = await crypto.subtle.digest('SHA-256', data);
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
-async function hashOtp(phone: string, purpose: string, otp: string): Promise<string> {
-  return sha256Hex(`${phone}:${purpose}:${otp}:${OTP_PEPPER}`);
-}
-
-async function findProfileByPhone(phone: string): Promise<ProfileLookupRow | null> {
-  const normalized = normalizePhoneForProfile(phone);
-
-  const { data, error } = await supabaseAdmin
-    .rpc('find_profile_by_phone', { p_phone: normalized })
-    .maybeSingle();
-
-  if (error && error.code !== 'PGRST116') {
-    throw new Error(`Telefon bo'yicha profilni tekshirishda xato: ${error.message}`);
+function normalizeOtp(value: unknown): string {
+  if (typeof value !== 'string' && typeof value !== 'number') {
+    throw new Error('SMS kod kiritilishi kerak.');
   }
 
-  if (!data) {
-    return null;
+  const code = String(value).replace(/\D/g, '');
+  if (code.length !== 6) {
+    throw new Error('SMS kod 6 raqamdan iborat bo‘lishi kerak.');
   }
+  return code;
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function hashOtp(phoneE164: string, purpose: string, otpCode: string): Promise<string> {
+  return sha256Hex(`${phoneE164}|${purpose}|${otpCode}|${OTP_PEPPER}`);
+}
+
+async function lookupRegistrationByPhone(phoneE164: string): Promise<LookupResponse> {
+  const { data, error } = await supabaseAdmin.rpc('find_profile_by_phone_for_otp', {
+    p_phone: phoneE164,
+  });
+
+  if (error) {
+    throw new Error(`Telefon bo‘yicha profilni tekshirishda xato: ${error.message}`);
+  }
+
+  const row = Array.isArray(data) && data.length > 0 ? data[0] as Partial<LookupResponse> : null;
 
   return {
-    id: String((data as JsonRecord).id ?? ''),
-    phone: ((data as JsonRecord).phone as string | null) ?? null,
-    phone_normalized: ((data as JsonRecord).phone_normalized as string | null) ?? null,
+    exists_profile: Boolean(row?.exists_profile),
+    profile_id: typeof row?.profile_id === 'string' ? row.profile_id : null,
+    auth_user_id: typeof row?.auth_user_id === 'string' ? row.auth_user_id : null,
+    matched_phone: typeof row?.matched_phone === 'string' ? row.matched_phone : null,
   };
 }
 
-Deno.serve(async (req: Request): Promise<Response> => {
-  if (req.method === 'OPTIONS') {
+Deno.serve(async (request: Request) => {
+  if (request.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders() });
   }
 
-  if (req.method !== 'POST') {
-    return jsonResponse(405, { error: 'Method not allowed' });
+  if (request.method !== 'POST') {
+    return jsonResponse(405, { error: 'Faqat POST ruxsat etiladi.' });
   }
 
   try {
-    const body = (await req.json()) as ResetPasswordBody;
-    const phone = normalizeUzbekPhone(body.phone);
-    const otp = validateOtpFormat(body.otp);
-    const newPassword = validatePassword(body.new_password);
+    const body = await request.json() as ResetPasswordRequest;
+    const phoneE164 = normalizePhone(typeof body.phone === 'string' ? body.phone.trim() : '');
+    const otpCode = normalizeOtp(body.otp ?? body.code);
+    const newPassword = typeof (body.new_password ?? body.newPassword) === 'string'
+      ? String(body.new_password ?? body.newPassword)
+      : '';
 
-    const profile = await findProfileByPhone(phone);
-    if (!profile?.id) {
-      return jsonResponse(404, {
-        error: 'Bu telefon raqam bilan foydalanuvchi topilmadi.',
+    if (newPassword.length < 6) {
+      return jsonResponse(400, {
+        error: 'Parol kamida 6 ta belgidan iborat bo‘lishi kerak.',
       });
     }
 
-    const { data: otpRows, error: fetchError } = await supabaseAdmin
+    const existing = await lookupRegistrationByPhone(phoneE164);
+    if (!existing.exists_profile || !existing.auth_user_id) {
+      return jsonResponse(404, {
+        error: 'Bu telefon raqam bilan akkaunt topilmadi.',
+        code: 'ACCOUNT_NOT_FOUND',
+      });
+    }
+
+    const otpHash = await hashOtp(phoneE164, 'reset_password', otpCode);
+
+    const { data: otpRows, error: otpError } = await supabaseAdmin
       .from('phone_otp_verifications')
-      .select('id, otp_hash, expires_at, attempt_count, max_attempts')
-      .eq('phone_e164', phone)
+      .select('id, attempt_count, expires_at, verified_at, status')
+      .eq('phone_e164', phoneE164)
       .eq('purpose', 'reset_password')
+      .eq('otp_hash', otpHash)
       .eq('status', 'pending')
       .is('verified_at', null)
       .order('created_at', { ascending: false })
       .limit(1);
 
-    if (fetchError) {
+    if (otpError) {
       return jsonResponse(500, {
-        error: 'OTP ni o‘qishda xato',
-        details: fetchError.message,
+        error: 'OTP kodini tekshirishda xato',
+        details: otpError.message,
       });
     }
 
-    const otpRow = ((otpRows?.[0] as OtpRow | undefined) ?? null);
+    const otpRow = Array.isArray(otpRows) && otpRows.length > 0 ? otpRows[0] as {
+      id: string;
+      attempt_count: number | null;
+      expires_at: string | null;
+      verified_at: string | null;
+      status: string;
+    } : null;
+
     if (!otpRow) {
-      return jsonResponse(404, {
-        error: 'Faol tiklash kodi topilmadi.',
+      return jsonResponse(400, {
+        error: 'SMS kod noto‘g‘ri yoki eskirgan.',
+        code: 'INVALID_OTP',
       });
     }
 
-    if (new Date(otpRow.expires_at).getTime() < Date.now()) {
+    if (otpRow.expires_at && new Date(otpRow.expires_at).getTime() < Date.now()) {
       await supabaseAdmin
         .from('phone_otp_verifications')
-        .update({ status: 'expired' })
+        .update({ status: 'expired', updated_at: new Date().toISOString() })
         .eq('id', otpRow.id);
 
       return jsonResponse(400, {
-        error: 'Tiklash kodi muddati tugagan.',
+        error: 'SMS kod muddati tugagan. Yangi kod so‘rang.',
+        code: 'OTP_EXPIRED',
       });
     }
 
-    if (otpRow.attempt_count >= otpRow.max_attempts) {
+    const nextAttemptCount = (otpRow.attempt_count ?? 0) + 1;
+    if (nextAttemptCount > OTP_MAX_ATTEMPTS) {
       await supabaseAdmin
         .from('phone_otp_verifications')
-        .update({ status: 'blocked' })
+        .update({ status: 'blocked', attempt_count: nextAttemptCount, updated_at: new Date().toISOString() })
         .eq('id', otpRow.id);
 
       return jsonResponse(429, {
-        error: 'Tiklash kodi urinishlari tugagan.',
+        error: 'Juda ko‘p urinish qilindi. Yangi kod so‘rang.',
+        code: 'TOO_MANY_ATTEMPTS',
       });
     }
 
-    const submittedHash = await hashOtp(phone, 'reset_password', otp);
-    if (submittedHash !== otpRow.otp_hash) {
-      const nextAttemptCount = otpRow.attempt_count + 1;
-      const nextStatus = nextAttemptCount >= otpRow.max_attempts ? 'blocked' : 'pending';
-
-      await supabaseAdmin
-        .from('phone_otp_verifications')
-        .update({ attempt_count: nextAttemptCount, status: nextStatus })
-        .eq('id', otpRow.id);
-
-      return jsonResponse(400, {
-        error: 'Tiklash kodi noto‘g‘ri.',
-        attempts_left: Math.max(otpRow.max_attempts - nextAttemptCount, 0),
-      });
-    }
-
-    const updatedAt = new Date().toISOString();
-
-    const { error: updateUserError } = await supabaseAdmin.auth.admin.updateUserById(profile.id, {
+    const { data: updatedUser, error: updateUserError } = await supabaseAdmin.auth.admin.updateUserById(existing.auth_user_id, {
       password: newPassword,
+      phone_confirm: true,
+      user_metadata: {
+        password_reset_via_phone_otp_at: new Date().toISOString(),
+      },
     });
 
-    if (updateUserError) {
+    if (updateUserError || !updatedUser.user) {
       return jsonResponse(500, {
         error: 'Parolni yangilashda xato',
-        details: updateUserError.message,
+        details: updateUserError?.message ?? 'Auth user yangilanmadi.',
       });
     }
 
-    const { error: verifyError } = await supabaseAdmin
+    const { error: verifyOtpError } = await supabaseAdmin
       .from('phone_otp_verifications')
       .update({
-        verified_at: updatedAt,
         status: 'verified',
+        verified_at: new Date().toISOString(),
+        attempt_count: nextAttemptCount,
+        updated_at: new Date().toISOString(),
       })
       .eq('id', otpRow.id);
 
-    if (verifyError) {
+    if (verifyOtpError) {
       return jsonResponse(500, {
-        error: 'OTP holatini yangilashda xato',
-        details: verifyError.message,
+        error: 'OTP yozuvini yakunlashda xato',
+        details: verifyOtpError.message,
       });
     }
 
     return jsonResponse(200, {
       success: true,
-      phone,
+      user_id: updatedUser.user.id,
+      phone: phoneE164,
       message: 'Parol muvaffaqiyatli yangilandi.',
-      updated_at: updatedAt,
     });
   } catch (error) {
-    return jsonResponse(400, {
-      error: error instanceof Error ? error.message : 'Parolni tiklashda xato yuz berdi.',
-    });
+    const message = error instanceof Error ? error.message : 'Noma’lum xatolik yuz berdi.';
+    return jsonResponse(500, { error: message });
   }
 });
