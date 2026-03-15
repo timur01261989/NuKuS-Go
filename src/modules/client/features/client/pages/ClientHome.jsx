@@ -1,326 +1,95 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { prefetch } from "@/services/platform/prefetchService";
-import { supabase } from "@/services/supabase/supabaseClient";
-import { listMarketCars, formatPriceUZS } from "@services/marketService";
-import { useLanguage } from "@/modules/shared/i18n/useLanguage.js";
-import ClientSidebar from "../components/ClientSidebar";
+import React, { memo, useCallback, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { UnigoBottomNav, UnigoButton, UnigoCard, UnigoEmptyState, UnigoHeader, UnigoInput, UnigoKpiGrid, UnigoListRow, UnigoMapPanel, UnigoScreen, UnigoSection, UnigoSelect, UnigoServiceTile, UnigoStatusPill, UnigoToggle } from '@/modules/shared/ui/UnigoMobileUI.jsx';
 
-function initials(name) {
-  const s = String(name || "").trim();
-  if (!s) return "U";
-  const parts = s.split(/\s+/).slice(0, 2);
-  return parts.map((p) => (p[0] || "").toUpperCase()).join("") || "U";
-}
 
-export default function ClientHome() {
+const SERVICE_ITEMS = [
+  { title: 'Viloyatlar aro', subtitle: 'Viloyatdan viloyatga qulay safar', icon: 'travel_explore', to: '/intercity', blue: true },
+  { title: 'Tumanlar aro', subtitle: 'Tumanlar orasida yo‘l toping', icon: 'alt_route', to: '/interdistrict' },
+  { title: 'Yuk tashish', subtitle: 'Yukingiz uchun mos transport', icon: 'local_shipping', to: '/freight', blue: true },
+  { title: 'Eltish xizmati', subtitle: 'Hujjat va buyumlarni topshiring', icon: 'package_2', to: '/delivery' },
+];
+
+function ClientHome() {
   const navigate = useNavigate();
-  const { t } = useLanguage();
-
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [profile, setProfile] = useState({ fullName: t.passenger, avatarUrl: "" });
-  const [cars, setCars] = useState([]);
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const { data: u } = await supabase.auth.getUser();
-        const user = u?.user;
-        if (!user) return;
-
-        let fullName = user.user_metadata?.full_name || user.user_metadata?.name || "";
-        let avatarUrl = user.user_metadata?.avatar_url || "";
-        try {
-          const pRes = await supabase
-            .from("profiles")
-            .select("full_name,avatar_url")
-            .eq("id", user.id)
-            .maybeSingle();
-
-          const p = pRes.data;
-          if (p?.full_name) fullName = p.full_name;
-          if (p?.avatar_url) avatarUrl = p.avatar_url;
-        } catch {
-          // ignore
-        }
-
-        if (mounted) {
-          setProfile({
-            fullName: fullName || t.userLabel,
-            avatarUrl: avatarUrl || "",
-          });
-        }
-      } catch {
-        // ignore
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const list = await listMarketCars({ limit: 6 });
-        if (mounted) setCars(Array.isArray(list) ? list : []);
-      } catch {
-        if (mounted) setCars([]);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const avatarFallback = useMemo(() => initials(profile.fullName), [profile.fullName]);
+  const navItems = useMemo(() => ([
+    { to: '/', icon: 'home', label: 'Asosiy', active: true },
+    { to: '/orders', icon: 'receipt_long', label: 'Buyurtmalar' },
+    { to: '/wallet', icon: 'account_balance_wallet', label: 'Hamyon' },
+    { to: '/profile', icon: 'person', label: 'Profil' },
+  ]), []);
 
   return (
-    <div className="min-h-screen pb-24 bg-softBlue dark:bg-backgroundDark font-display text-slate-900 dark:text-slate-100">
-      {/* Top Header */}
-      <header className="sticky top-0 z-50 flex items-center justify-between px-6 py-4 bg-softBlue/80 dark:bg-backgroundDark/80 backdrop-blur-md">
-        <button
-          type="button"
-          className="flex items-center gap-3 text-left"
-          onClick={() => setSidebarOpen(true)}
-        >
-          <div className="size-10 rounded-full overflow-hidden border-2 border-primaryHome flex items-center justify-center bg-white">
-            {profile.avatarUrl ? (
-              <img
-                className="w-full h-full object-cover"
-                alt="avatar"
-                src={profile.avatarUrl}
-              />
-            ) : (
-              <span className="text-sm font-bold text-primaryHome">{avatarFallback}</span>
-            )}
-          </div>
-          <div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">{t.welcome}</p>
-            <h1 className="text-lg font-bold leading-none tracking-tight">{t.appName}</h1>
-          </div>
-        </button>
+    <UnigoScreen>
+      <UnigoHeader
+        avatarLabel="TA"
+        title="Assalomu alaykum"
+        subtitle="Bugun qayerga boramiz?"
+        onAvatarClick={() => navigate('/profile')}
+        rightActions={[
+          { icon: 'notifications', label: 'Bildirishnomalar', onClick: () => navigate('/profile') },
+          { icon: 'menu', label: 'Menyu', onClick: () => navigate('/profile') },
+        ]}
+      />
 
-        <div className="flex items-center gap-2">
-          <button type="button" className="neumorphic-dark p-2 rounded-xl text-primaryHome" onClick={() => navigate('/settings')}>
-            <span className="material-symbols-outlined" data-no-auto-translate="true">settings</span>
-          </button>
-          <button type="button" className="neumorphic-dark p-2 rounded-xl text-primaryHome">
-            <span className="material-symbols-outlined" data-no-auto-translate="true">notifications</span>
-          </button>
+      <UnigoCard>
+        <div className="unigo-hero">
+          <div className="unigo-card__stack" style={{ justifyContent: 'space-between' }}>
+            <div className="unigo-card__stack">
+              <span className="unigo-pill unigo-pill--orange">Asosiy xizmat</span>
+              <h2 className="unigo-card-title">Shahar ichida taksi</h2>
+              <p className="unigo-card-caption">Tez va ishonchli xizmat. Eng yaqin haydovchini topib, safarni darhol boshlang.</p>
+            </div>
+            <UnigoButton onClick={() => navigate('/taxi')}>Buyurtma berish</UnigoButton>
+          </div>
+          <div className="unigo-hero__visual">
+            <div className="unigo-vehicle-outline" />
+          </div>
         </div>
-      </header>
+      </UnigoCard>
 
-      <main className="px-4 space-y-6">
-        {/* Main Service: City Taxi */}
-        <section className="mt-4">
-          <div className="neumorphic-dark rounded-2xl overflow-hidden p-1">
-            <div className="relative h-48 rounded-xl overflow-hidden">
-              <img
-                className="w-full h-full object-cover"
-                alt="taxi"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDZ5RHRrcqAdtLXXxWBcOvZs_KD32FUb7YdVjteNkkkhWjhfBHBKG2gB_RSlsRaYwrfRZUwHixUJmclJITyR47DG2p4FTJqQfWxKq0l17XyiD1Q7kicXJ3ciB4bDmp4xRF52nGbLE6x-LQ2AwYb9Z_7LssASTvhhyjaRMSakVJ1D1WIwnNrOS-3ri9C3Yajle213_nKptAO9IsWfiI5npd7USNZIK2iwXdkfaV2pmDX2gnJGgaVtW7f46Jyaw53Jdp8n6JG-9737w0"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-backgroundDark/90 to-transparent" />
-              <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end">
-                <div>
-                  <h2 className="text-xl font-bold text-white">{t.cityTaxi}</h2>
-                  <p className="text-slate-300 text-sm">{t.cityTaxiHint}</p>
-                </div>
-                <button
-                  type="button"
-                  className="bg-primaryHome hover:bg-primaryHome/90 text-backgroundDark font-bold py-2 px-6 rounded-lg transition-transform active:scale-95 shadow-lg"
-                  onMouseEnter={prefetch.taxi}
-                  onTouchStart={prefetch.taxi}
-                  onClick={() => navigate("/client/taxi")}
-                >
-                  {t.orderNow}
-                </button>
+      <UnigoSection title="Xizmatlar">
+        <div className="unigo-grid-2">
+          {SERVICE_ITEMS.map((item) => (
+            <UnigoServiceTile
+              key={item.title}
+              title={item.title}
+              subtitle={item.subtitle}
+              icon={item.icon}
+              blue={item.blue}
+              onClick={() => navigate(item.to)}
+            />
+          ))}
+        </div>
+      </UnigoSection>
+
+      <UnigoSection title="Avto savdo" actionLabel="Ko‘rish" onAction={() => navigate('/auto-market')}>
+        <UnigoCard soft="soft-blue">
+          <div className="unigo-card__row">
+            <div className="unigo-card__stack">
+              <h3 className="unigo-card-title" style={{ fontSize: 18 }}>Yangi e’lonlar</h3>
+              <p className="unigo-card-caption">Mashina, barter, vikup va zapchast bo‘limlari bitta joyda.</p>
+              <div>
+                <UnigoStatusPill variant="info">Bugun yangilandi</UnigoStatusPill>
               </div>
             </div>
-          </div>
-        </section>
-
-        {/* Service Grid */}
-        <section>
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold">{t.services}</h3>
-            <span className="text-primaryHome text-sm font-medium">{t.all}</span>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <ServiceCard
-              icon="map"
-              label={t?.interProv || "Viloyatlar aro"}
-              onMouseEnter={prefetch.intercity}
-              onTouchStart={prefetch.intercity}
-              onClick={() => navigate("/client/inter-provincial")} 
-            />
-            <ServiceCard
-              icon="distance"
-              label={t?.interDistrict || "Tumanlar aro"}
-              onMouseEnter={prefetch.interDistrict}
-              onTouchStart={prefetch.interDistrict}
-              onClick={() => navigate("/client/inter-district")} 
-            />
-            <ServiceCard
-              icon="local_shipping"
-              label={t?.freight || "Yuk tashish"}
-              onMouseEnter={prefetch.freight}
-              onTouchStart={prefetch.freight}
-              onClick={() => navigate("/client/freight")} 
-            />
-            <ServiceCard
-              icon="package_2"
-              label={t?.delivery || "Eltish xizmati"}
-              onMouseEnter={prefetch.delivery}
-              onTouchStart={prefetch.delivery}
-              onClick={() => navigate("/client/delivery")} 
-            />
-          </div>
-        </section>
-
-        {/* Auto Savdo Banner */}
-        <section>
-          <button
-            type="button"
-            className="w-full neumorphic-dark rounded-2xl p-4 flex items-center justify-between bg-gradient-to-r from-cardDark to-primaryHome/10 border-l-4 border-primaryHome text-left"
-            onClick={() => navigate("/auto-market")}
-          >
-            <div className="space-y-1">
-              <h3 className="text-xl font-bold">{t.autoMarketTitle}</h3>
-              <p className="text-sm text-slate-400">{t.autoMarketHint}</p>
+            <div className="unigo-service-tile__icon unigo-service-tile__icon--blue">
+              <span className="material-symbols-outlined" data-no-auto-translate="true">directions_car</span>
             </div>
-            <div className="text-primaryHome">
-              <span className="material-symbols-outlined text-4xl" data-no-auto-translate="true">directions_car</span>
-            </div>
-          </button>
-        </section>
-
-        {/* New Cars */}
-        <section className="pb-8">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold">{t.newCars}</h3>
-            <button
-              type="button"
-              className="text-primaryHome text-sm font-medium"
-              onClick={() => navigate("/auto-market")}
-            >
-              {t.viewAll}
-            </button>
           </div>
+        </UnigoCard>
+      </UnigoSection>
 
-          <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 no-scrollbar">
-            {(cars.length ? cars : Array.from({ length: 3 }).map((_, i) => ({ id: "p" + i }))).map(
-              (c, i) => (
-                <CarCard
-                  key={c.id || i}
-                  title={c.title || c.model || `${t.autoMarketTitle} ${i + 1}`}
-                  year={c.year}
-                  priceUZS={c.price_uzs ?? c.price}
-                  image={c.image}
-                  onClick={() => navigate("/auto-market")}
-                />
-              )
-            )}
-          </div>
-        </section>
-      </main>
+      <UnigoSection title="Tezkor holat">
+        <UnigoKpiGrid items={[
+          { label: 'Faol haydovchilar', value: '128' },
+          { label: 'So‘nggi buyurtmalar', value: '42' },
+        ]} />
+      </UnigoSection>
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-softBlue dark:bg-backgroundDark/95 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 px-2 pb-6 pt-2">
-        <div className="flex justify-around items-center">
-          <BottomNavItem
-            active
-            icon="home"
-            label={t.home}
-            onClick={() => navigate("/client/home")}
-          />
-          <BottomNavItem
-            icon="receipt_long"
-            label={t.orders}
-            onClick={() => navigate("/client/orders")}
-          />
-          <BottomNavItem
-            icon="account_balance_wallet"
-            label={t.wallet}
-            onClick={() => navigate("/client/wallet")}
-          />
-          <BottomNavItem
-            icon="person"
-            label={t.profile}
-            onClick={() => navigate("/client/profile")}
-          />
-        </div>
-      </nav>
-
-      <ClientSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} profile={profile} />
-    </div>
+      <UnigoBottomNav items={navItems} />
+    </UnigoScreen>
   );
 }
 
-function ServiceCard({ icon, label, onClick, onMouseEnter, onTouchStart }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      onMouseEnter={onMouseEnter}
-      onTouchStart={onTouchStart}
-      className="neumorphic-dark p-4 rounded-2xl flex flex-col items-center text-center gap-3 active:scale-95 transition-all"
-    >
-      <div className="bg-primaryHome/10 p-3 rounded-xl text-primaryHome">
-        <span className="material-symbols-outlined text-3xl" data-no-auto-translate="true">{icon}</span>
-      </div>
-      <p className="text-sm font-semibold">{label}</p>
-    </button>
-  );
-}
-
-function CarCard({ title, year, priceUZS, image, onClick }) {
-  const priceLabel =
-    typeof priceUZS === "number" ? formatPriceUZS(priceUZS) : priceUZS ? String(priceUZS) : "";
-  const yearLabel = year ? String(year) + ` ${"yil"}` : "";
-  const img = image || "";
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="neumorphic-dark min-w-[200px] w-52 rounded-2xl overflow-hidden p-2 text-left"
-    >
-      <div className="h-32 rounded-xl overflow-hidden mb-3 bg-slate-800/30">
-        {img ? (
-          <img className="w-full h-full object-cover" alt={title} src={img} />
-        ) : (
-          <div className="w-full h-full" />
-        )}
-      </div>
-      <div className="px-2 pb-2">
-        <h4 className="font-bold text-sm truncate">{title}</h4>
-        <div className="flex justify-between items-center mt-1">
-          <span className="text-xs text-slate-400">{yearLabel}</span>
-          <span className="text-primaryHome font-bold text-sm">{priceLabel}</span>
-        </div>
-      </div>
-    </button>
-  );
-}
-
-function BottomNavItem({ icon, label, active, onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={
-        "flex flex-col items-center gap-1 " +
-        (active ? "text-primaryHome" : "text-slate-400")
-      }
-    >
-      <span className={"material-symbols-outlined " + (active ? "font-variation-fill" : "")} data-no-auto-translate="true">
-        {icon}
-      </span>
-      <span className="text-[10px] font-medium">{label}</span>
-    </button>
-  );
-}
+export default memo(ClientHome);

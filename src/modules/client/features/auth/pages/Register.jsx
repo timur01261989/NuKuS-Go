@@ -4,6 +4,7 @@ import { message } from 'antd';
 import { supabase } from '@/services/supabase/supabaseClient';
 import { useLanguage } from '@/modules/shared/i18n/useLanguage';
 import { applyReferralCode, resolveReferralCode } from '@/services/referralApi.js';
+import { sendSignupOtp, verifySignupOtp } from '@/services/otpService.js';
 import {
   clearPendingReferralContext,
   getPendingReferralContext,
@@ -28,6 +29,12 @@ function toFullPhone(localDigits) {
   return `+998${digits}`;
 }
 
+function buildFullName(name, surname, tr) {
+  const safeName = String(name || '').trim() || tr('register.unknownName', 'Noma’lum');
+  const safeSurname = String(surname || '').trim() || tr('register.userSurnameFallback', 'Foydalanuvchi');
+  return `${safeName} ${safeSurname}`.trim();
+}
+
 const Register = memo(function Register() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -41,6 +48,11 @@ const Register = memo(function Register() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [referralCode, setReferralCode] = useState('');
+  const [otpMeta, setOtpMeta] = useState({
+    resendCooldownSeconds: 60,
+    expiresInSeconds: 180,
+    cooldownLeft: 0,
+  });
   const [referralStatus, setReferralStatus] = useState({
     checking: false,
     valid: false,
@@ -92,101 +104,20 @@ const Register = memo(function Register() {
     };
   }, [searchParams]);
 
-  const handleVerifyOtp = useCallback(async (otpValue) => {
-    const verificationCode = String(otpValue || '').replace(/\D/g, '').slice(0, 6);
-    if (verificationCode.length !== 6) {
-      message.error(tr('register.codeMustBe6', 'Kod 6 ta raqam bo‘lishi kerak.'));
-      return;
-    }
-    if (!formData?.fullPhone) {
-      message.error(tr('register.phoneNotFoundRetry', 'Telefon raqam topilmadi. Qaytadan urinib ko‘ring.'));
-      setStep(1);
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.auth.verifyOtp({
-        phone: formData.fullPhone,
-        token: verificationCode,
-        type: 'sms',
-      });
-      if (error) throw error;
-
-      const nextUser = data?.user;
-      if (!nextUser?.id) {
-        throw new Error(tr('register.unknownError', 'Noma’lum xatolik'));
-      }
-
-      const registrationTime = new Date().toISOString();
-      const safeName = String(formData.name || '').trim() || tr('register.unknownName', 'Noma’lum');
-      const safeSurname = String(formData.surname || '').trim() || tr('register.userSurnameFallback', 'Foydalanuvchi');
-      const fullName = `${safeName} ${safeSurname}`.trim();
-
-      const { error: updatePasswordError } = await supabase.auth.updateUser({ password: formData.password });
-      if (updatePasswordError) throw updatePasswordError;
-
-      const { error: profileError } = await supabase.from('profiles').upsert({
-        id: nextUser.id,
-        full_name: fullName,
-        phone: formData.fullPhone,
-        phone_e164: formData.fullPhone,
-        phone_normalized: formData.fullPhone,
-        phone_verified_at: registrationTime,
-        role: 'client',
-        current_role: 'client',
-        is_test_user: false,
-        created_at: registrationTime,
-        updated_at: registrationTime,
-        last_login: registrationTime,
-      }, { onConflict: 'id' });
-      if (profileError) throw profileError;
-
-      const normalizedReferralCode = normalizeReferralCode(formData.referralCode || '');
-      if (normalizedReferralCode) {
-        try {
-          const deviceHash = await getReferralDeviceHash();
-          await applyReferralCode({
-            code: normalizedReferralCode,
-            device_hash: deviceHash,
-          });
-          clearPendingReferralContext();
-        } catch (referralError) {
-          message.warning(String(referralError?.message || tr('referral.applyWarning', 'Referral kod saqlanmadi. Keyinroq tekshiring.')));
-        }
-      } else {
-        clearPendingReferralContext();
-      }
-
-      message.success(tr('register.success', 'Muvaffaqiyatli ro‘yxatdan o‘tdingiz!'));
-      navigate('/', { replace: true });
-    } catch (error) {
-      message.error(String(error?.message || tr('register.unknownError', 'Noma’lum xatolik')));
-    } finally {
-      setLoading(false);
-    }
-  }, [formData, navigate, tr]);
-
   useEffect(() => {
-    if (!('OTPCredential' in window)) return undefined;
-    if (step !== 2 || !formData?.fullPhone) return undefined;
+    if (step !== 2 || otpMeta.cooldownLeft <= 0) {
+      return undefined;
+    }
 
-    const abortController = new AbortController();
-    navigator.credentials
-      .get({
-        otp: { transport: ['sms'] },
-        signal: abortController.signal,
-      })
-      .then((credential) => {
-        if (!credential?.code) return;
-        const nextOtp = String(credential.code).slice(0, 6);
-        setOtp(nextOtp);
-        void handleVerifyOtp(nextOtp);
-      })
-      .catch(() => {});
+    const timeoutId = window.setTimeout(() => {
+      setOtpMeta((current) => ({
+        ...current,
+        cooldownLeft: Math.max(current.cooldownLeft - 1, 0),
+      }));
+    }, 1000);
 
-    return () => abortController.abort();
-  }, [formData?.fullPhone, handleVerifyOtp, step]);
+    return () => window.clearTimeout(timeoutId);
+  }, [otpMeta.cooldownLeft, step]);
 
   const validateReferral = useCallback(async (codeValue) => {
     const normalizedCode = normalizeReferralCode(codeValue);
@@ -253,9 +184,51 @@ const Register = memo(function Register() {
     try {
       await validateReferral(normalizedCode);
     } catch {
-      // inline error only
+      // inline validation is enough
     }
   }, [referralCode, validateReferral]);
+
+  const requestOtp = useCallback(async ({
+    nextName,
+    nextSurname,
+    nextLocalDigits,
+    nextPassword,
+    nextReferralCode,
+  }) => {
+    const normalizedReferralCode = normalizeReferralCode(nextReferralCode);
+
+    if (normalizedReferralCode && (!referralStatus.valid || normalizedReferralCode !== normalizeReferralCode(getPendingReferralContext()?.code))) {
+      await validateReferral(normalizedReferralCode);
+    }
+
+    const fullPhone = toFullPhone(nextLocalDigits);
+    if (!fullPhone) {
+      throw new Error(tr('phoneRequired', 'Telefon raqamni to‘liq kiriting (9 ta raqam).'));
+    }
+
+    const otpResponse = await sendSignupOtp({
+      phone: fullPhone,
+      purpose: 'signup',
+    });
+
+    setFormData({
+      name: String(nextName || '').trim(),
+      surname: String(nextSurname || '').trim(),
+      password: nextPassword,
+      fullPhone,
+      referralCode: normalizedReferralCode || '',
+    });
+    setOtp('');
+    setOtpMeta({
+      resendCooldownSeconds: otpResponse.resendCooldownSeconds,
+      expiresInSeconds: otpResponse.expiresInSeconds,
+      cooldownLeft: otpResponse.retryAfterSeconds > 0
+        ? otpResponse.retryAfterSeconds
+        : otpResponse.resendCooldownSeconds,
+    });
+    message.success(String(otpResponse.message || tr('smsSent', 'SMS kod yuborildi!')));
+    setStep(2);
+  }, [referralStatus.valid, tr, validateReferral]);
 
   const handleGetOtp = useCallback(async (event) => {
     event.preventDefault();
@@ -279,78 +252,154 @@ const Register = memo(function Register() {
       return;
     }
 
-    const normalizedReferralCode = normalizeReferralCode(referralCode);
-
     setLoading(true);
     try {
-      if (normalizedReferralCode && (!referralStatus.valid || normalizedReferralCode !== normalizeReferralCode(getPendingReferralContext()?.code))) {
-        await validateReferral(normalizedReferralCode);
-      }
-
-      const fullPhone = toFullPhone(localDigits);
-      if (!fullPhone) {
-        throw new Error(tr('phoneRequired', 'Telefon raqamni to‘liq kiriting (9 ta raqam).'));
-      }
-
-      const { error } = await supabase.auth.signInWithOtp({
-        phone: fullPhone,
-        options: {
-          shouldCreateUser: true,
-        },
+      await requestOtp({
+        nextName: name,
+        nextSurname: surname,
+        nextLocalDigits: localDigits,
+        nextPassword: password,
+        nextReferralCode: referralCode,
       });
-      if (error) throw error;
-
-      setFormData({
-        name: String(name || '').trim(),
-        surname: String(surname || '').trim(),
-        password,
-        fullPhone,
-        referralCode: normalizedReferralCode || '',
-      });
-      message.success(tr('smsSent', 'SMS kod yuborildi!'));
-      setStep(2);
     } catch (error) {
       message.error(String(error?.message || tr('register.unknownError', 'Noma’lum xatolik')));
     } finally {
       setLoading(false);
     }
-  }, [loading, name, password, phone, referralCode, referralStatus.valid, surname, tr, validateReferral]);
+  }, [loading, name, password, phone, referralCode, requestOtp, surname, tr]);
 
-  const handleOtpChange = useCallback((event) => {
-    setOtp(String(event.target.value || '').replace(/\D/g, '').slice(0, 6));
-  }, []);
+  const handleResendOtp = useCallback(async () => {
+    if (loading) return;
+    if (!formData?.fullPhone) {
+      message.error(tr('register.phoneNotFoundRetry', 'Telefon raqam topilmadi. Qaytadan urinib ko‘ring.'));
+      setStep(1);
+      return;
+    }
+    if (otpMeta.cooldownLeft > 0) {
+      message.warning(`${tr('register.waitBeforeResend', 'Qayta yuborish uchun kuting')}: ${otpMeta.cooldownLeft}s`);
+      return;
+    }
 
-  const handleNameChange = useCallback((event) => {
-    setName(event.target.value);
-  }, []);
+    setLoading(true);
+    try {
+      const localDigits = formData.fullPhone.replace(/^\+998/, '');
+      await requestOtp({
+        nextName: formData.name,
+        nextSurname: formData.surname,
+        nextLocalDigits: localDigits,
+        nextPassword: formData.password,
+        nextReferralCode: formData.referralCode,
+      });
+    } catch (error) {
+      message.error(String(error?.message || tr('register.unknownError', 'Noma’lum xatolik')));
+    } finally {
+      setLoading(false);
+    }
+  }, [formData, loading, otpMeta.cooldownLeft, requestOtp, tr]);
 
-  const handleSurnameChange = useCallback((event) => {
-    setSurname(event.target.value);
-  }, []);
+  const handleVerifyOtp = useCallback(async (otpValue) => {
+    const verificationCode = String(otpValue || otp).replace(/\D/g, '').slice(0, 6);
+    if (verificationCode.length !== 6) {
+      message.error(tr('register.codeMustBe6', 'Kod 6 ta raqam bo‘lishi kerak.'));
+      return;
+    }
+    if (!formData?.fullPhone) {
+      message.error(tr('register.phoneNotFoundRetry', 'Telefon raqam topilmadi. Qaytadan urinib ko‘ring.'));
+      setStep(1);
+      return;
+    }
 
-  const handlePhoneChange = useCallback((event) => {
-    setPhone(normalizePhoneInput(event.target.value));
-  }, []);
+    setLoading(true);
+    try {
+      await verifySignupOtp({
+        phone: formData.fullPhone,
+        otp: verificationCode,
+        purpose: 'signup',
+      });
 
-  const handlePasswordChange = useCallback((event) => {
-    setPassword(event.target.value);
-  }, []);
+      const registrationTime = new Date().toISOString();
+      const fullName = buildFullName(formData.name, formData.surname, tr);
 
-  const handleReferralChange = useCallback((event) => {
-    const nextCode = normalizeReferralCode(event.target.value);
-    setReferralCode(nextCode);
-    setReferralStatus((current) => ({
-      ...current,
-      valid: false,
-      inviter: null,
-      error: '',
-    }));
-  }, []);
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        phone: formData.fullPhone,
+        password: formData.password,
+        options: {
+          data: {
+            full_name: fullName,
+            phone: formData.fullPhone,
+          },
+        },
+      });
 
-  const handleBackToForm = useCallback(() => {
-    setStep(1);
-    setOtp('');
-  }, []);
+      if (signUpError) {
+        const signUpMessage = String(signUpError.message || 'Ro‘yxatdan o‘tishda xato yuz berdi.');
+        if (signUpMessage.toLowerCase().includes('already')) {
+          throw new Error(tr('register.phoneAlreadyExists', 'Bu telefon raqam bilan foydalanuvchi allaqachon mavjud.'));
+        }
+        throw signUpError;
+      }
+
+      let nextUser = signUpData?.user ?? null;
+      let activeSession = signUpData?.session ?? null;
+
+      if (!activeSession) {
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          phone: formData.fullPhone,
+          password: formData.password,
+        });
+        if (signInError) throw signInError;
+        nextUser = signInData?.user ?? nextUser;
+        activeSession = signInData?.session ?? null;
+      }
+
+      if (!nextUser?.id) {
+        throw new Error(tr('register.unknownError', 'Noma’lum xatolik'));
+      }
+
+      const { error: profileError } = await supabase.from('profiles').upsert({
+        id: nextUser.id,
+        full_name: fullName,
+        phone: formData.fullPhone,
+        phone_normalized: formData.fullPhone,
+        phone_verified: true,
+        phone_verified_at: registrationTime,
+        role: 'client',
+        current_role: 'client',
+        is_test_user: false,
+        created_at: registrationTime,
+        updated_at: registrationTime,
+        last_login: registrationTime,
+      }, { onConflict: 'id' });
+      if (profileError) throw profileError;
+
+      const normalizedReferralCode = normalizeReferralCode(formData.referralCode || '');
+      if (normalizedReferralCode) {
+        try {
+          const deviceHash = await getReferralDeviceHash();
+          await applyReferralCode({
+            code: normalizedReferralCode,
+            device_hash: deviceHash,
+          });
+          clearPendingReferralContext();
+        } catch (referralError) {
+          message.warning(String(referralError?.message || tr('referral.applyWarning', 'Referral kod saqlanmadi. Keyinroq tekshiring.')));
+        }
+      } else {
+        clearPendingReferralContext();
+      }
+
+      if (!activeSession) {
+        throw new Error(tr('register.sessionNotCreated', 'Sessiya yaratilmadi. Qayta kirib ko‘ring.'));
+      }
+
+      message.success(tr('register.success', 'Muvaffaqiyatli ro‘yxatdan o‘tdingiz!'));
+      navigate('/', { replace: true });
+    } catch (error) {
+      message.error(String(error?.message || tr('register.unknownError', 'Noma’lum xatolik')));
+    } finally {
+      setLoading(false);
+    }
+  }, [formData, navigate, otp, tr]);
 
   const inviterName = useMemo(() => {
     return String(referralStatus.inviter?.full_name || '').trim();
@@ -380,6 +429,7 @@ const Register = memo(function Register() {
             <div className="mb-5">{headerIcon}</div>
             <h1 className="text-4xl font-bold text-slate-900">UniGo</h1>
             <p className="mt-2 text-sm text-slate-500">{tr('register.smsSentInfo', 'SMS kodni kiriting')}</p>
+            <p className="mt-1 text-xs text-slate-500">{formData?.fullPhone}</p>
           </div>
 
           <div className="space-y-5">
@@ -388,18 +438,21 @@ const Register = memo(function Register() {
               <div className="mt-2 rounded-2xl bg-[#E3EDF7] shadow-[inset_8px_8px_16px_#ccd4dc,inset_-8px_-8px_16px_#ffffff] px-4 py-3">
                 <input
                   value={otp}
-                  onChange={handleOtpChange}
+                  onChange={(event) => setOtp(String(event.target.value || '').replace(/\D/g, '').slice(0, 6))}
                   className="w-full bg-transparent outline-none text-center tracking-[0.5em] text-xl font-black text-slate-800 placeholder:text-slate-400"
                   placeholder="000000"
                   inputMode="numeric"
                   autoComplete="one-time-code"
                 />
               </div>
+              <p className="mt-2 text-xs text-slate-500">
+                {tr('register.codeExpiresIn', 'Kod amal qilish vaqti')}: {otpMeta.expiresInSeconds}s
+              </p>
             </div>
 
             <button
               type="button"
-              onClick={() => void handleVerifyOtp(otp)}
+              onClick={() => void handleVerifyOtp()}
               disabled={loading}
               className="w-full rounded-2xl bg-[#ec5b13] text-white font-bold py-4 shadow-lg shadow-[#ec5b13]/20 hover:bg-[#d44d0a] active:scale-[0.99] transition-all disabled:opacity-60"
             >
@@ -408,7 +461,18 @@ const Register = memo(function Register() {
 
             <button
               type="button"
-              onClick={handleBackToForm}
+              onClick={() => void handleResendOtp()}
+              disabled={loading || otpMeta.cooldownLeft > 0}
+              className="w-full rounded-2xl bg-white text-slate-700 font-semibold py-4 border border-slate-200 hover:bg-slate-50 active:scale-[0.99] transition-all disabled:opacity-50"
+            >
+              {otpMeta.cooldownLeft > 0
+                ? `${tr('register.waitBeforeResend', 'Qayta yuborish uchun kuting')} ${otpMeta.cooldownLeft}s`
+                : tr('register.resendCode', 'Kodni qayta yuborish')}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setStep(1)}
               className="w-full rounded-2xl bg-white text-slate-700 font-semibold py-4 border border-slate-200 hover:bg-slate-50 active:scale-[0.99] transition-all"
             >
               {tr('back', 'Orqaga')}
@@ -450,7 +514,7 @@ const Register = memo(function Register() {
               <div className="mt-2 rounded-2xl bg-[#E3EDF7] shadow-[inset_8px_8px_16px_#ccd4dc,inset_-8px_-8px_16px_#ffffff] px-4 py-3">
                 <input
                   value={name}
-                  onChange={handleNameChange}
+                  onChange={(event) => setName(event.target.value)}
                   className="w-full bg-transparent outline-none text-slate-800 placeholder:text-slate-400"
                   placeholder={tr('register.namePlaceholder', 'Ismingiz')}
                   autoComplete="given-name"
@@ -463,7 +527,7 @@ const Register = memo(function Register() {
               <div className="mt-2 rounded-2xl bg-[#E3EDF7] shadow-[inset_8px_8px_16px_#ccd4dc,inset_-8px_-8px_16px_#ffffff] px-4 py-3">
                 <input
                   value={surname}
-                  onChange={handleSurnameChange}
+                  onChange={(event) => setSurname(event.target.value)}
                   className="w-full bg-transparent outline-none text-slate-800 placeholder:text-slate-400"
                   placeholder={tr('register.surnamePlaceholder', 'Familiyangiz')}
                   autoComplete="family-name"
@@ -477,7 +541,7 @@ const Register = memo(function Register() {
                 <span className="text-slate-600 font-semibold mr-2">+998</span>
                 <input
                   value={phone}
-                  onChange={handlePhoneChange}
+                  onChange={(event) => setPhone(normalizePhoneInput(event.target.value))}
                   className="w-full bg-transparent outline-none text-slate-800 placeholder:text-slate-400"
                   placeholder={tr('phonePlaceholder', '90 123 45 67')}
                   inputMode="numeric"
@@ -492,7 +556,7 @@ const Register = memo(function Register() {
                 <input
                   type="password"
                   value={password}
-                  onChange={handlePasswordChange}
+                  onChange={(event) => setPassword(event.target.value)}
                   className="w-full bg-transparent outline-none text-slate-800 placeholder:text-slate-400"
                   placeholder={tr('register.passwordPlaceholder', 'Parol yarating')}
                   autoComplete="new-password"
@@ -515,7 +579,16 @@ const Register = memo(function Register() {
               <div className="mt-2 rounded-2xl bg-[#E3EDF7] shadow-[inset_8px_8px_16px_#ccd4dc,inset_-8px_-8px_16px_#ffffff] px-4 py-3">
                 <input
                   value={referralCode}
-                  onChange={handleReferralChange}
+                  onChange={(event) => {
+                    const nextCode = normalizeReferralCode(event.target.value);
+                    setReferralCode(nextCode);
+                    setReferralStatus((current) => ({
+                      ...current,
+                      valid: false,
+                      inviter: null,
+                      error: '',
+                    }));
+                  }}
                   onBlur={() => void handleReferralBlur()}
                   className="w-full bg-transparent outline-none text-slate-800 placeholder:text-slate-400 uppercase"
                   placeholder={tr('referral.optionalAtRegisterPlaceholder', 'Agar sizda taklif kodi bo‘lsa kiriting')}
