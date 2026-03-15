@@ -2,9 +2,11 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 
 type JsonRecord = Record<string, unknown>;
 
+type SendOtpPurpose = 'signup' | 'phone_change' | 'reset_password';
+
 interface SendOtpBody {
   phone: string;
-  purpose?: 'signup' | 'phone_change' | 'reset_password';
+  purpose?: SendOtpPurpose;
 }
 
 interface TelerivetSendResponse {
@@ -15,10 +17,16 @@ interface TelerivetSendResponse {
   [key: string]: unknown;
 }
 
-interface ProfileRow {
+interface ProfileLookupRow {
   id: string;
   phone: string | null;
-  phone_normalized?: string | null;
+  phone_normalized: string | null;
+}
+
+interface PendingOtpRow {
+  id: string;
+  resend_count: number;
+  last_sent_at: string;
 }
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
@@ -68,7 +76,7 @@ function jsonResponse(status: number, body: JsonRecord): Response {
 }
 
 function normalizeUzbekPhone(rawPhone: string): string {
-  const cleaned = String(rawPhone).replace(/[^\d+]/g, '');
+  const cleaned = String(rawPhone || '').replace(/[^\d+]/g, '');
 
   if (/^\+998\d{9}$/.test(cleaned)) return cleaned;
   if (/^998\d{9}$/.test(cleaned)) return `+${cleaned}`;
@@ -78,7 +86,8 @@ function normalizeUzbekPhone(rawPhone: string): string {
 }
 
 function normalizePhoneForProfile(phone: string): string {
-  return phone.replace(/\D/g, '').startsWith('998') ? `+${phone.replace(/\D/g, '')}` : phone;
+  const digits = String(phone || '').replace(/\D/g, '');
+  return digits.startsWith('998') ? `+${digits}` : phone;
 }
 
 function generateOtpCode(): string {
@@ -89,20 +98,32 @@ function generateOtpCode(): string {
 async function sha256Hex(input: string): Promise<string> {
   const data = new TextEncoder().encode(input);
   const digest = await crypto.subtle.digest('SHA-256', data);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-async function hashOtp(phone: string, purpose: string, otp: string): Promise<string> {
+async function hashOtp(phone: string, purpose: SendOtpPurpose, otp: string): Promise<string> {
   return sha256Hex(`${phone}:${purpose}:${otp}:${OTP_PEPPER}`);
 }
 
 function getBasicAuthHeader(apiKey: string): string {
   const bytes = new TextEncoder().encode(`${apiKey}:`);
   let binary = '';
-  for (let i = 0; i < bytes.length; i += 1) {
-    binary += String.fromCharCode(bytes[i]);
+  for (let index = 0; index < bytes.length; index += 1) {
+    binary += String.fromCharCode(bytes[index]);
   }
   return `Basic ${btoa(binary)}`;
+}
+
+function buildSmsContent(purpose: SendOtpPurpose, otpCode: string): string {
+  if (purpose === 'reset_password') {
+    return `UniGo parol tiklash kodi: ${otpCode}. Kod 3 daqiqa amal qiladi. Uni hech kimga bermang.`;
+  }
+
+  if (purpose === 'phone_change') {
+    return `UniGo telefon almashtirish kodi: ${otpCode}. Kod 3 daqiqa amal qiladi. Uni hech kimga bermang.`;
+  }
+
+  return `UniGo tasdiqlash kodi: ${otpCode}. Kod 3 daqiqa amal qiladi. Uni hech kimga bermang.`;
 }
 
 async function sendTelerivetSms(phone: string, content: string): Promise<TelerivetSendResponse> {
@@ -121,13 +142,13 @@ async function sendTelerivetSms(phone: string, content: string): Promise<Teleriv
     }),
   });
 
-  const responseText = await response.text();
+  const rawText = await response.text();
   let parsed: TelerivetSendResponse = {};
 
   try {
-    parsed = responseText ? (JSON.parse(responseText) as TelerivetSendResponse) : {};
+    parsed = rawText ? (JSON.parse(rawText) as TelerivetSendResponse) : {};
   } catch {
-    parsed = { message: responseText };
+    parsed = { message: rawText };
   }
 
   if (!response.ok) {
@@ -137,46 +158,37 @@ async function sendTelerivetSms(phone: string, content: string): Promise<Teleriv
   return parsed;
 }
 
-async function findProfileByPhone(phone: string): Promise<ProfileRow | null> {
+async function findProfileByPhone(phone: string): Promise<ProfileLookupRow | null> {
   const normalized = normalizePhoneForProfile(phone);
 
-  const byNormalized = await supabaseAdmin
-    .from('profiles')
-    .select('id, phone, phone_normalized')
-    .eq('phone_normalized', normalized)
-    .limit(1)
+  const { data, error } = await supabaseAdmin
+    .rpc('find_profile_by_phone', { p_phone: normalized })
     .maybeSingle();
 
-  if (byNormalized.error && byNormalized.error.code !== 'PGRST116') {
-    throw new Error(`Telefon bo'yicha profilni tekshirishda xato: ${byNormalized.error.message}`);
+  if (error && error.code !== 'PGRST116') {
+    throw new Error(`Telefon bo'yicha profilni tekshirishda xato: ${error.message}`);
   }
 
-  if (byNormalized.data) {
-    return byNormalized.data as ProfileRow;
+  if (!data) {
+    return null;
   }
 
-  const byPhone = await supabaseAdmin
-    .from('profiles')
-    .select('id, phone, phone_normalized')
-    .eq('phone', normalized)
-    .limit(1)
-    .maybeSingle();
-
-  if (byPhone.error && byPhone.error.code !== 'PGRST116') {
-    throw new Error(`Telefon bo'yicha profilni tekshirishda xato: ${byPhone.error.message}`);
-  }
-
-  return (byPhone.data as ProfileRow | null) ?? null;
+  return {
+    id: String((data as JsonRecord).id ?? ''),
+    phone: ((data as JsonRecord).phone as string | null) ?? null,
+    phone_normalized: ((data as JsonRecord).phone_normalized as string | null) ?? null,
+  };
 }
 
-function buildSmsContent(purpose: 'signup' | 'phone_change' | 'reset_password', otpCode: string): string {
-  if (purpose === 'reset_password') {
-    return `UniGo parol tiklash kodi: ${otpCode}. Kod 3 daqiqa amal qiladi. Uni hech kimga bermang.`;
+async function cancelPendingOtpById(id: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('phone_otp_verifications')
+    .update({ status: 'cancelled' })
+    .eq('id', id);
+
+  if (error) {
+    throw new Error(`Oldingi OTP ni bekor qilishda xato: ${error.message}`);
   }
-  if (purpose === 'phone_change') {
-    return `UniGo telefon almashtirish kodi: ${otpCode}. Kod 3 daqiqa amal qiladi. Uni hech kimga bermang.`;
-  }
-  return `UniGo tasdiqlash kodi: ${otpCode}. Kod 3 daqiqa amal qiladi. Uni hech kimga bermang.`;
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
@@ -190,7 +202,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   try {
     const body = (await req.json()) as SendOtpBody;
-    const purpose = body.purpose ?? 'signup';
+    const purpose: SendOtpPurpose = body.purpose ?? 'signup';
     const phone = normalizeUzbekPhone(body.phone);
     const profile = await findProfileByPhone(phone);
 
@@ -206,11 +218,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
       });
     }
 
-    const nowIso = new Date().toISOString();
-
-    const { data: existingPendingList, error: existingPendingError } = await supabaseAdmin
+    const { data: pendingRows, error: pendingError } = await supabaseAdmin
       .from('phone_otp_verifications')
-      .select('id, resend_count, last_sent_at, status, expires_at')
+      .select('id, resend_count, last_sent_at')
       .eq('phone_e164', phone)
       .eq('purpose', purpose)
       .eq('status', 'pending')
@@ -218,30 +228,29 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .order('created_at', { ascending: false })
       .limit(1);
 
-    if (existingPendingError) {
+    if (pendingError) {
       return jsonResponse(500, {
         error: 'OTP holatini tekshirishda xato',
-        details: existingPendingError.message,
+        details: pendingError.message,
       });
     }
 
-    const existingPending = existingPendingList?.[0] ?? null;
+    const pending = ((pendingRows?.[0] as PendingOtpRow | undefined) ?? null);
 
-    if (existingPending) {
-      const cooldownEndsAt = new Date(new Date(existingPending.last_sent_at).getTime() + RESEND_COOLDOWN_SECONDS * 1000);
+    if (pending) {
+      const cooldownEndsAt = new Date(new Date(pending.last_sent_at).getTime() + RESEND_COOLDOWN_SECONDS * 1000);
       if (cooldownEndsAt.getTime() > Date.now()) {
-        const retryAfter = Math.ceil((cooldownEndsAt.getTime() - Date.now()) / 1000);
         return jsonResponse(429, {
           error: 'OTP qayta yuborish uchun kuting',
-          retry_after_seconds: retryAfter,
+          retry_after_seconds: Math.ceil((cooldownEndsAt.getTime() - Date.now()) / 1000),
         });
       }
 
-      if (existingPending.resend_count >= MAX_RESEND_COUNT) {
+      if (pending.resend_count >= MAX_RESEND_COUNT) {
         const { error: blockError } = await supabaseAdmin
           .from('phone_otp_verifications')
           .update({ status: 'blocked' })
-          .eq('id', existingPending.id);
+          .eq('id', pending.id);
 
         if (blockError) {
           return jsonResponse(500, {
@@ -255,61 +264,56 @@ Deno.serve(async (req: Request): Promise<Response> => {
         });
       }
 
-      const { error: cancelError } = await supabaseAdmin
-        .from('phone_otp_verifications')
-        .update({ status: 'cancelled' })
-        .eq('id', existingPending.id);
-
-      if (cancelError) {
-        return jsonResponse(500, {
-          error: 'Eski OTP ni bekor qilishda xato',
-          details: cancelError.message,
-        });
-      }
+      await cancelPendingOtpById(pending.id);
     }
 
     const otpCode = generateOtpCode();
     const otpHash = await hashOtp(phone, purpose, otpCode);
-    const expiresAt = new Date(Date.now() + OTP_TTL_SECONDS * 1000).toISOString();
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const expiresAtIso = new Date(now.getTime() + OTP_TTL_SECONDS * 1000).toISOString();
     const smsContent = buildSmsContent(purpose, otpCode);
-    const telerivetResponse = await sendTelerivetSms(phone, smsContent);
-    const resendCount = existingPending ? Math.min((existingPending.resend_count ?? 0) + 1, MAX_RESEND_COUNT) : 1;
 
-    const { error: insertError } = await supabaseAdmin.from('phone_otp_verifications').insert({
-      phone_e164: phone,
-      purpose,
-      otp_hash: otpHash,
-      expires_at: expiresAt,
-      attempt_count: 0,
-      max_attempts: MAX_ATTEMPTS,
-      resend_count: resendCount,
-      last_sent_at: nowIso,
-      verified_at: null,
-      status: 'pending',
-      provider: 'telerivet',
-      provider_message_id: typeof telerivetResponse.id === 'string' ? telerivetResponse.id : null,
-      metadata: {
-        telerivet_status: telerivetResponse.status ?? null,
-      },
-    });
+    const smsResult = await sendTelerivetSms(phone, smsContent);
+
+    const nextResendCount = pending ? pending.resend_count + 1 : 0;
+
+    const { error: insertError } = await supabaseAdmin
+      .from('phone_otp_verifications')
+      .insert({
+        phone_e164: phone,
+        purpose,
+        otp_hash: otpHash,
+        status: 'pending',
+        resend_count: nextResendCount,
+        attempt_count: 0,
+        max_attempts: MAX_ATTEMPTS,
+        sent_via: 'telerivet',
+        provider_message_id: smsResult.id ?? null,
+        provider_response: smsResult as unknown as JsonRecord,
+        expires_at: expiresAtIso,
+        last_sent_at: nowIso,
+      });
 
     if (insertError) {
       return jsonResponse(500, {
-        error: 'OTP ma’lumotini saqlashda xato',
+        error: 'OTP yozishda xato',
         details: insertError.message,
       });
     }
 
     return jsonResponse(200, {
       success: true,
-      message: purpose === 'reset_password' ? 'Parol tiklash kodi yuborildi' : 'OTP yuborildi',
       phone,
       purpose,
+      message: purpose === 'reset_password' ? 'Tiklash kodi yuborildi.' : 'Tasdiqlash kodi yuborildi.',
       expires_in_seconds: OTP_TTL_SECONDS,
       resend_cooldown_seconds: RESEND_COOLDOWN_SECONDS,
+      provider_status: smsResult.status ?? 'queued',
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Noma’lum xato';
-    return jsonResponse(400, { error: message });
+    return jsonResponse(400, {
+      error: error instanceof Error ? error.message : 'OTP yuborishda xato yuz berdi.',
+    });
   }
 });

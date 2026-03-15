@@ -16,10 +16,10 @@ interface OtpRow {
   max_attempts: number;
 }
 
-interface ProfileRow {
+interface ProfileLookupRow {
   id: string;
   phone: string | null;
-  phone_normalized?: string | null;
+  phone_normalized: string | null;
 }
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
@@ -57,7 +57,7 @@ function jsonResponse(status: number, body: JsonRecord): Response {
 }
 
 function normalizeUzbekPhone(rawPhone: string): string {
-  const cleaned = String(rawPhone).replace(/[^\d+]/g, '');
+  const cleaned = String(rawPhone || '').replace(/[^\d+]/g, '');
   if (/^\+998\d{9}$/.test(cleaned)) return cleaned;
   if (/^998\d{9}$/.test(cleaned)) return `+${cleaned}`;
   if (/^\d{9}$/.test(cleaned)) return `+998${cleaned}`;
@@ -65,7 +65,8 @@ function normalizeUzbekPhone(rawPhone: string): string {
 }
 
 function normalizePhoneForProfile(phone: string): string {
-  return phone.replace(/\D/g, '').startsWith('998') ? `+${phone.replace(/\D/g, '')}` : phone;
+  const digits = String(phone || '').replace(/\D/g, '');
+  return digits.startsWith('998') ? `+${digits}` : phone;
 }
 
 function validateOtpFormat(otp: string): string {
@@ -87,41 +88,33 @@ function validatePassword(password: string): string {
 async function sha256Hex(input: string): Promise<string> {
   const data = new TextEncoder().encode(input);
   const digest = await crypto.subtle.digest('SHA-256', data);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 async function hashOtp(phone: string, purpose: string, otp: string): Promise<string> {
   return sha256Hex(`${phone}:${purpose}:${otp}:${OTP_PEPPER}`);
 }
 
-async function findProfileByPhone(phone: string): Promise<ProfileRow | null> {
+async function findProfileByPhone(phone: string): Promise<ProfileLookupRow | null> {
   const normalized = normalizePhoneForProfile(phone);
 
-  const byNormalized = await supabaseAdmin
-    .from('profiles')
-    .select('id, phone, phone_normalized')
-    .eq('phone_normalized', normalized)
-    .limit(1)
+  const { data, error } = await supabaseAdmin
+    .rpc('find_profile_by_phone', { p_phone: normalized })
     .maybeSingle();
 
-  if (byNormalized.error && byNormalized.error.code !== 'PGRST116') {
-    throw new Error(`Telefon bo'yicha profilni tekshirishda xato: ${byNormalized.error.message}`);
+  if (error && error.code !== 'PGRST116') {
+    throw new Error(`Telefon bo'yicha profilni tekshirishda xato: ${error.message}`);
   }
 
-  if (byNormalized.data) return byNormalized.data as ProfileRow;
-
-  const byPhone = await supabaseAdmin
-    .from('profiles')
-    .select('id, phone, phone_normalized')
-    .eq('phone', normalized)
-    .limit(1)
-    .maybeSingle();
-
-  if (byPhone.error && byPhone.error.code !== 'PGRST116') {
-    throw new Error(`Telefon bo'yicha profilni tekshirishda xato: ${byPhone.error.message}`);
+  if (!data) {
+    return null;
   }
 
-  return (byPhone.data as ProfileRow | null) ?? null;
+  return {
+    id: String((data as JsonRecord).id ?? ''),
+    phone: ((data as JsonRecord).phone as string | null) ?? null,
+    phone_normalized: ((data as JsonRecord).phone_normalized as string | null) ?? null,
+  };
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
@@ -163,7 +156,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       });
     }
 
-    const otpRow = (otpRows?.[0] as OtpRow | undefined) ?? null;
+    const otpRow = ((otpRows?.[0] as OtpRow | undefined) ?? null);
     if (!otpRow) {
       return jsonResponse(404, {
         error: 'Faol tiklash kodi topilmadi.',
@@ -239,11 +232,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return jsonResponse(200, {
       success: true,
       phone,
-      updated_at: updatedAt,
       message: 'Parol muvaffaqiyatli yangilandi.',
+      updated_at: updatedAt,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Noma’lum xato';
-    return jsonResponse(400, { error: message });
+    return jsonResponse(400, {
+      error: error instanceof Error ? error.message : 'Parolni tiklashda xato yuz berdi.',
+    });
   }
 });
