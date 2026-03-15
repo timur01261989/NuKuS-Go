@@ -2,11 +2,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 
 type JsonRecord = Record<string, unknown>;
 
-type OtpPurpose = 'signup' | 'phone_change' | 'reset_password';
-
 interface SendOtpBody {
   phone: string;
-  purpose?: OtpPurpose;
+  purpose?: 'signup' | 'phone_change' | 'reset_password';
 }
 
 interface TelerivetSendResponse {
@@ -17,18 +15,10 @@ interface TelerivetSendResponse {
   [key: string]: unknown;
 }
 
-interface ExistingPendingOtpRow {
-  id: string;
-  resend_count: number;
-  last_sent_at: string;
-  status: string;
-  expires_at: string;
-}
-
-interface ExistingProfileRow {
+interface ProfileRow {
   id: string;
   phone: string | null;
-  phone_normalized: string | null;
+  phone_normalized?: string | null;
 }
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
@@ -51,7 +41,7 @@ if (!TELERIVET_API_KEY || !TELERIVET_PROJECT_ID || !TELERIVET_ROUTE_ID || !OTP_P
   throw new Error('Missing Telerivet or OTP environment variables');
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: {
     persistSession: false,
     autoRefreshToken: false,
@@ -80,19 +70,15 @@ function jsonResponse(status: number, body: JsonRecord): Response {
 function normalizeUzbekPhone(rawPhone: string): string {
   const cleaned = String(rawPhone).replace(/[^\d+]/g, '');
 
-  if (/^\+998\d{9}$/.test(cleaned)) {
-    return cleaned;
-  }
-
-  if (/^998\d{9}$/.test(cleaned)) {
-    return `+${cleaned}`;
-  }
-
-  if (/^\d{9}$/.test(cleaned)) {
-    return `+998${cleaned}`;
-  }
+  if (/^\+998\d{9}$/.test(cleaned)) return cleaned;
+  if (/^998\d{9}$/.test(cleaned)) return `+${cleaned}`;
+  if (/^\d{9}$/.test(cleaned)) return `+998${cleaned}`;
 
   throw new Error('Telefon raqam formati noto‘g‘ri. Masalan: +998901234567');
+}
+
+function normalizePhoneForProfile(phone: string): string {
+  return phone.replace(/\D/g, '').startsWith('998') ? `+${phone.replace(/\D/g, '')}` : phone;
 }
 
 function generateOtpCode(): string {
@@ -106,7 +92,7 @@ async function sha256Hex(input: string): Promise<string> {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-async function hashOtp(phone: string, purpose: OtpPurpose, otp: string): Promise<string> {
+async function hashOtp(phone: string, purpose: string, otp: string): Promise<string> {
   return sha256Hex(`${phone}:${purpose}:${otp}:${OTP_PEPPER}`);
 }
 
@@ -151,53 +137,51 @@ async function sendTelerivetSms(phone: string, content: string): Promise<Teleriv
   return parsed;
 }
 
-async function findProfileByPhone(phone: string): Promise<ExistingProfileRow | null> {
-  const byNormalized = await supabase
+async function findProfileByPhone(phone: string): Promise<ProfileRow | null> {
+  const normalized = normalizePhoneForProfile(phone);
+
+  const byNormalized = await supabaseAdmin
     .from('profiles')
     .select('id, phone, phone_normalized')
-    .eq('phone_normalized', phone)
+    .eq('phone_normalized', normalized)
     .limit(1)
     .maybeSingle();
 
-  if (byNormalized.error) {
-    throw new Error(`Telefon bo‘yicha profilni tekshirishda xato: ${byNormalized.error.message}`);
+  if (byNormalized.error && byNormalized.error.code !== 'PGRST116') {
+    throw new Error(`Telefon bo'yicha profilni tekshirishda xato: ${byNormalized.error.message}`);
   }
 
   if (byNormalized.data) {
-    return byNormalized.data as ExistingProfileRow;
+    return byNormalized.data as ProfileRow;
   }
 
-  const byPhone = await supabase
+  const byPhone = await supabaseAdmin
     .from('profiles')
     .select('id, phone, phone_normalized')
-    .eq('phone', phone)
+    .eq('phone', normalized)
     .limit(1)
     .maybeSingle();
 
-  if (byPhone.error) {
-    throw new Error(`Telefon bo‘yicha profilni tekshirishda xato: ${byPhone.error.message}`);
+  if (byPhone.error && byPhone.error.code !== 'PGRST116') {
+    throw new Error(`Telefon bo'yicha profilni tekshirishda xato: ${byPhone.error.message}`);
   }
 
-  return (byPhone.data as ExistingProfileRow | null) ?? null;
+  return (byPhone.data as ProfileRow | null) ?? null;
 }
 
-async function ensurePurposePreconditions(phone: string, purpose: OtpPurpose): Promise<void> {
-  const existingProfile = await findProfileByPhone(phone);
-
-  if (purpose === 'signup' && existingProfile?.id) {
-    throw new Error('Bu telefon raqam bilan ro‘yxatdan o‘tgansiz. Iltimos, login qiling.');
+function buildSmsContent(purpose: 'signup' | 'phone_change' | 'reset_password', otpCode: string): string {
+  if (purpose === 'reset_password') {
+    return `UniGo parol tiklash kodi: ${otpCode}. Kod 3 daqiqa amal qiladi. Uni hech kimga bermang.`;
   }
-
-  if (purpose === 'reset_password' && !existingProfile?.id) {
-    throw new Error('Bu telefon raqam bilan foydalanuvchi topilmadi. Avval ro‘yxatdan o‘ting.');
+  if (purpose === 'phone_change') {
+    return `UniGo telefon almashtirish kodi: ${otpCode}. Kod 3 daqiqa amal qiladi. Uni hech kimga bermang.`;
   }
+  return `UniGo tasdiqlash kodi: ${otpCode}. Kod 3 daqiqa amal qiladi. Uni hech kimga bermang.`;
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', {
-      headers: corsHeaders(),
-    });
+    return new Response('ok', { headers: corsHeaders() });
   }
 
   if (req.method !== 'POST') {
@@ -206,14 +190,25 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   try {
     const body = (await req.json()) as SendOtpBody;
-    const purpose = (body.purpose ?? 'signup') as OtpPurpose;
+    const purpose = body.purpose ?? 'signup';
     const phone = normalizeUzbekPhone(body.phone);
+    const profile = await findProfileByPhone(phone);
 
-    await ensurePurposePreconditions(phone, purpose);
+    if (purpose === 'signup' && profile) {
+      return jsonResponse(409, {
+        error: 'Bu telefon raqam bilan allaqachon ro‘yxatdan o‘tilgan. Iltimos, login qiling.',
+      });
+    }
+
+    if (purpose === 'reset_password' && !profile) {
+      return jsonResponse(404, {
+        error: 'Bu telefon raqam bilan foydalanuvchi topilmadi.',
+      });
+    }
 
     const nowIso = new Date().toISOString();
 
-    const { data: existingPendingList, error: existingPendingError } = await supabase
+    const { data: existingPendingList, error: existingPendingError } = await supabaseAdmin
       .from('phone_otp_verifications')
       .select('id, resend_count, last_sent_at, status, expires_at')
       .eq('phone_e164', phone)
@@ -230,13 +225,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
       });
     }
 
-    const existingPending = (existingPendingList?.[0] as ExistingPendingOtpRow | undefined) ?? null;
+    const existingPending = existingPendingList?.[0] ?? null;
 
     if (existingPending) {
-      const cooldownEndsAt = new Date(
-        new Date(existingPending.last_sent_at).getTime() + RESEND_COOLDOWN_SECONDS * 1000,
-      );
-
+      const cooldownEndsAt = new Date(new Date(existingPending.last_sent_at).getTime() + RESEND_COOLDOWN_SECONDS * 1000);
       if (cooldownEndsAt.getTime() > Date.now()) {
         const retryAfter = Math.ceil((cooldownEndsAt.getTime() - Date.now()) / 1000);
         return jsonResponse(429, {
@@ -246,11 +238,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
 
       if (existingPending.resend_count >= MAX_RESEND_COUNT) {
-        const { error: blockError } = await supabase
+        const { error: blockError } = await supabaseAdmin
           .from('phone_otp_verifications')
-          .update({
-            status: 'blocked',
-          })
+          .update({ status: 'blocked' })
           .eq('id', existingPending.id);
 
         if (blockError) {
@@ -265,11 +255,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
         });
       }
 
-      const { error: cancelError } = await supabase
+      const { error: cancelError } = await supabaseAdmin
         .from('phone_otp_verifications')
-        .update({
-          status: 'cancelled',
-        })
+        .update({ status: 'cancelled' })
         .eq('id', existingPending.id);
 
       if (cancelError) {
@@ -283,15 +271,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const otpCode = generateOtpCode();
     const otpHash = await hashOtp(phone, purpose, otpCode);
     const expiresAt = new Date(Date.now() + OTP_TTL_SECONDS * 1000).toISOString();
-    const smsContent = purpose === 'reset_password'
-      ? `UniGo parolni tiklash kodi: ${otpCode}. Kod 3 daqiqa amal qiladi. Uni hech kimga bermang.`
-      : `UniGo tasdiqlash kodi: ${otpCode}. Kod 3 daqiqa amal qiladi. Uni hech kimga bermang.`;
-
+    const smsContent = buildSmsContent(purpose, otpCode);
     const telerivetResponse = await sendTelerivetSms(phone, smsContent);
-
     const resendCount = existingPending ? Math.min((existingPending.resend_count ?? 0) + 1, MAX_RESEND_COUNT) : 1;
 
-    const insertPayload = {
+    const { error: insertError } = await supabaseAdmin.from('phone_otp_verifications').insert({
       phone_e164: phone,
       purpose,
       otp_hash: otpHash,
@@ -307,9 +291,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       metadata: {
         telerivet_status: telerivetResponse.status ?? null,
       },
-    };
-
-    const { error: insertError } = await supabase.from('phone_otp_verifications').insert(insertPayload);
+    });
 
     if (insertError) {
       return jsonResponse(500, {
@@ -320,7 +302,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     return jsonResponse(200, {
       success: true,
-      message: purpose === 'reset_password' ? 'Parolni tiklash kodi yuborildi' : 'OTP yuborildi',
+      message: purpose === 'reset_password' ? 'Parol tiklash kodi yuborildi' : 'OTP yuborildi',
       phone,
       purpose,
       expires_in_seconds: OTP_TTL_SECONDS,
@@ -328,8 +310,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Noma’lum xato';
-    return jsonResponse(400, {
-      error: message,
-    });
+    return jsonResponse(400, { error: message });
   }
 });
