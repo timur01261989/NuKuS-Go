@@ -2,7 +2,7 @@ export function getAntdTheme() {
   return {
     token: {
       colorPrimary: "var(--brand)",
-      borderRadius: 12,
+      borderRadius: 16,
       fontFamily: "var(--font-sans)",
 
       /* Text */
@@ -15,7 +15,7 @@ export function getAntdTheme() {
       colorBgContainer: "var(--bg-elevated)",
 
       /* Border */
-      colorBorder: "rgba(0,0,0,0.08)",
+      colorBorder: "#E5E7EB",
     },
 
     components: {
@@ -37,7 +37,7 @@ export function getAntdTheme() {
       },
 
       Button: {
-        borderRadiusLG: 16,
+        borderRadiusLG: 18,
         fontWeight: 800,
       },
 
