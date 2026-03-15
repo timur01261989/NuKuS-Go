@@ -10,6 +10,7 @@ import DriverRoutes from "./DriverRoutes.jsx";
 const AuthPage = lazy(() => import("../../modules/client/features/auth/pages/Auth.jsx"));
 const RegisterPage = lazy(() => import("../../modules/client/features/auth/pages/Register.jsx"));
 const ReferralInviteLanding = lazy(() => import("../../modules/client/features/auth/pages/ReferralInviteLanding.jsx"));
+const ResetPasswordPage = lazy(() => import("../../modules/client/pages/pages/ResetPassword.jsx"));
 const DriverRegisterPage = lazy(() => import("../../modules/driver/registration/DriverRegister.jsx"));
 const DriverPendingPage = lazy(() => import("../../modules/driver/registration/DriverPending.jsx"));
 
@@ -32,7 +33,7 @@ function AppRouterComponent({ appRole }) {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/r/:code" element={<ReferralInviteLanding />} />
           <Route path="/invite/:code" element={<ReferralInviteLanding />} />
-          <Route path="/reset-password" element={<Navigate replace to="/login" />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
 
           <Route element={<AuthGuard />}>
             <Route element={<ClientLayout />}>

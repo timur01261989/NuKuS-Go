@@ -2,9 +2,11 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 
 type JsonRecord = Record<string, unknown>;
 
+type OtpPurpose = 'signup' | 'phone_change' | 'reset_password';
+
 interface SendOtpBody {
   phone: string;
-  purpose?: 'signup' | 'phone_change' | 'reset_password';
+  purpose?: OtpPurpose;
 }
 
 interface TelerivetSendResponse {
@@ -13,6 +15,20 @@ interface TelerivetSendResponse {
   error?: string;
   message?: string;
   [key: string]: unknown;
+}
+
+interface ExistingPendingOtpRow {
+  id: string;
+  resend_count: number;
+  last_sent_at: string;
+  status: string;
+  expires_at: string;
+}
+
+interface ExistingProfileRow {
+  id: string;
+  phone: string | null;
+  phone_normalized: string | null;
 }
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
@@ -90,7 +106,7 @@ async function sha256Hex(input: string): Promise<string> {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-async function hashOtp(phone: string, purpose: string, otp: string): Promise<string> {
+async function hashOtp(phone: string, purpose: OtpPurpose, otp: string): Promise<string> {
   return sha256Hex(`${phone}:${purpose}:${otp}:${OTP_PEPPER}`);
 }
 
@@ -135,6 +151,48 @@ async function sendTelerivetSms(phone: string, content: string): Promise<Teleriv
   return parsed;
 }
 
+async function findProfileByPhone(phone: string): Promise<ExistingProfileRow | null> {
+  const byNormalized = await supabase
+    .from('profiles')
+    .select('id, phone, phone_normalized')
+    .eq('phone_normalized', phone)
+    .limit(1)
+    .maybeSingle();
+
+  if (byNormalized.error) {
+    throw new Error(`Telefon bo‘yicha profilni tekshirishda xato: ${byNormalized.error.message}`);
+  }
+
+  if (byNormalized.data) {
+    return byNormalized.data as ExistingProfileRow;
+  }
+
+  const byPhone = await supabase
+    .from('profiles')
+    .select('id, phone, phone_normalized')
+    .eq('phone', phone)
+    .limit(1)
+    .maybeSingle();
+
+  if (byPhone.error) {
+    throw new Error(`Telefon bo‘yicha profilni tekshirishda xato: ${byPhone.error.message}`);
+  }
+
+  return (byPhone.data as ExistingProfileRow | null) ?? null;
+}
+
+async function ensurePurposePreconditions(phone: string, purpose: OtpPurpose): Promise<void> {
+  const existingProfile = await findProfileByPhone(phone);
+
+  if (purpose === 'signup' && existingProfile?.id) {
+    throw new Error('Bu telefon raqam bilan ro‘yxatdan o‘tgansiz. Iltimos, login qiling.');
+  }
+
+  if (purpose === 'reset_password' && !existingProfile?.id) {
+    throw new Error('Bu telefon raqam bilan foydalanuvchi topilmadi. Avval ro‘yxatdan o‘ting.');
+  }
+}
+
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', {
@@ -148,8 +206,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   try {
     const body = (await req.json()) as SendOtpBody;
-    const purpose = body.purpose ?? 'signup';
+    const purpose = (body.purpose ?? 'signup') as OtpPurpose;
     const phone = normalizeUzbekPhone(body.phone);
+
+    await ensurePurposePreconditions(phone, purpose);
 
     const nowIso = new Date().toISOString();
 
@@ -170,7 +230,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       });
     }
 
-    const existingPending = existingPendingList?.[0] ?? null;
+    const existingPending = (existingPendingList?.[0] as ExistingPendingOtpRow | undefined) ?? null;
 
     if (existingPending) {
       const cooldownEndsAt = new Date(
@@ -223,8 +283,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const otpCode = generateOtpCode();
     const otpHash = await hashOtp(phone, purpose, otpCode);
     const expiresAt = new Date(Date.now() + OTP_TTL_SECONDS * 1000).toISOString();
-
-    const smsContent = `UniGo tasdiqlash kodi: ${otpCode}. Kod 3 daqiqa amal qiladi. Uni hech kimga bermang.`;
+    const smsContent = purpose === 'reset_password'
+      ? `UniGo parolni tiklash kodi: ${otpCode}. Kod 3 daqiqa amal qiladi. Uni hech kimga bermang.`
+      : `UniGo tasdiqlash kodi: ${otpCode}. Kod 3 daqiqa amal qiladi. Uni hech kimga bermang.`;
 
     const telerivetResponse = await sendTelerivetSms(phone, smsContent);
 
@@ -259,7 +320,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     return jsonResponse(200, {
       success: true,
-      message: 'OTP yuborildi',
+      message: purpose === 'reset_password' ? 'Parolni tiklash kodi yuborildi' : 'OTP yuborildi',
       phone,
       purpose,
       expires_in_seconds: OTP_TTL_SECONDS,

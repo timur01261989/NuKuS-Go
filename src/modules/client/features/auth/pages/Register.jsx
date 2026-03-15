@@ -35,6 +35,11 @@ function buildFullName(name, surname, tr) {
   return `${safeName} ${safeSurname}`.trim();
 }
 
+function isAlreadyRegisteredMessage(input) {
+  const messageText = String(input || '').toLowerCase();
+  return messageText.includes('login qiling') || messageText.includes('allaqachon mavjud') || messageText.includes('ro‘yxatdan o‘tgansiz') || messageText.includes("ro'yxatdan o'tgansiz");
+}
+
 const Register = memo(function Register() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -262,11 +267,17 @@ const Register = memo(function Register() {
         nextReferralCode: referralCode,
       });
     } catch (error) {
-      message.error(String(error?.message || tr('register.unknownError', 'Noma’lum xatolik')));
+      const errorMessage = String(error?.message || tr('register.unknownError', 'Noma’lum xatolik'));
+      if (isAlreadyRegisteredMessage(errorMessage)) {
+        message.warning(errorMessage);
+        navigate('/login', { replace: true, state: { suggestedPhone: localDigits } });
+        return;
+      }
+      message.error(errorMessage);
     } finally {
       setLoading(false);
     }
-  }, [loading, name, password, phone, referralCode, requestOtp, surname, tr]);
+  }, [loading, name, navigate, password, phone, referralCode, requestOtp, surname, tr]);
 
   const handleResendOtp = useCallback(async () => {
     if (loading) return;
@@ -291,11 +302,17 @@ const Register = memo(function Register() {
         nextReferralCode: formData.referralCode,
       });
     } catch (error) {
-      message.error(String(error?.message || tr('register.unknownError', 'Noma’lum xatolik')));
+      const errorMessage = String(error?.message || tr('register.unknownError', 'Noma’lum xatolik'));
+      if (isAlreadyRegisteredMessage(errorMessage)) {
+        message.warning(errorMessage);
+        navigate('/login', { replace: true, state: { suggestedPhone: formData.fullPhone.replace(/^\+998/, '') } });
+        return;
+      }
+      message.error(errorMessage);
     } finally {
       setLoading(false);
     }
-  }, [formData, loading, otpMeta.cooldownLeft, requestOtp, tr]);
+  }, [formData, loading, navigate, otpMeta.cooldownLeft, requestOtp, tr]);
 
   const handleVerifyOtp = useCallback(async (otpValue) => {
     const verificationCode = String(otpValue || otp).replace(/\D/g, '').slice(0, 6);
@@ -334,7 +351,7 @@ const Register = memo(function Register() {
       if (signUpError) {
         const signUpMessage = String(signUpError.message || 'Ro‘yxatdan o‘tishda xato yuz berdi.');
         if (signUpMessage.toLowerCase().includes('already')) {
-          throw new Error(tr('register.phoneAlreadyExists', 'Bu telefon raqam bilan foydalanuvchi allaqachon mavjud.'));
+          throw new Error(tr('register.phoneAlreadyExists', 'Bu telefon raqam bilan ro‘yxatdan o‘tgansiz. Iltimos, login qiling.'));
         }
         throw signUpError;
       }
@@ -395,7 +412,13 @@ const Register = memo(function Register() {
       message.success(tr('register.success', 'Muvaffaqiyatli ro‘yxatdan o‘tdingiz!'));
       navigate('/', { replace: true });
     } catch (error) {
-      message.error(String(error?.message || tr('register.unknownError', 'Noma’lum xatolik')));
+      const errorMessage = String(error?.message || tr('register.unknownError', 'Noma’lum xatolik'));
+      if (isAlreadyRegisteredMessage(errorMessage)) {
+        message.warning(errorMessage);
+        navigate('/login', { replace: true, state: { suggestedPhone: formData?.fullPhone?.replace(/^\+998/, '') || '' } });
+        return;
+      }
+      message.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -415,11 +438,8 @@ const Register = memo(function Register() {
     if (referralStatus.valid && inviterName) {
       return `${tr('referral.inviterLabel', 'Taklif qiluvchi')}: ${inviterName}`;
     }
-    if (referralCode) {
-      return tr('referral.optionalAtRegister', 'Referral kod faqat ro‘yxatdan o‘tish vaqtida qo‘llanadi.');
-    }
     return tr('referral.optionalAtRegister', 'Referral kod faqat ro‘yxatdan o‘tish vaqtida qo‘llanadi.');
-  }, [inviterName, referralCode, referralStatus.checking, referralStatus.error, referralStatus.valid, tr]);
+  }, [inviterName, referralStatus.checking, referralStatus.error, referralStatus.valid, tr]);
 
   if (step === 2) {
     return (
@@ -536,14 +556,14 @@ const Register = memo(function Register() {
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-500 ml-1">{tr('phoneLabel', 'Telefon raqam')}</label>
-              <div className="mt-2 rounded-2xl bg-[#E3EDF7] shadow-[inset_8px_8px_16px_#ccd4dc,inset_-8px_-8px_16px_#ffffff] px-4 py-3 flex items-center">
-                <span className="text-slate-600 font-semibold mr-2">+998</span>
+              <label className="text-xs font-semibold text-slate-500 ml-1">{tr('phone', 'Telefon')}</label>
+              <div className="mt-2 rounded-2xl bg-[#E3EDF7] shadow-[inset_8px_8px_16px_#ccd4dc,inset_-8px_-8px_16px_#ffffff] px-4 py-3 flex items-center gap-3">
+                <span className="font-semibold text-slate-600">+998</span>
                 <input
                   value={phone}
                   onChange={(event) => setPhone(normalizePhoneInput(event.target.value))}
                   className="w-full bg-transparent outline-none text-slate-800 placeholder:text-slate-400"
-                  placeholder={tr('phonePlaceholder', '90 123 45 67')}
+                  placeholder="90 123 45 67"
                   inputMode="numeric"
                   autoComplete="tel"
                 />
@@ -565,37 +585,18 @@ const Register = memo(function Register() {
             </div>
 
             <div>
-              <div className="flex items-center justify-between gap-3">
-                <label className="text-xs font-semibold text-slate-500 ml-1">{tr('referralCode', 'Taklif kodi')}</label>
-                <button
-                  type="button"
-                  onClick={() => void handleReferralBlur()}
-                  disabled={referralStatus.checking || !referralCode}
-                  className="text-xs font-semibold text-[#ec5b13] disabled:opacity-50"
-                >
-                  {tr('checkPromo', 'Tekshirish')}
-                </button>
-              </div>
+              <label className="text-xs font-semibold text-slate-500 ml-1">{tr('referral.codeLabel', 'Referral kod (ixtiyoriy)')}</label>
               <div className="mt-2 rounded-2xl bg-[#E3EDF7] shadow-[inset_8px_8px_16px_#ccd4dc,inset_-8px_-8px_16px_#ffffff] px-4 py-3">
                 <input
                   value={referralCode}
-                  onChange={(event) => {
-                    const nextCode = normalizeReferralCode(event.target.value);
-                    setReferralCode(nextCode);
-                    setReferralStatus((current) => ({
-                      ...current,
-                      valid: false,
-                      inviter: null,
-                      error: '',
-                    }));
-                  }}
+                  onChange={(event) => setReferralCode(String(event.target.value || '').toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 32))}
                   onBlur={() => void handleReferralBlur()}
                   className="w-full bg-transparent outline-none text-slate-800 placeholder:text-slate-400 uppercase"
-                  placeholder={tr('referral.optionalAtRegisterPlaceholder', 'Agar sizda taklif kodi bo‘lsa kiriting')}
+                  placeholder={tr('referral.codePlaceholder', 'Referral kod')}
                   autoComplete="off"
                 />
               </div>
-              <p className={`mt-2 text-xs ${referralStatus.error ? 'text-red-500' : referralStatus.valid ? 'text-green-600' : 'text-slate-500'}`}>
+              <p className={`mt-2 text-xs ${referralStatus.error ? 'text-red-500' : referralStatus.valid ? 'text-emerald-600' : 'text-slate-500'}`}>
                 {referralHelperText}
               </p>
             </div>
