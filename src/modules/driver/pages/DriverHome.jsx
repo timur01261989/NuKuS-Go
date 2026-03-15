@@ -1,10 +1,13 @@
-import React, { memo, useCallback, useMemo, useState } from 'react';
+import React, { memo, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/modules/shared/auth/AuthProvider.jsx';
 import { UnigoBottomNav, UnigoButton, UnigoCard, UnigoEmptyState, UnigoHeader, UnigoInput, UnigoKpiGrid, UnigoListRow, UnigoMapPanel, UnigoScreen, UnigoSection, UnigoSelect, UnigoServiceTile, UnigoStatusPill, UnigoToggle } from '@/modules/shared/ui/UnigoMobileUI.jsx';
 
 function DriverHomePage() {
   const navigate = useNavigate();
-  const [online, setOnline] = useState(true);
+  const auth = useAuth();
+  const [online, setOnline] = useState(Boolean(auth?.driverApproved));
+  const avatarLabel = String(auth?.profile?.full_name || auth?.profile?.phone || auth?.user?.phone || 'D').trim().split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0] || '').join('').toUpperCase().slice(0, 2) || 'D';
   const navItems = useMemo(() => ([
     { to: '/driver', icon: 'home', label: 'Asosiy', active: true },
     { to: '/driver/orders', icon: 'receipt_long', label: 'Buyurtma tarixi' },
@@ -15,7 +18,7 @@ function DriverHomePage() {
     <UnigoScreen dark>
       <UnigoHeader
         dark
-        avatarLabel="AK"
+        avatarLabel={avatarLabel}
         title="Haydovchi paneli"
         subtitle="Bugungi ish holati va faol xizmatlar"
         onAvatarClick={() => navigate('/driver/profile')}
@@ -36,10 +39,10 @@ function DriverHomePage() {
       </UnigoCard>
       <UnigoSection title="Faol ko‘rsatkichlar">
         <UnigoKpiGrid dark items={[
-          { label: 'Bugungi daromad', value: '425 000' },
-          { label: 'Safarlar soni', value: '12' },
-          { label: 'Aktiv navbat', value: '4' },
-          { label: 'Reyting', value: '4.9' },
+          { label: 'Bugungi daromad', value: '—' },
+          { label: 'Safarlar soni', value: '—' },
+          { label: 'Aktiv navbat', value: '—' },
+          { label: 'Holat', value: online ? 'Onlayn' : 'Oflayn' },
         ]} />
       </UnigoSection>
       <UnigoSection title="Faol xizmatlar">

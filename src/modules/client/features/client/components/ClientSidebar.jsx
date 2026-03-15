@@ -164,11 +164,22 @@ const ClientSidebar = memo(function ClientSidebar({ open, onClose, profile }) {
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
           <button
             type="button"
-            className="w-full flex items-center gap-4 p-3 rounded-xl transition-colors bg-primarySidebar/10 text-primarySidebar border border-primarySidebar/20 text-left"
+            className="w-full text-left rounded-2xl border border-primarySidebar/20 bg-gradient-to-br from-primarySidebar/10 to-blue-500/10 p-4 shadow-sm transition-transform hover:scale-[1.01]"
             onClick={() => go('/driver-mode', { replace: true, state: { from: location.pathname } })}
           >
-            <span className="material-symbols-outlined" data-no-auto-translate="true">local_taxi</span>
-            <span className="font-semibold">{t.workAsDriver}</span>
+            <div className="flex items-start gap-3">
+              <div className="size-11 rounded-2xl bg-white dark:bg-slate-800 border border-primarySidebar/20 flex items-center justify-center text-primarySidebar shrink-0">
+                <span className="material-symbols-outlined" data-no-auto-translate="true">local_taxi</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center rounded-full bg-primarySidebar/15 text-primarySidebar px-2.5 py-1 text-[11px] font-bold">Haydovchi rejimi</span>
+                  <span className="material-symbols-outlined text-primarySidebar text-[18px]" data-no-auto-translate="true">arrow_forward</span>
+                </div>
+                <p className="mt-2 text-sm font-bold text-slate-900 dark:text-white">Haydovchi tarafga o‘tish</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">Buyurtmalar, xizmatlar va boshqaruv paneliga o‘ting</p>
+              </div>
+            </div>
           </button>
 
           <div className="py-2"><div className="h-px bg-slate-100 dark:bg-slate-800 mx-3" /></div>
