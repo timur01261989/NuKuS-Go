@@ -7,6 +7,7 @@ import { installGlobalDebugRuntime } from "./modules/shared/debug/debugRuntime.j
 import AppProviders from "./app/providers/AppProviders.jsx";
 import { setupNotifications } from "./services/notifications.js";
 import { supabase } from "@/services/supabase/supabaseClient.js";
+import { assertClientEnv } from "./config/env.js";
 
 import "antd/dist/reset.css";
 import "leaflet/dist/leaflet.css";

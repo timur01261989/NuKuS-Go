@@ -212,7 +212,7 @@ const Register = memo(function Register() {
       firstName: String(nextName || '').trim(),
       lastName: String(nextSurname || '').trim(),
       password: nextPassword,
-      referralCode: normalizedReferralCode || '',
+      referralCode: normalizedReferralCode || null,
     });
 
     setFormData({
@@ -315,45 +315,62 @@ const Register = memo(function Register() {
 
     setLoading(true);
     try {
-      await verifySignupOtp({
+      const verificationResult = await verifySignupOtp({
         phone: formData.fullPhone,
         otp: verificationCode,
         purpose: 'signup',
+        firstName: formData.name,
+        lastName: formData.surname,
+        password: formData.password,
+        referralCode: formData.referralCode || null,
       });
 
       const registrationTime = new Date().toISOString();
       const fullName = buildFullName(formData.name, formData.surname, tr);
 
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        phone: formData.fullPhone,
-        password: formData.password,
-        options: {
-          data: {
-            full_name: fullName,
-            phone: formData.fullPhone,
-          },
-        },
-      });
+      let nextUser = null;
+      let activeSession = null;
 
-      if (signUpError) {
-        const signUpMessage = String(signUpError.message || 'Ro‘yxatdan o‘tishda xato yuz berdi.');
-        if (signUpMessage.toLowerCase().includes('already')) {
-          throw new Error(tr('register.phoneAlreadyExists', 'Bu telefon raqam bilan foydalanuvchi allaqachon mavjud.'));
-        }
-        throw signUpError;
-      }
-
-      let nextUser = signUpData?.user ?? null;
-      let activeSession = signUpData?.session ?? null;
-
-      if (!activeSession) {
+      if (verificationResult?.userCreated) {
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           phone: formData.fullPhone,
           password: formData.password,
         });
         if (signInError) throw signInError;
-        nextUser = signInData?.user ?? nextUser;
+        nextUser = signInData?.user ?? null;
         activeSession = signInData?.session ?? null;
+      } else {
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          phone: formData.fullPhone,
+          password: formData.password,
+          options: {
+            data: {
+              full_name: fullName,
+              phone: formData.fullPhone,
+            },
+          },
+        });
+
+        if (signUpError) {
+          const signUpMessage = String(signUpError.message || 'Ro‘yxatdan o‘tishda xato yuz berdi.');
+          if (signUpMessage.toLowerCase().includes('already')) {
+            throw new Error(tr('register.phoneAlreadyExists', 'Bu telefon raqam bilan foydalanuvchi allaqachon mavjud.'));
+          }
+          throw signUpError;
+        }
+
+        nextUser = signUpData?.user ?? null;
+        activeSession = signUpData?.session ?? null;
+
+        if (!activeSession) {
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            phone: formData.fullPhone,
+            password: formData.password,
+          });
+          if (signInError) throw signInError;
+          nextUser = signInData?.user ?? nextUser;
+          activeSession = signInData?.session ?? null;
+        }
       }
 
       if (!nextUser?.id) {
