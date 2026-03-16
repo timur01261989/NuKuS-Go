@@ -209,6 +209,10 @@ const Register = memo(function Register() {
     const otpResponse = await sendSignupOtp({
       phone: fullPhone,
       purpose: 'signup',
+      firstName: String(nextName || '').trim(),
+      lastName: String(nextSurname || '').trim(),
+      password: nextPassword,
+      referralCode: normalizedReferralCode || '',
     });
 
     setFormData({
