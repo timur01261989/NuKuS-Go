@@ -8,7 +8,7 @@ import {
 } from "@ant-design/icons";
 
 import { supabase } from "@/services/supabase/supabaseClient";
-import { compressImage } from "@/modules/shared/utils/imageUtils";
+import { compressImage } from "../../../utils/imageUtils";
 
 const { Title, Text } = Typography;
 

@@ -5,7 +5,7 @@
  * YANGI QO'SHILDI: AI Price Analytics, Visual Body Status, Auto Loan Calculator.
  * TO'G'IRLANDI: Null pointer error (car.price) va Narx formatlash mantiqi.
  */
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Button, Spin, message, Tag, Divider, Card, Statistic, Progress } from "antd";
 import { 
   ArrowLeftOutlined, 
@@ -52,9 +52,9 @@ export default function DetailsPage() {
   const [promoOpen, setPromoOpen] = useState(false);
 
   // Yaqinda ko'rilganlar ro'yxatiga qo'shish
-  useEffect(() => {
+  useMemo(() => {
     if (car) addToHistory(car);
-  }, [car, addToHistory]);
+  }, [car]);
 
   // Yuklanish holatini tekshirish
   if (loading) return <div style={{ padding: 100, textAlign: "center" }}><Spin size="large" /></div>;

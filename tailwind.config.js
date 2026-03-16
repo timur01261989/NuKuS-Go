@@ -7,17 +7,17 @@ export default {
     extend: {
       colors: {
         // Client home design
-        primary: "#F46A0A",
-        primaryHome: "#F46A0A",
-        primarySidebar: "#2F6BFF",
+        primary: "#f48c25",
+        primaryHome: "#f48c25",
+        primarySidebar: "#ec5b13",
         // Driver home design
-        backgroundLightDriver: "#EEF5FB",
-        cardLightDriver: "#FFFFFF",
-        backgroundLight: "#EEF5FB",
-        backgroundLightSidebar: "#F8FBFF",
-        backgroundDark: "#161A22",
-        softBlue: "#EEF5FB",
-        cardDark: "#161A22",
+        backgroundLightDriver: "#e0f2fe",
+        cardLightDriver: "#f0f9ff",
+        backgroundLight: "#f0f4f8",
+        backgroundLightSidebar: "#f8f6f6",
+        backgroundDark: "#1a1f26",
+        softBlue: "#e1e8f0",
+        cardDark: "#232b35",
       },
       fontFamily: {
         display: [

@@ -1,122 +1,65 @@
-/* ===============================
-   DESIGN TOKENS (single source)
-   - ranglar
-   - shrift
-   - radius/shadow
-   - night mode: body.night-mode-active
-=============================== */
-
-/* Font */
 @font-face {
-  font-family: "YangoHeadline";
-  src: url('/assets/fonts/yango-headline-multi.woff') format('woff');
+  font-family: "UnigoDisplay";
+  src: local("Bebas Neue"), local("Oswald");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
 
 :root {
-  /* =========================
-     TYPOGRAPHY
-  ========================= */
-  --font-sans: Inter, "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-sans: Inter, Manrope, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: "UnigoDisplay", Inter, Manrope, system-ui, sans-serif;
 
-  /* =========================
-     BRAND / ACCENT
-  ========================= */
-  --brand: #2F6BFF; /* blue */
-  --accent: #F46A0A; /* orange accent */
+  --brand: #f46a0a;
+  --accent: #2f6bff;
+  --bg-layout: #eef5fb;
+  --bg-elevated: rgba(255, 255, 255, 0.92);
+  --text: #1c2430;
+  --text-2: #6d7785;
+  --placeholder: #9aa3af;
+  --divider: #e5e7eb;
 
-  /* =========================
-     PAGE / LAYOUT (DAY)
-  ========================= */
-  --bg-layout: #EEF5FB; /* sahifa orqa foni */
-  --bg-elevated: #FFFFFF;
-
-  /* Light surfaces text */
-  --text: #1C2430;
-  --text-2: #6D7785;
-
-  /* ✅ Qo‘shimcha: GLOBAL placeholder/divider (day) */
-  --placeholder: #9AA3AF;
-  --divider: #E5E7EB;
-
-  /* =========================
-     PREMIUM BLACK CARDS (DEFAULT)
-     Day/night farqi yo‘q: karta doim premium qora.
-  ========================= */
-  --card-bg: linear-gradient(180deg, #161A22 0%, #111318 100%);
-  --card-bg-strong: linear-gradient(180deg, #161A22 0%, #111318 100%);
-  --card-border: rgba(255, 255, 255, 0.06);
-
-  /* Text on black cards */
-  --card-text: rgba(255, 255, 255, 0.96);
-  --card-text-2: rgba(255, 255, 255, 0.72);
-
-  /* ✅ Qo‘shimcha: CARD placeholder/divider (qora karta ichida) */
-  --card-placeholder: rgba(255, 255, 255, 0.45);
+  --card-bg: rgba(22, 26, 34, 0.98);
+  --card-bg-strong: rgba(17, 19, 24, 0.98);
+  --card-border: rgba(255, 255, 255, 0.08);
+  --card-text: rgba(255, 255, 255, 0.94);
+  --card-text-2: rgba(255, 255, 255, 0.70);
+  --card-placeholder: rgba(255, 255, 255, 0.44);
   --card-divider: rgba(255, 255, 255, 0.12);
 
-  /* Inputs on black cards */
-  --field-bg: rgba(255, 255, 255, 0.08);
-  --field-border: rgba(255, 255, 255, 0.14);
-
-  /* =========================
-     HEADER / STRONG SURFACE
-     Siz DriverDashboard / ClientHome’da topbar uchun ishlatyapsiz
-     (oldin #111 edi). Endi token bo‘ldi.
-  ========================= */
+  --field-bg: rgba(255, 255, 255, 0.95);
+  --field-border: #e5e7eb;
   --card-bg-strong-header: rgba(17, 19, 24, 0.98);
 
-  /* =========================
-     RADIUS / SHADOW
-  ========================= */
   --radius: 16px;
   --radius-xl: 24px;
   --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.12);
   --shadow-hard: 0 12px 28px rgba(0, 0, 0, 0.28);
 }
 
-/* ===============================
-   NIGHT MODE
-   Faqat sahifa fonini va umumiy textni "dark layout"ga o‘tkazamiz.
-   Premium card allaqachon qora, lekin night mode’da uni glass qilishni xohlasangiz
-   card-bg ni biroz shaffofroq qilamiz.
-=============================== */
 body.night-mode-active {
+  --brand: #ff8a33;
+  --accent: #76a2ff;
   --bg-layout: #111318;
-  --bg-elevated: rgba(22, 26, 34, 0.92);
-
+  --bg-elevated: rgba(255, 255, 255, 0.06);
   --text: rgba(255, 255, 255, 0.92);
-  --text-2: rgba(255, 255, 255, 0.72);
-
-  /* ✅ Night mode placeholder/divider */
+  --text-2: rgba(255, 255, 255, 0.70);
   --placeholder: rgba(255, 255, 255, 0.45);
   --divider: rgba(255, 255, 255, 0.12);
-
-  /* premium card: night mode’da "glass" effekt */
-  --card-bg: rgba(255, 255, 255, 0.10);
-  --card-bg-strong: rgba(255, 255, 255, 0.14);
-  --card-border: rgba(255, 255, 255, 0.18);
-
-  --card-text: rgba(255, 255, 255, 0.96);
+  --card-bg: rgba(22, 26, 34, 0.98);
+  --card-bg-strong: rgba(17, 19, 24, 0.98);
+  --card-border: rgba(255, 255, 255, 0.10);
+  --card-text: rgba(255, 255, 255, 0.94);
   --card-text-2: rgba(255, 255, 255, 0.72);
-
   --card-placeholder: rgba(255, 255, 255, 0.45);
   --card-divider: rgba(255, 255, 255, 0.12);
-
   --field-bg: rgba(255, 255, 255, 0.08);
-  --field-border: rgba(255, 255, 255, 0.18);
-
-  --card-bg-strong-header: rgba(17, 17, 17, 0.92);
-
-  --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.35);
-  --shadow-hard: 0 18px 50px rgba(0, 0, 0, 0.55);
+  --field-border: rgba(255, 255, 255, 0.12);
+  --card-bg-strong-header: rgba(17, 19, 24, 0.98);
+  --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.32);
+  --shadow-hard: 0 12px 28px rgba(0, 0, 0, 0.48);
 }
 
-/* ===============================
-   GLOBAL BASE
-=============================== */
 html,
 body {
   margin: 0;
@@ -127,28 +70,23 @@ body {
   font-family: var(--font-sans);
   background: var(--bg-layout);
   color: var(--text);
-
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Leaflet base background */
 .leaflet-container {
   background: #f0f0f0 !important;
 }
 
-/* Night mode: map HDR / invert faqat mapga */
 body.night-mode-active .leaflet-container {
   filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
 }
 
-/* Neon path */
 body.night-mode-active .leaflet-ant-path {
   stroke: var(--accent);
   filter: drop-shadow(0 0 8px var(--accent));
 }
 
-/* Interactive glow */
 body.night-mode-active .leaflet-interactive {
   filter: drop-shadow(0 0 5px var(--accent));
 }

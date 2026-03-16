@@ -505,7 +505,7 @@ export default function DeliveryPage({ onBack }) {
   );
 
   return (
-    <div className="unigo-page" style={{ maxWidth: 920, margin: "0 auto", padding: 16, paddingBottom: 100, minHeight: "100vh", background: pageBg }}>
+    <div style={{ maxWidth: 920, margin: "0 auto", padding: 16, paddingBottom: 100, minHeight: "100vh", background: pageBg }}>
       <Space align="center" style={{ width: "100%", justifyContent: "space-between" }}>
         <Button icon={<ArrowLeftOutlined />} onClick={onBack}>{cp("Orqaga")}</Button>
         <div style={{ textAlign: "right" }}>
@@ -515,7 +515,6 @@ export default function DeliveryPage({ onBack }) {
       </Space>
 
       <Card
-        className="unigo-surface-card"
         style={{ marginTop: 14, borderRadius: 24, background: cardBg, border: "1px solid rgba(87,119,255,0.12)", boxShadow: "0 18px 40px rgba(64,96,160,0.08)" }}
         bodyStyle={{ padding: 18 }}
       >

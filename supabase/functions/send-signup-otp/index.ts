@@ -39,93 +39,116 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '
 const OTP_PEPPER = Deno.env.get('OTP_PEPPER') ?? '';
 const TELERIVET_API_KEY = Deno.env.get('TELERIVET_API_KEY') ?? '';
 const TELERIVET_PROJECT_ID = Deno.env.get('TELERIVET_PROJECT_ID') ?? '';
-const TELERIVET_PHONE_ID = Deno.env.get('TELERIVET_PHONE_ID') ?? '';
-const SMS_MOCK_MODE = (Deno.env.get('SMS_MOCK_MODE') ?? 'false').toLowerCase() === 'true';
+const TELERIVET_ROUTE_ID = Deno.env.get('TELERIVET_ROUTE_ID') ?? '';
 
-const OTP_EXPIRY_SECONDS = 180;
+const OTP_TTL_SECONDS = 180;
 const RESEND_COOLDOWN_SECONDS = 60;
-const MAX_RESENDS = 5;
+const MAX_RESEND_COUNT = 3;
+const OTP_LENGTH = 6;
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !OTP_PEPPER) {
+  throw new Error('Missing required environment variables: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OTP_PEPPER');
+}
 
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false },
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+  },
 });
 
-function corsHeaders() {
+function corsHeaders(): HeadersInit {
   return {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Content-Type': 'application/json',
   };
 }
 
-function jsonResponse(status: number, payload: JsonObject) {
+function jsonResponse(status: number, payload: JsonObject): Response {
   return new Response(JSON.stringify(payload), {
     status,
-    headers: corsHeaders(),
-  });
-}
-
-function normalizePhone(value: string) {
-  const digits = value.replace(/\D/g, '');
-  if (digits.startsWith('998') && digits.length === 12) return `+${digits}`;
-  if (digits.length === 9) return `+998${digits}`;
-  if (digits.startsWith('+998') && digits.replace(/\D/g, '').length === 12) return value;
-  throw new Error('Telefon raqami noto‘g‘ri formatda');
-}
-
-async function hashOtp(phone: string, purpose: string, otpCode: string) {
-  const payload = `${phone}:${purpose}:${otpCode}:${OTP_PEPPER}`;
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload));
-  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
-function generateOtpCode() {
-  return String(Math.floor(100000 + Math.random() * 900000));
-}
-
-async function lookupProfileByPhone(rawPhone: string, normalizedPhone: string) {
-  const candidates = Array.from(new Set([rawPhone, normalizedPhone, normalizedPhone.replace('+', '')].filter(Boolean)));
-
-  for (const candidate of candidates) {
-    const { data } = await supabaseAdmin
-      .from('profiles')
-      .select('id, phone, phone_normalized')
-      .or(`phone.eq.${candidate},phone_normalized.eq.${candidate}`)
-      .limit(1);
-
-    const row = ((data ?? [])[0] as ProfileLookupRow | undefined) ?? null;
-    if (row) return row;
-  }
-
-  return null;
-}
-
-async function sendSms(phone: string, message: string) {
-  if (SMS_MOCK_MODE) {
-    console.info('SMS_MOCK_MODE enabled', { phone, message });
-    return { id: 'mock-sms', status: 'mocked' } as TelerivetResponse;
-  }
-
-  const response = await fetch('https://api.telerivet.com/v1/projects/' + TELERIVET_PROJECT_ID + '/messages/send', {
-    method: 'POST',
     headers: {
-      Authorization: `Basic ${btoa(`${TELERIVET_API_KEY}:`)}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
+      ...corsHeaders(),
+      'Content-Type': 'application/json; charset=utf-8',
     },
-    body: new URLSearchParams({
-      content: message,
-      to_number: phone,
-      phone_id: TELERIVET_PHONE_ID,
-    }),
   });
+}
+
+function normalizePhone(input: string): string {
+  const digitsOnly = input.replace(/\D/g, '');
+  if (digitsOnly.length === 12 && digitsOnly.startsWith('998')) {
+    return `+${digitsOnly}`;
+  }
+  if (digitsOnly.length === 9) {
+    return `+998${digitsOnly}`;
+  }
+  throw new Error('Telefon raqami noto‘g‘ri formatda. Masalan: +998901234567');
+}
+
+function generateOtpCode(): string {
+  const random = crypto.getRandomValues(new Uint32Array(1))[0] % 1000000;
+  return String(random).padStart(OTP_LENGTH, '0');
+}
+
+async function hashOtp(phone: string, purpose: string, code: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(`${OTP_PEPPER}|${phone}|${purpose}|${code}`);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  const bytes = new Uint8Array(digest);
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function lookupProfileByPhone(rawPhone: string, normalizedPhone: string): Promise<ProfileLookupRow | null> {
+  const { data, error } = await supabaseAdmin.rpc('lookup_profile_by_phone', {
+    input_phone: rawPhone.replace(/\D/g, ''),
+    input_phone_normalized: normalizedPhone,
+  });
+
+  if (error) {
+    throw new Error(`lookup_profile_by_phone RPC failed: ${error.message}`);
+  }
+
+  const rows = Array.isArray(data) ? (data as ProfileLookupRow[]) : [];
+  return rows[0] ?? null;
+}
+
+async function sendSmsViaTelerivet(phone: string, message: string): Promise<TelerivetResponse | null> {
+  if (!TELERIVET_API_KEY || !TELERIVET_PROJECT_ID || !TELERIVET_ROUTE_ID) {
+    return null;
+  }
+
+  const form = new URLSearchParams();
+  form.set('content', message);
+  form.set('to_number', phone);
+  form.set('route_id', TELERIVET_ROUTE_ID);
+
+  const response = await fetch(
+    `https://api.telerivet.com/v1/projects/${TELERIVET_PROJECT_ID}/messages/send`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${btoa(`${TELERIVET_API_KEY}:`)}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: form.toString(),
+    },
+  );
+
+  const text = await response.text();
+  let parsed: TelerivetResponse | null = null;
+
+  try {
+    parsed = text ? JSON.parse(text) as TelerivetResponse : null;
+  } catch {
+    parsed = { status: response.statusText, raw: text };
+  }
 
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`SMS yuborilmadi (${response.status}): ${text}`);
+    throw new Error(`Telerivet SMS send failed: ${response.status} ${text}`);
   }
 
-  return await response.json() as TelerivetResponse;
+  return parsed;
 }
 
 serve(async (request) => {
@@ -139,21 +162,31 @@ serve(async (request) => {
 
   try {
     const body = await request.json() as SendOtpRequest;
+
     const rawPhone = body.phone?.trim() ?? '';
     const purpose = body.purpose === 'reset_password' ? 'reset_password' : 'signup';
 
     if (!rawPhone) {
-      return jsonResponse(400, { error: 'Telefon raqami kerak', code: 'PHONE_REQUIRED' });
+      return jsonResponse(400, { error: 'Telefon raqamini kiriting' });
     }
 
     const normalizedPhone = normalizePhone(rawPhone);
+
     const existingProfile = await lookupProfileByPhone(rawPhone, normalizedPhone);
 
     if (purpose === 'signup' && existingProfile) {
-      return jsonResponse(409, { error: 'Bu raqam allaqachon ro‘yxatdan o‘tgan', code: 'PHONE_ALREADY_EXISTS' });
+      return jsonResponse(409, {
+        error: 'Siz bu raqam bilan ro‘yxatdan o‘tgansiz. Iltimos, login qiling.',
+      });
     }
 
-    const { data: existingRows } = await supabaseAdmin
+    if (purpose === 'reset_password' && !existingProfile) {
+      return jsonResponse(404, {
+        error: 'Bu telefon raqamiga bog‘langan akkaunt topilmadi.',
+      });
+    }
+
+    const { data: pendingRows, error: pendingError } = await supabaseAdmin
       .from('phone_otp_verifications')
       .select('id, resend_count, last_sent_at')
       .eq('phone_e164', normalizedPhone)
@@ -163,95 +196,114 @@ serve(async (request) => {
       .order('created_at', { ascending: false })
       .limit(1);
 
-    const existingOtp = ((existingRows ?? [])[0] as PendingOtpRow | undefined) ?? null;
-    const now = Date.now();
+    if (pendingError) {
+      return jsonResponse(500, {
+        error: 'OTP holatini tekshirishda xato',
+        debug_step: 'select_pending_otp',
+        code: pendingError.code ?? null,
+        details: pendingError.message,
+        hint: pendingError.hint ?? null,
+        phone: normalizedPhone,
+        purpose,
+      });
+    }
 
-    if (existingOtp?.last_sent_at) {
-      const lastSentMs = new Date(existingOtp.last_sent_at).getTime();
-      const cooldownLeft = Math.max(0, RESEND_COOLDOWN_SECONDS - Math.floor((now - lastSentMs) / 1000));
-      if (cooldownLeft > 0) {
+    const pending = ((pendingRows ?? [])[0] as PendingOtpRow | undefined) ?? null;
+
+    if (pending?.last_sent_at) {
+      const cooldownUntil = new Date(new Date(pending.last_sent_at).getTime() + RESEND_COOLDOWN_SECONDS * 1000);
+      if (cooldownUntil.getTime() > Date.now()) {
         return jsonResponse(429, {
-          error: 'Kod yaqinda yuborilgan. Biroz kuting.',
-          code: 'OTP_COOLDOWN',
-          retry_after_seconds: cooldownLeft,
+          error: 'OTP qayta yuborish uchun kuting',
+          retry_after_seconds: Math.ceil((cooldownUntil.getTime() - Date.now()) / 1000),
         });
       }
-      if ((existingOtp.resend_count ?? 0) >= MAX_RESENDS) {
-        return jsonResponse(429, { error: 'Qayta yuborish limiti tugadi', code: 'OTP_RESEND_LIMIT' });
-      }
+    }
+
+    if (pending && pending.resend_count >= MAX_RESEND_COUNT) {
+      return jsonResponse(429, {
+        error: 'OTP yuborish limiti tugadi. Keyinroq urinib ko‘ring.',
+      });
     }
 
     const otpCode = generateOtpCode();
     const otpHash = await hashOtp(normalizedPhone, purpose, otpCode);
     const nowIso = new Date().toISOString();
-    const expiresAt = new Date(now + OTP_EXPIRY_SECONDS * 1000).toISOString();
+    const expiresAtIso = new Date(Date.now() + OTP_TTL_SECONDS * 1000).toISOString();
 
-    const metadata = {
-      first_name: body.firstName?.trim() || null,
-      last_name: body.lastName?.trim() || null,
-      password: body.password?.trim() || null,
-      referral_code: body.referralCode?.trim() || null,
-    };
-
-    if (existingOtp) {
+    if (pending) {
       const { error: updateError } = await supabaseAdmin
         .from('phone_otp_verifications')
         .update({
           otp_hash: otpHash,
-          expires_at: expiresAt,
-          resend_count: (existingOtp.resend_count ?? 0) + 1,
+          otp_code: otpCode,
+          expires_at: expiresAtIso,
           last_sent_at: nowIso,
+          resend_count: pending.resend_count + 1,
+          attempt_count: 0,
           updated_at: nowIso,
-          metadata,
         })
-        .eq('id', existingOtp.id);
+        .eq('id', pending.id);
 
       if (updateError) {
-        return jsonResponse(500, { error: 'OTP saqlashda xato', code: 'OTP_SAVE_FAILED' });
+        return jsonResponse(500, {
+          error: 'OTP yozishda xato',
+          debug_step: 'update_pending_otp',
+          code: updateError.code ?? null,
+          details: updateError.message,
+          hint: updateError.hint ?? null,
+        });
       }
     } else {
       const { error: insertError } = await supabaseAdmin
         .from('phone_otp_verifications')
         .insert({
-          phone: rawPhone,
+          phone: rawPhone.replace(/\D/g, ''),
           phone_e164: normalizedPhone,
           purpose,
           otp_hash: otpHash,
-          expires_at: expiresAt,
+          otp_code: otpCode,
+          status: 'pending',
           resend_count: 0,
           attempt_count: 0,
-          status: 'pending',
           last_sent_at: nowIso,
-          metadata,
-          created_at: nowIso,
-          updated_at: nowIso,
+          expires_at: expiresAtIso,
+          metadata: {
+            first_name: body.firstName ?? null,
+            last_name: body.lastName ?? null,
+            password: body.password ?? null,
+            referral_code: body.referralCode ?? null,
+          },
         });
 
       if (insertError) {
-        return jsonResponse(500, { error: 'OTP yozishda xato', code: 'OTP_INSERT_FAILED' });
+        return jsonResponse(500, {
+          error: 'OTP saqlashda xato',
+          debug_step: 'insert_pending_otp',
+          code: insertError.code ?? null,
+          details: insertError.message,
+          hint: insertError.hint ?? null,
+        });
       }
     }
 
-    const smsText = purpose === 'reset_password'
-      ? `UniGo parol tiklash kodingiz: ${otpCode}`
-      : `UniGo tasdiqlash kodingiz: ${otpCode}`;
-
-    await sendSms(normalizedPhone, smsText);
+    const smsText = `UniGo tasdiqlash kodingiz: ${otpCode}. Kod ${Math.floor(OTP_TTL_SECONDS / 60)} daqiqa amal qiladi.`;
+    const smsResult = await sendSmsViaTelerivet(normalizedPhone, smsText);
 
     return jsonResponse(200, {
       success: true,
+      message: 'SMS kod yuborildi',
       phone: normalizedPhone,
       purpose,
-      message: 'OTP yuborildi',
-      expires_in_seconds: OTP_EXPIRY_SECONDS,
+      sms_provider: smsResult ? 'telerivet' : 'skipped',
+      expires_in_seconds: OTP_TTL_SECONDS,
       resend_cooldown_seconds: RESEND_COOLDOWN_SECONDS,
-      retry_after_seconds: 0,
     });
   } catch (error) {
-    console.error('send-signup-otp failed', error);
     return jsonResponse(500, {
-      error: 'OTP yuborishda xato yuz berdi',
-      code: 'OTP_SEND_FAILED',
+      error: 'UNCAUGHT_DEBUG',
+      details: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : null,
     });
   }
 });

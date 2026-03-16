@@ -6,7 +6,7 @@ function ClientLayoutComponent() {
 
   const layoutClassName = useMemo(() => {
     const normalizedPath = location.pathname === "/" ? "home" : location.pathname.replace(/^\//, "").replace(/\//g, "-");
-    return `unigo-layout unigo-layout-client unigo-mobile-app route-${normalizedPath}`;
+    return `unigo-layout unigo-layout-client route-${normalizedPath}`;
   }, [location.pathname]);
 
   return (

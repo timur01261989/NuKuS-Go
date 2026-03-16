@@ -31,8 +31,6 @@ import promoHandler from "../server/api/promo.js";
 import referralHandler from "../server/api/referral.js";
 import rewardWorkerHandler from "../server/api/reward_worker.js";
 import deliveryHandler from "../server/api/delivery.js";
-import paymentsHandler from "../server/api/payments.js";
-import { logger } from "../server/_shared/logger.js";
 
 function normalizePath(rawPath) {
   // Supports both direct path (/api/order) and rewritten query (?path=order)
@@ -188,22 +186,14 @@ async function ensureParsedBody(req) {
   return parsed;
 }
 
-
-function createRequestId() {
-  return `req_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
-}
-
 export default async function handler(req, res) {
   try {
-    req.requestId = req.headers?.["x-request-id"] || req.headers?.["X-Request-Id"] || createRequestId();
-    res.setHeader("X-Request-Id", req.requestId);
     const url = new URL(req.url, "http://localhost");
     // Vercel rewrite friendly: /api/(.*) -> /api?path=$1
     const queryPath = url.searchParams.get("path");
     const directPath = url.pathname.replace(/^\/api\/?/, "");
     const path = normalizePath(queryPath || directPath);
 
-    logger.info("api_request_started", { requestId: req.requestId, method: req.method, url: req.url });
     // Basic CORS (safe default). Adjust origins if you want stricter policy.
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
@@ -256,10 +246,6 @@ export default async function handler(req, res) {
       return await offerHandler(req, res);
     }
 
-    if (path.startsWith("payments") || path.startsWith("order-pay-wallet") || path.startsWith("order-complete")) {
-      return await paymentsHandler(req, res);
-    }
-
     if (path.startsWith("wallet")) {
       return await walletHandler(req, res);
     }
@@ -293,12 +279,8 @@ export default async function handler(req, res) {
     }
 
 
-    if (path.startsWith("promo-validate")) {
+    if (path.startsWith("promo-validate") || path.startsWith("order-apply-promo")) {
       return await promoHandler(req, res);
-    }
-
-    if (path.startsWith("order-apply-promo")) {
-      return await paymentsHandler(req, res);
     }
 
     if (path.startsWith("delivery")) {
@@ -325,7 +307,6 @@ export default async function handler(req, res) {
     res.setHeader("Content-Type", "application/json");
     res.end(JSON.stringify({ error: "API route topilmadi", path }));
   } catch (e) {
-    logger.error("api_request_failed", { requestId: req.requestId, method: req.method, url: req.url, message: e?.message });
     const isProd = String(process.env.NODE_ENV || "").toLowerCase() === "production";
     res.statusCode = 500;
     res.setHeader("Content-Type", "application/json");

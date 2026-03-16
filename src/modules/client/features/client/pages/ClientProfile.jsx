@@ -1,200 +1,107 @@
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import imageCompression from 'browser-image-compression';
-import { message } from 'antd';
+import React, { memo, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/services/supabase/supabaseClient';
-import { useLanguage } from '@/modules/shared/i18n/useLanguage.js';
+import { useAuth } from '@/modules/shared/auth/AuthProvider.jsx';
+import { useAppMode } from '@/app/providers/AppModeProvider.jsx';
+import { UnigoBottomNav, UnigoButton, UnigoCard, UnigoEmptyState, UnigoHeader, UnigoListRow, UnigoScreen, UnigoSection, UnigoStatusPill } from '@/modules/shared/ui/UnigoMobileUI.jsx';
 
-const AVATAR_BUCKET = 'avatars';
-
-const ClientProfile = memo(function ClientProfile() {
-  const navigate = useNavigate();
-  const { tr } = useLanguage();
-  const fileInputRef = useRef(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [userId, setUserId] = useState('');
-  const [profileState, setProfileState] = useState({ fullName: '', phone: '', avatarUrl: '' });
-  const [selectedAvatarFile, setSelectedAvatarFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState('');
-
-  useEffect(() => {
-    let mounted = true;
-    async function loadProfile() {
-      setLoading(true);
-      try {
-        const [{ data: authData, error: authError }] = await Promise.all([supabase.auth.getUser()]);
-        if (authError) throw authError;
-        const currentUser = authData?.user;
-        if (!currentUser?.id) throw new Error(tr('authRequired', 'Avval tizimga kiring.'));
-        const { data: profileRow, error: profileError } = await supabase
-          .from('profiles')
-          .select('id,full_name,phone,avatar_url')
-          .eq('id', currentUser.id)
-          .maybeSingle();
-        if (profileError) throw profileError;
-        const metadata = currentUser.user_metadata || {};
-        if (!mounted) return;
-        setUserId(currentUser.id);
-        setProfileState({
-          fullName: String(profileRow?.full_name || metadata.full_name || '').trim(),
-          phone: String(profileRow?.phone || currentUser.phone || '').trim(),
-          avatarUrl: String(profileRow?.avatar_url || metadata.avatar_url || '').trim(),
-        });
-      } catch (error) {
-        message.error(String(error?.message || tr('errorLoadingProfile', 'Profilni yuklashda xatolik yuz berdi.')));
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    }
-    loadProfile();
-    return () => {
-      mounted = false;
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-    };
-  }, [previewUrl, tr]);
-
-  const displayAvatar = useMemo(() => previewUrl || profileState.avatarUrl, [previewUrl, profileState.avatarUrl]);
-  const initial = useMemo(() => (String(profileState.fullName || 'U').trim()[0] || 'U').toUpperCase(), [profileState.fullName]);
-  const handleInputChange = useCallback((event) => {
-    const { name, value } = event.target;
-    setProfileState((current) => ({ ...current, [name]: value }));
-  }, []);
-
-  const handleAvatarSelect = useCallback(async (event) => {
-    const nextFile = event.target.files?.[0];
-    if (!nextFile) return;
-    try {
-      const compressedFile = await imageCompression(nextFile, {
-        maxWidthOrHeight: 1200,
-        maxSizeMB: 0.6,
-        initialQuality: 0.78,
-        useWebWorker: true,
-      });
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      const nextPreviewUrl = URL.createObjectURL(compressedFile);
-      setSelectedAvatarFile(compressedFile);
-      setPreviewUrl(nextPreviewUrl);
-    } catch (error) {
-      message.error(String(error?.message || tr('changePhoto', 'Rasmni o‘zgartirish')));
-    }
-  }, [previewUrl, tr]);
-
-  const uploadAvatar = useCallback(async (file) => {
-    if (!file || !userId) return profileState.avatarUrl || '';
-    const extension = String(file.name || 'jpg').split('.').pop()?.toLowerCase() || 'jpg';
-    const filePath = `avatars/${userId}-${Date.now()}.${extension}`;
-    const { error: uploadError } = await supabase.storage.from(AVATAR_BUCKET).upload(filePath, file, {
-      upsert: true,
-      contentType: file.type || 'image/jpeg',
-    });
-    if (uploadError) throw uploadError;
-    const { data: publicUrlData } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(filePath);
-    return String(publicUrlData?.publicUrl || '').trim();
-  }, [profileState.avatarUrl, userId]);
-
-  const handleSave = useCallback(async (event) => {
-    event.preventDefault();
-    if (!userId) {
-      message.error(tr('authRequired', 'Avval tizimga kiring.'));
-      return;
-    }
-    setSaving(true);
-    try {
-      const trimmedFullName = String(profileState.fullName || '').trim();
-      if (!trimmedFullName) throw new Error(tr('register.nameRequired', 'Ismingizni kiriting.'));
-      const uploadedAvatarUrl = selectedAvatarFile ? await uploadAvatar(selectedAvatarFile) : profileState.avatarUrl;
-      const timestamp = new Date().toISOString();
-      const { error: authUpdateError } = await supabase.auth.updateUser({ data: { full_name: trimmedFullName, avatar_url: uploadedAvatarUrl || null } });
-      if (authUpdateError) throw authUpdateError;
-      const { error: profileUpdateError } = await supabase.from('profiles').update({
-        full_name: trimmedFullName,
-        avatar_url: uploadedAvatarUrl || null,
-        updated_at: timestamp,
-      }).eq('id', userId);
-      if (profileUpdateError) throw profileUpdateError;
-      setProfileState((current) => ({ ...current, fullName: trimmedFullName, avatarUrl: uploadedAvatarUrl || '' }));
-      setSelectedAvatarFile(null);
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-        setPreviewUrl('');
-      }
-      message.success(tr('profileUpdated', 'Profil muvaffaqiyatli saqlandi!'));
-    } catch (error) {
-      message.error(String(error?.message || tr('errorSavingProfile', 'Ma’lumotlarni saqlashda xatolik yuz berdi.')));
-    } finally {
-      setSaving(false);
-    }
-  }, [previewUrl, profileState.avatarUrl, profileState.fullName, selectedAvatarFile, tr, uploadAvatar, userId]);
-
-  if (loading) {
-    return (
-      <div className="unigo-page flex items-center justify-center">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-primaryHome border-t-transparent" />
-      </div>
-    );
+function getInitials(fullName, phone) {
+  const safeName = String(fullName || '').trim();
+  if (safeName) {
+    const parts = safeName.split(/\s+/).filter(Boolean).slice(0, 2);
+    const label = parts.map((part) => part[0] || '').join('');
+    if (label) return label.toUpperCase();
   }
+  return String(phone || 'U').replace(/\D/g, '').slice(-2) || 'U';
+}
+
+function formatMoney(value) {
+  const amount = Number(value || 0);
+  return `${amount.toLocaleString('uz-UZ')} so‘m`;
+}
+
+function ClientModeSwitchCard({ onSwitch }) {
+  return (
+    <UnigoCard soft="soft-blue">
+      <div className="unigo-card__stack" style={{ gap: 14 }}>
+        <div className="unigo-card__row" style={{ alignItems: 'flex-start' }}>
+          <div className="unigo-card__stack" style={{ gap: 6, flex: 1 }}>
+            <span className="unigo-pill unigo-pill--info">Haydovchi rejimi</span>
+            <h3 className="unigo-card-title" style={{ fontSize: 22 }}>Haydovchi tarafga o‘tish</h3>
+            <p className="unigo-card-caption">Buyurtmalar, xizmatlar va daromad boshqaruvi uchun haydovchi paneliga o‘ting.</p>
+          </div>
+          <div className="unigo-list-row__icon" style={{ flexShrink: 0 }}>
+            <span className="material-symbols-outlined" data-no-auto-translate="true">local_taxi</span>
+          </div>
+        </div>
+        <UnigoButton icon="arrow_forward" onClick={onSwitch}>Haydovchi paneliga o‘tish</UnigoButton>
+      </div>
+    </UnigoCard>
+  );
+}
+
+function ClientProfile() {
+  const navigate = useNavigate();
+  const { setAppMode } = useAppMode();
+  const auth = useAuth();
+
+  const fullName = String(auth?.profile?.full_name || '').trim();
+  const phone = String(auth?.profile?.phone || auth?.user?.phone || '').trim();
+  const avatarLabel = useMemo(() => getInitials(fullName, phone), [fullName, phone]);
+  const balanceUzs = Number(auth?.referralSnapshot?.wallet?.bonus_balance_uzs || auth?.referralSnapshot?.wallet?.balance_uzs || 0);
+
+  const navItems = useMemo(() => ([
+    { to: '/', icon: 'home', label: 'Asosiy' },
+    { to: '/orders', icon: 'receipt_long', label: 'Buyurtmalar' },
+    { to: '/wallet', icon: 'account_balance_wallet', label: 'Hamyon' },
+    { to: '/profile', icon: 'person', label: 'Profil', active: true },
+  ]), []);
+
+  const handleSwitchToDriver = useCallback(() => {
+    setAppMode('driver');
+    navigate('/driver-mode');
+  }, [navigate, setAppMode]);
 
   return (
-    <div className="unigo-page pb-8">
-      <header className="unigo-topbar px-4 py-4">
-        <div className="mx-auto flex max-w-2xl items-center gap-3">
-          <button type="button" onClick={() => navigate(-1)} className="unigo-soft-card flex h-11 w-11 items-center justify-center p-0">
-            <span className="material-symbols-outlined">arrow_back</span>
-          </button>
-          <h1 className="text-lg font-black text-slate-900">{tr('profileSettings', 'Profil ma’lumotlari')}</h1>
+    <UnigoScreen>
+      <UnigoHeader back="/" title="Profil" subtitle="Hisob va shaxsiy ma’lumotlar" />
+      <UnigoCard>
+        <div className="unigo-card__row">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div className="unigo-avatar">{avatarLabel}</div>
+            <div className="unigo-card__stack" style={{ gap: 4 }}>
+              <h2 className="unigo-card-title" style={{ fontSize: 22 }}>{fullName || 'Foydalanuvchi'}</h2>
+              <p className="unigo-card-caption">{phone || 'Telefon raqami kiritilmagan'}</p>
+            </div>
+          </div>
+          <UnigoStatusPill variant="success">Faol</UnigoStatusPill>
         </div>
-      </header>
+        <div style={{ marginTop: 14 }}>
+          <UnigoStatusPill variant="info">Balans: {formatMoney(balanceUzs)}</UnigoStatusPill>
+        </div>
+      </UnigoCard>
 
-      <main className="mx-auto max-w-2xl space-y-5 px-4 pt-5">
-        <form onSubmit={handleSave} className="space-y-5">
-          <section className="unigo-dark-card flex flex-col items-center p-6 text-center">
-            <div className="relative">
-              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/10">
-                {displayAvatar ? <img src={displayAvatar} alt="Profile Avatar" className="h-full w-full object-cover" /> : <span className="text-3xl font-black text-white">{initial}</span>}
-              </div>
-              <button type="button" onClick={() => fileInputRef.current?.click()} className="absolute bottom-0 right-0 flex h-10 w-10 items-center justify-center rounded-full bg-primaryHome text-white shadow-lg">
-                <span className="material-symbols-outlined text-[18px]">photo_camera</span>
-              </button>
-              <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/webp" onChange={handleAvatarSelect} className="hidden" />
-            </div>
-            <div className="mt-4 text-lg font-black text-white">{profileState.fullName || 'Foydalanuvchi'}</div>
-            <div className="mt-1 text-sm text-slate-300">Rasmni o‘zgartirish va ma’lumotlarni yangilash</div>
-          </section>
+      <UnigoSection title="Rejimni almashtirish">
+        <ClientModeSwitchCard onSwitch={handleSwitchToDriver} />
+      </UnigoSection>
 
-          <section className="unigo-soft-card p-5">
-            <div className="space-y-4">
-              <label className="block">
-                <span className="mb-2 block text-sm font-bold text-slate-800">To‘liq ism</span>
-                <input name="fullName" value={profileState.fullName} onChange={handleInputChange} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[15px] font-medium text-slate-900 outline-none focus:border-primaryHome" placeholder="Ismingiz va familiyangiz" />
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-sm font-bold text-slate-800">Telefon raqam</span>
-                <input name="phone" value={profileState.phone} onChange={handleInputChange} className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[15px] font-medium text-slate-500 outline-none" placeholder="+998 XX XXX XX XX" disabled />
-              </label>
-            </div>
-          </section>
+      <UnigoSection title="Hisob bo‘limlari">
+        <div className="unigo-list">
+          <UnigoListRow icon="person_edit" title="Profil ma’lumotlari" description="Ism, telefon, rasm" onClick={() => navigate('/profile/details')} />
+          <UnigoListRow icon="group_add" title="Do‘stlarni taklif qilish" description="Kod va havola orqali bonus oling" onClick={() => navigate('/referral')} />
+          <UnigoListRow icon="confirmation_number" title="Promo kodlar" description="Chegirma va aksiyalar" onClick={() => navigate('/promo')} />
+          <UnigoListRow icon="settings" title="Sozlamalar" description="Til, tungi rejim va bildirishnomalar" onClick={() => navigate('/settings')} />
+          <UnigoListRow icon="logout" title="Chiqish" description="Hisobdan xavfsiz chiqish" danger onClick={() => navigate('/login')} />
+        </div>
+      </UnigoSection>
 
-          <section className="rounded-[24px] bg-gradient-to-r from-[#FFF1E7] to-[#EAF2FF] p-5 shadow-[0_10px_24px_rgba(28,36,48,.08)]">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-base font-black text-slate-900">Do‘stlarni taklif qilish</div>
-                <div className="mt-1 text-sm text-slate-600">Taklif havolasi va referral bonuslarini shu bo‘limdan boshqaring</div>
-              </div>
-              <div className="flex h-11 w-11 items-center justify-center rounded-[16px] bg-white text-primaryHome">
-                <span className="material-symbols-outlined">share</span>
-              </div>
-            </div>
-            <button type="button" className="unigo-secondary-btn mt-4 min-h-[48px] px-4" onClick={() => navigate('/client/referral')}>Takliflar bo‘limi</button>
-          </section>
-
-          <button type="submit" disabled={saving} className="unigo-primary-btn flex min-h-[56px] w-full items-center justify-center px-5 text-base font-black disabled:opacity-60">
-            {saving ? 'Saqlanmoqda...' : 'Saqlash'}
-          </button>
-        </form>
-      </main>
-    </div>
+      {!fullName && !phone ? (
+        <UnigoSection>
+          <UnigoEmptyState title="Profil hali to‘ldirilmagan" description="Profil ma’lumotlarini kiritsangiz hisobingiz yanada to‘liq ko‘rinadi." actionLabel="Profilni to‘ldirish" onAction={() => navigate('/profile/details')} />
+        </UnigoSection>
+      ) : null}
+      <UnigoBottomNav items={navItems} />
+    </UnigoScreen>
   );
-});
+}
 
-export default ClientProfile;
+export default memo(ClientProfile);

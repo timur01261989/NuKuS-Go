@@ -55,15 +55,11 @@ function mapOtpResponse(data, phone, purpose, defaultMessage) {
   };
 }
 
-export async function sendSignupOtp({ phone, purpose = 'signup', firstName = '', lastName = '', password = '', referralCode = null }) {
+export async function sendSignupOtp({ phone, purpose = 'signup' }) {
   const { data, error } = await supabase.functions.invoke('send-signup-otp', {
     body: {
       phone,
       purpose,
-      firstName,
-      lastName,
-      password,
-      referralCode,
     },
   });
 
@@ -93,18 +89,13 @@ export async function sendResetPasswordOtp({ phone }) {
   return mapOtpResponse(data, phone, 'reset_password', 'Tiklash kodi yuborildi');
 }
 
-export async function verifySignupOtp({ phone, otp, purpose = 'signup', userId = null, firstName = '', lastName = '', password = '', referralCode = null }) {
+export async function verifySignupOtp({ phone, otp, purpose = 'signup', userId = null }) {
   const { data, error } = await supabase.functions.invoke('verify-signup-otp', {
     body: {
       phone,
-      code: otp,
       otp,
       purpose,
       user_id: userId,
-      firstName,
-      lastName,
-      password,
-      referralCode,
     },
   });
 
@@ -120,8 +111,6 @@ export async function verifySignupOtp({ phone, otp, purpose = 'signup', userId =
     purpose: data?.purpose || purpose,
     verifiedAt: data?.verified_at || null,
     message: data?.message || 'Telefon muvaffaqiyatli tasdiqlandi',
-    userId: data?.user_id || null,
-    userCreated: !!data?.user_created,
   };
 }
 
@@ -130,7 +119,7 @@ export async function resetPasswordWithOtp({ phone, otp, newPassword }) {
     body: {
       phone,
       otp,
-      newPassword,
+      new_password: newPassword,
     },
   });
 
@@ -144,5 +133,13 @@ export async function resetPasswordWithOtp({ phone, otp, newPassword }) {
     success: !!data?.success,
     phone: data?.phone || phone,
     message: data?.message || 'Parol muvaffaqiyatli yangilandi',
+    updatedAt: data?.updated_at || null,
   };
 }
+
+export default {
+  sendSignupOtp,
+  sendResetPasswordOtp,
+  verifySignupOtp,
+  resetPasswordWithOtp,
+};
