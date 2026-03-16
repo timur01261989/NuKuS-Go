@@ -1,3 +1,5 @@
+import { supabase } from "@/services/supabase/supabaseClient";
+
 /**
  * src/utils/apiHelper.js (MAX FIXED)
  * ------------------------------------------------------------
@@ -204,7 +206,18 @@ const api = {
     if (!headers.has("Accept")) headers.set("Accept", "application/json, text/plain, */*");
 
     // Auth
-    const token = typeof this._cfg.getAccessToken === "function" ? this._cfg.getAccessToken() : null;
+    let token = typeof this._cfg.getAccessToken === "function" ? await this._cfg.getAccessToken() : null;
+    if (!token) {
+      try {
+        const { data } = await supabase.auth.getSession();
+        token = data?.session?.access_token || null;
+      } catch {}
+    }
+    if (!token && typeof window !== "undefined") {
+      try {
+        token = window.localStorage?.getItem("token") || null;
+      } catch {}
+    }
     if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
 
     let body = undefined;

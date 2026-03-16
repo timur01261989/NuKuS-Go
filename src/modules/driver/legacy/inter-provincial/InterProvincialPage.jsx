@@ -116,7 +116,7 @@ function TripRow({ trip, onEdit, onDelete, onShowMap }) {
         💰 <b>{priceDisplay}</b> • {trip.seats} o'rin
       </div>
 
-      <div style={{ display: "flex", gap: 8 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <Button size="small" onClick={() => onShowMap(trip)} icon={<EnvironmentOutlined />}>Yo‘l</Button>
         <Button size="small" onClick={() => onEdit(trip)}>Tahrir</Button>
         <Button size="small" danger onClick={() => onDelete(trip)}>O‘chirish</Button>
@@ -605,9 +605,16 @@ export default function InterProvincialPage() {
         </div>
       </div>
 
-      <div style={{ marginTop: 20 }}>
-        <h3>Mening reyslarim</h3>
-        {loadingTrips ? <div style={{textAlign:'center', padding:20}}><Spin /></div> : trips.map(t => (
+      <div style={{ marginTop: 24, background: "#fff", borderRadius: 16, border: "1px solid rgba(15, 23, 42, 0.08)", padding: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+          <h3 style={{ margin: 0, fontSize: 18, lineHeight: 1.25 }}>Mening reyslarim</h3>
+          <div style={{ fontSize: 12, color: "#64748b" }}>{trips.length} ta faol reys</div>
+        </div>
+        {loadingTrips ? (
+          <div style={{ textAlign: "center", padding: 20 }}><Spin /></div>
+        ) : trips.length === 0 ? (
+          <Empty description="Hali faol reys yoʻq" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+        ) : trips.map((t) => (
           <TripRow key={t.id} trip={t} onEdit={startEdit} onDelete={deleteTrip} onShowMap={showRouteMap} />
         ))}
       </div>

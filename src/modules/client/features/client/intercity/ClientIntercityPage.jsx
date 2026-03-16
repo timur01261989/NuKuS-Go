@@ -357,11 +357,11 @@ export default function ClientIntercityPage() {
   };
 
   return (
-    <div style={{ padding: 16, maxWidth: 820, margin: "0 auto", paddingBottom: 80 }}>
+    <div className="unigo-page" style={{ padding: 16, maxWidth: 820, margin: "0 auto", paddingBottom: 96 }}>
       <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 16 }}>{t.interProvincial || cp("Viloyatlar aro")}</div>
 
       {/* MAP PREVIEW */}
-      <div style={{ borderRadius: 16, overflow: "hidden", border: "1px solid #eee", marginBottom: 16, boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
+      <div className="unigo-map-card" style={{ overflow: "hidden", marginBottom: 16 }}>
         <div style={{ height: 200, position: "relative" }}>
           <MapContainer
             center={fromLL || toLL || [41.31, 69.24]}
@@ -395,7 +395,7 @@ export default function ClientIntercityPage() {
         />
         
         {/* PICKUP TOGGLE */}
-        <div style={{ background: "#f5f5f5", padding: 10, borderRadius: 12 }}>
+        <div className="unigo-form-card" style={{ padding: 12 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: pickupMode === 'address' ? 10 : 0 }}>
             <span style={{ fontSize: 13, fontWeight: 600 }}>{cp("Manzildan olib ketish") || "Manzildan olib ketish"}</span>
             <Switch 
@@ -441,7 +441,7 @@ export default function ClientIntercityPage() {
         />
 
         {/* FILTERS */}
-        <div style={{ background: "#fff", padding: 12, borderRadius: 12, border: "1px solid #eee" }}>
+        <div className="unigo-form-card" style={{ padding: 14 }}>
           <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, opacity: 0.7 }}>{t.transportAndComfort || cp("Transport va qulayliklar")}</div>
           
           <Segmented 

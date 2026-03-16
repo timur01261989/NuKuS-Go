@@ -209,6 +209,10 @@ const Register = memo(function Register() {
     const otpResponse = await sendSignupOtp({
       phone: fullPhone,
       purpose: 'signup',
+      firstName: String(nextName || '').trim(),
+      lastName: String(nextSurname || '').trim(),
+      password: nextPassword,
+      referralCode: normalizedReferralCode || '',
     });
 
     setFormData({
@@ -365,10 +369,7 @@ const Register = memo(function Register() {
         phone_verified_at: registrationTime,
         role: 'client',
         current_role: 'client',
-        is_test_user: false,
-        created_at: registrationTime,
         updated_at: registrationTime,
-        last_login: registrationTime,
       }, { onConflict: 'id' });
       if (profileError) throw profileError;
 

@@ -394,6 +394,12 @@ export default function DriverHome({ onLogout }) {
     [canUseService]
   );
 
+  const hasVisibleServices = useMemo(() => Object.values(visibleServices).some(Boolean), [visibleServices]);
+  const resolvedVisibleServices = useMemo(() => {
+    if (hasVisibleServices) return visibleServices;
+    return fallbackVisibleServices;
+  }, [fallbackVisibleServices, hasVisibleServices, visibleServices]);
+
   const content = useMemo(() => {
     if (selectedService === "taxi") return <DriverTaxi onBack={backToMenu} />;
     if (selectedService === "interDist") return <DriverInterDistrict onBack={backToMenu} />;
@@ -494,7 +500,7 @@ export default function DriverHome({ onLogout }) {
 
       <main className="p-4 space-y-6 pb-24">
         <section>
-          {visibleServices.taxi ? (
+          {resolvedVisibleServices.taxi ? (
             <button
               type="button"
               onClick={() => selectService("taxi")}
@@ -517,7 +523,7 @@ export default function DriverHome({ onLogout }) {
         </section>
 
         <section className="grid grid-cols-2 gap-4">
-          {visibleServices.interProv ? (
+          {resolvedVisibleServices.interProv ? (
             <button type="button" onClick={() => selectService("interProv")} className="neumorphic-pop rounded-2xl p-6 flex flex-col items-center text-center gap-4 border border-white/50">
               <div className="w-14 h-14 rounded-2xl bg-orange-100 flex items-center justify-center text-primarySidebar">
                 <span className="material-symbols-outlined text-4xl" data-no-auto-translate="true">map</span>
@@ -526,7 +532,7 @@ export default function DriverHome({ onLogout }) {
             </button>
           ) : null}
 
-          {visibleServices.interDist ? (
+          {resolvedVisibleServices.interDist ? (
             <button type="button" onClick={() => selectService("interDist")} className="neumorphic-pop rounded-2xl p-6 flex flex-col items-center text-center gap-4 border border-white/50">
               <div className="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center text-blue-600">
                 <span className="material-symbols-outlined text-4xl" data-no-auto-translate="true">distance</span>
@@ -535,7 +541,7 @@ export default function DriverHome({ onLogout }) {
             </button>
           ) : null}
 
-          {visibleServices.freight ? (
+          {resolvedVisibleServices.freight ? (
             <button type="button" onClick={() => selectService("freight")} className="neumorphic-pop rounded-2xl p-6 flex flex-col items-center text-center gap-4 border border-white/50">
               <div className="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600">
                 <span className="material-symbols-outlined text-4xl" data-no-auto-translate="true">local_shipping</span>
@@ -544,7 +550,7 @@ export default function DriverHome({ onLogout }) {
             </button>
           ) : null}
 
-          {visibleServices.delivery ? (
+          {resolvedVisibleServices.delivery ? (
             <button type="button" onClick={() => selectService("delivery")} className="neumorphic-pop rounded-2xl p-6 flex flex-col items-center text-center gap-4 border border-white/50">
               <div className="w-14 h-14 rounded-2xl bg-purple-100 flex items-center justify-center text-purple-600">
                 <span className="material-symbols-outlined text-4xl" data-no-auto-translate="true">inventory_2</span>
@@ -553,7 +559,7 @@ export default function DriverHome({ onLogout }) {
             </button>
           ) : null}
 
-          {!visibleServices.taxi && !visibleServices.interProv && !visibleServices.interDist && !visibleServices.freight && !visibleServices.delivery ? (
+          {!resolvedVisibleServices.taxi && !resolvedVisibleServices.interProv && !resolvedVisibleServices.interDist && !resolvedVisibleServices.freight && !resolvedVisibleServices.delivery ? (
             <div className="col-span-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-5 text-amber-900">
               Sozlamalarda kamida bitta xizmatni yoqing. Aktiv mashina bo'lmasa buyurtmalar chiqmaydi.
             </div>
@@ -562,15 +568,15 @@ export default function DriverHome({ onLogout }) {
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-slate-200 px-6 py-2 flex justify-around items-center z-50">
-        <button type="button" onClick={() => { backToMenu(); navigate("/driver/dashboard"); }} className="flex flex-col items-center gap-1 text-primarySidebar">
+        <button type="button" onClick={() => { backToMenu(); navigate("/driver"); }} className="flex flex-col items-center gap-1 text-primarySidebar">
           <span className="material-symbols-outlined" data-no-auto-translate="true">home</span>
           <span className="text-[10px] font-bold">{tr("home", "Asosiy")}</span>
         </button>
         <button type="button" onClick={() => navigate("/driver/orders")} className="flex flex-col items-center gap-1 text-slate-400">
           <span className="material-symbols-outlined" data-no-auto-translate="true">history</span>
-          <span className="text-[10px] font-medium">{tr("orderHistoryDriver", tr("orders", "Buyurtmalar tarixi"))}</span>
+          <span className="text-[10px] font-medium">{tr("orderHistoryDriver", tr("orders", "Buyurtmalar"))}</span>
         </button>
-        <button type="button" onClick={() => navigate("/settings")} className="flex flex-col items-center gap-1 text-slate-400">
+        <button type="button" onClick={() => navigate("/driver/settings")} className="flex flex-col items-center gap-1 text-slate-400">
           <span className="material-symbols-outlined" data-no-auto-translate="true">settings</span>
           <span className="text-[10px] font-medium">{tr("settingsTitle", "Sozlamalar")}</span>
         </button>
@@ -592,10 +598,14 @@ export default function DriverHome({ onLogout }) {
     </div>
   );
 
+  const mainView = serviceContent ? serviceContent : menuUi;
+
   return (
     <div style={{ minHeight: "100vh" }}>
-      {serviceContent ? serviceContent : menuUi}
-      <RadarMiniOverlay online={driveAssistantEnabled} speedKmh={speedKmh} radar={nearestRadar} severity={radarSeverity} />
+      {mainView}
+      {!profileOpen ? (
+        <RadarMiniOverlay online={driveAssistantEnabled} speedKmh={speedKmh} radar={nearestRadar} severity={radarSeverity} />
+      ) : null}
     </div>
   );
 }

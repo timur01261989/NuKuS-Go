@@ -1,24 +1,6 @@
-// api/auth.js
-// Combined auth: OTP request + OTP verify
-
 import crypto from 'crypto';
 import { json, badRequest, nowIso, uid, isPhone } from '../_shared/cors.js';
-
-
-export async function auth_otp_request_handler(req, res) {
-  if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Method not allowed' });
-
-  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-  const phone = String(body.phone || '').trim();
-
-  if (!isPhone(phone)) return badRequest(res, 'Telefon raqam noto\'g\'ri', { field:'phone' });
-
-  // DEMO: return fixed OTP and session id
-  const session_id = uid('otp');
-  const otp_code = '1111'; // demo only
-  return json(res, 200, { ok:true, session_id, otp_code, sent_at: nowIso() });
-}
-
+import { getServerEnv } from '../_shared/env.js';
 
 function sign(payload, secret) {
   const data = JSON.stringify(payload);
@@ -26,47 +8,67 @@ function sign(payload, secret) {
   return Buffer.from(data).toString('base64url') + '.' + sig;
 }
 
+function legacyDisabled(res) {
+  return json(res, 410, {
+    ok: false,
+    error: 'Legacy auth disabled',
+    code: 'LEGACY_AUTH_DISABLED',
+  });
+}
+
+export async function auth_otp_request_handler(req, res) {
+  if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Method not allowed' });
+  const env = getServerEnv();
+  if (!env.LEGACY_AUTH_ENABLED || env.NODE_ENV === 'production') {
+    return legacyDisabled(res);
+  }
+
+  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+  const phone = String(body.phone || '').trim();
+
+  if (!isPhone(phone)) return badRequest(res, 'Telefon raqam noto\'g\'ri', { field:'phone' });
+
+  const session_id = uid('otp');
+  const otp_code = '1111';
+  return json(res, 200, {
+    ok:true,
+    legacy:true,
+    session_id,
+    otp_code,
+    sent_at: nowIso(),
+    warning: 'Legacy demo auth faqat development uchun yoqilgan',
+  });
+}
+
 export async function auth_otp_verify_handler(req, res) {
   if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Method not allowed' });
+  const env = getServerEnv();
+  if (!env.LEGACY_AUTH_ENABLED || env.NODE_ENV === 'production') {
+    return legacyDisabled(res);
+  }
 
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
   const { session_id, otp_code, phone } = body;
 
   if (!session_id) return badRequest(res, 'session_id kerak');
   if (String(otp_code||'') !== '1111') return badRequest(res, 'OTP noto\'g\'ri');
+  if (!env.AUTH_SECRET) return json(res, 500, { ok:false, error:'AUTH_SECRET missing', code:'AUTH_SECRET_MISSING' });
 
-  const secret = process.env.AUTH_SECRET || 'dev-secret-change-me';
   const user = { id: uid('u'), phone: String(phone||'').trim(), created_at: nowIso() };
-  const token = sign({ user, exp: Date.now() + 1000*60*60*24 }, secret); // 24h
+  const token = sign({ user, exp: Date.now() + 1000*60*60*24 }, env.AUTH_SECRET);
 
-  return json(res, 200, { ok:true, token, user });
+  return json(res, 200, {
+    ok:true,
+    legacy:true,
+    token,
+    user,
+    warning: 'Legacy demo auth faqat development uchun yoqilgan',
+  });
 }
 
-export default async function auth(req, res, routeKey = 'auth') {
-  // Backward compatible route keys:
-  // - auth-otp-request
-  // - auth-otp-verify
-  // New consolidated key:
-  // - auth  (action via query/body)
-  const url = new URL(req.url, 'http://localhost');
-  const action = url.searchParams.get('action') || (typeof req.body === 'object' && req.body?.action) || (typeof req.body === 'string' ? (()=>{try{return JSON.parse(req.body||'{}').action}catch{return null}})() : null);
-
-  switch (routeKey) {
-    case 'auth-otp-request':
-      return await auth_otp_request_handler(req, res);
-    case 'auth-otp-verify':
-      return await auth_otp_verify_handler(req, res);
-    case 'auth':
-    default:
-      if (action === 'otp-request') return await auth_otp_request_handler(req, res);
-      if (action === 'otp-verify') return await auth_otp_verify_handler(req, res);
-      // default: if client calls /api/auth without action, infer by body fields
-      try {
-        const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-        if (body.code) return await auth_otp_verify_handler(req, res);
-        return await auth_otp_request_handler(req, res);
-      } catch {
-        return await auth_otp_request_handler(req, res);
-      }
-  }
+export default async function handler(req, res) {
+  const action = String(req.query?.action || req.body?.action || '').trim().toLowerCase();
+  if (action === 'otp-request') return auth_otp_request_handler(req, res);
+  if (action === 'otp-verify') return auth_otp_verify_handler(req, res);
+  return legacyDisabled(res);
 }

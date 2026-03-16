@@ -43,14 +43,14 @@ export default function DriverSidebar({ open, onClose, onLogout }) {
 
           <div className="px-4 pb-4 flex-1 overflow-auto">
             <div className="space-y-3">
-              <MenuItem icon="person" title={passengerTitle} onClick={() => go("/client/home")} />
+              <MenuItem icon="person" title={passengerTitle} onClick={() => go("/")} />
               <MenuItem icon="history" title={t.orderHistoryDriver || t.orders} onClick={() => go("/driver/orders")} />
               <MenuItem icon="account_balance_wallet" title={t.wallet} onClick={() => go("/driver/wallet")} />
               <MenuItem icon="share" title={t.shareReferral || "Do'stlarni taklif qilish"} onClick={() => go("/driver/referral")} />
-              <MenuItem icon="settings" title={t.settingsTitle || t.settings || "Sozlamalar"} onClick={() => go("/settings")} />
+              <MenuItem icon="settings" title={t.settingsTitle || t.settings || "Sozlamalar"} onClick={() => go("/driver/settings")} />
               <MenuItem icon="tune" title={t.driverSettingsTitle || "Haydovchi sozlamalari"} onClick={() => go("/driver/settings?tab=services")} />
               <MenuItem icon="directions_car" title={t.driverVehicleManagement || "Mashinalar"} onClick={() => go("/driver/settings?tab=vehicles")} />
-              <MenuItem icon="insights" title={t.insights || "Insights"} onClick={() => go("/driver/insights")} />
+              <MenuItem icon="insights" title={t.insights || "Analitika"} onClick={() => go("/driver/insights")} />
             </div>
           </div>
 
@@ -64,7 +64,7 @@ export default function DriverSidebar({ open, onClose, onLogout }) {
             </button>
             <div className="mt-4 text-center">
               <div className="text-sm font-extrabold text-slate-800">{t.appName}</div>
-              <div className="text-xs text-slate-500">UniGo</div>
+              <div className="text-xs text-slate-500">Haydovchi paneli</div>
             </div>
           </div>
         </div>

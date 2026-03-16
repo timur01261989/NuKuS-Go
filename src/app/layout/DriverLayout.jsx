@@ -6,7 +6,7 @@ function DriverLayoutComponent() {
 
   const layoutClassName = useMemo(() => {
     const normalizedPath = location.pathname.replace(/^\//, "").replace(/\//g, "-") || "driver";
-    return `unigo-layout unigo-layout-driver route-${normalizedPath}`;
+    return `unigo-layout unigo-layout-driver unigo-mobile-app route-${normalizedPath}`;
   }, [location.pathname]);
 
   return (

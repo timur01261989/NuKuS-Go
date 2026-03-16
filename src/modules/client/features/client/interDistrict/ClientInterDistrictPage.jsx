@@ -413,7 +413,7 @@ function Inner({ onBack }) {
 export default function ClientInterDistrictPage(props) {
   return (
     <DistrictProvider>
-      <Inner {...props} />
+      <div className="unigo-page"><Inner {...props} /></div>
     </DistrictProvider>
   );
 }

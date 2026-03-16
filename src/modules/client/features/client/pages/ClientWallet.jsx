@@ -1,61 +1,96 @@
-import React, { memo, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/modules/shared/auth/AuthProvider.jsx';
-import { getOwnReferralSnapshot } from '@/services/referralLinkService.js';
-import { UnigoBottomNav, UnigoButton, UnigoCard, UnigoEmptyState, UnigoHeader, UnigoListRow, UnigoScreen, UnigoSection } from '@/modules/shared/ui/UnigoMobileUI.jsx';
+import React, { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/services/supabase/supabaseClient";
+import { demoTopup, getWalletBalance } from "@/services/walletApi";
+import { useClientText, formatClientMoney } from "../shared/i18n_clientLocalize";
 
-function formatMoney(value) {
-  const amount = Number(value || 0);
-  return `${amount.toLocaleString('uz-UZ')} so‘m`;
-}
-
-function ClientWallet() {
+export default function ClientWallet() {
   const navigate = useNavigate();
-  const auth = useAuth();
-  const snapshot = auth?.referralSnapshot || getOwnReferralSnapshot() || null;
-  const wallet = snapshot?.wallet || null;
-  const navItems = useMemo(() => ([
-    { to: '/', icon: 'home', label: 'Asosiy' },
-    { to: '/orders', icon: 'receipt_long', label: 'Buyurtmalar' },
-    { to: '/wallet', icon: 'account_balance_wallet', label: 'Hamyon', active: true },
-    { to: '/profile', icon: 'person', label: 'Profil' },
-  ]), []);
+  const { cp, language } = useClientText();
+  const [loading, setLoading] = useState(true);
+  const [balance, setBalance] = useState(null);
+  const [err, setErr] = useState("");
+
+  const load = useCallback(async () => {
+    setErr("");
+    setLoading(true);
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      const user = u?.user;
+      if (!user) {
+        navigate("/login", { replace: true });
+        return;
+      }
+      const j = await getWalletBalance(user.id);
+      setBalance(typeof j?.balance_uzs === "number" ? j.balance_uzs : 0);
+    } catch (e) {
+      setErr(String(e?.message || e || cp("Xatolik")));
+    } finally {
+      setLoading(false);
+    }
+  }, [cp, navigate]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const topup = useCallback(async () => {
+    setErr("");
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      const user = u?.user;
+      if (!user) return;
+      await demoTopup(user.id, 10000);
+      await load();
+    } catch (e) {
+      setErr(String(e?.message || e || cp("Xatolik")));
+    }
+  }, [cp, load]);
 
   return (
-    <UnigoScreen>
-      <UnigoHeader back="/" title="Hamyon" subtitle="Balans, to‘ldirish va tranzaksiyalar" rightActions={[{ icon: 'history', label: 'Tarix', onClick: () => navigate('/orders') }]} />
-      <UnigoCard>
-        <div className="unigo-card__stack">
-          <span className="unigo-pill unigo-pill--orange">Joriy balans</span>
-          <h2 className="unigo-card-title" style={{ fontSize: 30 }}>{formatMoney(wallet?.balance_uzs || 0)}</h2>
-          <p className="unigo-card-caption">To‘lovlar va bonuslar shu hisobda jamlanadi.</p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            <span className="unigo-pill unigo-pill--info">Bonus: {formatMoney(wallet?.bonus_balance_uzs || 0)}</span>
-            <span className="unigo-pill unigo-pill--warning">Band summa: {formatMoney(wallet?.reserved_uzs || 0)}</span>
-          </div>
+    <div className="unigo-page pb-8">
+      <header className="unigo-topbar px-4 py-4">
+        <div className="mx-auto flex max-w-2xl items-center gap-3">
+          <button type="button" className="unigo-soft-card flex h-11 w-11 items-center justify-center p-0" onClick={() => navigate('/client/home')}>
+            <span className="material-symbols-outlined">arrow_back</span>
+          </button>
+          <h1 className="text-lg font-black text-slate-900">{cp("Hamyon", "wallet")}</h1>
         </div>
-      </UnigoCard>
-      <div className="unigo-buttons" style={{ marginTop: 20 }}>
-        <UnigoButton icon="add_card">Pul qo‘shish</UnigoButton>
-        <UnigoButton variant="secondary" icon="sync">Balansni yangilash</UnigoButton>
-      </div>
-      <UnigoSection title="Hamyon holati">
-        {wallet ? (
-          <div className="unigo-list">
-            <UnigoListRow icon="south_west" title="Kiritilgan mablag‘" description="Jami tushum" value={formatMoney(wallet?.total_topup_uzs || 0)} />
-            <UnigoListRow icon="north_east" title="Sarflangan mablag‘" description="Jami to‘lovlar" value={formatMoney(wallet?.total_spent_uzs || 0)} />
-            <UnigoListRow icon="savings" title="Jami bonus va daromad" description="Mukofot va bonuslar" value={formatMoney(wallet?.total_earned_uzs || 0)} />
+      </header>
+
+      <main className="mx-auto max-w-2xl space-y-5 px-4 pt-5">
+        <section className="unigo-dark-card p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-400">Joriy balans</div>
+              <div className="mt-3 text-3xl font-black text-white">{loading ? '…' : formatClientMoney(language, balance)}</div>
+              <div className="mt-2 text-sm text-slate-300">To‘lovlar va bonuslar shu hisobda yuritiladi</div>
+            </div>
+            <div className="flex h-14 w-14 items-center justify-center rounded-[20px] bg-white/10 text-white">
+              <span className="material-symbols-outlined">account_balance_wallet</span>
+            </div>
           </div>
-        ) : (
-          <UnigoEmptyState title="Hamyon ma’lumoti hali tayyor emas" description="Balans ma’lumotlari yuklangach bu yerda ko‘rinadi." />
-        )}
-      </UnigoSection>
-      <UnigoSection>
-        <UnigoEmptyState title="Hozircha tranzaksiya yo‘q" description="Pul qo‘shish yoki to‘lov qilganingizdan keyin tarix shu yerda chiqadi." />
-      </UnigoSection>
-      <UnigoBottomNav items={navItems} />
-    </UnigoScreen>
+        </section>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <button type="button" className="unigo-primary-btn min-h-[54px] px-5" onClick={topup}>Pul qo‘shish</button>
+          <button type="button" className="unigo-secondary-btn min-h-[54px] px-5" onClick={load}>Balansni yangilash</button>
+        </div>
+
+        {err ? (
+          <section className="rounded-[22px] border border-red-100 bg-red-50 p-4 text-sm font-medium text-red-500">{err}</section>
+        ) : null}
+
+        <section className="unigo-soft-card p-5">
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-[#EAF2FF] text-[#2F6BFF]">
+              <span className="material-symbols-outlined">info</span>
+            </div>
+            <div>
+              <div className="text-base font-black text-slate-900">Hozircha tranzaksiyalar yo‘q</div>
+              <div className="mt-1 text-sm leading-6 text-slate-500">Balansga pul qo‘shganingizdan yoki bonus olganingizdan keyin tarix shu yerda ko‘rinadi.</div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
   );
 }
-
-export default memo(ClientWallet);

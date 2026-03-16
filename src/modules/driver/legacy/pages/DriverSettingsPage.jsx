@@ -727,8 +727,8 @@ export default function DriverSettingsPage({ forceTab = null }) {
             <Alert
               type="info"
               showIcon
-              message="Driver registratsiyada tanlangan xizmatlarni shu yerda yoqib/o'chira oladi"
-              description="Bu o'zgarishlar user_id bo'yicha saqlanadi. Mashina turi va sig'imi esa faqat admin tasdig'i bilan o'zgaradi."
+              message="Roʻyxatdan oʻtishda tanlangan xizmatlarni shu yerda boshqarasiz"
+              description="Xizmat holati darhol saqlanadi. Mashina turi va sigʻimi boʻyicha soʻrovlar tasdiqlangach yangilanadi."
               style={{ borderRadius: 16 }}
             />
             <ServiceTypesEditor value={serviceTypes} onChange={setServiceTypes} />
@@ -753,8 +753,8 @@ export default function DriverSettingsPage({ forceTab = null }) {
             <Alert
               type="warning"
               showIcon
-              message="Mashina turi, sig'imi va yangi mashina qo'shish admin tasdig'i bilan ishlaydi"
-              description="Haydovchi yangi mashina qo'shishi yoki o'zgartirish so'rovi yuborishi mumkin. Buyurtmalar aktiv mashina bo'yicha filter qilinadi."
+              message="Mashina maʼlumotlari bo‘yicha yuborilgan so‘rov tasdiqlangach kuchga kiradi"
+              description="Yangi mashina qoʻshishingiz yoki o‘zgartirish yuborishingiz mumkin. Buyurtmalar faqat aktiv mashina bo‘yicha chiqadi."
               style={{ borderRadius: 16 }}
             />
 
@@ -870,13 +870,13 @@ export default function DriverSettingsPage({ forceTab = null }) {
     >
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-          <PageBackButton fallback="/driver/dashboard" />
+          <PageBackButton fallback="/driver" />
           <div>
             <Title level={3} style={{ margin: 0, color: "#f8fafc" }}>
               Haydovchi sozlamalari
             </Title>
             <Text style={{ color: "#94a3b8" }}>
-              Xizmat turlari user_id bo'yicha saqlanadi. Mashina o'zgarishlari admin tasdiqlagandan keyin aktiv bo'ladi.
+              Xizmatlar shu sahifada boshqariladi. Mashina bo‘yicha yuborilgan so‘rov tasdiqlangach aktiv bo‘ladi.
             </Text>
           </div>
         </div>

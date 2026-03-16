@@ -1,13 +1,31 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { message } from 'antd';
 import { useLanguage } from '@/modules/shared/i18n/useLanguage.js';
-import { getLocalizedLanguages, getLocalizedLanguageLabel } from '@/modules/shared/i18n/languages.js';
+import { getLocalizedLanguages } from '@/modules/shared/i18n/languages.js';
 import { supabase } from '@/services/supabase/supabaseClient';
 import { useAppMode } from '@/app/providers/AppModeProvider';
 
+function normalizePhoneInput(value) {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 9);
+  let out = digits;
+  if (digits.length > 2) out = `${digits.slice(0, 2)} ${digits.slice(2)}`;
+  if (digits.length > 5) out = `${out.slice(0, 6)} ${digits.slice(5)}`;
+  if (digits.length > 7) out = `${out.slice(0, 9)} ${digits.slice(7)}`;
+  return out;
+}
+
+function formatUzPhone(rawPhone) {
+  let digits = String(rawPhone || '').replace(/\D/g, '');
+  if (digits.length === 9) digits = `998${digits}`;
+  if (!digits.startsWith('998')) digits = `998${digits}`;
+  digits = digits.slice(0, 12);
+  return `+${digits}`;
+}
+
 export default function Auth() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(false);
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -15,7 +33,7 @@ export default function Auth() {
   const [showPassword, setShowPassword] = useState(false);
 
   const { langKey, setLanguage, t } = useLanguage();
-  const localizedLanguages = React.useMemo(() => getLocalizedLanguages(langKey), [langKey]);
+  const localizedLanguages = useMemo(() => getLocalizedLanguages(langKey), [langKey]);
   const { appMode } = useAppMode();
 
   useEffect(() => {
@@ -24,28 +42,28 @@ export default function Auth() {
       const { data } = await supabase.auth.getSession();
       if (data?.session) navigate('/', { replace: true });
     };
-    checkSession();
+    void checkSession();
   }, [navigate]);
 
-  const formatUzPhone = (rawPhone) => {
-    let digits = String(rawPhone || '').replace(/\D/g, '');
-    if (digits.length === 9) digits = '998' + digits;
-    if (!digits.startsWith('998')) digits = '998' + digits;
-    digits = digits.slice(0, 12);
-    return '+' + digits;
-  };
+  useEffect(() => {
+    try {
+      const suggestedPhone = location.state?.suggestedPhone;
+      if (suggestedPhone) {
+        setPhone(normalizePhoneInput(suggestedPhone));
+        return;
+      }
 
-  const normalizePhoneInput = (value) => {
-    const digits = String(value || '').replace(/\D/g, '').slice(0, 9);
-    let out = digits;
-    if (digits.length > 2) out = `${digits.slice(0, 2)} ${digits.slice(2)}`;
-    if (digits.length > 5) out = `${out.slice(0, 6)} ${digits.slice(5)}`;
-    if (digits.length > 7) out = `${out.slice(0, 9)} ${digits.slice(7)}`;
-    return out;
-  };
+      const last = localStorage.getItem('last_phone');
+      if (last && !phone) {
+        setPhone(normalizePhoneInput(last));
+      }
+    } catch {
+      // ignore local storage failures
+    }
+  }, [location.state, phone]);
 
-  const onSubmit = async (e) => {
-    e.preventDefault();
+  const onSubmit = async (event) => {
+    event.preventDefault();
     if (loading) return;
 
     const digits = phone.replace(/\D/g, '');
@@ -65,27 +83,36 @@ export default function Auth() {
       if (error) throw error;
 
       try {
-        const { data: u } = await supabase.auth.getUser();
-        const user = u?.user;
+        const { data: userPayload } = await supabase.auth.getUser();
+        const user = userPayload?.user;
         if (user?.id) {
           const nowIso = new Date().toISOString();
           await supabase.from('profiles').upsert([
             {
               id: user.id,
               phone: user.phone || fullPhone,
-              phone_e164: user.phone || fullPhone,
+              phone_normalized: user.phone || fullPhone,
+              phone_verified: true,
               phone_verified_at: nowIso,
               last_login: nowIso,
+              updated_at: nowIso,
             },
           ]);
         }
-      } catch {}
+      } catch {
+        // login itself succeeded, profile sync is best-effort
+      }
 
       message.success(t.welcome);
       try {
-        if (remember) localStorage.setItem('last_phone', digits);
-        else localStorage.removeItem('last_phone');
-      } catch {}
+        if (remember) {
+          localStorage.setItem('last_phone', digits);
+        } else {
+          localStorage.removeItem('last_phone');
+        }
+      } catch {
+        // ignore local storage failures
+      }
 
       navigate('/', { replace: true, state: { appMode } });
     } catch {
@@ -94,14 +121,6 @@ export default function Auth() {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    try {
-      const last = localStorage.getItem('last_phone');
-      if (last && !phone) setPhone(normalizePhoneInput(last));
-    } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-100 to-blue-100 p-4 font-sans">
@@ -133,7 +152,7 @@ export default function Auth() {
                   required
                   placeholder={t.phonePlaceholder}
                   value={phone}
-                  onChange={(e) => setPhone(normalizePhoneInput(e.target.value))}
+                  onChange={(event) => setPhone(normalizePhoneInput(event.target.value))}
                   className="w-full pl-16 pr-4 py-3.5 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-unigo-accent transition-all text-gray-700"
                   inputMode="numeric"
                 />
@@ -152,12 +171,12 @@ export default function Auth() {
                   placeholder="••••••••"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(event) => setPassword(event.target.value)}
                   className="w-full px-4 py-3.5 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-unigo-accent transition-all text-gray-700"
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword((s) => !s)}
+                  onClick={() => setShowPassword((current) => !current)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-unigo-accent"
                   aria-label="Toggle password visibility"
                 >
@@ -175,7 +194,7 @@ export default function Auth() {
                   className="rounded border-gray-300 text-unigo-accent focus:ring-unigo-accent w-4 h-4"
                   type="checkbox"
                   checked={remember}
-                  onChange={(e) => setRemember(e.target.checked)}
+                  onChange={(event) => setRemember(event.target.checked)}
                 />
                 <span className="ml-2 text-gray-600 group-hover:text-gray-800">{t.remember}</span>
               </label>
@@ -211,17 +230,17 @@ export default function Auth() {
             <select
               key={langKey}
               value={langKey}
-              onChange={(e) => {
-                const nextLang = e.target.value;
+              onChange={(event) => {
+                const nextLang = event.target.value;
                 setLanguage(nextLang);
-                setTimeout(() => message.success(getLocalizedLanguages(nextLang).find((x) => x.key === nextLang)?.label || t.languageChanged), 0);
+                setTimeout(() => message.success(getLocalizedLanguages(nextLang).find((item) => item.key === nextLang)?.label || t.languageChanged), 0);
               }}
               className="bg-transparent text-xs font-bold text-gray-500 outline-none cursor-pointer"
               aria-label={t.language}
             >
-              {localizedLanguages.map((l) => (
-                <option key={l.key} value={l.key}>
-                  {l.label}
+              {localizedLanguages.map((languageItem) => (
+                <option key={languageItem.key} value={languageItem.key}>
+                  {languageItem.label}
                 </option>
               ))}
             </select>

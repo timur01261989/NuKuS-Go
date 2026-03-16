@@ -82,7 +82,7 @@ function DriverProfile({ onBack, onLogout }) {
       });
     } catch (error) {
       console.error("DriverProfile fetchProfileData error:", error);
-      message.error(error?.message || "Driver profile yuklanmadi");
+      message.error(error?.message || "Profil maʼlumotlari yuklanmadi");
       setDriverData(null);
       setStats({ total_trips: 0, rating: 5.0 });
     } finally {
@@ -119,10 +119,10 @@ function DriverProfile({ onBack, onLogout }) {
   }
 
   return (
-    <div style={{ padding: "20px", background: "#f8f9fa", minHeight: "100vh" }}>
+    <div style={{ padding: "20px", background: "#eef6ff", minHeight: "100vh" }}>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={onBack} shape="circle" style={{ border: "none" }} />
-        <Title level={4} style={{ margin: 0, fontFamily: "YangoHeadline" }}>
+        <Title level={4} style={{ margin: 0, fontFamily: "Inter, system-ui, sans-serif" }}>
           {cp("Profil")}
         </Title>
         <Button icon={<SettingOutlined />} shape="circle" onClick={() => navigate("/driver/settings?tab=services")} />
@@ -143,7 +143,7 @@ function DriverProfile({ onBack, onLogout }) {
             shape="circle"
             size="small"
             icon={<CameraOutlined />}
-            style={{ position: "absolute", bottom: 5, right: 5, background: "#FFD700", border: "none" }}
+            style={{ position: "absolute", bottom: 5, right: 5, background: "#ff8a00", border: "none", color: "#fff" }}
           />
         </div>
         <Title level={3} style={{ marginTop: 15, marginBottom: 5 }}>
