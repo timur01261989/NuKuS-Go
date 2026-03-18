@@ -11,7 +11,7 @@ export { default as chatAttachMedia } from "./support/chat-attach-media.png";
 export { default as chatAttachRide } from "./support/chat-attach-ride.png";
 export { default as chatAttach } from "./support/chat-attach.png";
 export { default as chatJumpLatest } from "./support/chat-jump-latest.png";
-export { default as commUserFill } from "./support/comm-user-fill.svg";
+export { default as supportCommUserFill } from "./support/comm-user-fill.svg"; // ← RENAMED: was commUserFill (duplicate)
 export { default as supportBugDark } from "./support/support-bug-dark.svg";
 export { default as supportBugLight } from "./support/support-bug-light.svg";
 export { default as supportMain } from "./support/support-main.svg";
@@ -57,7 +57,7 @@ export { default as commEdited } from "./core/comm-edited.svg";
 export { default as commRead } from "./core/comm-read.svg";
 export { default as commSent } from "./core/comm-sent.svg";
 export { default as commTime } from "./core/comm-time.svg";
-export { default as commUserFill } from "./core/comm-user-fill.svg";
+export { default as commUserFill } from "./core/comm-user-fill.svg"; // ← PRIMARY: core versiyasi saqlanadi
 export { default as commViews } from "./core/comm-views.svg";
 export { default as coreStar } from "./core/core-star.svg";
 export { default as navAuto } from "./core/nav-auto.svg";
@@ -71,6 +71,7 @@ export const authAssets = {
   authRewardBadge,
   authUserpic
 };
+
 export const supportAssets = {
   chatAttachCamera,
   chatAttachCard,
@@ -80,7 +81,7 @@ export const supportAssets = {
   chatAttachRide,
   chatAttach,
   chatJumpLatest,
-  commUserFill,
+  supportCommUserFill, // ← UPDATED: yangi nom bilan
   supportBugDark,
   supportBugLight,
   supportMain,
@@ -88,6 +89,7 @@ export const supportAssets = {
   supportReports,
   supportVideoReport
 };
+
 export const financeAssets = {
   financeAdvanceDone,
   financeCardProFill,
@@ -102,6 +104,7 @@ export const financeAssets = {
   financeWithdrawPro,
   financeWithdraw
 };
+
 export const loyaltyAssets = {
   debtWarning,
   loyaltyRewardBadge,
@@ -116,6 +119,7 @@ export const loyaltyAssets = {
   tierPlatinum,
   tierSilver
 };
+
 export const autoAssets = {
   serviceGarageBlack,
   serviceGarageCircleDay,
@@ -128,13 +132,14 @@ export const autoAssets = {
   serviceWagonFill,
   serviceWagonOutline
 };
+
 export const coreAssets = {
   commBell,
   commEdited,
   commRead,
   commSent,
   commTime,
-  commUserFill,
+  commUserFill, // ← core versiyasi (to'g'ri)
   commViews,
   coreStar,
   navAuto,
