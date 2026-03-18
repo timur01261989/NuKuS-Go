@@ -85,8 +85,6 @@ export function useTaxiOrderCore() {
     setEtaMin,
     etaUpdatedAt,
     setEtaUpdatedAt,
-    etaUpdatedAt,
-    setEtaUpdatedAt,
   } = orderState;
 
   // Order extras
