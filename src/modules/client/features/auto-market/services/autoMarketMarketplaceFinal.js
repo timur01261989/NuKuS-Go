@@ -39,8 +39,8 @@ export function buildDealerReviews(seller = {}) {
     count: Number(seller.reviewCount || 138),
     highlights: [
       { key: "response", title: "Javob tezligi", value: seller.responseSpeed || "12 daqiqa" },
-      { key: "completion", title: "Uchrashuv bajarilishi", value: `${seller.completionRate || 94}%` },
-      { key: "repeat", title: "Qayta xaridorlar", value: `${seller.repeatBuyers || 28}%` },
+      { key: "completion", title: "Uchrashuv bajarilishi", value: ${seller.completionRate || 94}% },
+      { key: "repeat", title: "Qayta xaridorlar", value: ${seller.repeatBuyers || 28}% },
     ],
     reviews,
   };
@@ -54,7 +54,7 @@ export function buildDealerTrustProfile(seller = {}) {
   const bookingSummary = buildBookingEventSummary(listBookingEvents().filter((item) => String(item.sellerId) === String(seller.id || "seller-main")));
   const reviews = buildDealerReviews(seller);
   return {
-    sellerName: seller.name || seller.seller_name || "Verified showroom",
+    sellerName: seller.name  seller.seller_name  "Verified showroom",
     trust,
     response,
     sold,
@@ -104,10 +104,10 @@ export function buildFinanceCalculator(car = {}, options = {}) {
       { key: "monthly", title: "Oyma-oy", value: formatCurrency(Math.round(monthlyPayment)) },
       { key: "total", title: "Umumiy to‘lov", value: formatCurrency(total) },
     ],
-    durations: [12, 18, 24, 36].map((item) => ({ key: String(item), title: `${item} oy`, selected: item === duration })),
+    durations: [12, 18, 24, 36].map((item) => ({ key: String(item), title: ${item} oy, selected: item === duration })),
     downPaymentOptions: [0.2, 0.25, 0.3, 0.4].map((share) => {
       const amount = Math.round(price * share);
-      return { key: String(share), title: `${Math.round(share * 100)}%`, amount: formatCurrency(amount), selected: amount === downPayment };
+      return { key: String(share), title: ${Math.round(share * 100)}%, amount: formatCurrency(amount), selected: amount === downPayment };
     }),
   };
 }
@@ -126,7 +126,7 @@ export function buildFinanceOffers(car = {}) {
       monthly: formatCurrency(Math.round((price - baseDown) / 18 || 0)),
       duration: "18 oy",
       note: "Tezkor oldindan tasdiq va local checkout.",
-      route: `/auto-market/booking/${car?.id || "preview"}/checkout`,
+      route: /auto-market/booking/${car?.id || "preview"}/checkout,
       tone: "#1d4ed8",
     },
     {
@@ -136,7 +136,7 @@ export function buildFinanceOffers(car = {}) {
       monthly: formatCurrency(Math.round((price - baseDown * 1.1) / 12 || 0)),
       duration: "12 oy",
       note: "Bron, ko‘rik va premium xizmatlar bilan bog‘lanadi.",
-      route: `/auto-market/booking/${car?.id || "preview"}/checkout`,
+      route: /auto-market/booking/${car?.id || "preview"}/checkout,
       tone: "#0f766e",
     },
     {
@@ -146,7 +146,7 @@ export function buildFinanceOffers(car = {}) {
       monthly: formatCurrency(Math.round((price - baseDown * 0.8) / 24 || 0)),
       duration: "24 oy",
       note: "Showroom va ko‘rish to‘lovlari uchun moslashuvchan usul.",
-      route: `/auto-market/booking/${car?.id || "preview"}/checkout`,
+      route: /auto-market/booking/${car?.id || "preview"}/checkout,
       tone: "#7c3aed",
     },
     {
@@ -154,9 +154,9 @@ export function buildFinanceOffers(car = {}) {
       title: "Finance calculator tavsiyasi",
       downPayment: formatCurrency(calculator.downPayment),
       monthly: formatCurrency(calculator.monthlyPayment),
-      duration: `${calculator.duration} oy`,
+      duration: ${calculator.duration} oy,
       note: "Boshlang‘ich to‘lov va muddatni o‘zgartirib eng qulay rejani tanlang.",
-      route: `/auto-market/finance-offers/${car?.id || "preview"}`,
+      route: /auto-market/finance-offers/${car?.id || "preview"},
       tone: "#ef4444",
     },
     ...paymentStats.map((item) => ({
@@ -225,9 +225,9 @@ export function buildAutoMarketNotifications(seed = {}) {
   const rules = buildNotificationRules();
   const items = [
     ...alerts.slice(0, 4).map((item, index) => ({
-      key: `alert-${item.id || index}`,
+      key: alert-${item.id || index},
       title: "Alert faollashgan",
-      text: `${item.label || "Qidiruv"} uchun yangi mos e’lonlarni kuzatish yoqilgan.`,
+      text: ${item.label || "Qidiruv"} uchun yangi mos e’lonlarni kuzatish yoqilgan.,
       tone: "#16a34a",
       route: "/auto-market/saved-alerts",
       category: "alert",
@@ -235,30 +235,30 @@ export function buildAutoMarketNotifications(seed = {}) {
     ...bookings.slice(0, 4).map((item) => ({
       key: item.key,
       title: item.status === "confirmed" ? "Booking tasdiqlandi" : "Booking yangilandi",
-      text: `${item.vehicle} · ${item.appointmentLabel} · ${item.provider.toUpperCase()}.`,
+      text: ${item.vehicle} · ${item.appointmentLabel} · ${item.provider.toUpperCase()}.,
       tone: item.status === "confirmed" ? "#16a34a" : "#f59e0b",
-      route: `/auto-market/booking/${item.adId}/receipt?day=${item.day}&slot=${item.slot}&provider=${item.provider}&service=${item.service}&status=${item.status}`,
+      route: /auto-market/booking/${item.adId}/receipt?day=${item.day}&slot=${item.slot}&provider=${item.provider}&service=${item.service}&status=${item.status},
       category: "booking",
     })),
     ...payments.slice(0, 4).map((item) => ({
       key: item.key,
       title: item.status === "paid" || item.status === "confirmed" ? "To‘lov muvaffaqiyatli" : "To‘lov kutilmoqda",
-      text: `${item.vehicle} · ${item.provider.toUpperCase()} orqali ${formatCurrency(item.amount || 0)}.`,
+      text: ${item.vehicle} · ${item.provider.toUpperCase()} orqali ${formatCurrency(item.amount || 0)}.,
       tone: item.status === "paid" || item.status === "confirmed" ? "#16a34a" : "#2563eb",
-      route: `/auto-market/booking/${item.adId}/receipt?provider=${item.provider}&service=${item.service}&status=${item.status}`,
+      route: /auto-market/booking/${item.adId}/receipt?provider=${item.provider}&service=${item.service}&status=${item.status},
       category: "payment",
     })),
     ...searches.slice(0, 2).map((item) => ({
       key: item.id,
       title: "Saqlangan qidiruv tayyor",
-      text: `${item.label} qidiruvini bir bosishda qayta ochish mumkin.`,
+      text: ${item.label} qidiruvini bir bosishda qayta ochish mumkin.,
       tone: "#7c3aed",
       route: "/auto-market/saved-searches",
       category: "search",
     })),
     ...rules.slice(0, 2).map((item) => ({
-      key: `rule-${item.key}`,
-      title: `${item.title} qoidasi`,
+      key: rule-${item.key},
+      title: ${item.title} qoidasi,
       text: item.text,
       tone: "#ef4444",
       route: "/auto-market/notifications/rules",
@@ -272,12 +272,11 @@ export function buildAutoMarketNotifications(seed = {}) {
     { key: "inspection-ready", title: "Ko‘rik tayyor", text: "Inspection report ko‘rishga tayyor bo‘ldi.", tone: "#7c3aed", route: "/auto-market/booking/preview/checkout", category: "inspection" },
   ];
 }
-
-export function buildPriceHistorySummary(car = {}) {
+  export function buildPriceHistorySummary(car = {}) {
   const price = Number(car.price || 0);
   const anchor = price || 100000000;
   const points = [1.06, 1.02, 1, 0.98, 0.96].map((m, idx) => ({
-    key: `p-${idx}`,
+    key: p-${idx},
     label: ["5 oy oldin", "4 oy oldin", "3 oy oldin", "1 oy oldin", "Hozir"][idx],
     value: Math.round(anchor * m),
   }));
@@ -290,8 +289,8 @@ export function buildPriceHistorySummary(car = {}) {
     deltaText: formatCurrency(Math.abs(diff)),
     nextBestActions: [
       { key: "alert", title: "Narx alerti yoqish", route: "/auto-market/saved-alerts" },
-      { key: "finance", title: "Finance offers ko‘rish", route: `/auto-market/finance-offers/${car?.id || "preview"}` },
-      { key: "booking", title: "Ko‘rishga yozilish", route: `/auto-market/booking/${car?.id || "preview"}/checkout` },
+      { key: "finance", title: "Finance offers ko‘rish", route: /auto-market/finance-offers/${car?.id || "preview"} },
+      { key: "booking", title: "Ko‘rishga yozilish", route: /auto-market/booking/${car?.id || "preview"}/checkout },
     ],
   };
 }
