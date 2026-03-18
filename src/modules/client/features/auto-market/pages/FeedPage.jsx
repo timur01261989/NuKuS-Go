@@ -61,7 +61,7 @@ export default function FeedPage() {
 
   const renderItems = () => {
     if (!items?.length && !loading) return (
-      <Card style={{ borderRadius: 22, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 18 }}>
+      <Card style={{ borderRadius: 22, border: "1px solid #e2e8f0" }} styles={{ body: { padding: 18 } }}>
         <Empty description="E'lonlar topilmadi" />
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
           {rescueHints.map((item) => (
@@ -283,33 +283,34 @@ export default function FeedPage() {
       </div>
       <MarketEntryGuide />
 
-<div style={{ padding: "0 16px", marginTop: 14 }}>
-  <Card className="final-marketplace-shortcuts" style={{ borderRadius: 24, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 16 }}>
-    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
-      <div>
-        <div style={{ fontWeight: 900, color: "#0f172a", fontSize: 18 }}>Marketplace center</div>
-        <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>Qidiruvdan tashqari finance, notifications va dealer sahifalariga tez kirish.</div>
+      <div style={{ padding: "0 16px", marginTop: 14 }}>
+        <Card className="final-marketplace-shortcuts" style={{ borderRadius: 24, border: "1px solid #e2e8f0" }} styles={{ body: { padding: 16 } }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
+            <div>
+              <div style={{ fontWeight: 900, color: "#0f172a", fontSize: 18 }}>Marketplace center</div>
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>Qidiruvdan tashqari finance, notifications va dealer sahifalariga tez kirish.</div>
+            </div>
+            <Tag color="purple" style={{ borderRadius: 999, margin: 0 }}>Final layer</Tag>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10, marginTop: 14 }}>
+            {[
+              { key: "alerts", title: "Alerts", text: "Narx, booking va seller javoblari", href: "/auto-market/notifications" },
+              { key: "finance", title: "Finance", text: "Mahalliy to'lov va bo'lib to'lash", href: "/auto-market/finance-offers/showcase" },
+              { key: "dealer", title: "Dealer", text: "Showroom va ishonch profili", href: "/auto-market/dealer/main" },
+            ].map((item) => (
+              <div key={item.key} style={{ borderRadius: 18, padding: 14, border: "1px solid #e2e8f0", background: "#fff" }}>
+                <div style={{ fontWeight: 900, color: "#0f172a" }}>{item.title}</div>
+                <div style={{ fontSize: 12, color: "#475569", marginTop: 6 }}>{item.text}</div>
+                <Button style={{ marginTop: 12 }} onClick={() => nav(item.href)}>Ochish</Button>
+              </div>
+            ))}
+          </div>
+        </Card>
       </div>
-      <Tag color="purple" style={{ borderRadius: 999, margin: 0 }}>Final layer</Tag>
-    </div>
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10, marginTop: 14 }}>
-      {[
-        { key: "alerts", title: "Alerts", text: "Narx, booking va seller javoblari", href: "/auto-market/notifications" },
-        { key: "finance", title: "Finance", text: "Mahalliy to‘lov va bo‘lib to‘lash", href: "/auto-market/finance-offers/showcase" },
-        { key: "dealer", title: "Dealer", text: "Showroom va ishonch profili", href: "/auto-market/dealer/main" },
-      ].map((item) => (
-        <div key={item.key} style={{ borderRadius: 18, padding: 14, border: "1px solid #e2e8f0", background: "#fff" }}>
-          <div style={{ fontWeight: 900, color: "#0f172a" }}>{item.title}</div>
-          <div style={{ fontSize: 12, color: "#475569", marginTop: 6 }}>{item.text}</div>
-          <Button style={{ marginTop: 12 }} onClick={() => nav(item.href)}>Ochish</Button>
-        </div>
-      ))}
-    </div>
-  </Card>
-</div>
 
-      <div style={{ padding: "0 16px", marginTop: 14 }}
-        <Card style={{ borderRadius: 22, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 16 }}>
+      {/* ✅ FIX: 311-qatorda ">" belgisi yo'q edi — qo'shildi */}
+      <div style={{ padding: "0 16px", marginTop: 14 }}>
+        <Card style={{ borderRadius: 22, border: "1px solid #e2e8f0" }} styles={{ body: { padding: 16 } }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
             <div>
               <div style={{ fontWeight: 900, color: "#0f172a" }}>Budjet va vazifa bo'yicha tez tanlov</div>
@@ -327,12 +328,13 @@ export default function FeedPage() {
           </div>
         </Card>
       </div>
+
       <div style={{ padding: "0 16px", marginTop: 14, display: "grid", gap: 12 }}>
-        <Card style={{ borderRadius: 22, border: "1px solid #e2e8f0", boxShadow: "0 14px 34px rgba(15,23,42,.05)" }} bodyStyle={{ padding: 16 }}>
+        <Card style={{ borderRadius: 22, border: "1px solid #e2e8f0", boxShadow: "0 14px 34px rgba(15,23,42,.05)" }} styles={{ body: { padding: 16 } }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
             <div>
-              <div style={{ fontWeight: 900, color: "#0f172a", fontSize: 18 }}>Qayerdan boshlashni o‘ylab o‘tirmang</div>
-              <div style={{ fontSize: 13, color: "#64748b", marginTop: 6 }}>Qidiruv, ishonch tekshiruvi va bog‘lanish oqimi bir ko‘rinishda berildi.</div>
+              <div style={{ fontWeight: 900, color: "#0f172a", fontSize: 18 }}>Qayerdan boshlashni o'ylab o'tirmang</div>
+              <div style={{ fontSize: 13, color: "#64748b", marginTop: 6 }}>Qidiruv, ishonch tekshiruvi va bog'lanish oqimi bir ko'rinishda berildi.</div>
             </div>
             <Tag color="blue" style={{ borderRadius: 999, paddingInline: 12, margin: 0 }}>Yangi professional bozor oqimi</Tag>
           </div>
@@ -351,7 +353,7 @@ export default function FeedPage() {
           </div>
         </Card>
 
-        <Card style={{ borderRadius: 22, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 16 }}>
+        <Card style={{ borderRadius: 22, border: "1px solid #e2e8f0" }} styles={{ body: { padding: 16 } }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <div>
               <div style={{ fontWeight: 900, color: "#0f172a" }}>Body type guide</div>
@@ -431,7 +433,7 @@ export default function FeedPage() {
         footer={null}
         centered
         width={350}
-        bodyStyle={{ padding: 0 }}
+        styles={{ body: { padding: 0 } }}
         closable={false}
       >
         {quickViewItem && (
