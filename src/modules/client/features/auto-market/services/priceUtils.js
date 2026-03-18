@@ -1,6 +1,6 @@
 /**
  * PRODUCTION-GRADE: Price & Currency Utilities
- * High-performance memoization of Intl.NumberFormat to prevent memory bloat in high-load lists.
+ * High-performance formatting for UniGo Super App.
  */
 
 const UZ_FORMATTER = new Intl.NumberFormat("uz-UZ", {
@@ -10,7 +10,7 @@ const UZ_FORMATTER = new Intl.NumberFormat("uz-UZ", {
 });
 
 /**
- * Basic number formatting for uz-UZ locale
+ * Raqamlarni uz-UZ formatiga o'tkazadi.
  */
 export function formatNumber(n) {
   try {
@@ -18,20 +18,17 @@ export function formatNumber(n) {
     return UZ_FORMATTER.format(value);
   } catch (e) {
     console.error("FormatNumber Error:", e);
-    return String(n ?? "0");
+    return String(n ?? "");
   }
 }
 
 /**
- * Canonical currency formatter required by marketplace modules.
- * Strictly exported to fix [vite:load-fallback] ENOENT/Export errors.
+ * [CRITICAL FIX]: formatCurrency exporti qo'shildi.
  */
-export function formatCurrency(amount) {
-  return formatNumber(amount);
-}
+export const formatCurrency = (n) => formatNumber(n);
 
 /**
- * Formats price with currency unit
+ * Narxni valyuta belgisi bilan formatlash.
  */
 export function formatPrice(price, currency = "UZS") {
   const p = Number(price || 0);
@@ -43,25 +40,20 @@ export function formatPrice(price, currency = "UZS") {
 }
 
 /**
- * Static Exchange Rates (Mock for production-grade failover)
- * In real production, this should be fetched from a global state/cache.
+ * Statik valyuta kursi.
  */
 export const FX = {
   USD_UZS: 12500,
 };
 
 /**
- * Currency conversion logic with precision handling
+ * Valyuta konvertatsiyasi.
  */
 export function convert(price, from, to) {
   const p = Number(price || 0);
   if (!p || from === to) return p;
   
-  if (from === "USD" && to === "UZS") {
-    return Math.round(p * FX.USD_UZS);
-  }
-  if (from === "UZS" && to === "USD") {
-    return Math.round(p / FX.USD_UZS);
-  }
+  if (from === "USD" && to === "UZS") return Math.round(p * FX.USD_UZS);
+  if (from === "UZS" && to === "USD") return Math.round(p / FX.USD_UZS);
   return p;
 }

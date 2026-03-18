@@ -3,6 +3,9 @@ import { listSavedAlerts, listSavedSearches } from "./autoMarketBuyerCore";
 import { listBookingEvents, buildBookingEventSummary } from "./autoMarketBookingCheckout";
 import { listPaymentEvents, buildPaymentEventInsights } from "./autoMarketLocalPayments";
 
+/**
+ * Dealer sharhlarini shakllantirish.
+ */
 export function buildDealerReviews(seller = {}) {
   const reviews = [
     {
@@ -33,7 +36,9 @@ export function buildDealerReviews(seller = {}) {
       tag: "Ko‘rik",
     },
   ];
+
   const average = Number((reviews.reduce((sum, item) => sum + item.rating, 0) / reviews.length).toFixed(1));
+
   return {
     average,
     count: Number(seller.reviewCount || 138),
@@ -46,13 +51,21 @@ export function buildDealerReviews(seller = {}) {
   };
 }
 
+/**
+ * Sotuvchi profilini yaratish (Trust Score mantiqi bilan).
+ */
 export function buildDealerTrustProfile(seller = {}) {
   const sold = Number(seller.soldCount || 24);
   const years = Number(seller.yearsOnPlatform || 3);
   const response = seller.responseSpeed || "15 daqiqa";
   const trust = Math.min(98, 72 + years * 4 + Math.round(sold / 10));
-  const bookingSummary = buildBookingEventSummary(listBookingEvents().filter((item) => String(item.sellerId) === String(seller.id || "seller-main")));
+  
+  const bookingSummary = buildBookingEventSummary(
+    listBookingEvents().filter((item) => String(item.sellerId) === String(seller.id || "seller-main"))
+  );
+  
   const reviews = buildDealerReviews(seller);
+
   return {
     sellerName: seller.name  seller.seller_name  "Verified showroom",
     trust,
@@ -79,6 +92,9 @@ export function buildDealerTrustProfile(seller = {}) {
   };
 }
 
+/**
+ * Avto-kredit kalkulyatori mantiqi.
+ */
 export function buildFinanceCalculator(car = {}, options = {}) {
   const price = Number(car.price || 285000000);
   const downPayment = Math.max(5000000, Number(options.downPayment || Math.round(price * 0.25)));
@@ -86,11 +102,13 @@ export function buildFinanceCalculator(car = {}, options = {}) {
   const annualRate = Number(options.annualRate || 26);
   const financed = Math.max(0, price - downPayment);
   const monthlyRate = annualRate / 12 / 100;
+  
   const monthlyPayment = monthlyRate === 0
     ? financed / Math.max(1, duration)
-    : financed * monthlyRate / (1 - Math.pow(1 + monthlyRate, -duration));
+    : (financed * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -duration));
+  
   const total = Math.round(monthlyPayment * duration + downPayment);
-  return {
+    return {
     price,
     downPayment,
     duration,
@@ -104,20 +122,38 @@ export function buildFinanceCalculator(car = {}, options = {}) {
       { key: "monthly", title: "Oyma-oy", value: formatCurrency(Math.round(monthlyPayment)) },
       { key: "total", title: "Umumiy to‘lov", value: formatCurrency(total) },
     ],
-    durations: [12, 18, 24, 36].map((item) => ({ key: String(item), title: ${item} oy, selected: item === duration })),
+    durations: [12, 18, 24, 36].map((item) => ({ 
+      key: String(item), 
+      title: ${item} oy, 
+      selected: item === duration 
+    })),
     downPaymentOptions: [0.2, 0.25, 0.3, 0.4].map((share) => {
       const amount = Math.round(price * share);
-      return { key: String(share), title: ${Math.round(share * 100)}%, amount: formatCurrency(amount), selected: amount === downPayment };
+      return { 
+        key: String(share), 
+        title: ${Math.round(share * 100)}%, 
+        amount: formatCurrency(amount), 
+        selected: amount === downPayment 
+      };
     }),
   };
 }
 
+/**
+ * Bo'lib to'lash takliflarini shakllantirish.
+ */
 export function buildFinanceOffers(car = {}) {
   const price = Number(car.price || 0);
   const baseDown = Math.max(5000000, Math.round(price * 0.2));
   const paymentEvents = listPaymentEvents();
   const paymentStats = buildPaymentEventInsights(paymentEvents);
-  const calculator = buildFinanceCalculator(car, { downPayment: Math.round(price * 0.25), duration: 24, annualRate: 26 });
+  
+  const calculator = buildFinanceCalculator(car, { 
+    downPayment: Math.round(price * 0.25), 
+    duration: 24, 
+    annualRate: 26 
+  });
+
   return [
     {
       key: "click-installment",
@@ -172,6 +208,9 @@ export function buildFinanceOffers(car = {}) {
   ];
 }
 
+/**
+ * Bildirishnoma qoidalari.
+ */
 export function buildNotificationRules() {
   return [
     {
@@ -217,12 +256,16 @@ export function buildNotificationRules() {
   ];
 }
 
+/**
+ * Avtobozor bildirishnomalari generatori.
+ */
 export function buildAutoMarketNotifications(seed = {}) {
   const alerts = seed.alerts?.length ? seed.alerts : listSavedAlerts();
   const searches = listSavedSearches();
   const bookings = listBookingEvents();
   const payments = listPaymentEvents();
   const rules = buildNotificationRules();
+
   const items = [
     ...alerts.slice(0, 4).map((item, index) => ({
       key: alert-${item.id || index},
@@ -265,24 +308,35 @@ export function buildAutoMarketNotifications(seed = {}) {
       category: "rule",
     })),
   ];
-  return items.length ? items : [
-    { key: "price-drop", title: "Narx tushdi", text: "Saqlangan Malibu 2 uchun narx yangilandi.", tone: "#16a34a", route: "/auto-market/saved-alerts", category: "alert" },
-    { key: "seller-replied", title: "Sotuvchi javob berdi", text: "Ko‘rish vaqti bo‘yicha javob tayyor.", tone: "#2563eb", route: "/auto-market/seller/leads", category: "lead" },
-    { key: "booking-confirmed", title: "Booking tasdiqlandi", text: "Uchrashuv payshanba 16:00 ga belgilandi.", tone: "#f59e0b", route: "/auto-market/seller/appointments", category: "booking" },
-    { key: "inspection-ready", title: "Ko‘rik tayyor", text: "Inspection report ko‘rishga tayyor bo‘ldi.", tone: "#7c3aed", route: "/auto-market/booking/preview/checkout", category: "inspection" },
-  ];
+
+  if (!items.length) {
+    return [
+      { key: "price-drop", title: "Narx tushdi", text: "Saqlangan Malibu 2 uchun narx yangilandi.", tone: "#16a34a", route: "/auto-market/saved-alerts", category: "alert" },
+      { key: "seller-replied", title: "Sotuvchi javob berdi", text: "Ko‘rish vaqti bo‘yicha javob tayyor.", tone: "#2563eb", route: "/auto-market/seller/leads", category: "lead" },
+      { key: "booking-confirmed", title: "Booking tasdiqlandi", text: "Uchrashuv payshanba 16:00 ga belgilandi.", tone: "#f59e0b", route: "/auto-market/seller/appointments", category: "booking" },
+      { key: "inspection-ready", title: "Ko‘rik tayyor", text: "Inspection report ko‘rishga tayyor bo‘ldi.", tone: "#7c3aed", route: "/auto-market/booking/preview/checkout", category: "inspection" },
+    ];
+  }
+
+  return items;
 }
-  export function buildPriceHistorySummary(car = {}) {
+  /**
+ * Narx o'zgarishi tarixi.
+ */
+export function buildPriceHistorySummary(car = {}) {
   const price = Number(car.price || 0);
   const anchor = price || 100000000;
+  
   const points = [1.06, 1.02, 1, 0.98, 0.96].map((m, idx) => ({
     key: p-${idx},
     label: ["5 oy oldin", "4 oy oldin", "3 oy oldin", "1 oy oldin", "Hozir"][idx],
     value: Math.round(anchor * m),
   }));
+
   const current = points[points.length - 1].value;
   const first = points[0].value;
   const diff = current - first;
+
   return {
     points,
     summary: diff < 0 ? "Narx pasaygan" : diff > 0 ? "Narx oshgan" : "Narx barqaror",
