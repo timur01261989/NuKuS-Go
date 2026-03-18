@@ -1,4 +1,6 @@
 import { supabase } from "@/services/supabase/supabaseClient";
+import { sleep, randomJitter, isPlainObject, joinUrl, toQueryString, buildKey, pickHeadersObj, inflight, cache, getCached, setCached } from "./apiHelper.core.js";
+import { getDefaultApiConfig } from "./apiHelper.config.js";
 
 /**
  * src/utils/apiHelper.js (MAX FIXED)
@@ -52,130 +54,15 @@ export class ApiError extends Error {
 }
 
 // ------------------------------
-// Small utils
+// Shared core helpers
 // ------------------------------
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-const randomJitter = (base) => {
-  const delta = base * 0.2; // +-20%
-  return base + (Math.random() * 2 - 1) * delta;
-};
-
-const isPlainObject = (v) =>
-  v != null && typeof v === "object" && Object.getPrototypeOf(v) === Object.prototype;
-
-const safeTrimSlash = (s) => (s || "").replace(/\/+$/, "");
-
-const joinUrl = (base, path) => {
-  const p = (path || "").toString();
-  // If absolute URL, keep it as-is
-  if (/^https?:\/\//i.test(p)) return p;
-  const b = safeTrimSlash(base || "");
-  const pp = p.replace(/^\/+/, "");
-  if (!b) return `/${pp}`.replace(/\/+$/, "");
-  return `${b}/${pp}`;
-};
-
-const toQueryString = (query) => {
-  if (!query || !isPlainObject(query)) return "";
-  const params = new URLSearchParams();
-  for (const [k, v] of Object.entries(query)) {
-    if (v === undefined || v === null) continue;
-    if (Array.isArray(v)) {
-      v.forEach((item) => {
-        if (item === undefined || item === null) return;
-        params.append(k, String(item));
-      });
-    } else if (typeof v === "object") {
-      // keep readable & stable
-      params.set(k, JSON.stringify(v));
-    } else {
-      params.set(k, String(v));
-    }
-  }
-  const s = params.toString();
-  return s ? `?${s}` : "";
-};
-
-const stableStringify = (obj) => {
-  if (obj === null || obj === undefined) return "";
-  if (typeof obj !== "object") return String(obj);
-  if (Array.isArray(obj)) return `[${obj.map(stableStringify).join(",")}]`;
-  const keys = Object.keys(obj).sort();
-  return `{${keys.map((k) => `${k}:${stableStringify(obj[k])}`).join(",")}}`;
-};
-
-const buildKey = ({ method, url, query, body, bodyType }) => {
-  const q = query ? stableStringify(query) : "";
-  const b = bodyType === "form" ? "[form]" : stableStringify(body);
-  return `${method} ${url}${q ? " " + q : ""}${b ? " " + b : ""}`;
-};
-
-const pickHeadersObj = (headers) => {
-  const obj = {};
-  if (!headers) return obj;
-  for (const [k, v] of headers.entries()) obj[k] = v;
-  return obj;
-};
-
-// ------------------------------
-// Cache + inflight dedupe
-// ------------------------------
-const inflight = new Map(); // key -> promise
-const cache = new Map(); // key -> { ts, ttl, data }
-
-const getCached = (key) => {
-  const hit = cache.get(key);
-  if (!hit) return null;
-  if (Date.now() - hit.ts > hit.ttl) {
-    cache.delete(key);
-    return null;
-  }
-  return hit.data;
-};
-
-const setCached = (key, data, ttl) => {
-  cache.set(key, { ts: Date.now(), ttl, data });
-};
 
 // ------------------------------
 // API core
 // ------------------------------
 const api = {
   // Defaults (override via configure)
-  _cfg: {
-    baseUrl:
-      // Vite
-      (typeof import.meta !== "undefined" && import.meta?.env?.VITE_API_BASE_URL) ||
-      // Node-like env fallback
-      (typeof process !== "undefined" && process?.env?.VITE_API_BASE_URL) ||
-      "",
-    timeoutMs: 20000,
-    retry: {
-      enabled: true,
-      max: 2,
-      baseDelayMs: 600,
-      // Retry only for safe/idempotent methods by default
-      methods: ["GET", "HEAD", "OPTIONS"],
-      // Also retry on these status codes (server overload / temporary)
-      statuses: [408, 425, 429, 500, 502, 503, 504],
-    },
-    cache: {
-      enabled: false,
-      ttlMs: 10_000, // 10s
-    },
-    // Auth hooks (optional)
-    getAccessToken: null,
-    setAccessToken: null,
-    getRefreshToken: null,
-    setRefreshToken: null,
-    refreshAccessToken: null, // async ({ refreshToken }) => ({ accessToken, refreshToken? })
-    // Hooks
-    onRequest: null,
-    onResponse: null,
-    onError: null,
-    onAuthFail: null,
-  },
+  _cfg: getDefaultApiConfig(),
 
   configure(partial = {}) {
     this._cfg = {

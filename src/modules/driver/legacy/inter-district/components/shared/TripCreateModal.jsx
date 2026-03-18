@@ -3,6 +3,7 @@ import { Modal, Form, Input, InputNumber, Switch, DatePicker, TimePicker, Select
 import { CarOutlined, SafetyCertificateOutlined, InboxOutlined, SettingOutlined, AppstoreAddOutlined, ReconciliationOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { REGIONS, getDistrictsByRegion } from "../../services/districtData";
+import { createInterDistrictTrip } from "../../services/districtApi";
 
 /**
  * TripCreateModal.jsx (Driver)
@@ -115,15 +116,26 @@ export default function TripCreateModal({
         active_vehicle_max_volume_m3: activeMaxVolumeM3 || null,
       };
 
-      // Bu yerda sizning api call funksiyangiz ishlaydi
-      // await createInterDistrictTrip(payload);
-      
+      if (!payload.from_district || !payload.to_district) {
+        throw new Error("Yo‘nalish to‘liq tanlanmagan");
+      }
+      if (payload.from_district === payload.to_district) {
+        throw new Error("Boshlanish va tugash tumani bir xil bo‘lishi mumkin emas");
+      }
+      if (!payload.depart_at || new Date(payload.depart_at).getTime() <= Date.now()) {
+        throw new Error("Ketish vaqti hozirdan keyin bo‘lishi kerak");
+      }
+      if (!Number(payload.base_price_uzs)) {
+        throw new Error("Asosiy narx kiritilishi kerak");
+      }
+
+      const created = await createInterDistrictTrip(payload);
       message.success("Reys muvaffaqiyatli yaratildi!");
-      onSuccess?.(payload);
+      onSuccess?.(created);
       onClose();
     } catch (error) {
       message.error("Reys yaratishda xatolik yuz berdi.");
-      console.error(error);
+      console.error("InterDistrict trip create failed:", error);
     } finally {
       setLoading(false);
     }

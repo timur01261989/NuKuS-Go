@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { useClientText } from "../shared/i18n_clientLocalize";
+import taxiLogger from "../../../../shared/taxi/utils/taxiLogger";
 import { useNavigate } from "react-router-dom";
 import {
   Avatar,
@@ -19,7 +20,6 @@ import {
   message,
 } from "antd";
 import {
-  AimOutlined,
   HomeOutlined,
   BankOutlined,
   ArrowLeftOutlined,
@@ -38,9 +38,9 @@ import {
   UserOutlined,
   CompassOutlined,
 } from "@ant-design/icons";
-import { MapContainer, Polyline, TileLayer, useMap } from "react-leaflet";
-import L from "leaflet";
+import { MapContainer, Polyline, TileLayer } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import { CenterWatcher, LocateMeButton, destIcon, pickupIcon } from "./taxiMapArtifacts";
 
 import VehicleMarker from "./components/VehicleMarker";
 import TaxiMap from "./TaxiMap";
@@ -52,6 +52,8 @@ import ClientTaxiScreen from "./containers/ClientTaxiScreen";
 import RatingModal from "@/modules/client/features/shared/components/RatingModal.jsx";
 import ClientBonusWidget from "@/modules/client/features/client/components/ClientBonusWidget.jsx";
 import TaxiOrderTimeline from "./components/TaxiOrderTimeline";
+import TaxiMainSheet from "./components/TaxiMainSheet";
+import TaxiRouteSheet from "./components/TaxiRouteSheet";
 import { useOrderTimeline } from "./hooks/useOrderTimeline";
 import {
   useTaxiOrder,
@@ -65,95 +67,6 @@ import {
 } from "./hooks/useTaxiOrder";
 
 const { Text } = Typography;
-
-/** --- icons --- */
-const pickupIcon = L.divIcon({
-  className: "yg-pin",
-  html: `
-    <div class="yg-pin-wrap">
-      <div class="yg-pin-top">
-        <div class="yg-pin-yellow">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4Z" fill="rgba(0,0,0,.75)"/>
-            <path d="M4 22c0-4.42 3.58-8 8-8s8 3.58 8 8" stroke="rgba(0,0,0,.75)" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-        </div>
-      </div>
-      <div class="yg-pin-stem"></div>
-      <div class="yg-pin-dot"></div>
-    </div>
-  `,
-  iconSize: [44, 62],
-  iconAnchor: [22, 54],
-});
-
-const destIcon = L.divIcon({
-  className: "yg-dest",
-  html: `
-    <div class="yg-dest-wrap">
-      <div class="yg-dest-top">
-        <div class="yg-dest-flag">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <path d="M6 3v18" stroke="rgba(0,0,0,.75)" stroke-width="2" stroke-linecap="round"/>
-            <path d="M6 4h11l-2 4 2 4H6" fill="rgba(0,0,0,.1)" stroke="rgba(0,0,0,.75)" stroke-width="2" stroke-linejoin="round"/>
-          </svg>
-        </div>
-      </div>
-      <div class="yg-pin-stem"></div>
-      <div class="yg-pin-dot red"></div>
-    </div>
-  `,
-  iconSize: [44, 62],
-  iconAnchor: [22, 54],
-});
-
-/** --- Map helpers --- */
-function CenterWatcher({ onCenterChange, onMoveStart, onMoveEnd }) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!map) return;
-
-    const fire = () => {
-      const c = map.getCenter();
-      onCenterChange?.([c.lat, c.lng], map.getZoom());
-    };
-
-    const ms = () => onMoveStart?.();
-    const me = () => {
-      onMoveEnd?.();
-      fire();
-    };
-
-    map.on("movestart", ms);
-    map.on("moveend", me);
-    map.on("zoomend", me);
-
-    fire();
-
-    return () => {
-      map.off("movestart", ms);
-      map.off("moveend", me);
-      map.off("zoomend", me);
-    };
-  }, [map, onCenterChange, onMoveStart, onMoveEnd]);
-
-  return null;
-}
-
-function LocateMeButton({ mapRef, userLoc, bottom = 240, onRequestLocate }) {
-  return (
-    <div style={{ position: "absolute", right: 16, bottom, zIndex: 800 }}>
-      <Button
-        shape="circle"
-        size="large"
-        icon={<AimOutlined style={{ fontSize: 22 }} />}
-        style={{ boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}
-        onClick={onRequestLocate}
-      />
-    </div>
-  );
-}
 
 /** --- main component --- */
 export default function ClientTaxiPage() {
@@ -217,6 +130,8 @@ export default function ClientTaxiPage() {
     setEarnedBonus,
     etaMin,
     setEtaMin,
+    etaUpdatedAt,
+    setEtaUpdatedAt,
     podyezdOpen,
     setPodyezdOpen,
     shareOpen,
@@ -261,6 +176,8 @@ export default function ClientTaxiPage() {
   } = useTaxiOrder();
 
   const { events: timelineEvents } = useOrderTimeline(orderId);
+  const cancelReasonOptions = buildTaxiCancelReasons();
+  const routeMeta = buildTaxiRouteMeta(route);
 
   // Mobile BACK handling
   const isPopNavRef = useRef(false);
@@ -274,7 +191,9 @@ export default function ClientTaxiPage() {
     if (!isPopNavRef.current) {
       try {
         window.history.pushState(st, "");
-      } catch {}
+      } catch (error) {
+        taxiLogger.warn("client.taxi.page.copy_driver_phone_failed", { error });
+      }
     }
     isPopNavRef.current = false;
   }, [step]);
@@ -457,7 +376,9 @@ export default function ClientTaxiPage() {
       setTimeout(() => {
         try {
           tariffSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-        } catch {}
+        } catch (error) {
+          taxiLogger.warn("client.taxi.page.copy_car_number_failed", { error });
+        }
       }, 50);
     }
   }, [step]);
@@ -541,74 +462,28 @@ export default function ClientTaxiPage() {
 
   // Sheets
   const MainSheet = (
-    <div className="yg-sheet">
-      <div className="yg-sheet-title">
-        <div className="yg-logo" />
-        <div style={{ fontSize: 30, fontWeight: 800 }}>Taksi</div>
-      </div>
-
-      <Button className="yg-long" onClick={openDestinationSearch}>
-        Qaerga borasiz?
-        <span className="yg-long-right">›</span>
-      </Button>
-
-      <div style={{ marginTop: 12 }}>
-        {PickupSummaryRow}
-      </div>
-
-      <div style={{ marginTop: 10 }}>
-        <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Mening manzillarim</div>
-        <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-          <Button
-            icon={<HomeOutlined />}
-            style={{ flex: 1, borderRadius: 12 }}
-            disabled={!homeAddr}
-            onClick={() => applyDestinationFromAddressString(homeAddr?.address)}
-          >
-            Uy
-          </Button>
-          <Button
-            icon={<BankOutlined />}
-            style={{ flex: 1, borderRadius: 12 }}
-            disabled={!workAddr}
-            onClick={() => applyDestinationFromAddressString(workAddr?.address)}
-          >
-            Ish
-          </Button>
-        </div>
-        {(savedPlaces?.length ?? 0) === 0 ? (
-          <div style={{ fontSize: 12, opacity: 0.55, padding: "8px 0" }}>Hozircha saqlangan manzil yo'q</div>
-        ) : (
-          <div className="yg-saved">
-            {(savedPlaces || []).slice(0, 4).map((p) => (
-              <button key={p.id || p.place_id || `${p.lat},${p.lng}`} className="yg-saved-item" onClick={() => handlePickSaved(p)}>
-                <div className="yg-saved-ic">📍</div>
-                <div className="yg-saved-txt">
-                  <div className="yg-saved-title">{p.name || p.title || 'Manzil'}</div>
-                  <div className="yg-saved-sub">{p.label || ''}</div>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="yg-bottom-row">
-        <Button className="yg-blue" type="primary" onClick={handleOrderCreate}>
-          Buyurtma berish
-        </Button>
-        <Button className="yg-round" icon={<CarOutlined />} onClick={() => {
-          if (step !== "route") {
-            scrollTariffOnOpenRef.current = true;
-            setStep("route");
-            return;
-          }
-          try {
-            tariffSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-          } catch {}
-        }} />
-      </div>
-    </div>
+    <TaxiMainSheet
+      homeAddr={homeAddr}
+      workAddr={workAddr}
+      savedPlaces={savedPlaces}
+      pickupSummaryRow={PickupSummaryRow}
+      openDestinationSearch={openDestinationSearch}
+      applyDestinationFromAddressString={applyDestinationFromAddressString}
+      handlePickSaved={handlePickSaved}
+      handleOrderCreate={handleOrderCreate}
+      onTariffOpen={() => {
+        if (step !== "route") {
+          scrollTariffOnOpenRef.current = true;
+          setStep("route");
+          return;
+        }
+        try {
+          tariffSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        } catch (error) {
+          taxiLogger.warn("client.taxi.page.copy_trip_id_failed", { error });
+        }
+      }}
+    />
   );
 
   const SearchDrawer = (
@@ -650,157 +525,36 @@ export default function ClientTaxiPage() {
   );
 
   const RouteSheet = (
-    <div className="yg-sheet">
-      <div className="yg-route-top">
-        <div className="yg-route-row">
-          <div className="yg-field-icon"><EnvironmentOutlined /></div>
-          <div className="yg-route-txt">
-            <div className="yg-field-label">Ketish nuqtasi</div>
-            <div className="yg-field-value">{pickup.address || "—"}</div>
-          </div>
-          <Button size="small" className="yg-chip" onClick={openDestinationSearch}>
-            {dest.address ? "Podyezd" : "Xarita"}
-          </Button>
-        </div>
-
-        <div className="yg-route-row">
-          <div className="yg-field-icon"><FlagOutlined /></div>
-          <div className="yg-route-txt">
-            <div className="yg-field-label">Borish nuqtasi</div>
-            <div className="yg-field-value">{dest.address || "Belgilanmagan"}</div>
-          </div>
-          <Button size="small" className="yg-chip" onClick={changeDestination}>
-            O'zgartirish
-          </Button>
-        </div>
-
-        <div style={{ marginTop: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ fontSize: 12, opacity: 0.7 }}>Oraliq bekatlar</div>
-            <Button
-              size="small"
-              icon={<PlusOutlined style={{ fontSize: 16 }} />}
-              className="yg-chip"
-              onClick={() => {
-                setAddStopOpen(true);
-                setStep('stop_map');
-              }}
-              disabled={waypoints.length >= 3}
-            />
-          </div>
-          {waypoints.length === 0 ? (
-            <div style={{ fontSize: 12, opacity: 0.55, marginTop: 4 }}>Hozircha yo'q</div>
-          ) : (
-            <div style={{ marginTop: 6 }}>
-              {waypoints.map((w, idx) => (
-                <div key={idx} className="yg-stop">
-                  <div className="yg-stop-dot" />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 650 }}>Bekat {idx + 1}</div>
-                    <div className="yg-stop-addr">{w.address || "—"}</div>
-                  </div>
-                  <Button
-                    size="small"
-                    icon={<CloseOutlined />}
-                    className="yg-chip"
-                    onClick={() => setWaypoints((arr) => arr.filter((_, i) => i !== idx))}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <Divider style={{ margin: "12px 0" }} />
-
-        <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
-          <Button
-            size="small"
-            style={{ borderRadius: 999 }}
-            icon={<CompassOutlined />}
-            onClick={() => {
-              const p = normalizeLatLng(pickup?.latlng);
-              const d = normalizeLatLng(dest?.latlng);
-              if (!p || !d) {
-                message.info("Manzil tanlang");
-                return;
-              }
-              navigate("/client/navigator", {
-                state: {
-                  pickup: p,
-                  dest: d,
-                  waypoints: (waypoints || []).map(normalizeLatLng).filter(Boolean),
-                },
-              });
-            }}
-          >
-            Navigator
-          </Button>
-          <div className="yg-tab">Yetkazish xizmati</div>
-        </div>
-
-        <div className="yg-tariffs" ref={tariffSectionRef}>
-          {tariffs.map((t) => (
-            <button
-              key={t.id}
-              className={"yg-tariff " + (tariff.id === t.id ? "active" : "")}
-              onClick={() => setTariff(t)}
-            >
-              <div style={{ fontSize: 11, opacity: 0.7 }}>{Math.max(1, Math.round(durationMin))} daq</div>
-              <div style={{ fontWeight: 800, marginTop: 2 }}>{t.title}</div>
-              <div style={{ fontWeight: 800, marginTop: 2 }}>{money((t.base + (distanceKm || 0) * t.perKm) * t.mult)}</div>
-            </button>
-          ))}
-        </div>
-
-        <div style={{ marginTop: 14, background: "rgba(255,255,255,0.85)", borderRadius: 14, padding: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-            <div style={{ fontWeight: 800 }}>Kim uchun buyurtma?</div>
-            <Segmented
-              size="small"
-              value={orderFor}
-              options={[
-                { label: "O'zimga", value: "self" },
-                { label: "Boshqaga", value: "other" },
-              ]}
-              onChange={(v) => setOrderFor(v)}
-            />
-          </div>
-          {orderFor === "other" && (
-            <Input
-              prefix={<PhoneOutlined />}
-              value={otherPhone}
-              onChange={(e) => setOtherPhone(e.target.value)}
-              placeholder="U odamning telefon raqami"
-            />
-          )}
-
-          <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-            <Button
-              icon={<ClockCircleOutlined />}
-              onClick={() => setScheduleOpen(true)}
-              style={{ flex: 1, borderRadius: 12 }}
-            >
-              Rejalash
-            </Button>
-          </div>
-
-          {(comment || wishes.ac || wishes.trunk || wishes.childSeat || wishes.smoking === "yes" || scheduledTime) && (
-            <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>
-              {scheduledTime ? <>🕒 {new Date(scheduledTime).toLocaleString()}</> : null}
-              {comment ? <div style={{ marginTop: 4 }}>📒 {comment}</div> : null}
-            </div>
-          )}
-        </div>
-
-        <div className="yg-bottom-row" style={{ marginTop: 14 }}>
-          <Button className="yg-yellow" type="primary" onClick={handleOrderCreate}>
-            Buyurtma berish
-          </Button>
-          <Button className="yg-round" icon={<ShareAltOutlined />} onClick={() => setShareOpen(true)} />
-        </div>
-      </div>
-    </div>
+    <TaxiRouteSheet
+      pickup={pickup}
+      dest={dest}
+      openDestinationSearch={openDestinationSearch}
+      changeDestination={changeDestination}
+      setAddStopOpen={setAddStopOpen}
+      setStep={setStep}
+      waypoints={waypoints}
+      setWaypoints={setWaypoints}
+      message={message}
+      navigate={navigate}
+      tariffs={tariffs}
+      tariff={tariff}
+      setTariff={setTariff}
+      durationMin={durationMin}
+      distanceKm={distanceKm}
+      money={money}
+      orderFor={orderFor}
+      setOrderFor={setOrderFor}
+      otherPhone={otherPhone}
+      setOtherPhone={setOtherPhone}
+      setScheduleOpen={setScheduleOpen}
+      comment={comment}
+      wishes={wishes}
+      scheduledTime={scheduledTime}
+      handleOrderCreate={handleOrderCreate}
+      setShareOpen={setShareOpen}
+      tariffSectionRef={tariffSectionRef}
+      routeMeta={routeMeta}
+    />
   );
 
   const SearchingSheet = (
@@ -824,6 +578,15 @@ export default function ClientTaxiPage() {
     <div className="yg-sheet">
       <div style={{ fontSize: 26, fontWeight: 900 }}>
         {etaMin ? `~${etaMin} daq va keladi` : "Haydovchi yo'lda"}
+      </div>
+
+      <div style={{ marginTop: 10 }}>
+        <TaxiEtaBadge
+          etaMin={etaMin}
+          distanceKm={assignedDriver?.lat != null && assignedDriver?.lng != null && pickup?.latlng ? Number((Math.hypot((assignedDriver.lat - pickup.latlng[0]) * 111, (assignedDriver.lng - pickup.latlng[1]) * 85)).toFixed(1)) : null}
+          etaUpdatedAt={etaUpdatedAt}
+          isFallback={routeMeta?.isFallback}
+        />
       </div>
 
       <div className="yg-driver-card">
@@ -860,7 +623,18 @@ export default function ClientTaxiPage() {
       <Divider style={{ margin: "12px 0" }} />
 
 
-      <div className="yg-cancel-link" onClick={handleCancel}>
+      <div style={{ marginTop: 12 }}>
+        <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>Bekor qilish sababi</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {cancelReasonOptions.map((reason) => (
+            <Button key={reason.key} size="small" className="yg-chip" onClick={() => handleCancel(reason.key)}>
+              {reason.label}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      <div className="yg-cancel-link" onClick={() => handleCancel(null)}>
         Safarni bekor qilish
       </div>
     </div>
@@ -1024,7 +798,8 @@ export default function ClientTaxiPage() {
               if (!v) return setScheduledTime(null);
               try {
                 setScheduledTime(new Date(v).toISOString());
-              } catch {
+              } catch (error) {
+                taxiLogger.warn("client.taxi.page.invalid_schedule_time", { error });
                 setScheduledTime(null);
               }
             }}
@@ -1057,7 +832,8 @@ export default function ClientTaxiPage() {
             try {
               await navigator.clipboard.writeText(shareLink);
               message.success("Nusxa olindi");
-            } catch {
+            } catch (error) {
+              taxiLogger.warn("client.taxi.page.copy_address_failed", { error });
               message.info("Nusxa olish uchun brauzer ruxsat bermadi");
             }
           }}

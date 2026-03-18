@@ -2,52 +2,23 @@ import React, { useMemo } from "react";
 import AppRouter from "./app/router/AppRouter.jsx";
 import Loader from "./modules/shared/components/Loader.jsx";
 import { useAuth } from "./modules/shared/auth/AuthProvider.jsx";
+import { selectAccessState } from "./modules/shared/auth/accessState.js";
 
 function AppComponent() {
   const auth = useAuth();
 
   const appState = useMemo(() => {
-    if (!auth?.authReady || auth?.loading) {
-      return {
-        status: "loading",
-        role: null,
-      };
-    }
+    const access = selectAccessState(auth);
 
-    if (!auth?.isAuthed || !auth?.user) {
-      return {
-        status: "guest",
-        role: "guest",
-      };
-    }
-
-    if (auth?.isAdmin) {
-      return {
-        status: "ready",
-        role: "admin",
-      };
-    }
-
-    if (auth?.role === "driver" || auth?.driverExists) {
-      return {
-        status: "ready",
-        role: "driver",
-      };
+    if (access.mode === "loading") {
+      return { status: "loading", role: null };
     }
 
     return {
-      status: "ready",
-      role: "client",
+      status: access.mode === "guest" ? "guest" : "ready",
+      role: access.appRole,
     };
-  }, [
-    auth?.authReady,
-    auth?.driverExists,
-    auth?.isAdmin,
-    auth?.isAuthed,
-    auth?.loading,
-    auth?.role,
-    auth?.user,
-  ]);
+  }, [auth]);
 
   if (appState.status === "loading") {
     return <Loader />;

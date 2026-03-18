@@ -1,0 +1,12 @@
+src/modules/client/features/auto-market/services/autoMarketMarketplaceFinal.js
+src/modules/client/features/auto-market/pages/DealerProfilePage.jsx
+src/modules/client/features/auto-market/pages/FinanceOffersPage.jsx
+src/modules/client/features/auto-market/pages/AutoMarketNotificationsPage.jsx
+src/modules/client/features/auto-market/pages/PriceHistoryPage.jsx
+src/modules/client/features/auto-market/AutoMarketEntry.jsx
+src/modules/client/features/auto-market/pages/DetailsPage.jsx
+src/modules/client/features/auto-market/components/Details/SellerProfile.jsx
+src/modules/client/features/auto-market/pages/FeedPage.jsx
+src/modules/client/features/auto-market/pages/MyAdsPage.jsx
+tests/batch67-auto-market-marketplace-final.test.js
+BATCH67_AUTO_MARKET_MARKETPLACE_FINAL_CHANGED_FILES.txt

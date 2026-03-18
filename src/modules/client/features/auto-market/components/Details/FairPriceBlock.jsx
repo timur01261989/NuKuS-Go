@@ -1,107 +1,72 @@
-/**
- * FairPriceBlock.jsx
- * AI Narx Tahlili — "Bu narx qanchalik to'g'ri?"
- * Local bozor statistikasi asosida 🔴🟡🟢 indikator ko'rsatadi.
- *
- * Props:
- *  - car: { brand, model, year, mileage, price, currency }
- */
-import React, { useEffect, useState } from "react";
-import { Card, Spin, Progress } from "antd";
+import React, { useMemo } from "react";
+import { Card, Progress, Tag } from "antd";
 import { RobotOutlined } from "@ant-design/icons";
-import { analyzeFairPrice } from "../../services/marketBackend";
+import { evaluateInstantMarketValue, getDealBadgeMeta } from "../../services/instantMarketValue";
+import estimateVisual from "@/assets/auto-market/pro/pricing/price-estimate.svg";
+import trendDown from "@/assets/auto-market/pro/pricing/price-trend-down.png";
+import trendUp from "@/assets/auto-market/pro/pricing/price-trend-up.png";
 
 export default function FairPriceBlock({ car }) {
-  const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const result = useMemo(() => {
+    if (!car?.brand || !car?.price) return null;
+    return evaluateInstantMarketValue({
+      make: car.brand,
+      model: car.model,
+      year: car.year,
+      mileageKm: car.mileage,
+      listedPrice: car.price,
+      marketMedianPrice: car.market_median_price || car.price,
+      conditionScore: car.inspection_score || 78,
+    });
+  }, [car]);
 
-  useEffect(() => {
-    if (!car?.brand || !car?.model || !car?.price) return;
-    setLoading(true);
-    analyzeFairPrice({
-      brand:    car.brand,
-      model:    car.model,
-      year:     car.year,
-      mileage:  car.mileage,
-      price:    car.price,
-      currency: car.currency,
-    })
-      .then(setResult)
-      .catch(() => setResult(null))
-      .finally(() => setLoading(false));
-  }, [car?.brand, car?.model, car?.year, car?.price]);
+  if (!result) return null;
 
-  if (!car?.brand || !car?.price) return null;
-  if (loading) return (
-    <Card style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 16 }}>
-      <div style={{ display:"flex", gap: 10, alignItems:"center" }}>
-        <Spin size="small" />
-        <span style={{ color:"#64748b", fontSize: 13 }}>AI narxni tahlil qilyapti...</span>
-      </div>
-    </Card>
-  );
-  if (!result || result.verdict === "unknown") return null;
-
-  const pct = result.percentile ?? 50;
-  const strokeColor = result.color;
-
-  const fmt = (n) => Number(n||0).toLocaleString("uz-UZ");
+  const meta = getDealBadgeMeta(result.badge);
+  const confidence = Math.max(10, 100 - Math.min(Math.abs(result.deltaPercent) * 3, 60));
+  const trendVisual = result.deltaPercent > 0 ? trendUp : trendDown;
 
   return (
-    <Card
-      style={{ borderRadius: 18, border: `1.5px solid ${result.color}22` }}
-      bodyStyle={{ padding: 16 }}
-    >
-      <div style={{ display:"flex", gap: 10, alignItems:"flex-start" }}>
-        <div style={{
-          width: 42, height: 42, borderRadius: 16, flexShrink: 0,
-          background: `linear-gradient(135deg, ${result.color}cc, ${result.color})`,
-          display:"flex", alignItems:"center", justifyContent:"center", color:"#fff",
-          boxShadow: `0 8px 20px ${result.color}44`,
-        }}>
-          <RobotOutlined style={{ fontSize: 20 }} />
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 900, color: "#0f172a", fontSize: 14 }}>AI Narx Tahlili</div>
-          <div style={{ marginTop: 4, fontWeight: 800, color: result.color, fontSize: 15 }}>
-            {result.label}
+    <Card style={{ borderRadius: 20, border: `1px solid ${meta.color}26` }} bodyStyle={{ padding: 16 }}>
+      <div style={{ display:"grid", gridTemplateColumns: "1.1fr .9fr", gap: 14, alignItems: "center" }}>
+        <div>
+          <div style={{ display:"flex", gap: 10, alignItems:"center" }}>
+            <div style={{ width: 38, height: 38, borderRadius: 14, background: meta.tone, color: meta.color, display: "grid", placeItems: "center" }}>
+              <RobotOutlined />
+            </div>
+            <div>
+              <div style={{ fontWeight: 900, color: "#0f172a" }}>Bozor narxi tahlili</div>
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>Xaridor uchun aniq, sotuvchi uchun tushunarli signal.</div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      <div style={{ marginTop: 14 }}>
-        <div style={{ display:"flex", justifyContent:"space-between", marginBottom: 6, fontSize: 12, color:"#64748b" }}>
-          <span>Bozordagi o'rin</span>
-          <span style={{ fontWeight:800, color: result.color }}>{pct}% arzonroq</span>
-        </div>
-        <Progress
-          percent={pct}
-          strokeColor={strokeColor}
-          trailColor="#e2e8f0"
-          showInfo={false}
-          size="small"
-        />
-      </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+            <Tag color={meta.color} style={{ borderRadius: 999, paddingInline: 10 }}>{meta.label}</Tag>
+            <Tag style={{ borderRadius: 999, paddingInline: 10 }}>Taxminiy bozor: {result.estimatedValue.toLocaleString("uz-UZ")}</Tag>
+          </div>
 
-      {result.avg && (
-        <div style={{ marginTop: 12, display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap: 8 }}>
-          <div style={{ textAlign:"center", background:"#f8fafc", borderRadius: 10, padding:"8px 4px" }}>
-            <div style={{ fontSize: 10, color:"#64748b" }}>Min</div>
-            <div style={{ fontWeight:800, fontSize: 12 }}>{fmt(result.min)}</div>
+          <div style={{ marginTop: 14 }}>
+            <Progress percent={confidence} strokeColor={meta.color} />
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 12, color: "#64748b" }}>
+              <span>Ishonch indeksi</span>
+              <span>{result.deltaPercent > 0 ? "+" : ""}{result.deltaPercent}%</span>
+            </div>
           </div>
-          <div style={{ textAlign:"center", background:"#f0fdf4", borderRadius: 10, padding:"8px 4px" }}>
-            <div style={{ fontSize: 10, color:"#64748b" }}>O'rtacha</div>
-            <div style={{ fontWeight:900, fontSize: 12, color:"#059669" }}>{fmt(result.avg)}</div>
-          </div>
-          <div style={{ textAlign:"center", background:"#f8fafc", borderRadius: 10, padding:"8px 4px" }}>
-            <div style={{ fontSize: 10, color:"#64748b" }}>Max</div>
-            <div style={{ fontWeight:800, fontSize: 12 }}>{fmt(result.max)}</div>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+            {result.reasons.map((reason) => <Tag key={reason} style={{ borderRadius: 999 }}>{reason}</Tag>)}
           </div>
         </div>
-      )}
 
-      <div style={{ marginTop: 10, fontSize: 11, color:"#94a3b8" }}>
-        {result.count} ta o'xshash e'lon tahlil qilindi
+        <div style={{ display: "grid", gap: 10 }}>
+          <div style={{ borderRadius: 18, border: "1px solid #e2e8f0", background: "#f8fafc", padding: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <img src={estimateVisual} alt="" style={{ width: 40, height: 40 }} />
+            <img src={trendVisual} alt="" style={{ width: 70, objectFit: "contain" }} />
+          </div>
+          <div style={{ fontSize: 12, color: "#475569" }}>
+            “Juda yaxshi narx”, “Yaxshi narx” va “Narx balandroq” holatlari bir qarashda ko‘rinsin.
+          </div>
+        </div>
       </div>
     </Card>
   );

@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useClientText } from "../shared/i18n_clientLocalize";
-import { Button, Card, Divider, List, message, Tag, Typography } from "antd";
+import { Avatar, Button, Card, Divider, List, message, Typography } from "antd";
 import { SendOutlined, ReloadOutlined, StopOutlined, CheckCircleOutlined } from "@ant-design/icons";
+import { statusTag } from "./ClientFreightPage.helpers.jsx";
 
 import FreightMap from "./map/FreightMap";
 import { FreightProvider, useFreight } from "./context/FreightContext";
@@ -10,26 +11,16 @@ import CargoPhotoUpload from "./components/Details/CargoPhotoUpload";
 import LoadersCounter from "./components/Details/LoadersCounter";
 import CargoForm from "./components/Details/CargoForm";
 
-import { createCargo, cancelCargo, cargoStatus, matchVehicles, listOffers, acceptOffer } from "./services/freightApi";
+import { freightSdk } from "@/modules/shared/domain/freight/freightSdk.js";
+import { normalizeFreightStatus, isFreightTerminalStatus } from "@/modules/shared/domain/freight/statusMap.js";
+import { logisticsLogger } from "@/modules/shared/domain/logistics/logisticsLogger.js";
 import { formatUZS } from "./services/truckData";
 import { useAuth } from "@/modules/shared/auth/AuthProvider";
 import { supabase } from "@/services/supabase/supabaseClient";
 import { subscribeClientCargo } from "@/services/freightService";
+import { supportAssets } from "@/assets/support";
 
 const { Title, Text } = Typography;
-
-function statusTag(status) {
-  const st = String(status || "");
-  if (st === "posted") return <Tag color="blue">E’lon qilindi</Tag>;
-  if (st === "offering") return <Tag color="gold">Takliflar kelyapti</Tag>;
-  if (st === "driver_selected") return <Tag color="green">{cp("Haydovchi tanlandi ✅")}</Tag>;
-  if (st === "loading") return <Tag color="cyan">{cp("Yuk joylanmoqda...")}</Tag>;
-  if (st === "in_transit") return <Tag color="purple">Yo‘lda</Tag>;
-  if (st === "delivered") return <Tag color="geekblue">Yetkazildi</Tag>;
-  if (st === "closed") return <Tag color="green">Yopildi</Tag>;
-  if (st === "cancelled") return <Tag color="red">Bekor qilindi</Tag>;
-  return <Tag>{st || "-"}</Tag>;
-}
 
 function Inner() {
   const { user } = useAuth();
@@ -75,21 +66,26 @@ function Inner() {
       const silent = !!opts.silent;
       if (!silent) setLoading(true);
       try {
-        const st = await cargoStatus({ cargoId });
+        const st = await freightSdk.cargoStatus({ cargoId });
         const c = st?.data?.cargo || st?.cargo;
         const o = st?.data?.offers || st?.offers || [];
-        setCargo(c || null);
+        const normalizedCargo = c ? { ...c, status: normalizeFreightStatus(c?.status) } : null;
+        setCargo(normalizedCargo);
         setOffers(Array.isArray(o) ? o : []);
+        if (normalizedCargo && isFreightTerminalStatus(normalizedCargo.status)) {
+          try { localStorage.removeItem("activeCargoId"); } catch {}
+        }
 
         // matches are optional (for “Mos mashinalar” panel)
         try {
-          const m = await matchVehicles({ cargoId, radiusKm: 30 });
+          const m = await freightSdk.matchVehicles({ cargoId, radiusKm: 30 });
           const mm = m?.data?.data || m?.data || [];
           setMatches(Array.isArray(mm) ? mm : []);
-        } catch {
-          // ignore
+        } catch (error) {
+          logisticsLogger.warn("freight", "matchVehicles", { message: error?.message || "match failed", cargoId });
         }
       } catch (e) {
+        logisticsLogger.error("freight", "cargoStatus", { message: e?.message || "Status olishda xatolik", cargoId });
         if (!silent) message.error(e?.message || "Status olishda xatolik");
       } finally {
         if (!silent) setLoading(false);
@@ -150,7 +146,7 @@ function Inner() {
         // truck tanlovi: hozircha “tavsiya” sifatida qoladi (backend matching capacity asosida)
         title: cargoName || (truck?.title ? `${cp("Yuk")}: ${truck.title}` : cp("Yuk")),
       };
-      const res = await createCargo(payload);
+      const res = await freightSdk.createCargo(payload);
       const id = res?.data?.data?.id || res?.data?.id || res?.id;
       if (!id) throw new Error("Serverdan cargoId kelmadi");
       setCargoId(String(id));
@@ -160,7 +156,7 @@ function Inner() {
       message.success(cp("Yuk e’loni yaratildi. Endi haydovchilar taklif yuboradi."));
       // show immediate movement: how many drivers can see it
       try {
-        const m = await matchVehicles({ cargoId: String(id), radiusKm: 30 });
+        const m = await freightSdk.matchVehicles({ cargoId: String(id), radiusKm: 30 });
         const mm = m?.data?.data || m?.data || [];
         setMatchedDrivers(Array.isArray(mm) ? mm.length : 0);
       } catch {
@@ -179,7 +175,7 @@ function Inner() {
     if (!cargoId) return;
     const hide = message.loading("Bekor qilinmoqda...", 0);
     try {
-      await cancelCargo({ cargoId, actorId: user?.id || null });
+      await freightSdk.cancelCargo({ cargoId, actorId: user?.id || null });
       setCargoId("");
       setCargo(null);
       setOffers([]);
@@ -200,7 +196,7 @@ function Inner() {
       if (!cargoId || !offerId) return;
       const hide = message.loading("Taklif qabul qilinmoqda...", 0);
       try {
-        await acceptOffer({ cargoId, offerId });
+        await freightSdk.acceptOffer({ cargoId, offerId });
         message.success(cp("Haydovchi tanlandi ✅"));
         await refresh({ silent: true });
       } catch (e) {
@@ -223,7 +219,7 @@ function Inner() {
       <div style={{ padding: 14, maxWidth: 840, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
           <div>
-            <Title level={4} style={{ margin: 0 }}>{cp("Yuk tashish")}</Title>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><img src={supportAssets.services.truckAlt || supportAssets.services.truck} alt="" style={{ width: 18, height: 18, objectFit: "contain" }} /><Title level={4} style={{ margin: 0 }}>{cp("Yuk tashish")}</Title></div>
             <Text type="secondary" style={{ fontSize: 12 }}>{cp("Yuk e’loni va haydovchi takliflari.")}</Text>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -363,7 +359,7 @@ function Inner() {
     <div className="unigo-page" style={{ padding: 14, maxWidth: 840, margin: "0 auto", paddingBottom: 96 }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
         <div>
-          <Title level={4} style={{ margin: 0 }}>{cp("Yuk tashish")}</Title>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}><img src={supportAssets.services.truckAlt || supportAssets.services.truck} alt="" style={{ width: 18, height: 18, objectFit: "contain" }} /><Title level={4} style={{ margin: 0 }}>{cp("Yuk tashish")}</Title></div>
           <Text type="secondary" style={{ fontSize: 12 }}>
             {cp("Nuqtalarni belgilang, yuk detallarini to‘ldiring va e’lon qiling — haydovchilar taklif yuboradi.")}
           </Text>

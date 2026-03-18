@@ -4,6 +4,10 @@ import { message } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/services/supabase/supabaseClient';
 import { useLanguage } from '@/modules/shared/i18n/useLanguage.js';
+import { integratedAssets } from '@/assets/integrated';
+import { securityAssets } from '@/assets/security';
+import { essentialsAssets } from '@/assets/essentials';
+import { buildRewardsDashboard } from './clientRewardsServicesGuidance.js';
 
 const AVATAR_BUCKET = 'avatars';
 
@@ -17,6 +21,15 @@ const ClientProfile = memo(function ClientProfile() {
   const [profileState, setProfileState] = useState({ fullName: '', phone: '', avatarUrl: '' });
   const [selectedAvatarFile, setSelectedAvatarFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
+
+
+  const rewardsDashboard = useMemo(() => buildRewardsDashboard({ debt: 0, tier: 'gold' }), []);
+
+  const essentialsTrustPoints = useMemo(() => ([
+    { icon: essentialsAssets.auth.authMaskSelfie, label: tr('profile.security.selfie', 'Selfie himoyasi'), text: tr('profile.security.selfie.desc', 'Biometriya va self-service verification uchun tayyor overlay qatlam.') },
+    { icon: essentialsAssets.auth.authMaskLicense, label: tr('profile.security.document', 'Hujjat nazorati'), text: tr('profile.security.document.desc', 'Hujjat va profil mosligini ko‘rsatadigan vizual guidance.') },
+    { icon: essentialsAssets.loyalty.loyaltyRewardBadge, label: tr('profile.security.reward', 'Faollik darajasi'), text: tr('profile.security.reward.desc', 'Mukofot, daraja va ishonch indikatorlarini profil ichida ko‘rsatadi.') },
+  ]), [tr]);
 
   useEffect(() => {
     let mounted = true;
@@ -148,18 +161,28 @@ const ClientProfile = memo(function ClientProfile() {
 
       <main className="mx-auto max-w-2xl space-y-5 px-4 pt-5">
         <form onSubmit={handleSave} className="space-y-5">
-          <section className="unigo-dark-card flex flex-col items-center p-6 text-center">
-            <div className="relative">
-              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/10">
-                {displayAvatar ? <img src={displayAvatar} alt="Profile Avatar" className="h-full w-full object-cover" /> : <span className="text-3xl font-black text-white">{initial}</span>}
-              </div>
-              <button type="button" onClick={() => fileInputRef.current?.click()} className="absolute bottom-0 right-0 flex h-10 w-10 items-center justify-center rounded-full bg-primaryHome text-white shadow-lg">
-                <span className="material-symbols-outlined text-[18px]">photo_camera</span>
-              </button>
-              <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/webp" onChange={handleAvatarSelect} className="hidden" />
+          <section className="unigo-dark-card relative overflow-hidden flex flex-col items-center p-6 text-center">
+            <img src={integratedAssets.auth.onboardingIntercity} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-15" />
+            <div className="pointer-events-none absolute right-5 top-5 flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-xs font-bold text-white backdrop-blur-sm">
+              <img src={integratedAssets.auth.profilePreferencesBadge} alt="" className="h-4 w-4" />
+              <span>Profile upgraded</span>
             </div>
-            <div className="mt-4 text-lg font-black text-white">{profileState.fullName || 'Foydalanuvchi'}</div>
-            <div className="mt-1 text-sm text-slate-300">Rasmni o‘zgartirish va ma’lumotlarni yangilash</div>
+            <div className="relative z-10">
+              <div className="relative">
+                <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/10">
+                  {displayAvatar ? <img src={displayAvatar} alt="Profile Avatar" className="h-full w-full object-cover" /> : <span className="text-3xl font-black text-white">{initial}</span>}
+                </div>
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="absolute bottom-0 right-0 flex h-10 w-10 items-center justify-center rounded-full bg-primaryHome text-white shadow-lg">
+                  <span className="material-symbols-outlined text-[18px]">photo_camera</span>
+                </button>
+                <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/webp" onChange={handleAvatarSelect} className="hidden" />
+              </div>
+              <div className="mt-4 flex items-center justify-center gap-2">
+                <div className="text-lg font-black text-white">{profileState.fullName || 'Foydalanuvchi'}</div>
+                <img src={integratedAssets.auth.profileStatusWaiting} alt="" className="h-4 w-4" />
+              </div>
+              <div className="mt-1 text-sm text-slate-300">Rasmni o‘zgartirish va ma’lumotlarni yangilash</div>
+            </div>
           </section>
 
           <section className="unigo-soft-card p-5">
@@ -172,6 +195,83 @@ const ClientProfile = memo(function ClientProfile() {
                 <span className="mb-2 block text-sm font-bold text-slate-800">Telefon raqam</span>
                 <input name="phone" value={profileState.phone} onChange={handleInputChange} className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[15px] font-medium text-slate-500 outline-none" placeholder="+998 XX XXX XX XX" disabled />
               </label>
+            </div>
+          </section>
+
+
+          <section className="grid gap-3 md:grid-cols-3">
+            {essentialsTrustPoints.map((item) => (
+              <SecurityPoint key={item.label} icon={item.icon} label={item.label} text={item.text} />
+            ))}
+          </section>
+
+          <section className="grid gap-3 md:grid-cols-3">
+            <div className="unigo-soft-card p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-[16px] bg-amber-50">
+                  <img src={essentialsAssets.loyalty.tierGold} alt="" className="h-6 w-6 object-contain" />
+                </div>
+                <div>
+                  <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Account health</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-900">{rewardsDashboard.tier}</div>
+                </div>
+              </div>
+              <div className="mt-3 text-xs leading-5 text-slate-600">Profil, reward va servis kartalari {rewardsDashboard.cards.join(', ')} tartibida ko‘rinadi.</div>
+            </div>
+            <div className="unigo-soft-card p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-[16px] bg-slate-100">
+                  <img src={securityAssets.trust.trustCertificate} alt="" className="h-5 w-5 object-contain" />
+                </div>
+                <div>
+                  <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Trust</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-900">Profil himoyalangan</div>
+                </div>
+              </div>
+              <div className="mt-3 text-xs leading-5 text-slate-600">Asosiy ma’lumotlar va akkaunt holati tekshiriladigan markaziy bo‘lim.</div>
+            </div>
+            <div className="unigo-soft-card p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-[16px] bg-slate-100">
+                  <img src={securityAssets.auth.authMaskSelfieDocument} alt="" className="h-5 w-5 object-contain" />
+                </div>
+                <div>
+                  <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Verify</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-900">Selfie va hujjat</div>
+                </div>
+              </div>
+              <div className="mt-3 text-xs leading-5 text-slate-600">Kerak bo‘lsa shaxsni tasdiqlash oqimi shu profile experience bilan bir xil vizual tilda davom etadi.</div>
+            </div>
+            <div className="unigo-soft-card p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-[16px] bg-slate-100">
+                  <img src={securityAssets.state.securityLockOutline} alt="" className="h-5 w-5 object-contain" />
+                </div>
+                <div>
+                  <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Access</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-900">Cheklovlar nazorati</div>
+                </div>
+              </div>
+              <div className="mt-3 text-xs leading-5 text-slate-600">Agar akkaunt vaqtincha tekshiruvda bo‘lsa, warning va block state shu yerda aniq ko‘rinadi.</div>
+            </div>
+          </section>
+
+          <section className="rounded-[24px] border border-[#E2E8F0] bg-white p-5 shadow-[0_10px_24px_rgba(28,36,48,.06)]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-slate-600">
+                  <img src={securityAssets.state.securityRatingWarning} alt="" className="h-4 w-4 object-contain" />
+                  <span>Account health</span>
+                </div>
+                <div className="mt-3 text-base font-black text-slate-900">Profil holati va xavfsizlik ko‘rsatkichlari</div>
+                <div className="mt-2 text-sm leading-6 text-slate-600">Telefon, profil va xavfsizlik indikatorlari bir joyda ko‘rinadi. Keyingi verification, antifraud yoki scanner oqimlari ham shu blokka ulanadi.</div>
+              </div>
+              <img src={securityAssets.state.securityArtUserBlocked || securityAssets.auth.authUserAvatar} alt="" className="h-16 w-16 rounded-[20px] object-contain bg-slate-50 p-2" />
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <SecurityPoint icon={securityAssets.notifications.notifyBellUnread} label="Alerts ready" text="Muhim ogohlantirishlar alohida ko‘rinadi" />
+              <SecurityPoint icon={securityAssets.scanner.scanQrCode} label="Scanner ready" text="QR va identifikatsiya oqimlari ulanadi" />
+              <SecurityPoint icon={securityAssets.trust.trustHumanVerified} label="Trust ready" text="Verified va review state bir xil tizimda ishlaydi" />
             </div>
           </section>
 
@@ -196,5 +296,19 @@ const ClientProfile = memo(function ClientProfile() {
     </div>
   );
 });
+
+function SecurityPoint({ icon, label, text }) {
+  return (
+    <div className="rounded-[20px] bg-slate-50 p-4">
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-white shadow-sm">
+          <img src={icon} alt="" className="h-5 w-5 object-contain" />
+        </div>
+        <div className="text-sm font-black text-slate-900">{label}</div>
+      </div>
+      <div className="mt-3 text-xs leading-5 text-slate-600">{text}</div>
+    </div>
+  );
+}
 
 export default ClientProfile;

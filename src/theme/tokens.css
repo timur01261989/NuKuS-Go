@@ -8,8 +8,8 @@
 
 /* Font */
 @font-face {
-  font-family: "YangoHeadline";
-  src: url('/assets/fonts/yango-headline-multi.woff') format('woff');
+  font-family: "AccentHeadline";
+  src: url('/assets/fonts/accent-headline-multi.woff') format('woff');
   font-weight: 700;
   font-style: normal;
   font-display: swap;

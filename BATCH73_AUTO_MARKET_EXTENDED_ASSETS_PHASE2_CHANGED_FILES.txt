@@ -1,0 +1,2 @@
+BATCH73 AUTO MARKET EXTENDED ASSETS PHASE2
+Added extended body-type visuals, deep EV/price-drop/VIN signals, inspection certificate visuals, dealer tier ladder logic, stronger warranty/reservation cards, richer filter quick-picks, and stronger favorites/dealer/feed surfaces.

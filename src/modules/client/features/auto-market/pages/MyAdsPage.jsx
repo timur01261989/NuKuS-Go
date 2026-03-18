@@ -37,6 +37,12 @@ import { useNavigate } from "react-router-dom";
 import { myAds, markAdStatus, promoteAd } from "../services/marketBackend";
 import CarCardHorizontal from "../components/Feed/CarCardHorizontal";
 import { useAutoMarketI18n } from "../utils/useAutoMarketI18n";
+import { buildSellerPerformanceSummary } from "../services/autoMarketDecisionSupport";
+import { buildLuxuryDecisionRibbon } from "../services/autoMarketLuxury";
+import { buildSellerShowroomSummary } from "../services/autoMarketShowroom";
+import { buildSellerInsights } from "../services/autoMarketSellerStudio";
+import { buildSellerCommandCenter } from "../services/autoMarketFinalPolish";
+import SellerCrmBoard from "../components/Seller/SellerCrmBoard";
 
 export default function MyAdsPage() {
   const { am } = useAutoMarketI18n();
@@ -45,6 +51,10 @@ export default function MyAdsPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [promoModal, setPromoModal] = useState({ open: false, adId: null });
+  const performanceCards = buildSellerPerformanceSummary(items);
+  const luxuryDecisionRibbon = buildLuxuryDecisionRibbon(items);
+  const showroomSummary = buildSellerShowroomSummary(items);
+  const commandCenter = buildSellerCommandCenter(items);
 
   // Ma'lumotlarni yuklash
   const load = useCallback(async () => {
@@ -109,6 +119,29 @@ export default function MyAdsPage() {
         </Button>
       </div>
 
+      {luxuryDecisionRibbon.length ? (
+        <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", marginBottom: 16 }}>
+          {luxuryDecisionRibbon.map((item) => (
+            <div key={item.key} style={{ borderRadius: 18, padding: 14, border: `1px solid ${item.tone}22`, background: `${item.tone}10` }}>
+              <div style={{ fontSize: 12, color: "#64748b" }}>{item.label}</div>
+              <div style={{ marginTop: 8, fontWeight: 900, color: "#0f172a" }}>{item.value}</div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+
+      {commandCenter.length ? (
+        <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", marginBottom: 16 }}>
+          {commandCenter.map((item) => (
+            <div key={item.key} onClick={() => nav(item.route)} style={{ borderRadius: 18, padding: 14, border: `1px solid ${item.tone}22`, background: `${item.tone}10`, cursor: "pointer" }}>
+              <div style={{ fontSize: 12, color: "#64748b" }}>{item.label}</div>
+              <div style={{ marginTop: 8, fontWeight: 900, color: "#0f172a" }}>{item.value}</div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
       {loading && items.length === 0 ? (
         <div style={{ display: "flex", justifyContent: "center", padding: 50 }}><Spin size="large" /></div>
       ) : items.length === 0 ? (
@@ -171,7 +204,7 @@ export default function MyAdsPage() {
                       ghost 
                       icon={<ThunderboltOutlined />} 
                       style={{ borderRadius: 8, fontSize: 11 }}
-                      onClick={() => setPromoModal({ open: true, adId: ad.id })}
+                      onClick={() => nav(`/auto-market/promote/${ad.id}`)}
                     >
                       Tezlatish
                     </Button>
@@ -262,7 +295,63 @@ export default function MyAdsPage() {
         />
       </Modal>
 
-      {/* Pastki Tahlil Bloki */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, marginTop: 16 }}>
+        {sellerInsights.map((item) => (
+          <div key={item.key} style={{ borderRadius: 18, padding: 14, background: `${item.tone}10`, border: `1px solid ${item.tone}22` }}>
+            <div style={{ fontSize: 12, color: "#64748b" }}>{item.title}</div>
+            <div style={{ marginTop: 6, fontSize: 24, fontWeight: 950, color: item.tone }}>{item.value}</div>
+            <div style={{ marginTop: 4, fontSize: 12, color: "#475569" }}>{item.text}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, marginTop: 16 }}>
+        {showroomSummary.map((item) => (
+          <div key={item.key} style={{ borderRadius: 18, padding: 14, background: "#fff", border: "1px solid #e2e8f0", boxShadow: "0 10px 24px rgba(2,6,23,.04)" }}>
+            <div style={{ fontSize: 12, color: "#64748b" }}>{item.label}</div>
+            <div style={{ marginTop: 6, fontSize: 24, fontWeight: 950, color: item.tone }}>{item.value}</div>
+          </div>
+        ))}
+      </div>
+
+
+      <div style={{ marginTop: 16 }}>
+        
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+        <Button style={{ borderRadius: 12 }} onClick={() => nav("/auto-market/seller/leads")}>Leadlarni ochish</Button>
+        <Button style={{ borderRadius: 12 }} onClick={() => nav("/auto-market/seller/appointments")}>Seller agenda</Button>
+      </div>
+      <Card style={{ borderRadius: 22, marginBottom: 16, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+            <div>
+              <div style={{ fontWeight: 900, color: "#0f172a" }}>Marketplace final center</div>
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>Dealer profil, finance va alerts markaziga tez kirish.</div>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Button onClick={() => nav("/auto-market/notifications")}>Alerts</Button>
+              <Button onClick={() => nav("/auto-market/dealer/main")}>Dealer</Button>
+              <Button onClick={() => nav("/auto-market/finance-offers/showcase")}>Finance</Button>
+            </div>
+          </div>
+        </Card>
+
+        <SellerCrmBoard items={items} onOpenLeads={() => nav("/auto-market/seller/leads")} onOpenAgenda={() => nav("/auto-market/seller/appointments")} />
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10, marginBottom: 16 }}>
+        {[
+          { key: "leads", title: "Leadlar markazi", text: "Booking, chat va qo‘ng‘iroq oqimini bir joydan boshqaring.", action: () => nav("/auto-market/seller/leads"), tone: "#0ea5e9" },
+          { key: "agenda", title: "Appointment agenda", text: "Bugungi ko‘rishlar, reminder va receipt holatlarini nazorat qiling.", action: () => nav("/auto-market/seller/appointments"), tone: "#8b5cf6" },
+          { key: "promote", title: "Promote listing", text: "Premium yoki showroom paketga tez kirish.", action: () => setPromoModal({ open: true, adId: items[0]?.id || null }), tone: "#f59e0b" },
+        ].map((item) => (
+          <button key={item.key} type="button" onClick={item.action} style={{ borderRadius: 18, padding: 14, border: `1px solid ${item.tone}22`, background: `${item.tone}10`, textAlign: "left", cursor: "pointer" }}>
+            <div style={{ fontWeight: 900, color: "#0f172a" }}>{item.title}</div>
+            <div style={{ marginTop: 6, fontSize: 12, color: "#475569" }}>{item.text}</div>
+          </button>
+        ))}
+      </div>
+      </div>
+
+            {/* Pastki Tahlil Bloki */}
       <div style={{ 
         marginTop: 30, 
         padding: 20, 

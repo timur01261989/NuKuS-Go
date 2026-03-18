@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Marker } from "react-leaflet";
 import L from "leaflet";
+import { mapAssets } from "@/assets/map";
 
 /**
  * VehicleMarker
@@ -69,18 +70,23 @@ export default function VehicleMarker({
 
   const icon = useMemo(() => {
     const s = size;
+    const markerVisual = mapAssets.searchCarStart || mapAssets.searchCar || mapAssets.courierBikeMarker || "";
     const html = `
       <div class="yg-car-wrap" style="width:${s}px;height:${s}px;">
         <div class="yg-car" style="
           width:${s}px;height:${s}px;
           border-radius: 14px;
-          background:${color};
+          background:${markerVisual ? "rgba(255,255,255,.96)" : color};
           box-shadow: 0 10px 20px rgba(0,0,0,.25);
           display:flex;align-items:center;justify-content:center;
           transform: rotate(${bearing}deg);
           transform-origin: 50% 50%;
+          border: 1px solid rgba(15,23,42,.08);
+          overflow: hidden;
         ">
-          <div style="
+          ${markerVisual
+            ? `<img src="${markerVisual}" alt="" style="width:${Math.round(s*0.82)}px;height:${Math.round(s*0.82)}px;object-fit:contain;" />`
+            : `<div style="
             width:${Math.round(s*0.52)}px;height:${Math.round(s*0.52)}px;
             border-radius: 10px;
             background: rgba(0,0,0,.18);
@@ -91,7 +97,7 @@ export default function VehicleMarker({
               width:12px;height:10px;border-radius:0 0 10px 10px;
               background: rgba(0,0,0,.25);
             "></div>
-          </div>
+          </div>`}
         </div>
         ${label ? `<div class="yg-car-label">${label}</div>` : ``}
       </div>

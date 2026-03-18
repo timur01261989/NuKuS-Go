@@ -1,0 +1,12 @@
+UNIGO batch47 security assets phase3 final
+
+Changed files:
+- src/modules/client/features/client/components/PaymentStatus.jsx
+- src/modules/client/features/payments/PaymentsModule.jsx
+- src/modules/client/features/client/pages/ClientProfile.jsx
+- tests/batch47-security-assets-final.test.js
+
+Scope:
+- Extended final security visual layer into payment status, payments module and profile
+- Added trust / scanner / antifraud / alert sections without changing business logic
+- Kept neutral naming and removed external traces from touched files

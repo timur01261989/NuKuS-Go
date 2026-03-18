@@ -43,6 +43,7 @@ export default function UnifiedParcelFeed({
   const [acceptLoading, setAcceptLoading] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
+  const [realtimeMeta, setRealtimeMeta] = useState(null);
 
   useEffect(() => { setDriverMode(driverMode); }, [driverMode, setDriverMode]);
 
@@ -51,7 +52,10 @@ export default function UnifiedParcelFeed({
     supabase,
     filter: parcelFilter,
     onSnapshot: (data) => setParcels(data),
-    onEvent: (evt) => setRealtimeEvent(evt),
+    onEvent: (evt) => {
+      setRealtimeEvent(evt);
+      if (evt?.meta) setRealtimeMeta(evt.meta);
+    },
   });
 
   const matched = useRouteMatching({

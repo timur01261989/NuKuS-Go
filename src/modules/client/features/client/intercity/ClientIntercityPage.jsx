@@ -24,14 +24,10 @@ import {
   ThunderboltOutlined,
   CheckCircleFilled 
 } from "@ant-design/icons";
-import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from "react-leaflet";
-import L from "leaflet";
+import { MapContainer, TileLayer, Marker, Polyline } from "react-leaflet";
 import { useNavigate } from "react-router-dom"; 
 import { useLanguage } from "@/modules/shared/i18n/useLanguage";
 import { useClientText } from "../shared/i18n_clientLocalize";
-
-import RegionDistrictSelect from "@/modules/shared/components/RegionDistrictSelect";
-import { UZ_REGIONS } from "@/modules/shared/constants/uzRegions";
 import { supabase } from "@/services/supabase/supabaseClient";
 import { osrmRouteDriving, haversineKm } from "@/modules/shared/services/osrm"; 
 
@@ -40,175 +36,17 @@ import { listMarketCars } from "../../../services/marketService.js";
 
 import "leaflet/dist/leaflet.css";
 
-// Marker icon fix
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-});
-
-const mapTile = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
-
-// --- Yordamchi funksiyalar ---
-
-function getRegionCenter(regionName) {
-  const r = UZ_REGIONS.find((x) => x.name === regionName);
-  return r?.center || null;
-}
-
-function loadSavedPickupPoints() {
-  try {
-    return JSON.parse(localStorage.getItem("saved_pickup_points") || "[]");
-  } catch { return []; }
-}
-
-function savePickupPoint(pt) {
-  if (!pt) return;
-  const pts = loadSavedPickupPoints();
-  const newPts = [pt, ...pts].filter((v, i, a) => a.findIndex(t => (t[0] === v[0] && t[1] === v[1])) === i).slice(0, 5);
-  localStorage.setItem("saved_pickup_points", JSON.stringify(newPts));
-}
-
-// Manzil nomini aniqlash (Reverse Geocoding)
-async function getAddressName(lat, lng) {
-  try {
-    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=uz`);
-    const data = await res.json();
-    return data.display_name || cp("Noma'lum manzil");
-  } catch (e) {
-    return cp("Manzilni aniqlab bo'lmadi");
-  }
-}
-
-// --- Komponentlar ---
-
-function FitBounds({ points }) {
-  const map = useMap();
-  useEffect(() => {
-    if (!map) return;
-    const validPoints = (points || []).filter(p => Array.isArray(p) && p.length === 2);
-    if (validPoints.length === 0) return;
-    if (validPoints.length === 1) {
-      map.setView(validPoints[0], 9, { animate: true });
-      return;
-    }
-    const bounds = L.latLngBounds(validPoints.map((p) => L.latLng(p[0], p[1])));
-    map.fitBounds(bounds.pad(0.2), { animate: true });
-  }, [map, points]);
-  return null;
-}
-
-function PickupPicker({ value, onChange, savedPoints }) {
-  useMapEvents({
-    click(e) {
-      onChange([e.latlng.lat, e.latlng.lng]);
-    },
-  });
-
-  return (
-    <>
-      {Array.isArray(savedPoints) ? savedPoints.map((p, idx) => (
-        <Marker key={`sp-${idx}`} position={p} eventHandlers={{ click: () => onChange(p) }} opacity={0.6} />
-      )) : null}
-      {value ? <Marker position={value} /> : null}
-    </>
-  );
-}
-
-// --- O'rindiq Tanlash Komponenti ---
-function SeatSelector({ trip, selectedSeats, onToggleSeat }) {
-  const { t, cp } = useClientText();
-  const isCar = trip.vehicle_type === 'car' || !trip.vehicle_type; // Default yengil
-  const totalSeats = trip.seats || 4;
-
-  const seatStyle = (id) => ({
-    width: 40, height: 40, 
-    borderRadius: 8, 
-    display: "flex", alignItems: "center", justifyContent: "center",
-    fontWeight: "bold", cursor: "pointer",
-    border: "1px solid #ccc",
-    background: selectedSeats.includes(id) ? "#1890ff" : "#fff",
-    color: selectedSeats.includes(id) ? "#fff" : "#333",
-    fontSize: 14
-  });
-
-  const driverSeatStyle = {
-    width: 40, height: 40, borderRadius: 8, 
-    background: "#ddd", color: "#666", 
-    display: "flex", alignItems: "center", justifyContent: "center", 
-    fontSize: 10, fontWeight: "bold", border: "1px solid #999"
-  };
-
-  if (isCar) {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "center", background: "#f0f2f5", padding: 16, borderRadius: 12 }}>
-        <div style={{ fontWeight: 600, marginBottom: 4 }}>{`${t.lightCar || cp("Yengil mashina")} ${cp("sxemasi")}`}</div>
-        {/* Oldi qator */}
-        <div style={{ display: "flex", gap: 20 }}>
-          <div style={driverSeatStyle}>{cp("Rul")}</div>
-          <div style={seatStyle("A1")} onClick={() => onToggleSeat("A1")}>A1</div>
-        </div>
-        {/* Orqa qator */}
-        <div style={{ display: "flex", gap: 10 }}>
-          <div style={seatStyle("B1")} onClick={() => onToggleSeat("B1")}>B1</div>
-          <div style={seatStyle("B2")} onClick={() => onToggleSeat("B2")}>B2</div>
-          <div style={seatStyle("B3")} onClick={() => onToggleSeat("B3")}>B3</div>
-        </div>
-      </div>
-    );
-  }
-
-  // Avtobus yoki Gazel (Kataklar)
-  return (
-    <div style={{ background: "#f0f2f5", padding: 16, borderRadius: 12 }}>
-      <div style={{ fontWeight: 600, marginBottom: 8, textAlign: "center" }}>
-        {trip.vehicle_type === 'bus' ? t.bus : `${t.gazelle}/Mikroavtobus`} ({totalSeats} {cp("o'rin")})
-      </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center" }}>
-        {Array.from({ length: totalSeats }).map((_, i) => {
-          const id = i + 1;
-          return (
-            <div key={id} style={seatStyle(id)} onClick={() => onToggleSeat(id)}>
-              {id}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function TripCard({ trip, onViewMap, onSelect }) {
-  const { t, cp } = useClientText();
-  const titleFrom = trip.from_district ? `${trip.from_region} • ${trip.from_district}` : trip.from_region;
-  const titleTo = trip.to_district ? `${trip.to_region} • ${trip.to_district}` : trip.to_region;
-
-  return (
-    <div style={{ border: "1px solid rgba(0,0,0,0.08)", borderRadius: 14, padding: 14, marginBottom: 10, background: "#fff" }}>
-      <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 16 }}>{titleFrom} → {titleTo}</div>
-      
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
-        <Tag color="blue">{trip.vehicle_type === 'bus' ? t.bus : trip.vehicle_type === 'gazel' ? t.gazelle : t.lightCar}</Tag>
-        {trip.has_ac && <Tag color="cyan">AC</Tag>}
-        {trip.has_trunk && <Tag color="purple">{t.trunk}</Tag>}
-        {trip.women_only && <Tag color="magenta">{t.womenOnlyTag}</Tag>}
-      </div>
-
-      <div style={{ fontSize: 13, opacity: 0.8, marginBottom: 10 }}>
-        <div>📅 {trip.depart_date} {trip.depart_time ? `⏰ ${String(trip.depart_time).slice(0,5)}` : ""}</div>
-        <div style={{ fontWeight: 600, marginTop: 4 }}>
-          💺 {trip.seats} ta joy • {trip.price ? `${trip.price.toLocaleString()} so'm` : t.agreed}
-        </div>
-      </div>
-
-      <div style={{ display: "flex", gap: 10 }}>
-        <Button onClick={() => onViewMap(trip)} icon={<EnvironmentOutlined />} block>{t.routeView}</Button>
-        <Button type="primary" onClick={() => onSelect(trip)} block>{t.choose}</Button>
-      </div>
-    </div>
-  );
-}
+import {
+  FitBounds,
+  PickupPicker,
+  SeatSelector,
+  TripCard,
+  getAddressName,
+  getRegionCenter,
+  loadSavedPickupPoints,
+  mapTile,
+  savePickupPoint,
+} from "./ClientIntercityPage.helpers";
 
 export default function ClientIntercityPage() {
   const navigate = useNavigate();

@@ -22,7 +22,6 @@ interface AccountLookupRow {
 interface PendingOtpRow {
   id: string;
   otp_hash: string | null;
-  otp_code: string | null;
   expires_at: string | null;
   attempt_count: number;
 }

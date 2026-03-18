@@ -3,6 +3,7 @@ import { message } from "antd";
 import { useTaxi } from "../context/TaxiProvider";
 import { cityTaxiApi } from "../services/cityTaxiApi";
 import { haversineKm, smoothHeading } from "../utils/geo";
+import { taxiLogger } from "@/modules/shared/taxi/utils/taxiLogger.js";
 
 /**
  * useDriverLocation.js
@@ -37,7 +38,9 @@ export function useDriverLocation({ enabled }) {
       try {
         window.__driver_lat = lat;
         window.__driver_lng = lng;
-      } catch {}
+      } catch {
+        // noop
+      }
 
       dispatch({
         type: "driver/setLocation",
@@ -50,9 +53,6 @@ export function useDriverLocation({ enabled }) {
       });
 
       const now = Date.now();
-      // ✅ Throttle + distance gate:
-      // - juda tez-tez DB/serverga yozish (1s) -> write storm + realtime lag
-      // - amaliy MVP: 5-7 sekundda 1 marta yoki 25m+ siljisa yuboramiz
       const last = lastSentLatLngRef.current;
       const movedM = last ? haversineKm([last[0], last[1]], [lat, lng]) * 1000 : Infinity;
       const dueByTime = now - lastSendRef.current >= 7000;
@@ -63,13 +63,18 @@ export function useDriverLocation({ enabled }) {
         lastSentLatLngRef.current = [lat, lng];
         try {
           await cityTaxiApi.sendDriverLocation({ lat, lng, heading, accuracy: acc });
-        } catch {
-          // silent
+        } catch (error) {
+          taxiLogger.warn("Driver location yuborilmadi", {
+            error: error?.message || String(error),
+            lat,
+            lng,
+          });
         }
       }
     };
 
     const onErr = (err) => {
+      taxiLogger.warn("GPS error", { code: err?.code, message: err?.message });
       console.warn("GPS error", err);
     };
 

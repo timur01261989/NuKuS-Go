@@ -77,8 +77,8 @@ body {
    Fayl yo‘li to‘g‘ri ekanini tekshiring
 ========================================= */
 @font-face {
-  font-family: "YangoHeadline";
-  src: url('/assets/fonts/yango-headline-multi.woff') format('woff');
+  font-family: "AccentHeadline";
+  src: url('/assets/fonts/accent-headline-multi.woff') format('woff');
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -99,27 +99,27 @@ h5,
 .ant-typography,
 .ant-btn,
 .ant-card-head-title {
-  font-family: var(--font-sans, "YangoHeadline", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif) !important;
+  font-family: var(--font-sans, "AccentHeadline", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif) !important;
 
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 /* =========================================
-   3) YANDEX STYLE HEADERS
+   3) PREMIUM STYLE HEADERS
    Ranglarni bu yerda qotirib bermaymiz,
    currentColor ishlatsin (theme o‘zi beradi).
 ========================================= */
-.yango-header {
-  font-family: var(--font-sans, "YangoHeadline", sans-serif) !important;
+.accent-header {
+  font-family: var(--font-sans, "AccentHeadline", sans-serif) !important;
   letter-spacing: -0.8px;
   line-height: 1.1;
   font-weight: 800;
   color: currentColor;
 }
 
-.yango-title {
-  font-family: var(--font-sans, "YangoHeadline", sans-serif) !important;
+.accent-title {
+  font-family: var(--font-sans, "AccentHeadline", sans-serif) !important;
   letter-spacing: -0.8px;
   line-height: 1.1;
   font-weight: 700;

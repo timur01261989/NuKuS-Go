@@ -1,5 +1,5 @@
 /* Service Worker: cache map tiles (stale-while-revalidate) + offline fallback + Push Notifications */
-const VERSION = "nukusgo-sw-v3";
+const VERSION = "nukusgo-sw-v5";
 const TILE_CACHE = `tiles-${VERSION}`;
 
 /**
@@ -113,7 +113,7 @@ self.addEventListener("notificationclick", (event) => {
 
   // Haydovchi: buyurtmani qabul qilish
   if (event.action === "accept") {
-    const acceptUrl = event.notification.data?.acceptUrl || "/driver/dashboard";
+    const acceptUrl = event.notification.data?.acceptUrl || "/driver";
     event.waitUntil(clients.openWindow(acceptUrl));
     return;
   }

@@ -1,100 +1,52 @@
 /**
- * AUTO MARKET BACKEND (Supabase-first, mock fallback)
+ * AUTO MARKET BACKEND.
  *
- * Maqsad:
- *  - Avto savdo modulini real Supabase backend bilan ishlaydigan qilish.
- *  - Agar Supabase ENV yo'q yoki jadval hali yaratilmagan bo'lsa — eski mock (marketApi.js) ishlashda davom etadi.
- *
- * Cheklov:
- *  - Bu fayl faqat auto-market ichida ishlatiladi (boshqa xizmatlarga tegilmagan).
+ * Mode policy:
+ *  - development default: mock
+ *  - production default: backend
+ *  - fallback to mock remains for compatibility, but is explicit and logged
  */
 
 import { supabase } from "@/services/supabase/supabaseClient.js";
+import { clientLogger } from "@/modules/shared/utils/clientLogger.js";
+import { toUserError } from "@/modules/shared/utils/errorAdapter.js";
 import * as mock from "./marketApi";
-import { axiosClient } from "../api/axiosClient";
+export {
+  buyPromotion,
+  createPayment,
+  getWalletBalance,
+  promoteAd,
+  revealPhone,
+  revealSellerPhone,
+} from "./marketPayments";
+import {
+  SB_READY,
+  getAuthUserId,
+  isMissingRelationError,
+  normalizeAdRow,
+} from "./marketBackend.helpers";
+import { getAutoMarketMode, isAutoMarketMockMode } from "./marketMode";
 
-const SB_READY =
-  !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Helpers va payment actionlar alohida modullarga ajratilgan.
 
-function isMissingRelationError(err) {
-  const msg = (err && (err.message || err.error_description || err.details)) || "";
-  return (
-    String(msg).toLowerCase().includes("does not exist") ||
-    String(msg).toLowerCase().includes("relation") ||
-    String(msg).toLowerCase().includes("42p01")
-  );
+
+function shouldUseMockFallback() {
+  return isAutoMarketMockMode() || !SB_READY;
 }
 
-async function getAuthUserId() {
-  const { data, error } = await supabase.auth.getUser();
-  if (error) return null;
-  return data?.user?.id || null;
-}
-
-function normalizeAdRow(row) {
-  if (!row) return row;
-  const images = (row.images || []).map((x) => x.url || x.image_url).filter(Boolean);
-  return {
-    ...row,
-    images,
-    seller: row.seller || {
-      name: row.seller_name || "",
-      phone: row.seller_phone || "",
-      rating: row.seller_rating || null,
-    },
-  };
+function logMockFallback(feature, reason) {
+  clientLogger.warn("auto_market.mock_fallback", {
+    feature,
+    reason,
+    mode: getAutoMarketMode(),
+    supabaseReady: SB_READY,
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Cars / Ads
 // ─────────────────────────────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────────────────────
-// YANGI: PUL BILAN BOG'LIQ XIZMATLAR (PROMOTE, PHONE, WALLET)
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * E'lonni ko'tarish (Promotion) - PromoModal ishlatadi
- */
-export const promoteAd = async (adId, promoType) => {
-  try {
-    const { data } = await axiosClient.post("/market/promote", {
-      ad_id: adId,
-      promo_type: promoType,
-    });
-    return data;
-  } catch (err) {
-    console.error("Promote Error:", err);
-    if (mock.promoteAd) return mock.promoteAd(adId, promoType);
-    throw new Error(err.response?.data?.message || "Balans yetarli emas yoki tizim xatosi");
-  }
-};
-
-/**
- * Sotuvchi telefon raqamini ko'rish (Pullik xizmat)
- */
-export const revealSellerPhone = async (adId) => {
-  try {
-    const { data } = await axiosClient.post("/market/reveal-phone", { ad_id: adId });
-    return data;
-  } catch (err) {
-    console.error("Reveal Phone Error:", err);
-    throw new Error(err.response?.data?.message || "402");
-  }
-};
-
-/**
- * Foydalanuvchi hamyon balansini olish
- */
-export async function getWalletBalance() {
-  try {
-    const { data } = await axiosClient.get("/wallet");
-    if (typeof data === "number") return data;
-    return data?.wallet?.balance_uzs ?? data?.balance ?? 0;
-  } catch (err) {
-    console.error("Wallet Balance Fetch Error:", err);
-    return 0;
-  }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // YANGI QO'SHILGAN FUNKSIYALAR
@@ -105,7 +57,7 @@ export async function getWalletBalance() {
  * (Sug'urta muddati, yurgan yo'li va h.k.)
  */
 export const updateGarajItem = async (adId, updates) => {
-  if (!SB_READY) {
+  if (shouldUseMockFallback()) {
     const current = JSON.parse(localStorage.getItem("my_garaj") || "[]");
     const newList = current.map((item) =>
       String(item.ad_id) === String(adId) ? { ...item, ...updates } : item
@@ -127,8 +79,9 @@ export const updateGarajItem = async (adId, updates) => {
     if (error) throw error;
     return getGaraj();
   } catch (err) {
-    console.error("Garajni yangilashda xato:", err);
+    clientLogger.error("auto_market.garaj_update_failed", { message: err?.message });
     if (isMissingRelationError(err)) {
+      logMockFallback("updateGarajItem", "missing_relation");
       const current = JSON.parse(localStorage.getItem("my_garaj") || "[]");
       const newList = current.map((item) =>
         String(item.ad_id) === String(adId) ? { ...item, ...updates } : item
@@ -141,7 +94,7 @@ export const updateGarajItem = async (adId, updates) => {
 };
 
 export async function listCars(filters = {}, { page = 1, pageSize = 12 } = {}) {
-  if (!SB_READY) return mock.listCars(filters, { page, pageSize });
+  if (shouldUseMockFallback()) { logMockFallback("listCars", SB_READY ? "mode_mock" : "supabase_unavailable"); return mock.listCars(filters, { page, pageSize }); }
 
   try {
     const from = (page - 1) * pageSize;
@@ -167,6 +120,8 @@ export async function listCars(filters = {}, { page = 1, pageSize = 12 } = {}) {
     if (filters.model) q = q.eq("model", filters.model);
     if (filters.yearFrom) q = q.gte("year", Number(filters.yearFrom));
     if (filters.yearTo) q = q.lte("year", Number(filters.yearTo));
+    if (filters.bodyType) q = q.eq("body_type", filters.bodyType);
+    if (filters.fuel_type) q = q.eq("fuel_type", filters.fuel_type);
     if (filters.minPrice) q = q.gte("price_uzs", Number(filters.minPrice));
     if (filters.maxPrice) q = q.lte("price_uzs", Number(filters.maxPrice));
     if (filters.kredit) q = q.eq("is_credit", true);
@@ -192,7 +147,7 @@ export async function listCars(filters = {}, { page = 1, pageSize = 12 } = {}) {
     return { items: (data || []).map(normalizeAdRow), total: count || 0, page, pageSize };
   } catch (e) {
     if (isMissingRelationError(e)) return mock.listCars(filters, { page, pageSize });
-    throw new Error(e?.message || "Auto Market: listCars xatosi");
+    throw toUserError(e, "Auto Market: listCars xatosi");
   }
 }
 
@@ -224,28 +179,11 @@ export async function getCarById(id) {
     };
   } catch (e) {
     if (isMissingRelationError(e)) return mock.getCarById(id);
-    throw new Error(e?.message || "Auto Market: getCarById xatosi");
+    throw toUserError(e, "Auto Market: getCarById xatosi");
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Wallet / Payments / Paid actions (server-side)
-// ─────────────────────────────────────────────────────────────────────────────
-
-export async function createPayment({ provider = "demo", amount_uzs, return_url } = {}) {
-  const { data } = await axiosClient.post(`/auto-market/payment/create`, { provider, amount_uzs, return_url });
-  return data;
-}
-
-export async function buyPromotion({ ad_id, promo_type } = {}) {
-  const { data } = await axiosClient.post(`/auto-market/promo/buy`, { ad_id, promo_type });
-  return data;
-}
-
-export async function revealPhone({ ad_id } = {}) {
-  const { data } = await axiosClient.post(`/auto-market/contact/reveal`, { ad_id });
-  return data;
-}
+// Wallet / Payments / Paid actions alohida moduldan re-export qilinadi.
 
 export async function createCarAd(draft) {
   if (!SB_READY) return mock.createCarAd(draft);
@@ -337,7 +275,7 @@ export async function createCarAd(draft) {
     return normalizeAdRow({ ...inserted, images: images.map((url, idx) => ({ image_url: url, sort_order: idx })) });
   } catch (e) {
     if (isMissingRelationError(e)) return mock.createCarAd(draft);
-    throw new Error(e?.message || "Auto Market: createCarAd xatosi");
+    throw toUserError(e, "Auto Market: createCarAd xatosi");
   }
 }
 

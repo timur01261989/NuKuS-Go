@@ -1,5 +1,6 @@
 import React, { lazy } from "react";
 import { Navigate, Route } from "react-router-dom";
+import { ROUTES } from "./routePaths.js";
 
 const DriverHome = lazy(() => import("../../modules/driver/pages/DriverHome.jsx"));
 const DriverOrders = lazy(() => import("../../modules/driver/pages/DriverOrders.jsx"));
@@ -14,16 +15,17 @@ const DriverReferral = lazy(() => import("../../modules/driver/pages/DriverRefer
 function DriverRoutes() {
   return (
     <>
-      <Route path="/driver" element={<DriverHome />} />
-      <Route path="/driver/orders" element={<DriverOrders />} />
-      <Route path="/driver/active-order" element={<DriverActiveOrder />} />
-      <Route path="/driver/wallet" element={<DriverWallet />} />
-      <Route path="/driver/profile" element={<DriverProfile />} />
-      <Route path="/driver/settings" element={<DriverSettings />} />
-      <Route path="/driver/vehicles" element={<DriverVehicles />} />
-      <Route path="/driver/insights" element={<DriverInsights />} />
-      <Route path="/driver/referral" element={<DriverReferral />} />
-      <Route path="/driver/home" element={<Navigate replace to="/driver" />} />
+      <Route path={ROUTES.driver.home} element={<DriverHome />} />
+      <Route path={ROUTES.driver.orders} element={<DriverOrders />} />
+      <Route path={ROUTES.driver.activeOrder} element={<DriverActiveOrder />} />
+      <Route path={ROUTES.driver.wallet} element={<DriverWallet />} />
+      <Route path={ROUTES.driver.profile} element={<DriverProfile />} />
+      <Route path={ROUTES.driver.settings} element={<DriverSettings />} />
+      <Route path={ROUTES.driver.vehicles} element={<DriverVehicles />} />
+      <Route path={ROUTES.driver.insights} element={<DriverInsights />} />
+      <Route path={ROUTES.driver.referral} element={<DriverReferral />} />
+      <Route path={ROUTES.legacy.driverHome} element={<Navigate replace to={ROUTES.driver.home} />} />
+      <Route path={ROUTES.legacy.driverDashboard} element={<Navigate replace to={ROUTES.driver.home} />} />
     </>
   );
 }

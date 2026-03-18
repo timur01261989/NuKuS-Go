@@ -1,0 +1,9 @@
+PATCH_NOTES_BATCH8_APPLIED.md
+src/modules/client/features/client/delivery/DeliveryPage.jsx
+src/modules/client/features/client/delivery/DeliveryPage.helpers.jsx
+src/modules/client/features/client/intercity/ClientIntercityPage.jsx
+src/modules/client/features/client/intercity/ClientIntercityPage.helpers.jsx
+src/modules/client/features/auto-market/services/marketBackend.js
+src/modules/client/features/auto-market/services/marketBackend.helpers.js
+src/modules/client/features/auto-market/services/marketPayments.js
+tests/batch8-structure.test.js

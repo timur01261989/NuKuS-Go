@@ -1,8 +1,10 @@
 import { useMemo } from "react";
+import { TAXI_STATUS, isTaxiActive, normalizeTaxiStatus } from "@/modules/shared/taxi/constants/taxiStatuses.js";
 
 export function useTaxiOrderDerived({ orderStatus, orderId, step, isDraggingMap }) {
-  const isSearching = orderStatus === "searching" || step === "searching";
-  const isDriverAssigned = ["accepted", "coming", "arrived", "ontrip", "in_trip"].includes(orderStatus);
+  const normalizedStatus = normalizeTaxiStatus(orderStatus, TAXI_STATUS.SEARCHING);
+  const isSearching = normalizedStatus === TAXI_STATUS.SEARCHING || step === "searching";
+  const isDriverAssigned = isTaxiActive(normalizedStatus);
   const showSheet = step === "dest_map" ? !isDraggingMap : true;
   const shareLink = useMemo(() => {
     if (!orderId) return "";

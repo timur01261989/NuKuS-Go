@@ -122,7 +122,7 @@ export default function DeliveryMap({
         )}
 
         {courier?.lat && courier?.lng && (
-          <CourierMarker position={[courier.lat, courier.lng]} bearing={courier.bearing || 0} />
+          <CourierMarker position={[courier.lat, courier.lng]} bearing={courier.bearing || 0} vehicle={courier.vehicle || courier.transport || courier.mode} />
         )}
       </MapContainer>
 

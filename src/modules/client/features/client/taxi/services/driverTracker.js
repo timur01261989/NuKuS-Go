@@ -1,3 +1,5 @@
+import taxiLogger from "../../../../../shared/taxi/utils/taxiLogger";
+
 /**
  * Driver tracker (polling). Replace with Supabase realtime later.
  */
@@ -10,7 +12,9 @@ export function startDriverPolling({ getDriver, intervalMs = 2500, onUpdate }) {
     try {
       const d = await getDriver?.();
       if (d) onUpdate?.(d);
-    } catch {}
+    } catch (error) {
+      taxiLogger.warn("client.taxi.driver_tracker.tick_failed", { error });
+    }
     if (!stopped) timer = setTimeout(tick, intervalMs);
   };
 

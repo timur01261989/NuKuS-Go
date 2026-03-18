@@ -1,0 +1,12 @@
+src/modules/shared/domain/delivery/deliverySdk.js
+src/modules/shared/domain/freight/freightSdk.js
+src/modules/client/features/client/delivery/hooks/useDeliveryPageController.js
+src/modules/client/features/client/delivery/components/DeliveryRequestForm.jsx
+src/modules/client/features/client/delivery/components/DeliveryOrdersSection.jsx
+src/modules/client/features/client/delivery/DeliveryPage.jsx
+src/modules/driver/legacy/freight/hooks/useFreightDriverController.js
+src/modules/driver/legacy/freight/components/FreightVehicleSetupCard.jsx
+src/modules/driver/legacy/freight/components/FreightStatusDeck.jsx
+src/modules/driver/legacy/freight/FreightPage.jsx
+src/modules/client/features/client/freight/ClientFreightPage.jsx
+tests/batch84-freight-delivery-phase2.test.js

@@ -14,7 +14,7 @@ export function useAiPipeline() {
   const createJob = useMutation({
     mutationFn: (payload) => createAiJob(payload),
     onMutate: () => {
-      setState((s) => ({ ...s, status: "running", progress: 1, error: null }));
+      setState((s) => ({ ...s, status: "running", progress: 1, error: null, liveUpdates: false }));
     },
     onError: (e) => {
       setState((s) => ({ ...s, status: "error", error: e?.message || "AI job create error" }));
@@ -30,7 +30,7 @@ export function useAiPipeline() {
     queryKey: ["aiJob", jobId],
     queryFn: () => getAiJob(jobId),
     enabled: Boolean(jobId) && state.status === "running",
-    refetchInterval: 1000,
+    refetchInterval: state.liveUpdates ? false : 1000,
     staleTime: 0,
   });
 
@@ -61,6 +61,7 @@ export function useAiPipeline() {
       if (!evt) return;
       setState((s) => ({
         ...s,
+        liveUpdates: true,
         status: evt.status || s.status,
         progress: typeof evt.progress === "number" ? evt.progress : s.progress,
         steps: evt.steps || s.steps,
@@ -74,12 +75,12 @@ export function useAiPipeline() {
   const startPipeline = async ({ images = [], video = null, meta = {} } = {}) => {
     // Prevent multiple concurrent jobs from clobbering state accidentally.
     // If you want parallel jobs later, switch to "jobs[]" list in context.
-    setState((s) => ({ ...s, jobId: null, steps: {}, result: null, error: null }));
+    setState((s) => ({ ...s, jobId: null, steps: {}, result: null, error: null, liveUpdates: false }));
     return createJob.mutateAsync({ images, video, meta });
   };
 
   const resetPipeline = () =>
-    setState({ jobId: null, status: "idle", progress: 0, steps: {}, result: null, error: null });
+    setState({ jobId: null, status: "idle", progress: 0, steps: {}, result: null, error: null, liveUpdates: false });
 
   return {
     startPipeline,

@@ -1,0 +1,17 @@
+BATCH76 CITY TAXI PHASE1 CHANGED FILES
+
+src/modules/shared/taxi/constants/taxiStatuses.js
+src/modules/shared/taxi/mappers/mapServerTaxiStatus.js
+src/modules/shared/taxi/mappers/mapDriverTaxiStatus.js
+src/modules/shared/taxi/utils/taxiLogger.js
+src/modules/shared/taxi/api/taxiClientApi.js
+src/modules/client/features/client/taxi/hooks/useTaxiOrderPolling.js
+src/modules/client/features/client/taxi/hooks/useTaxiOrderDerived.js
+src/modules/driver/legacy/city-taxi/services/cityTaxiApi.js
+src/modules/driver/legacy/city-taxi/context/taxiReducer.js
+src/modules/driver/legacy/city-taxi/hooks/useEarnings.js
+src/modules/driver/legacy/city-taxi/hooks/useOrderActions.js
+src/modules/driver/legacy/city-taxi/hooks/useDriverLocation.js
+src/modules/driver/legacy/city-taxi/hooks/useTaxiSocket.js
+src/modules/driver/legacy/city-taxi/CityTaxiPageInner.jsx
+tests/batch76-city-taxi-phase1.test.js

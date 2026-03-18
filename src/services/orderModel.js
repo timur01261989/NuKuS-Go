@@ -1,4 +1,4 @@
-// Add-only: richer Yandex-style order shape helpers (does not break current code)
+// Add-only: richer premium order shape helpers (does not break current code)
 
 export function normalizePoint(p) {
   if (!p) return null;

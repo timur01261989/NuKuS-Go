@@ -28,6 +28,19 @@ import AutoBattlePage     from "./pages/AutoBattlePage";
 import PriceAnalyticsPage from "./pages/PriceAnalyticsPage";
 import ServiceBookPage    from "./pages/ServiceBookPage";
 import TopUpPage          from "./pages/TopUpPage";
+import BookingCheckoutPage from "./pages/BookingCheckoutPage";
+import PaymentReceiptPage from "./pages/PaymentReceiptPage";
+import SellerLeadsPage     from "./pages/SellerLeadsPage";
+import SellerAppointmentsPage from "./pages/SellerAppointmentsPage";
+import SavedSearchesPage   from "./pages/SavedSearchesPage";
+import SavedAlertsPage     from "./pages/SavedAlertsPage";
+import PromoteListingPage from "./pages/PromoteListingPage";
+import DealerProfilePage from "./pages/DealerProfilePage";
+import FinanceOffersPage from "./pages/FinanceOffersPage";
+import AutoMarketNotificationsPage from "./pages/AutoMarketNotificationsPage";
+import PriceHistoryPage from "./pages/PriceHistoryPage";
+import NotificationRulesPage from "./pages/NotificationRulesPage";
+import AutoMarketHubPage from "./pages/AutoMarketHubPage";
 
 export default function AutoMarketEntry() {
   const { language } = useLanguage();
@@ -53,6 +66,19 @@ export default function AutoMarketEntry() {
         <Route path="/analytics"    element={<PriceAnalyticsPage />} />
         <Route path="/service-book" element={<ServiceBookPage />} />
         <Route path="/topup"        element={<TopUpPage />} />
+        <Route path="/booking/:id/checkout" element={<BookingCheckoutPage />} />
+        <Route path="/booking/:id/receipt" element={<PaymentReceiptPage />} />
+        <Route path="/seller/leads" element={<SellerLeadsPage />} />
+        <Route path="/seller/appointments" element={<SellerAppointmentsPage />} />
+        <Route path="/saved-searches" element={<SavedSearchesPage />} />
+        <Route path="/saved-alerts" element={<SavedAlertsPage />} />
+        <Route path="/promote/:id" element={<PromoteListingPage />} />
+        <Route path="/dealer/:sellerId" element={<DealerProfilePage />} />
+        <Route path="/finance-offers/:id" element={<FinanceOffersPage />} />
+        <Route path="/notifications" element={<AutoMarketNotificationsPage />} />
+        <Route path="/notifications/rules" element={<NotificationRulesPage />} />
+        <Route path="/price-history/:id" element={<PriceHistoryPage />} />
+        <Route path="/hub" element={<AutoMarketHubPage />} />
 
         <Route path="*" element={<Navigate to="." replace />} />
       </Routes>

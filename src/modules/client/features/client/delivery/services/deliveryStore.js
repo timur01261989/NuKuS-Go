@@ -4,6 +4,7 @@ import {
   listMyDeliveryOrders,
   updateDeliveryOrderApi,
 } from '@/services/deliveryApi.js';
+import { normalizeDeliveryOrder, normalizeDeliveryStatus } from '@/modules/shared/domain/delivery/statusMap.js';
 import { supabase } from '@/services/supabase/supabaseClient';
 
 const TRIP_SETTINGS_KEY = 'unigo_delivery_trip_settings_v1';
@@ -28,51 +29,26 @@ async function requireUserId() {
   return userId;
 }
 
+
 function normalizeOrder(input = {}, userId) {
-  return {
+  return normalizeDeliveryOrder({
+    ...input,
     id: input.id || uid('delivery'),
     user_id: input.user_id || userId,
     driver_user_id: input.driver_user_id || null,
     created_at: input.created_at || new Date().toISOString(),
     updated_at: new Date().toISOString(),
     created_by: input.created_by || userId,
-    service_mode: input.service_mode || 'city',
-    status: input.status || 'searching',
-    parcel_type: input.parcel_type || 'document',
-    parcel_label: input.parcel_label || 'Hujjat',
-    weight_kg: Number(input.weight_kg || 0),
-    price: Number(input.price || 0),
-    price_uzs: Number(input.price_uzs ?? input.price ?? 0),
-    commission_amount: Number(input.commission_amount || 0),
-    payment_method: input.payment_method || 'cash',
-    comment: input.comment || '',
-    receiver_name: input.receiver_name || '',
-    receiver_phone: input.receiver_phone || '',
-    sender_phone: input.sender_phone || '',
-    pickup_mode: input.pickup_mode || 'precise',
-    dropoff_mode: input.dropoff_mode || 'precise',
-    pickup_region: input.pickup_region || '',
-    pickup_district: input.pickup_district || '',
-    pickup_label: input.pickup_label || '',
-    pickup_lat: input.pickup_lat ?? null,
-    pickup_lng: input.pickup_lng ?? null,
-    dropoff_region: input.dropoff_region || '',
-    dropoff_district: input.dropoff_district || '',
-    dropoff_label: input.dropoff_label || '',
-    dropoff_lat: input.dropoff_lat ?? null,
-    dropoff_lng: input.dropoff_lng ?? null,
-    matched_trip_id: input.matched_trip_id || null,
-    matched_trip_title: input.matched_trip_title || '',
-    matched_driver_user_id: input.matched_driver_user_id || null,
-    matched_driver_name: input.matched_driver_name || '',
+    status: normalizeDeliveryStatus(input.status || 'searching'),
     history: Array.isArray(input.history) ? input.history : [],
-  };
+  });
 }
+
 
 export async function listDeliveryOrders() {
   await requireUserId();
   const response = await listMyDeliveryOrders();
-  return response.orders || [];
+  return Array.isArray(response?.orders) ? response.orders.map((item) => normalizeOrder(item)) : [];
 }
 
 export async function createDeliveryOrder(payload) {

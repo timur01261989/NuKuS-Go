@@ -6,6 +6,7 @@ import AuthGuard from "../guards/AuthGuard.jsx";
 import DriverGuard from "../guards/DriverGuard.jsx";
 import ClientRoutes from "./ClientRoutes.jsx";
 import DriverRoutes from "./DriverRoutes.jsx";
+import { ROUTES } from "./routePaths.js";
 
 const AuthPage = lazy(() => import("../../modules/client/features/auth/pages/Auth.jsx"));
 const RegisterPage = lazy(() => import("../../modules/client/features/auth/pages/Register.jsx"));
@@ -23,30 +24,33 @@ const RouteFallback = memo(function RouteFallback() {
 });
 
 function AppRouterComponent({ appRole }) {
-  const defaultRoot = useMemo(() => (appRole === "driver" ? "/driver" : "/"), [appRole]);
+  const defaultRoot = useMemo(
+    () => (appRole === "driver" ? ROUTES.driver.home : ROUTES.client.home),
+    [appRole]
+  );
 
   return (
     <BrowserRouter>
       <Suspense fallback={<RouteFallback />}>
         <Routes>
-          <Route path="/login" element={<AuthPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/r/:code" element={<ReferralInviteLanding />} />
-          <Route path="/invite/:code" element={<ReferralInviteLanding />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path={ROUTES.auth.login} element={<AuthPage />} />
+          <Route path={ROUTES.auth.register} element={<RegisterPage />} />
+          <Route path={ROUTES.referral.shortInvite} element={<ReferralInviteLanding />} />
+          <Route path={ROUTES.referral.invite} element={<ReferralInviteLanding />} />
+          <Route path={ROUTES.auth.resetPassword} element={<ResetPasswordPage />} />
 
           <Route element={<AuthGuard />}>
             <Route element={<ClientLayout />}>
-              {ClientRoutes()}
+              <ClientRoutes />
             </Route>
           </Route>
 
-          <Route path="/driver/register" element={<DriverRegisterPage />} />
-          <Route path="/driver/pending" element={<DriverPendingPage />} />
+          <Route path={ROUTES.driver.register} element={<DriverRegisterPage />} />
+          <Route path={ROUTES.driver.pending} element={<DriverPendingPage />} />
 
           <Route element={<DriverGuard />}>
             <Route element={<DriverLayout />}>
-              {DriverRoutes()}
+              <DriverRoutes />
             </Route>
           </Route>
 

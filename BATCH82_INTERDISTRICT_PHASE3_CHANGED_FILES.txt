@@ -1,0 +1,16 @@
+BATCH82 INTERDISTRICT PHASE3 CHANGED FILES
+
+NEW
+- src/modules/shared/interdistrict/domain/interDistrictSignals.js
+- tests/batch82-interdistrict-phase3.test.js
+
+UPDATED
+- src/modules/client/features/client/interDistrict/hooks/useInterDistrictController.js
+- src/modules/client/features/client/interDistrict/components/InterDistrictActiveTripPanel.jsx
+- src/modules/client/features/client/interDistrict/ClientInterDistrictPage.jsx
+- src/modules/driver/legacy/inter-district/hooks/usePremiumSocket.js
+- src/modules/driver/legacy/inter-district/hooks/useDriverInterDistrictController.js
+- src/modules/driver/legacy/inter-district/components/shared/TripRequestsDrawer.jsx
+- src/modules/driver/legacy/inter-district/components/shared/TripEarnings.jsx
+- src/modules/driver/legacy/inter-district/components/panels/DriverTripModePanels.jsx
+- src/modules/driver/legacy/inter-district/InterDistrictPage.jsx

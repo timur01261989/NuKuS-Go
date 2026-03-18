@@ -2,7 +2,7 @@ import React from "react";
 import { Typography, Tag } from "antd";
 import { EnvironmentOutlined } from "@ant-design/icons";
 
-export default function FeedHeader({ title, subtitle, count = 0, tone = "gold" }) {
+export default function FeedHeader({ title, subtitle, count = 0, tone = "gold", realtimeMeta = null }) {
   const tagColor = tone === "blue" ? "blue" : tone === "green" ? "green" : "gold";
   return (
     <div style={{ padding: "12px 14px 8px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
@@ -14,10 +14,17 @@ export default function FeedHeader({ title, subtitle, count = 0, tone = "gold" }
             <span>{subtitle}</span>
           </div>
         ) : null}
+            </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {realtimeMeta?.state ? (
+          <Tag color={realtimeMeta.paused ? "default" : "processing"} style={{ borderRadius: 999, padding: "2px 10px", marginTop: 2 }}>
+            {realtimeMeta.paused ? "Pauza" : realtimeMeta.state}
+          </Tag>
+        ) : null}
+        <Tag color={tagColor} style={{ borderRadius: 999, padding: "2px 10px", marginTop: 2 }}>
+          {count} ta
+        </Tag>
       </div>
-      <Tag color={tagColor} style={{ borderRadius: 999, padding: "2px 10px", marginTop: 2 }}>
-        {count} ta
-      </Tag>
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { axiosClient } from "./axiosClient";
  */
 
 const mockStore = new Map();
+const IS_PROD = (typeof import.meta !== "undefined" && import.meta?.env?.PROD) || process.env.NODE_ENV === "production";
 
 function makeId() {
   return `job_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
@@ -18,6 +19,10 @@ function makeId() {
 
 export async function createAiJob({ images = [], video = null, meta = {} } = {}) {
   const hasBackend = Boolean(axiosClient?.defaults?.baseURL);
+
+  if (!hasBackend && IS_PROD) {
+    throw new Error("AI backend base URL is not configured");
+  }
 
   if (hasBackend) {
     const form = new FormData();
@@ -39,6 +44,10 @@ export async function createAiJob({ images = [], video = null, meta = {} } = {})
 
 export async function getAiJob(jobId) {
   const hasBackend = Boolean(axiosClient?.defaults?.baseURL);
+
+  if (!hasBackend && IS_PROD) {
+    return { jobId, status: "error", progress: 0, error: "AI backend base URL is not configured" };
+  }
 
   if (hasBackend) {
     const { data } = await axiosClient.get(`/ai/jobs/${jobId}`);
@@ -85,7 +94,9 @@ export async function getAiJob(jobId) {
  */
 export function subscribeAiJobEvents(jobId, onEvent) {
   try {
-    const url = `${axiosClient.defaults.baseURL}/ai/jobs/${jobId}/events`;
+    const baseURL = axiosClient?.defaults?.baseURL;
+    if (!baseURL) return () => {};
+    const url = `${baseURL}/ai/jobs/${jobId}/events`;
     const es = new EventSource(url, { withCredentials: false });
     es.onmessage = (evt) => {
       try {

@@ -17,6 +17,7 @@ export function AuthProvider({ children }) {
   const queuedSessionRef = useRef(undefined);
   const authDebounceRef = useRef(null);
   const lastAuthEventRef = useRef("");
+  const lastResolvedFingerprintRef = useRef(null);
 
   const [state, setState] = useState(() => ({
     loading: true,
@@ -68,6 +69,7 @@ export function AuthProvider({ children }) {
 
       try {
         const resolved = await resolveAuthSession(requestedSession, reason);
+        lastResolvedFingerprintRef.current = resolved?.lastSessionFingerprint ?? buildSessionFingerprint(requestedSession);
         commit(resolved);
       } catch (error) {
         console.error("[AuthProvider] resolveSession error", error);
@@ -100,13 +102,13 @@ export function AuthProvider({ children }) {
         if (queuedSessionRef.current !== undefined) {
           const queuedSession = queuedSessionRef.current;
           queuedSessionRef.current = undefined;
-          if (buildSessionFingerprint(queuedSession) !== state.lastSessionFingerprint) {
+          if (buildSessionFingerprint(queuedSession) !== lastResolvedFingerprintRef.current) {
             void resolveSession(queuedSession, "queued");
           }
         }
       }
     },
-    [commit, state.lastSessionFingerprint]
+    [commit]
   );
 
   const refetch = useCallback(async () => {
@@ -143,6 +145,7 @@ export function AuthProvider({ children }) {
           return;
         }
 
+        lastResolvedFingerprintRef.current = buildSessionFingerprint(data?.session ?? null);
         void resolveSession(data?.session ?? null, "bootstrap");
       })
       .catch((error) => {

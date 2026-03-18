@@ -1,6 +1,6 @@
 import { Worker } from "bullmq";
 import { redis } from "./queue.js";
-import { patchJob, patchStep, jobState } from "./store.js";
+import { getJob, patchJob, patchStep } from "./store.js";
 import { runMockPipeline } from "./ai/mock.js";
 import { runPythonPipeline } from "./ai/pythonClient.js";
 
@@ -33,7 +33,7 @@ new Worker(
       patchJob(jobId, {
         progress: 100,
         status: "done",
-        result: { steps: jobState.get(jobId)?.steps || {} }
+        result: { steps: getJob(jobId)?.steps || {} }
       });
 
       return { ok: true };

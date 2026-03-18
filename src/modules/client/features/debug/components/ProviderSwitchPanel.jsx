@@ -3,9 +3,9 @@ import { Card, CardContent } from '../../../shared/ui/index.js';
 import { getProviderConfig, setProviderConfig } from '../../../services/providerConfig.js';
 
 const opts = {
-  map_provider: ['OSM', 'YANDEX', 'GOOGLE'],
-  route_provider: ['OSRM', 'YANDEX', 'GOOGLE'],
-  traffic_provider: ['NONE', 'YANDEX', 'GOOGLE'],
+  map_provider: ['OSM', 'PREMIUM', 'GOOGLE'],
+  route_provider: ['OSRM', 'PREMIUM', 'GOOGLE'],
+  traffic_provider: ['NONE', 'PREMIUM', 'GOOGLE'],
 };
 
 export function ProviderSwitchPanel() {

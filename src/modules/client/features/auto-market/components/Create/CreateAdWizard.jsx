@@ -10,6 +10,12 @@ import Step5_Contact from "./steps/Step5_Contact";
 import PreviewModal from "./PreviewModal";
 import { createCarAd } from "../../services/marketBackend";
 import { useAutoMarketI18n } from "../../utils/useAutoMarketI18n";
+import { buildSellerPostingChecklist, buildProfessionalSellingPoints } from "../../services/autoMarketJourney";
+import { buildPremiumCreateSteps } from "../../services/autoMarketPremium";
+import { buildLuxuryCreateExperience } from "../../services/autoMarketLuxury";
+import { buildCreateShowroomChecklist } from "../../services/autoMarketShowroom";
+import { buildListingCompleteness, buildPricingRecommendation, buildPromotePackages } from "../../services/autoMarketSellerStudio";
+import { getLocalPaymentProviders } from "../../services/autoMarketLocalPayments";
 import { 
   RobotOutlined, 
   ThunderboltOutlined, 
@@ -21,8 +27,11 @@ export default function CreateAdWizard() {
   const { am } = useAutoMarketI18n();
   const titles = am("create.steps");
   const nav = useNavigate();
-  const { step, setStep, ad, reset } = useCreateAd();
+  const { step, setStep, ad, reset, saveDraftNow, getDraftMeta, completeness } = useCreateAd();
+  const premiumSteps = useMemo(() => buildPremiumCreateSteps(ad), [ad]);
   const [preview, setPreview] = useState(false);
+  const showroomChecklist = useMemo(() => buildCreateShowroomChecklist(ad), [ad]);
+  const localPaymentProviders = getLocalPaymentProviders();
 
   // YANGI: AI Video generatsiyasi uchun state
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
@@ -110,6 +119,9 @@ export default function CreateAdWizard() {
   };
 
   const pricePrediction = (step === 3 || step === 4) ? getPricePrediction(ad?.price) : null;
+  const postingChecklist = buildSellerPostingChecklist(ad);
+  const sellingPoints = buildProfessionalSellingPoints();
+  const luxuryCreateCards = buildLuxuryCreateExperience(ad);
 
   // 2. AI Video-Review Generatori
   const handleGenerateVideo = () => {
@@ -139,6 +151,18 @@ export default function CreateAdWizard() {
         {titles[step]} • {step + 1}/{titles.length}
       </div>
 
+      <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <Button onClick={() => { saveDraftNow(); message.success("Draft saqlandi"); }} style={{ borderRadius: 12 }}>Draft saqlash</Button>
+        {draftMeta?.updatedAt ? (
+          <Tag color="blue" style={{ borderRadius: 999, padding: "6px 10px", margin: 0 }}>
+            So‘nggi draft: {new Date(draftMeta.updatedAt).toLocaleString("uz-UZ")}
+          </Tag>
+        ) : null}
+        <Tag color="purple" style={{ borderRadius: 999, padding: "6px 10px", margin: 0 }}>
+          To‘liqlik: {completeness}%
+        </Tag>
+      </div>
+
       {/* YANGI: AI Smart Tip Banner */}
       <Alert
         message={<span style={{ fontWeight: 'bold' }}>AI Yordamchi</span>}
@@ -149,7 +173,130 @@ export default function CreateAdWizard() {
         style={{ marginTop: 16, borderRadius: 12, border: '1px solid #bae0ff', background: '#e6f7ff' }}
       />
 
+
       <div style={{ marginTop: 14 }}>{Step}</div>
+
+      <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+        {luxuryCreateCards.map((card) => (
+          <div key={card.key} style={{ borderRadius: 18, padding: 14, border: `1px solid ${card.tone}22`, background: `${card.tone}10`, boxShadow: "0 12px 28px rgba(15,23,42,.04)" }}>
+            <div style={{ fontSize: 12, color: "#64748b" }}>{card.label}</div>
+            <div style={{ marginTop: 8, fontWeight: 900, color: "#0f172a", fontSize: 18 }}>{card.value}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 18, display: "grid", gap: 12 }}>
+        <Alert
+          type="info"
+          showIcon
+          message="Sotuvchi uchun qulay professional oqim"
+          description="Bosqichlar xaridorni chalg‘itmaydigan e’lon tuzish uchun tartiblandi: ishonch, foto va aniq narx birinchi o‘rinda."
+          style={{ borderRadius: 16 }}
+        />
+        <div style={{ display: "grid", gridTemplateColumns: "1.1fr .9fr", gap: 12 }}>
+          <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 18, padding: 14 }}>
+            <div style={{ fontWeight: 900, color: "#0f172a" }}>E’lon tayyorlik checklisti</div>
+            <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+              {postingChecklist.map((item) => (
+                <div key={item.key} style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", borderRadius: 14, background: item.done ? "rgba(22,163,74,.08)" : "#f8fafc", padding: "10px 12px", border: `1px solid ${item.done ? "rgba(22,163,74,.18)" : "#e2e8f0"}` }}>
+                  <span style={{ fontWeight: 700, color: "#0f172a" }}>{item.label}</span>
+                  <Tag color={item.done ? "green" : "default"} style={{ borderRadius: 999, margin: 0 }}>{item.done ? "Tayyor" : "Kutilmoqda"}</Tag>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 18, padding: 14 }}>
+            <div style={{ fontWeight: 900, color: "#0f172a" }}>Nega shu e’lon yaxshiroq sotiladi</div>
+            <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+              {sellingPoints.map((item) => (
+                <div key={item} style={{ borderRadius: 14, background: "#f8fafc", padding: "10px 12px", color: "#475569", fontSize: 13, lineHeight: 1.45 }}>{item}</div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 18, padding: 14 }}>
+          <div style={{ fontWeight: 900, color: "#0f172a" }}>Listing completeness</div>
+          <Progress percent={completenessInfo.score} strokeColor={{ "0%": "#2563eb", "100%": "#16a34a" }} style={{ marginTop: 12 }} />
+          <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+            {completenessInfo.checks.map((item) => (
+              <div key={item.key} style={{ display: "flex", justifyContent: "space-between", gap: 10, borderRadius: 12, padding: "10px 12px", background: item.done ? "rgba(22,163,74,.08)" : "#f8fafc", border: `1px solid ${item.done ? "rgba(22,163,74,.18)" : "#e2e8f0"}` }}>
+                <span style={{ fontWeight: 700, color: "#0f172a" }}>{item.label}</span>
+                <Tag color={item.done ? "green" : "default"} style={{ margin: 0, borderRadius: 999 }}>{item.done ? "Bor" : "Yo‘q"}</Tag>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 18, padding: 14 }}>
+          <div style={{ fontWeight: 900, color: "#0f172a" }}>Narx tavsiyasi</div>
+          <div style={{ marginTop: 10, fontSize: 16, fontWeight: 900, color: "#0f172a" }}>{pricingRecommendation.headline}</div>
+          <div style={{ marginTop: 8, fontSize: 13, color: "#475569", lineHeight: 1.5 }}>{pricingRecommendation.text}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
+            <div style={{ borderRadius: 14, background: "#eff6ff", padding: 12 }}>
+              <div style={{ fontSize: 12, color: "#64748b" }}>Tavsiya min</div>
+              <div style={{ marginTop: 6, fontWeight: 900, color: "#0f172a" }}>{pricingRecommendation.recommendedMin ? `${pricingRecommendation.recommendedMin.toLocaleString("en-US")} UZS` : "—"}</div>
+            </div>
+            <div style={{ borderRadius: 14, background: "#f0fdf4", padding: 12 }}>
+              <div style={{ fontSize: 12, color: "#64748b" }}>Tavsiya max</div>
+              <div style={{ marginTop: 6, fontWeight: 900, color: "#0f172a" }}>{pricingRecommendation.recommendedMax ? `${pricingRecommendation.recommendedMax.toLocaleString("en-US")} UZS` : "—"}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <Alert
+          message="Booking + local payment + seller CRM tayyorgarligi"
+          description="E’lon joylangach xaridor vaqt band qilishi, bron to‘lashi va seller esa leadlarni boshqarishi uchun shu e’lon tayyor bo‘lishi kerak."
+          type="success"
+          showIcon
+          style={{ borderRadius: 16 }}
+        />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+          <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 18, padding: 14 }}>
+            <div style={{ fontWeight: 900, color: "#0f172a" }}>Mahalliy to‘lov tayyorligi</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+              {localPaymentProviders.map((provider) => (
+                <div key={provider.key} style={{ borderRadius: 999, padding: "8px 12px", border: `1px solid ${provider.accent}22`, background: `${provider.accent}10`, color: "#0f172a", fontWeight: 800 }}>
+                  {provider.title}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 18, padding: 14 }}>
+            <div style={{ fontWeight: 900, color: "#0f172a" }}>Seller CRM readiness</div>
+            <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+              {[
+                "Lead kelganda 5 daqiqada javob berish",
+                "Ko‘rish va test drive uchun bo‘sh vaqt qoldirish",
+                "Bron va premium xizmatlar uchun to‘lov kanallarini tayyor tutish",
+              ].map((item) => (
+                <div key={item} style={{ borderRadius: 14, background: "#f8fafc", padding: "10px 12px", color: "#475569", fontSize: 13, lineHeight: 1.45 }}>{item}</div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      <div style={{ marginTop: 18, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 18, padding: 14 }}>
+        <div style={{ fontWeight: 900, color: "#0f172a" }}>Promote / VIP tayyorligi</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginTop: 12 }}>
+          {promotePackages.map((item) => (
+            <div key={item.key} style={{ borderRadius: 16, padding: 14, background: `${item.accent}10`, border: `1px solid ${item.accent}22` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+                <div style={{ fontWeight: 900, color: "#0f172a" }}>{item.title}</div>
+                {item.recommended ? <Tag color="gold" style={{ margin: 0, borderRadius: 999 }}>Tavsiya</Tag> : null}
+              </div>
+              <div style={{ marginTop: 8, fontSize: 12, color: "#475569", lineHeight: 1.45 }}>{item.text}</div>
+              <div style={{ marginTop: 10, fontWeight: 900, color: item.accent }}>{item.price.toLocaleString("en-US")} UZS</div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* YANGI: AI Video-Review (Faqat 3 va 4-qadamda, rasmlar bor bo'lsa) */}
       {(step === 2 || step === 3) && ad?.images?.length > 0 && (

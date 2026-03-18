@@ -86,7 +86,7 @@ export default function DriverVerification({ userId, onFinish }) {
         textAlign: "center",
       }}
     >
-      <Title level={3} style={{ fontFamily: "YangoHeadline" }}>
+      <Title level={3} style={{ fontFamily: "AccentHeadline" }}>
         Tekshiruvdan o‘tish
       </Title>
       <Text type="secondary">

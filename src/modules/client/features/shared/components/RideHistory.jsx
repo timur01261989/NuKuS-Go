@@ -3,8 +3,20 @@ import { List, Card, Typography, Tag, Button, Spin, Empty } from 'antd';
 import { ClockCircleOutlined, EnvironmentFilled, ArrowLeftOutlined, RightOutlined } from '@ant-design/icons';
 import { supabase } from '@/services/supabase/supabaseClient';
 import { useLanguage } from '@/modules/shared/i18n/useLanguage';
+import { supportAssets } from '@/assets/support';
+import { assetStyles } from '@/assets/assetPolish';
 
 const { Title, Text } = Typography;
+
+
+function resolveServiceIcon(item) {
+  const type = String(item?.service_type || item?.service || item?.category || "").toLowerCase();
+  if (type.includes("truck") || type.includes("freight")) return supportAssets.services.truckLive || supportAssets.services.truck;
+  if (type.includes("wash")) return supportAssets.services.washBooking || supportAssets.services.wash;
+  if (type.includes("station") || type.includes("fuel")) return supportAssets.services.stationLive || supportAssets.services.station;
+  return supportAssets.history.receiptOrder || supportAssets.history.receipt;
+}
+
 
 export default function RideHistory({ userId, role, onBack }) {
   const { tr, langKey } = useLanguage();
@@ -62,7 +74,7 @@ export default function RideHistory({ userId, role, onBack }) {
       {/* HEADER */}
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 25 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={onBack} type="text" shape="circle" />
-        <Title level={4} style={{ margin: '0 0 0 15px', fontFamily: 'YangoHeadline' }}>{tr('rideHistory.title', 'Safarlar tarixi')}</Title>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 12 }}><img src={supportAssets.history.receiptOrder || supportAssets.history.receipt} alt='' style={assetStyles.historyAction} /><Title level={4} style={{ margin: 0, fontFamily: 'AccentHeadline' }}>{tr('rideHistory.title', 'Safarlar tarixi')}</Title></div>
       </div>
 
       {loading ? (
@@ -86,6 +98,8 @@ export default function RideHistory({ userId, role, onBack }) {
                 </Tag>
               </div>
 
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom: 12 }}><img src={resolveServiceIcon(item)} alt='' style={assetStyles.orderServiceIcon} /><Text strong>{item.service_type || item.service || tr('rideHistory.ride', 'Safar')}</Text></div>
+
               {/* MARSHRUT VIZUALIZATSIYASI */}
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 15 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, marginTop: 5 }}>
@@ -94,11 +108,11 @@ export default function RideHistory({ userId, role, onBack }) {
                   <EnvironmentFilled style={{ color: '#ff4d4f', fontSize: 12 }} />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <Text strong style={{ display: 'block', fontSize: 14, fontFamily: 'YangoHeadline' }}>
+                  <Text strong style={{ display: 'block', fontSize: 14, fontFamily: 'AccentHeadline' }}>
                     {item.pickup?.address || item.pickup_address || tr('rideHistory.startPoint', "Boshlang'ich nuqta")}
                   </Text>
                   <div style={{ height: 12 }} />
-                  <Text strong style={{ display: 'block', fontSize: 14, fontFamily: 'YangoHeadline' }}>
+                  <Text strong style={{ display: 'block', fontSize: 14, fontFamily: 'AccentHeadline' }}>
                     {item.dropoff?.address || item.destination_address || tr("rideHistory.destinationReached", "Manzilga yetib borildi")}
                   </Text>
                 </div>
@@ -107,11 +121,11 @@ export default function RideHistory({ userId, role, onBack }) {
               <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                    <Text type="secondary" style={{ fontSize: 12 }}>{tr('rideHistory.tripPrice', 'Safar narxi:')}</Text>
-                   <div style={{ fontSize: 18, fontWeight: 'bold', fontFamily: 'YangoHeadline' }}>
+                   <div style={{ fontSize: 18, fontWeight: 'bold', fontFamily: 'AccentHeadline' }}>
                      {Number(item.price_uzs || item.price || 0).toLocaleString()} {tr('common.sum', "so'm")}
                    </div>
                 </div>
-                <Button type="text" icon={<RightOutlined />} />
+                <div style={{ display: 'flex', gap: 8 }}><Button type="text" icon={<img src={supportAssets.history.receipt} alt='' style={assetStyles.historyAction} />} /><Button type="text" icon={<img src={supportAssets.history.share} alt='' style={assetStyles.historyAction} />} /><Button type="text" icon={<img src={supportAssets.support.mainAlt || supportAssets.support.main} alt='' style={assetStyles.historyAction} />} /></div>
               </div>
             </Card>
           )}

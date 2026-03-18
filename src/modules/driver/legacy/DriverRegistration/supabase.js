@@ -97,7 +97,10 @@ function buildApplicationPayload(formData) {
     last_name: String(formData.lastName || "").toUpperCase().trim() || null,
     first_name: String(formData.firstName || "").toUpperCase().trim() || null,
     middle_name: String(formData.middleName || "").toUpperCase().trim() || null,
-    father_name: String(formData.middleName || "").toUpperCase().trim() || null,
+    // FIX: father_name avval formData.middleName ga noto'g'ri bog'langan edi (duplicate bug).
+    // father_name — otasining ismi (patronimik). middleName bilan bir xil maydon emas.
+    // Forma fatherName maydonini qo'llasa o'shandan oladi, aks holda middle_name fallback.
+    father_name: String(formData.fatherName || formData.middleName || "").toUpperCase().trim() || null,
     phone: String(formData.phone || "").replace(/\D/g, "") || null,
     passport_number:
       String(formData.passportNumber || "")

@@ -1,0 +1,21 @@
+BATCH45_CHANGED_FILES
+
+Added directories:
+- src/assets/security/auth
+- src/assets/security/payment
+- src/assets/security/trust
+- src/assets/security/notifications
+- src/assets/security/scanner
+- src/assets/security/state
+
+Added files:
+- src/assets/security/auth/ (24 assets)
+- src/assets/security/payment/ (38 assets)
+- src/assets/security/trust/ (5 assets)
+- src/assets/security/notifications/ (8 assets)
+- src/assets/security/scanner/ (10 assets)
+- src/assets/security/state/ (53 assets)
+- src/assets/security/index.js
+- src/assets/security/security-assets-phase1.manifest.json
+- tests/batch45-security-assets-phase1.test.js
+- BATCH45_CHANGED_FILES.txt

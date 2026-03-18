@@ -1,67 +1,11 @@
 import { supabase, assertSupabase } from "./supabaseClient.js";
-import { fetchDriverCore } from "../../modules/shared/auth/driverCoreAccess.js";
-
-async function maybeSelectSingle(table, columns, filters = []) {
-  let query = supabase.from(table).select(columns);
-  for (const filter of filters) {
-    if (filter?.op === 'eq') {
-      query = query.eq(filter.column, filter.value);
-    }
-  }
-  return query.maybeSingle();
-}
-
-async function tryProfileSelect(userId, selectors) {
-  let lastError = null;
-  for (const selector of selectors) {
-    const result = await maybeSelectSingle('profiles', selector, [{ op: 'eq', column: 'id', value: userId }]);
-    if (!result.error) {
-      return { data: result.data ?? null, error: null };
-    }
-
-    lastError = result.error;
-    const message = String(result.error?.message || '').toLowerCase();
-    if (!message.includes('column')) {
-      return { data: null, error: result.error };
-    }
-  }
-  return { data: null, error: lastError };
-}
-
-function withTimeout(promise, ms, fallbackFactory) {
-  return Promise.race([
-    promise,
-    new Promise((resolve) => {
-      setTimeout(() => resolve(fallbackFactory()), ms);
-    }),
-  ]);
-}
-
-export function normalizeRole(value) {
-  const role = String(value || "client").trim().toLowerCase();
-  if (["admin", "driver", "client"].includes(role)) {
-    return role;
-  }
-  return "client";
-}
-
-export function normalizeStatus(value) {
-  return typeof value === "string" ? value.trim().toLowerCase() : null;
-}
-
-export function deriveDriverApproved(driver) {
-  if (!driver) return false;
-
-  if (typeof driver.approved === "boolean") return driver.approved;
-  if (typeof driver.is_approved === "boolean") return driver.is_approved;
-
-  const status = normalizeStatus(driver.status);
-  if (status) {
-    return ["approved", "active", "verified", "enabled", "ok"].includes(status);
-  }
-
-  return true;
-}
+import {
+  deriveDriverApproved,
+  normalizeRole,
+  normalizeStatus,
+  tryProfileSelect,
+} from "./authService.helpers.js";
+import { resolveAuthSessionState } from "./authService.resolver.js";
 
 export async function requestOtp(phone) {
   assertSupabase();
@@ -190,84 +134,7 @@ export function buildSessionFingerprint(session) {
 }
 
 export async function resolveAuthSession(session, reason = "unknown") {
-  const requestedSession = session ?? null;
-  const user = requestedSession?.user ?? null;
-
-  if (!user?.id) {
-    return {
-      ...createEmptyAuthState(null),
-      loading: false,
-      authReady: true,
-      isAuthed: false,
-      lastResolvedUserId: null,
-      lastSessionFingerprint: null,
-      lastReason: reason,
-    };
-  }
-
-  const userId = user.id;
-  const fingerprint = buildSessionFingerprint(requestedSession);
-
-  const [profileResult, driverCore] = await Promise.all([
-    withTimeout(fetchProfileByUserId(userId), 6000, () => ({ data: null, error: new Error('profile lookup timeout') })),
-    withTimeout(fetchDriverCore(userId), 6000, () => null),
-  ]);
-
-  let profile = profileResult.data ?? null;
-  let profileError = profileResult.error ?? null;
-
-  if (!profile && !profileError) {
-    const createdProfile = await upsertMinimalClientProfile(user);
-    profile = createdProfile.data ?? null;
-    profileError = createdProfile.error ?? null;
-  }
-
-  const driverRow = driverCore
-    ? {
-        user_id: userId,
-        approved: !!driverCore.driverApproved,
-        is_verified: !!driverCore.driverApproved,
-        allowed_services: driverCore.allowedServices || [],
-        transport_type:
-          driverCore.activeVehicle?.vehicle_type || driverCore.application?.requested_vehicle_type || null,
-      }
-    : null;
-
-  const driverApp = driverCore?.application ?? null;
-  const role = normalizeRole(profile?.role || (driverApp ? "driver" : "client"));
-  const isAdmin = !!profile?.is_admin;
-  const applicationStatus = normalizeStatus(driverApp?.status);
-  const driverApproved = !!driverCore?.driverApproved || deriveDriverApproved(driverRow);
-  const allowedServices = Array.isArray(driverCore?.allowedServices) ? driverCore.allowedServices : [];
-  const transportType =
-    driverCore?.activeVehicle?.vehicle_type ||
-    driverApp?.requested_vehicle_type ||
-    driverApp?.transport_type ||
-    null;
-
-  return {
-    loading: false,
-    authReady: true,
-    isAuthed: true,
-    session: requestedSession,
-    user,
-    profile,
-    role,
-    isAdmin,
-    driver: driverRow,
-    driverRow,
-    driverExists: !!driverRow,
-    driverApproved,
-    driverApp,
-    application: driverApp,
-    applicationStatus,
-    transportType,
-    allowedServices,
-    error: profileError,
-    lastResolvedUserId: userId,
-    lastSessionFingerprint: fingerprint,
-    lastReason: reason,
-  };
+  return resolveAuthSessionState(session, reason);
 }
 
 export default {

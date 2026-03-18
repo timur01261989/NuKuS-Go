@@ -1,0 +1,11 @@
+BATCH56 AUTO MARKET FINAL CHANGED FILES
+
+Updated:
+- src/modules/client/features/auto-market/pages/ComparePage.jsx
+- src/modules/client/features/auto-market/pages/FavoritesPage.jsx
+- src/modules/client/features/auto-market/pages/MyAdsPage.jsx
+- src/modules/client/features/auto-market/components/Details/SellerProfile.jsx
+
+Added:
+- src/modules/client/features/auto-market/services/autoMarketDecisionSupport.js
+- tests/batch56-auto-market-final.test.js

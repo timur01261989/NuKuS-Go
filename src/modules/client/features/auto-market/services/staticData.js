@@ -22,8 +22,8 @@ export const MODELS_BY_BRAND = {
 
 export const FUELS = ["Benzin", "Gaz-Metan", "Gaz-Propan", "Dizel", "Gibrid", "Elektro"];
 export const TRANSMISSIONS = ["Avtomat", "Mexanika"];
-export const COLORS = ["Oq","Qora","Kulrang","Ko'k","Qizil","Yashil","Sariq","Bej"];
-export const BODY_TYPES = ["Sedan","Hatchback","SUV","Coupe","Pickup","Minivan","Universal"];
+export const COLORS = ["Oq","Qora","Kulrang","Ko'k","Qizil","Yashil","Sariq","Bej","Ikki rang","Boshqa"];
+export const BODY_TYPES = ["Sedan","Hatchback","SUV","Coupe","Pickup","Minivan","Universal","Family Van","Kichik sedan","Kichik SUV","Kichik box","Kichik tall","Kichik super tall","Kichik sport","Compact","Commercial","Camper","Utility","Servis bus","Mid SUV","Large SUV","Elektro","Gibrid","PHEV","Maxsus"];
 export const DRIVE_TYPES = ["Oldi (FWD)","Orqa (RWD)","4x4 (AWD)"];
 
 // ─── Zapchast bo'limi ────────────────────────────────────────────────────────

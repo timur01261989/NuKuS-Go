@@ -1,5 +1,9 @@
 import React from "react";
-import { Alert, Progress } from "antd";
+import { Alert, Progress, Space } from "antd";
+import Lottie from "lottie-react";
+import { lottieAssets } from "@/assets/lottie";
+import { paymentAssets } from "@/assets/payment";
+import { assetStyles } from "@/assets/assetPolish";
 import { useAiProcess } from "../../../context/AiProcessContext";
 
 function StepRow({ label, step }) {
@@ -27,6 +31,18 @@ export default function AiPipelineStatus() {
         <Alert type="error" message={state.error || "AI xatolik"} showIcon />
       ) : (
         <>
+          <Space align="center" style={{ marginBottom: 10 }}>
+            <div style={assetStyles.aiStatusBox}>
+              <Lottie animationData={state.status === "done" ? lottieAssets.status.confetti : lottieAssets.status.awaitDark || lottieAssets.status.awaitLight} loop={state.status !== "done"} />
+            </div>
+            {state.status !== "done" ? (
+              <div style={assetStyles.aiFooterLottie}>
+                <Lottie animationData={lottieAssets.payment.challengeFooter || lottieAssets.payment.cardCvv} loop />
+              </div>
+            ) : (
+              <img src={paymentAssets.states.successAlt || paymentAssets.states.success} alt="" style={assetStyles.timelineIcon} />
+            )}
+          </Space>
           <Alert
             type={state.status === "done" ? "success" : "info"}
             message={state.status === "done" ? "AI tayyor" : "AI tahlil qilinmoqda..."}

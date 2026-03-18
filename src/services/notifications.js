@@ -4,6 +4,7 @@
  */
 import { setupNotifications as _setup, showLocalNotification } from "./fcmService";
 import { supabase } from "@/services/supabase/supabaseClient";
+import { realtimeAssets } from "@/assets/realtime";
 
 export { showLocalNotification };
 
@@ -49,4 +50,20 @@ export function subscribeToMyNotifications(userId) {
     .subscribe();
 
   return () => supabase.removeChannel(channel);
+}
+
+
+/**
+ * getNotificationVisual()
+ * UI qatlamlari uchun xabar turiga mos icon qaytaradi.
+ */
+export function getNotificationVisual(type = "", unread = true) {
+  const value = String(type || "").toLowerCase();
+  if (value.includes("wash")) return realtimeAssets.notifications.notifyServiceWashCar;
+  if (value.includes("qr")) return realtimeAssets.notifications.notifyQr;
+  if (value.includes("feed")) return realtimeAssets.notifications.notifyFeedIcon;
+  if (value.includes("warn") || value.includes("alert")) return realtimeAssets.status.statusWarningQuick || realtimeAssets.status.statusWarning;
+  return unread
+    ? (realtimeAssets.notifications.notifyBellUnread || realtimeAssets.notifications.notifyBellOutlineUnread)
+    : (realtimeAssets.notifications.notifyDotUnread || realtimeAssets.notifications.notifyDotOutlineUnread);
 }

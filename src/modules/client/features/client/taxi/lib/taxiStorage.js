@@ -1,9 +1,13 @@
+import taxiLogger from "../../../../../shared/taxi/utils/taxiLogger";
+
 export function loadMyAddressesV1() {
   try {
     const raw = localStorage.getItem("savedAddresses_v1");
     const arr = raw ? JSON.parse(raw) : [];
     if (Array.isArray(arr)) return arr;
-  } catch {}
+  } catch (error) {
+    taxiLogger.warn("client.taxi.storage.load_addresses_failed", { error });
+  }
   return [];
 }
 
@@ -12,7 +16,9 @@ export function loadSavedPlaces() {
     const raw = localStorage.getItem("client_saved_places");
     const arr = raw ? JSON.parse(raw) : [];
     if (Array.isArray(arr)) return arr;
-  } catch {}
+  } catch (error) {
+    taxiLogger.warn("client.taxi.storage.load_places_failed", { error });
+  }
   return [];
 }
 
@@ -29,7 +35,8 @@ export function loadTaxiShortcuts() {
     const raw = localStorage.getItem("taxiShortcuts") || '{}';
     const parsed = JSON.parse(raw);
     return { home: parsed.home || null, work: parsed.work || null };
-  } catch {
+  } catch (error) {
+    taxiLogger.warn("client.taxi.storage.shortcuts_failed", { error });
     return { home: null, work: null };
   }
 }

@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { Button, Spin, Table } from "antd";
+import { Button, Spin, Table, Tag } from "antd";
 import { ArrowLeftOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { useCompare } from "../context/CompareContext";
 import { getCarById } from "../services/marketBackend";
 import { formatPrice } from "../services/priceUtils";
+import { buildCompareHighlights } from "../services/autoMarketDecisionSupport";
+import { buildLuxuryDecisionRibbon } from "../services/autoMarketLuxury";
+import { buildShowroomConciergeDeck } from "../services/autoMarketShowroom";
+import { buildCompareWinner, saveAlertDraft } from "../services/autoMarketBuyerCore";
 import { useAutoMarketI18n } from "../utils/useAutoMarketI18n";
+import { buildCompareAssistRail } from "../services/autoMarketExtendedSignals";
 
 export default function ComparePage() {
   const { am } = useAutoMarketI18n();
@@ -13,6 +18,7 @@ export default function ComparePage() {
   const { ids, remove, clear } = useCompare();
   const [cars, setCars] = useState([]);
   const [loading, setLoading] = useState(false);
+  const compareAssist = buildCompareAssistRail(cars);
 
   useEffect(() => {
     let mounted = true;
@@ -27,6 +33,12 @@ export default function ComparePage() {
     })();
     return () => { mounted = false; };
   }, [ids]);
+
+
+  const compareHighlights = buildCompareHighlights(cars);
+  const luxuryDecisionRibbon = buildLuxuryDecisionRibbon(cars);
+  const conciergeDeck = buildShowroomConciergeDeck(cars);
+  const compareWinner = buildCompareWinner(cars);
 
   const rows = [
     { key: "brand", name: am("compare.brand"), v: (c) => c.brand },
@@ -43,6 +55,7 @@ export default function ComparePage() {
   return (
     <div style={{ padding: 14, paddingBottom: 60 }}>
       <div style={{ display:"flex", gap: 10, alignItems:"center", marginBottom: 12 }}>
+
         <Button icon={<ArrowLeftOutlined />} onClick={()=>nav(-1)} style={{ borderRadius: 14 }} />
         <div style={{ fontWeight: 950, fontSize: 18, color:"#0f172a", flex:1 }}>{am("compare.title")}</div>
         <Button icon={<DeleteOutlined />} onClick={clear} danger style={{ borderRadius: 12 }}>Tozalash</Button>
@@ -52,6 +65,41 @@ export default function ComparePage() {
 
       {!loading && !ids.length ? (
         <div style={{ color:"#64748b", fontWeight: 800 }}>{am("app.emptyCompare")}</div>
+      ) : null}
+
+      {!loading && compareWinner ? (
+        <div style={{ marginBottom: 12, borderRadius: 18, border: "1px solid #dcfce7", background: "#f0fdf4", padding: 14 }}>
+          <div style={{ fontWeight: 900, color: "#166534" }}>Eng qulay variant: {compareWinner.title}</div>
+          <div style={{ fontSize: 12, color: "#166534", marginTop: 6 }}>{compareWinner.text}</div>
+        </div>
+      ) : null}
+
+      {!loading && luxuryDecisionRibbon.length ? (
+        <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", marginBottom: 12 }}>
+          {luxuryDecisionRibbon.map((item) => (
+            <div key={item.key} style={{ borderRadius: 18, padding: 14, border: `1px solid ${item.tone}22`, background: `${item.tone}10` }}>
+              <div style={{ fontSize: 12, color: "#64748b" }}>{item.label}</div>
+              <div style={{ marginTop: 8, fontWeight: 900, color: "#0f172a" }}>{item.value || "Tanlanmoqda"}</div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {!loading && compareHighlights.cards.length ? (
+        <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", marginBottom: 14 }}>
+          {compareHighlights.cards.map((card) => (
+            <div key={card.key} style={{ borderRadius: 18, padding: 14, border: `1px solid ${card.tone}25`, background: `${card.tone}10` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                <div style={{ fontWeight: 900, color: "#0f172a" }}>{card.title}</div>
+                <Tag color={card.carId === compareHighlights.bestValueId ? "green" : "blue"} style={{ borderRadius: 999 }}>
+                  {card.carId === compareHighlights.bestValueId ? "Eng qulay variant" : card.badge}
+                </Tag>
+              </div>
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>{card.text}</div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: card.tone, marginTop: 8 }}>{card.subtitle}</div>
+            </div>
+          ))}
+        </div>
       ) : null}
 
       {!loading && ids.length ? (

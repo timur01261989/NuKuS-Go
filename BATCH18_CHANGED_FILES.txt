@@ -1,0 +1,13 @@
+src/modules/client/features/client/pages/clientReferral.logic.js
+src/modules/client/features/client/pages/ClientReferral.jsx
+src/modules/client/features/auth/pages/auth.logic.js
+src/modules/client/features/auth/pages/Auth.jsx
+src/services/referralLinkService.storage.js
+src/services/referralLinkService.js
+src/modules/client/features/auto-market/services/marketApi.seed.js
+src/modules/client/features/auto-market/services/marketApi.js
+src/modules/client/features/client/taxi/hooks/useTaxiOrder.core.selectors.js
+src/modules/client/features/client/taxi/hooks/useTaxiOrder.core.js
+src/modules/shared/utils/apiHelper.config.js
+src/modules/shared/utils/apiHelper.js
+tests/batch18-structure.test.js

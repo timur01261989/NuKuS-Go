@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { haversineKm } from "../../shared/geo/haversine";
+import { taxiLogger } from "@/modules/shared/taxi/utils/taxiLogger.js";
 
 export async function osrmRouteMulti(points) {
   if (!points || points.length < 2) return null;
@@ -15,10 +16,12 @@ export async function osrmRouteMulti(points) {
         coords,
         distanceKm: (r.distance || 0) / 1000,
         durationMin: (r.duration || 0) / 60,
+        source: "live",
+        isFallback: false,
       };
     }
   } catch (e) {
-    console.warn("OSRM yo'nalish chizishda xatolik:", e);
+    taxiLogger.warn("Taxi route fallback ishlatildi", { error: e?.message || String(e) });
   }
   const from = points[0];
   const to = points[points.length - 1];
@@ -26,6 +29,8 @@ export async function osrmRouteMulti(points) {
     coords: [from, to],
     distanceKm: haversineKm(from, to),
     durationMin: haversineKm(from, to) * 2,
+    source: "fallback",
+    isFallback: true,
   };
 }
 

@@ -3,7 +3,7 @@ import cors from "cors";
 import multer from "multer";
 import { nanoid } from "nanoid";
 import { aiQueue } from "./queue.js";
-import { jobState, initJob } from "./store.js";
+import { getJob, initJob } from "./store.js";
 import { saveBufferToDisk } from "./storage.js";
 
 const app = express();
@@ -12,7 +12,7 @@ app.use(cors({
   origin: process.env.CORS_ORIGIN || true
 }));
 
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: Number(process.env.AI_UPLOAD_MAX_BYTES || 8 * 1024 * 1024), files: 10 } });
 
 /**
  * POST /ai/jobs
@@ -24,6 +24,12 @@ app.post("/ai/jobs", upload.array("images", 10), async (req, res) => {
 
   const files = req.files || [];
   const imagePaths = [];
+  for (const f of files) {
+    const mime = String(f?.mimetype || "").toLowerCase();
+    if (mime && !mime.startsWith("image/")) {
+      return res.status(400).json({ error: "Only image uploads are supported" });
+    }
+  }
   for (const f of files) {
     const p = await saveBufferToDisk({ jobId, filename: f.originalname, buffer: f.buffer });
     imagePaths.push(p);
@@ -42,7 +48,7 @@ app.post("/ai/jobs", upload.array("images", 10), async (req, res) => {
  * GET /ai/jobs/:jobId
  */
 app.get("/ai/jobs/:jobId", (req, res) => {
-  const s = jobState.get(req.params.jobId);
+  const s = getJob(req.params.jobId);
   if (!s) return res.status(404).json({ error: "Job not found" });
   res.json(s);
 });
@@ -64,7 +70,7 @@ app.get("/ai/jobs/:jobId/events", (req, res) => {
   res.flushHeaders?.();
 
   const send = () => {
-    const s = jobState.get(jobId);
+    const s = getJob(jobId);
     if (!s) {
       res.write(`data: ${JSON.stringify({ jobId, status: "error", error: "Job not found" })}\n\n`);
       return;

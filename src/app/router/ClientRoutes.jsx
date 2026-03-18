@@ -1,5 +1,6 @@
 import React, { lazy } from "react";
 import { Navigate, Route } from "react-router-dom";
+import { ROUTES } from "./routePaths.js";
 
 const Home = lazy(() => import("../../modules/client/pages/Home.jsx"));
 const TaxiOrder = lazy(() => import("../../modules/client/pages/TaxiOrder.jsx"));
@@ -19,32 +20,32 @@ function ClientRoutes() {
   return (
     <>
       <Route index element={<Home />} />
-      <Route path="/" element={<Home />} />
-      <Route path="/taxi" element={<TaxiOrder />} />
-      <Route path="/delivery" element={<DeliveryOrder />} />
-      <Route path="/freight" element={<FreightOrder />} />
-      <Route path="/intercity" element={<IntercityOrder />} />
-      <Route path="/interdistrict" element={<InterdistrictOrder />} />
-      <Route path="/wallet" element={<Wallet />} />
-      <Route path="/profile" element={<Profile />} />
-      <Route path="/referral" element={<Referral />} />
-      <Route path="/promo" element={<ClientPromo />} />
-      <Route path="/settings" element={<Settings />} />
-      <Route path="/auto-market/*" element={<AutoMarket />} />
-      <Route path="/client/navigator" element={<ClientNavigator />} />
-      <Route path="/navigator" element={<Navigate replace to="/client/navigator" />} />
-      <Route path="/client/home" element={<Navigate replace to="/" />} />
-      <Route path="/client/taxi" element={<Navigate replace to="/taxi" />} />
-      <Route path="/client/delivery" element={<Navigate replace to="/delivery" />} />
-      <Route path="/client/freight" element={<Navigate replace to="/freight" />} />
-      <Route path="/client/inter-provincial" element={<Navigate replace to="/intercity" />} />
-      <Route path="/client/inter-district" element={<Navigate replace to="/interdistrict" />} />
-      <Route path="/client/wallet" element={<Navigate replace to="/wallet" />} />
-      <Route path="/client/profile" element={<Navigate replace to="/profile" />} />
-      <Route path="/client/referral" element={<Navigate replace to="/referral" />} />
-      <Route path="/client/promo" element={<Navigate replace to="/promo" />} />
-      <Route path="/client/settings" element={<Navigate replace to="/settings" />} />
-      <Route path="/market/*" element={<Navigate replace to="/auto-market" />} />
+      <Route path={ROUTES.client.home} element={<Home />} />
+      <Route path={ROUTES.client.taxi} element={<TaxiOrder />} />
+      <Route path={ROUTES.client.delivery} element={<DeliveryOrder />} />
+      <Route path={ROUTES.client.freight} element={<FreightOrder />} />
+      <Route path={ROUTES.client.intercity} element={<IntercityOrder />} />
+      <Route path={ROUTES.client.interdistrict} element={<InterdistrictOrder />} />
+      <Route path={ROUTES.client.wallet} element={<Wallet />} />
+      <Route path={ROUTES.client.profile} element={<Profile />} />
+      <Route path={ROUTES.client.referral} element={<Referral />} />
+      <Route path={ROUTES.client.promo} element={<ClientPromo />} />
+      <Route path={ROUTES.client.settings} element={<Settings />} />
+      <Route path={`${ROUTES.client.autoMarket}/*`} element={<AutoMarket />} />
+      <Route path={ROUTES.client.navigator} element={<ClientNavigator />} />
+      <Route path={ROUTES.legacy.navigator} element={<Navigate replace to={ROUTES.client.navigator} />} />
+      <Route path={ROUTES.legacy.clientHome} element={<Navigate replace to={ROUTES.client.home} />} />
+      <Route path={ROUTES.legacy.clientTaxi} element={<Navigate replace to={ROUTES.client.taxi} />} />
+      <Route path={ROUTES.legacy.clientDelivery} element={<Navigate replace to={ROUTES.client.delivery} />} />
+      <Route path={ROUTES.legacy.clientFreight} element={<Navigate replace to={ROUTES.client.freight} />} />
+      <Route path={ROUTES.legacy.clientInterProvincial} element={<Navigate replace to={ROUTES.client.intercity} />} />
+      <Route path={ROUTES.legacy.clientInterDistrict} element={<Navigate replace to={ROUTES.client.interdistrict} />} />
+      <Route path={ROUTES.legacy.clientWallet} element={<Navigate replace to={ROUTES.client.wallet} />} />
+      <Route path={ROUTES.legacy.clientProfile} element={<Navigate replace to={ROUTES.client.profile} />} />
+      <Route path={ROUTES.legacy.clientReferral} element={<Navigate replace to={ROUTES.client.referral} />} />
+      <Route path={ROUTES.legacy.clientPromo} element={<Navigate replace to={ROUTES.client.promo} />} />
+      <Route path={ROUTES.legacy.clientSettings} element={<Navigate replace to={ROUTES.client.settings} />} />
+      <Route path={`${ROUTES.legacy.market}/*`} element={<Navigate replace to={ROUTES.client.autoMarket} />} />
     </>
   );
 }

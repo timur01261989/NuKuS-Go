@@ -1,23 +1,16 @@
 import React from "react";
 import { Card } from "antd";
 import { useClientText } from "../../shared/i18n_clientLocalize";
-
-const CHIPS = [
-  { id: "document", label: "Hujjat", emoji: "📄" },
-  { id: "keys", label: "Kalit", emoji: "🔑" },
-  { id: "box_small", label: "Kichik quti", emoji: "📦" },
-  { id: "box_large", label: "Katta quti", emoji: "🧰" },
-  { id: "flowers", label: "Gul", emoji: "💐" },
-];
+import { orderAssets } from "@/assets/order";
 
 export default function ParcelTypeChips({ value, onChange }) {
   const { cp } = useClientText();
   const chips = [
-    { id: "document", label: cp("Hujjat"), emoji: "📄" },
-    { id: "keys", label: cp("Kalit"), emoji: "🔑" },
-    { id: "box_small", label: cp("Kichik quti"), emoji: "📦" },
-    { id: "box_large", label: cp("Katta quti"), emoji: "🧰" },
-    { id: "flowers", label: cp("Gul"), emoji: "💐" },
+    { id: "document", label: cp("Hujjat"), emoji: "📄", icon: orderAssets.orderSupportAlt },
+    { id: "keys", label: cp("Kalit"), emoji: "🔑", icon: orderAssets.serviceLock },
+    { id: "box_small", label: cp("Kichik quti"), emoji: "📦", icon: orderAssets.orderBoxOpen || orderAssets.orderBox },
+    { id: "box_large", label: cp("Katta quti"), emoji: "🧰", icon: orderAssets.orderBox },
+    { id: "flowers", label: cp("Gul"), emoji: "💐", icon: orderAssets.orderMarket },
   ];
   return (
     <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
@@ -38,7 +31,10 @@ export default function ParcelTypeChips({ value, onChange }) {
               }}
               type="button"
             >
-              <div style={{ fontSize: 22 }}>{c.emoji}</div>
+              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6 }}>
+                <img src={c.icon} alt="" style={{ width: 22, height: 22, objectFit: "contain" }} />
+                <span style={{ fontSize: 20 }}>{c.emoji}</span>
+              </div>
               <div style={{ fontWeight: 900, fontSize: 12, marginTop: 6 }}>{c.label}</div>
             </button>
           );

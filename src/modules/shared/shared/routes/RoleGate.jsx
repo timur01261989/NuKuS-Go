@@ -2,32 +2,27 @@ import React, { useMemo } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import Loader from "../../components/Loader.jsx";
 import { useAuth } from "../auth/AuthProvider.jsx";
+import { ROUTES } from "@/app/router/routePaths.js";
+import { pickHomeForAuth, selectAccessState } from "../../auth/accessState.js";
 
-export function pickHomeForRole({ role, driverExists, driverApproved, applicationStatus }) {
-  const normalizedRole = String(role || "client").trim().toLowerCase();
-  const normalizedStatus = typeof applicationStatus === "string" ? applicationStatus.trim().toLowerCase() : "";
-
-  if (normalizedRole === "admin") return "/admin";
-  if (normalizedRole !== "driver") return "/client/home";
-  if (!driverExists && normalizedStatus === "pending") return "/driver/pending";
-  if (!driverExists) return "/driver/register";
-  if (!driverApproved) return "/driver/pending";
-  return "/driver/dashboard";
+export function pickHomeForRole(auth, options = {}) {
+  const appMode = typeof options === "string" ? options : options?.appMode;
+  return pickHomeForAuth(auth, appMode);
 }
 
-export default function RoleGate({ children, allow, redirectTo = "/login" }) {
+export default function RoleGate({ children, allow, redirectTo = ROUTES.auth.login }) {
   const location = useLocation();
   const auth = useAuth();
 
   const decision = useMemo(() => {
     const allowConfig = allow || {};
-    const isLoading = !auth?.authReady || auth?.loading;
+    const access = selectAccessState(auth);
 
-    if (isLoading) {
+    if (access.mode === "loading") {
       return { mode: "loading", target: null };
     }
 
-    if (!auth?.isAuthed || !auth?.user) {
+    if (access.mode === "guest") {
       return {
         mode: "redirect",
         target: redirectTo,
@@ -35,27 +30,34 @@ export default function RoleGate({ children, allow, redirectTo = "/login" }) {
       };
     }
 
-    const role = String(auth?.role || "client").trim().toLowerCase();
-    const allowClient = !!allowConfig.client;
-    const allowDriver = !!allowConfig.driver;
-    const requireDriverApproved = !!allowConfig.requireDriverApproved;
-
-    if (role === "admin") {
+    if (access.mode === "admin") {
       return { mode: "allow" };
     }
 
-    if (role === "driver") {
+    const allowClient = !!allowConfig.client;
+    const allowDriver = !!allowConfig.driver;
+    const requireDriverApproved = !!allowConfig.requireDriverApproved;
+    const homeTarget = pickHomeForAuth(auth, allowConfig.appMode);
+
+    if (access.mode === "driver_approved") {
       if (!allowDriver) {
-        return { mode: "redirect", target: pickHomeForRole(auth) };
+        return { mode: "redirect", target: homeTarget };
       }
-      if (requireDriverApproved && !auth?.driverApproved) {
-        return { mode: "redirect", target: pickHomeForRole(auth) };
+      return { mode: "allow" };
+    }
+
+    if (access.mode === "driver_pending" || access.mode === "driver_rejected" || access.mode === "driver_unregistered") {
+      if (!allowDriver) {
+        return { mode: "redirect", target: homeTarget };
+      }
+      if (requireDriverApproved) {
+        return { mode: "redirect", target: homeTarget };
       }
       return { mode: "allow" };
     }
 
     if (!allowClient) {
-      return { mode: "redirect", target: pickHomeForRole(auth) };
+      return { mode: "redirect", target: homeTarget };
     }
 
     return { mode: "allow" };

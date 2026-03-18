@@ -5,9 +5,10 @@ import { useCreateAd } from "../../../context/CreateAdContext";
 import useUploadImages from "../../../hooks/useUploadImages";
 import { useAiPipeline } from "../../../hooks/ai/useAiPipeline";
 import AiPipelineStatus from "../../modules/CreateAd/AiPipelineStatus";
+import PhotoAngleGuide from "../PhotoAngleGuide";
 import { useAutoMarketI18n } from "../../../utils/useAutoMarketI18n";
 
-const AI_BASE = (import.meta?.env?.VITE_PYTHON_AI_URL || import.meta?.env?.VITE_API_BASE || "").replace(/\/$/, "");
+const AI_BASE = (import.meta?.env?.VITE_PYTHON_AI_URL || import.meta?.env?.VITE_API_BASE_URL || import.meta?.env?.VITE_API_BASE || "").replace(/\/$/, "");
 
 async function recognizeCar(file) {
   return new Promise((resolve) => {
@@ -16,7 +17,7 @@ async function recognizeCar(file) {
       try {
         const base64 = (e.target.result || "").split(",")[1];
         if (!base64) { resolve(null); return; }
-        const r = await fetch(`${AI_BASE}/python-ai/car-recognize`, {
+        const r = await fetch(`${AI_BASE}/car-recognize`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ image_base64: base64 }),
@@ -119,6 +120,8 @@ export default function Step3_Photos() {
           action={<Space direction="vertical" size="small"><Button size="small" type="primary" icon={<CheckOutlined />} onClick={applyAiResult} style={{ background: "#52c41a", border: "none" }}>{am("autoExtra.aiApply")}</Button><Button size="small" icon={<CloseOutlined />} onClick={() => { setAiResult(null); setAiDismissed(true); }}>{am("autoExtra.aiReject")}</Button></Space>}
         />
       )}
+
+      <PhotoAngleGuide images={ad.images || []} />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginTop: 16 }}>
         {(ad.images || []).map((src, idx) => (

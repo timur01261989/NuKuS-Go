@@ -83,7 +83,7 @@ export default function DriverServiceSelect({ onSelectService }) {
     <ConfigProvider>
       <div style={{ minHeight: '100vh', background: '#fff', padding: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <Button icon={<ArrowLeftOutlined />} shape="circle" size="large" onClick={() => safeBack(navigate, '/driver/dashboard')} />
+          <Button icon={<ArrowLeftOutlined />} shape="circle" size="large" onClick={() => safeBack(navigate, '/driver')} />
           <div style={{ background: '#f0f0f0', padding: '6px 16px', borderRadius: 20, fontWeight: 'bold', fontSize: 14 }}>{currentLanguageMeta.shortLabel}</div>
         </div>
 

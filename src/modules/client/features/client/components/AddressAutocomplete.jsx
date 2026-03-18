@@ -31,7 +31,7 @@ export default function AddressAutocomplete({ onSelect }) {
           height: 55, 
           border: 'none', 
           boxShadow: '0 4px 15px rgba(0,0,0,0.05)',
-          fontFamily: 'YangoHeadline' 
+          fontFamily: 'AccentHeadline' 
         }}
       />
 
@@ -53,7 +53,7 @@ export default function AddressAutocomplete({ onSelect }) {
               >
                 <List.Item.Meta
                   avatar={<EnvironmentFilled style={{ color: '#FFD700' }} />}
-                  title={<Text strong style={{ fontFamily: 'YangoHeadline' }}>{item.name}</Text>}
+                  title={<Text strong style={{ fontFamily: 'AccentHeadline' }}>{item.name}</Text>}
                   description={<Text type="secondary" style={{ fontSize: 12 }}>{item.address}</Text>}
                 />
               </List.Item>

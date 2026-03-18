@@ -1,9 +1,12 @@
+
 /**
  * integrationApi.js
- * parcels va active rides bilan ishlash.
- *
- * configureIntegrationApi({ apiHelper, supabase }) orqali ulaysiz.
+ * Delivery driver integration canonical layer.
+ * Legacy "parcel" nomlari saqlanadi, lekin source-of-truth delivery_orders.
  */
+import { normalizeDeliveryOrder, normalizeDeliveryStatus, toDeliveryDriverAction } from "@/modules/shared/domain/delivery/statusMap.js";
+import { logisticsLogger } from "@/modules/shared/domain/logistics/logisticsLogger.js";
+
 let _apiHelper = null;
 let _supabase = null;
 
@@ -12,101 +15,141 @@ export function configureIntegrationApi({ apiHelper, supabase }) {
   _supabase = supabase || null;
 }
 
-
-function normalizeParcelRow(row = {}) {
-  const serviceArea = row.service_area || row.serviceArea || row.mode || row.driver_mode || null;
-  const orderType = row.order_type || row.orderType || (row.is_freight ? "freight" : "delivery");
-  const weightKg = Number(row.weight_kg ?? row.weightKg ?? row.cargo_weight_kg ?? row.max_kg ?? 0);
-  const volumeM3 = Number(row.volume_m3 ?? row.volumeM3 ?? row.cargo_volume_m3 ?? row.max_volume_m3 ?? 0);
-  return { ...row, serviceArea, orderType, weightKg, volumeM3 };
-}
-
-function filterParcels(rows = [], params = {}) {
-  const serviceArea = params.serviceArea || null;
-  const orderType = params.orderType || null;
-  const maxWeightKg = Number(params.maxWeightKg ?? 0);
-  const maxVolumeM3 = Number(params.maxVolumeM3 ?? 0);
-  return rows
-    .map(normalizeParcelRow)
-    .filter((row) => {
-      if (serviceArea && row.serviceArea && row.serviceArea !== serviceArea) return false;
-      if (orderType && row.orderType && row.orderType !== orderType) return false;
-      if (maxWeightKg > 0 && Number(row.weightKg || 0) > maxWeightKg) return false;
-      if (maxVolumeM3 > 0 && Number(row.volumeM3 || 0) > maxVolumeM3) return false;
-      return true;
-    });
-}
-
 function assertConfigured() {
   if (!_apiHelper && !_supabase) {
     throw new Error("integrationApi konfiguratsiya qilinmagan. configureIntegrationApi({ apiHelper, supabase }) chaqiring.");
   }
 }
 
+function filterOrders(rows = [], params = {}) {
+  const serviceArea = params.serviceArea || null;
+  const maxWeightKg = Number(params.maxWeightKg ?? 0);
+  const list = Array.isArray(rows) ? rows.map(normalizeDeliveryOrder) : [];
+  return list.filter((row) => {
+    if (serviceArea && row.serviceArea && row.serviceArea !== serviceArea) return false;
+    if (maxWeightKg > 0 && Number(row.weight_kg || 0) > maxWeightKg) return false;
+    return ["searching", "accepted", "picked_up"].includes(row.status);
+  });
+}
+
+async function listDriverOrdersViaApi() {
+  const res = await _apiHelper.post("/api/delivery", { action: "list_driver_orders" });
+  return Array.isArray(res?.orders) ? res.orders : Array.isArray(res?.data?.orders) ? res.data.orders : [];
+}
+
 export async function listParcels(params = {}) {
   assertConfigured();
   if (_apiHelper) {
-    const res = await _apiHelper.post("/api/delivery", { action: "list_parcels", ...params });
-    return res?.data || res || [];
+    const rows = await listDriverOrdersViaApi();
+    return filterOrders(rows, params);
   }
-  const q = _supabase.from("parcels").select("*").eq("status", "searching").order("created_at", { ascending: false });
-  const { data, error } = await q;
+  const { data, error } = await _supabase
+    .from("delivery_orders")
+    .select("*")
+    .in("status", ["searching", "pending", "accepted", "pickup", "picked_up"])
+    .order("created_at", { ascending: false });
   if (error) throw error;
-  return filterParcels(data || [], params);
+  return filterOrders(data || [], params);
 }
 
 export async function acceptParcel({ parcelId, driverId, rideId, payload = {} }) {
   assertConfigured();
+  const patch = {
+    matched_trip_id: rideId || null,
+    matched_driver_user_id: driverId || null,
+    driver_user_id: driverId || null,
+    ...payload,
+  };
   if (_apiHelper) {
-    return _apiHelper.post("/api/delivery", { action: "accept_parcel", parcelId, driverId, rideId, payload });
+    return _apiHelper.post("/api/delivery", {
+      action: "driver_update_status",
+      id: parcelId,
+      status: toDeliveryDriverAction("searching"),
+      patch,
+    });
   }
   const { data, error } = await _supabase
-    .from("parcels")
-    .update({ status: "accepted", driver_id: driverId, accepted_at: new Date().toISOString(), ...payload })
+    .from("delivery_orders")
+    .update({ status: "accepted", ...patch, updated_at: new Date().toISOString() })
     .eq("id", parcelId)
+    .in("status", ["searching", "pending"])
     .select("*")
     .single();
   if (error) throw error;
-  return data;
+  return normalizeDeliveryOrder(data);
 }
 
 export async function markParcelPickup({ parcelId, photoUrl, note }) {
   assertConfigured();
+  const patch = { pickup_photo: photoUrl || null, pickup_note: note || null, pickup_at: new Date().toISOString() };
   if (_apiHelper) {
-    return _apiHelper.post("/api/delivery", { action: "pickup_parcel", parcelId, photoUrl, note });
+    return _apiHelper.post("/api/delivery", {
+      action: "driver_update_status",
+      id: parcelId,
+      status: toDeliveryDriverAction("accepted"),
+      patch,
+    });
   }
   const { data, error } = await _supabase
-    .from("parcels")
-    .update({ status: "pickup", pickup_photo: photoUrl || null, pickup_note: note || null, pickup_at: new Date().toISOString() })
+    .from("delivery_orders")
+    .update({ status: "picked_up", ...patch, updated_at: new Date().toISOString() })
     .eq("id", parcelId)
     .select("*")
     .single();
   if (error) throw error;
-  return data;
+  return normalizeDeliveryOrder(data);
 }
 
 export async function completeParcel({ parcelId, secureCode }) {
   assertConfigured();
+  const patch = { delivered_code: secureCode || null, completed_at: new Date().toISOString() };
   if (_apiHelper) {
-    return _apiHelper.post("/api/delivery", { action: "complete_parcel", parcelId, secureCode });
+    return _apiHelper.post("/api/delivery", {
+      action: "driver_update_status",
+      id: parcelId,
+      status: toDeliveryDriverAction("picked_up"),
+      patch,
+    });
   }
   const { data, error } = await _supabase
-    .from("parcels")
-    .update({ status: "completed", completed_at: new Date().toISOString(), delivered_code: secureCode || null })
+    .from("delivery_orders")
+    .update({ status: "delivered", ...patch, updated_at: new Date().toISOString() })
     .eq("id", parcelId)
     .select("*")
     .single();
   if (error) throw error;
-  return data;
+  return normalizeDeliveryOrder(data);
 }
 
 export function buildParcelSmsText({ fromCity, toCity, vehiclePlate, photoLink, deepLink }) {
   const lines = [
-    "📦 Sizga pochta kelyapti!",
+    "📦 Sizga posilka yetkazilmoqda",
     (fromCity && toCity) ? `🚗 Yo'nalish: ${fromCity} ➜ ${toCity}` : null,
     vehiclePlate ? `🚘 Mashina: ${vehiclePlate}` : null,
     photoLink ? `🖼 Rasm: ${photoLink}` : null,
     deepLink ? `🔗 Kuzatish: ${deepLink}` : null,
   ].filter(Boolean);
   return lines.join("\n");
+}
+
+export function toLegacyParcel(order = {}) {
+  const normalized = normalizeDeliveryOrder(order);
+  return {
+    ...normalized,
+    id: normalized.id,
+    title: normalized.title,
+    amount: normalized.amount,
+    status: normalized.status,
+    pickup_location: normalized.pickup_location,
+    drop_location: normalized.drop_location,
+    receiver_phone: normalized.receiver_phone,
+    service_area: normalized.serviceArea,
+  };
+}
+
+export function logIntegrationError(action, error, meta = {}) {
+  logisticsLogger.error("delivery", action, {
+    message: error?.message || String(error || "unknown"),
+    ...meta,
+  });
 }

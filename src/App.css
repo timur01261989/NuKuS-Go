@@ -1,8 +1,8 @@
 /* 1. PROFESSIONAL SHRIFT INTEGRATSIYASI */
 @font-face {
-  font-family: 'YangoHeadline';
+  font-family: 'AccentHeadline';
   /* Fayl yo'li to'g'ri ekanligini tekshiring */
-  src: url('/assets/fonts/yango-headline-multi.woff') format('woff');
+  src: url('/assets/fonts/accent-headline-multi.woff') format('woff');
   font-weight: bold;
   font-style: normal;
   font-display: swap;
@@ -15,9 +15,9 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Sarlavhalar va Yandex uslubidagi matnlar uchun */
-h1, h2, h3, .ant-typography, .yango-title {
-  font-family: 'YangoHeadline', sans-serif !important;
+/* Sarlavhalar va zamonaviy matnlar uchun */
+h1, h2, h3, .ant-typography, .accent-title {
+  font-family: 'AccentHeadline', sans-serif !important;
   letter-spacing: -0.5px;
 }
 

@@ -1,34 +1,36 @@
 /**
  * 🧠 taxiReducer.js
- * Toza logika (driver_web_module uslubi): statuslar + order holatlari
+ * Driver taxi holatlari canonical status enum bilan boshqariladi.
  */
+import { TAXI_STATUS } from "@/modules/shared/taxi/constants/taxiStatuses.js";
 
 export const TaxiOrderStatus = {
-  NEW: "NEW",
-  ACCEPTED: "ACCEPTED",
-  ARRIVED: "ARRIVED",
-  ON_TRIP: "ON_TRIP",
-  COMPLETED: "COMPLETED",
-  DECLINED: "DECLINED",
-  CANCELED: "CANCELED",
+  NEW: TAXI_STATUS.NEW,
+  SEARCHING: TAXI_STATUS.SEARCHING,
+  ACCEPTED: TAXI_STATUS.ACCEPTED,
+  ARRIVED: TAXI_STATUS.ARRIVED,
+  ON_TRIP: TAXI_STATUS.ON_TRIP,
+  COMPLETED: TAXI_STATUS.COMPLETED,
+  DECLINED: TAXI_STATUS.DECLINED,
+  CANCELED: TAXI_STATUS.CANCELED,
 };
 
 export const initialTaxiState = {
   isOnline: false,
 
   driverLocation: {
-    latlng: null, // [lat,lng]
-    heading: 0,   // degrees (0..360)
+    latlng: null,
+    heading: 0,
     accuracy: null,
     updatedAt: null,
   },
 
-  incomingOrder: null, // NEW order to show in modal
-  activeOrder: null,   // ACCEPTED/ARRIVED/ON_TRIP...
+  incomingOrder: null,
+  activeOrder: null,
 
   ordersFeed: {
     items: [],
-    status: "idle", // idle|loading|success|error
+    status: "idle",
     error: null,
     lastFetchAt: null,
   },

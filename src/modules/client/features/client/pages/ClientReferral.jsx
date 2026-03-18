@@ -12,39 +12,11 @@ import {
   persistOwnReferralSnapshot,
   shareReferralLink,
 } from '@/services/referralLinkService.js';
+import { formatMoney, mergeReferralState } from './clientReferral.helpers.js';
+import { buildInlineStatusText, buildReferralViewModel, buildWarningsText, getInitialReferralSummaryState } from './clientReferral.logic.js';
+import { promoAssets } from '@/assets/promo';
+import { assetStyles } from '@/assets/assetPolish';
 
-function formatMoney(language, amount) {
-  const normalizedAmount = Math.max(0, Math.round(Number(amount || 0)));
-  try {
-    return new Intl.NumberFormat(language === 'uz_kir' ? 'uz-Cyrl-UZ' : 'uz-UZ').format(normalizedAmount);
-  } catch {
-    return String(normalizedAmount);
-  }
-}
-
-function mergeReferralState(response, previousState = null) {
-  const cached = getOwnReferralSnapshot();
-  const merged = {
-    code: response?.code || previousState?.code || cached?.code || null,
-    summary: response?.summary || previousState?.summary || cached?.summary || null,
-    shareUrl:
-      String(response?.share_url || '').trim() ||
-      String(previousState?.shareUrl || '').trim() ||
-      String(cached?.share_url || '').trim() ||
-      '',
-    wallet: response?.wallet || previousState?.wallet || cached?.wallet || null,
-    warnings: Array.isArray(response?.warnings) ? response.warnings : previousState?.warnings || [],
-  };
-
-  persistOwnReferralSnapshot({
-    code: merged.code,
-    summary: merged.summary,
-    share_url: merged.shareUrl,
-    wallet: merged.wallet,
-  });
-
-  return merged;
-}
 
 const ClientReferral = memo(function ClientReferral() {
   const navigate = useNavigate();
@@ -55,33 +27,22 @@ const ClientReferral = memo(function ClientReferral() {
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [errorText, setErrorText] = useState('');
   const [codeStatus, setCodeStatus] = useState('loading');
-  const [summaryState, setSummaryState] = useState(() => {
-    const cached = getOwnReferralSnapshot();
-    return {
-      code: cached?.code ? { code: cached.code } : null,
-      summary: cached?.summary || null,
-      shareUrl: cached?.share_url || '',
-      wallet: cached?.wallet || null,
-      warnings: [],
-    };
-  });
+  const [summaryState, setSummaryState] = useState(() => getInitialReferralSummaryState(getOwnReferralSnapshot));
 
-  const referralCode = useMemo(() => String(summaryState?.code?.code || summaryState?.code || '').trim(), [summaryState?.code]);
-  const shareUrl = useMemo(() => String(summaryState?.shareUrl || '').trim() || buildReferralShareUrl(referralCode), [referralCode, summaryState?.shareUrl]);
-  const sharePayload = useMemo(() => buildReferralSharePayload({ code: referralCode, appName: 'UniGo' }), [referralCode]);
-  const externalTargets = useMemo(() => buildReferralExternalShareTargets({ code: referralCode, appName: 'UniGo' }), [referralCode]);
-  const canShare = useMemo(() => Boolean(referralCode && shareUrl), [referralCode, shareUrl]);
+  const {
+    referralCode,
+    shareUrl,
+    sharePayload,
+    externalTargets,
+    canShare,
+    totals,
+    rewardRows,
+  } = useMemo(
+    () => buildReferralViewModel(summaryState, buildReferralShareUrl, buildReferralSharePayload, buildReferralExternalShareTargets),
+    [summaryState]
+  );
   const canAttemptShare = useMemo(() => !loading && !sharing, [loading, sharing]);
 
-  const totals = useMemo(() => ({
-    invitedCount: Number(summaryState?.summary?.totals?.invited_count || 0),
-    qualifiedCount: Number(summaryState?.summary?.totals?.qualified_count || 0),
-    rewardedCount: Number(summaryState?.summary?.totals?.rewarded_count || 0),
-    earnedUzs: Number(summaryState?.summary?.totals?.earned_uzs || 0),
-    bonusBalanceUzs: Number(summaryState?.wallet?.bonus_balance_uzs || 0),
-  }), [summaryState?.summary?.totals, summaryState?.wallet]);
-
-  const rewardRows = useMemo(() => Array.isArray(summaryState?.summary?.rewards) ? summaryState.summary.rewards.slice(0, 10) : [], [summaryState?.summary?.rewards]);
 
   const closeShareSheet = useCallback(() => {
     setShareSheetOpen(false);
@@ -204,20 +165,13 @@ const ClientReferral = memo(function ClientReferral() {
     safeBack(navigate, fallbackPath);
   }, [location?.pathname, navigate]);
 
-  const inlineStatusText = useMemo(() => {
-    if (codeStatus === 'loading') {
-      return tr('referral.codePreparing', 'Taklif kodingiz tayyorlanmoqda...');
-    }
-    if (codeStatus === 'error') {
-      return tr('referral.codeUnavailable', 'Taklif kodi hali tayyor emas. Yangilashni bosing. Agar muammo qolsa SQL backfill migrationni ishga tushiring.');
-    }
-    return tr('referral.registerOnlyInfo', 'Referral kod faqat ro‘yxatdan o‘tish vaqtida bir marta biriktiriladi. Ro‘yxatdan o‘tgandan keyin qayta kiritilmaydi.');
-  }, [codeStatus, tr]);
+  const inlineStatusText = useMemo(
+    () => buildInlineStatusText({ loading, codeStatus, errorText, tr }),
+    [loading, codeStatus, errorText, tr]
+  );
 
-  const warningsText = useMemo(() => {
-    if (!Array.isArray(summaryState?.warnings) || summaryState.warnings.length === 0) return '';
-    return summaryState.warnings.join(' | ');
-  }, [summaryState?.warnings]);
+  const warningsText = useMemo(() => buildWarningsText(summaryState), [summaryState]);
+
 
   return (
     <div className="min-h-screen bg-softBlue dark:bg-backgroundDark font-display text-slate-900 dark:text-slate-100 p-4">
@@ -255,10 +209,11 @@ const ClientReferral = memo(function ClientReferral() {
         <div className="mt-4 flex flex-col gap-3 sm:flex-row">
           <button
             type="button"
-            className="flex-1 bg-primaryHome hover:bg-primaryHome/90 text-backgroundDark font-bold py-3 rounded-xl active:scale-95 disabled:opacity-50"
+            className="flex-1 bg-primaryHome hover:bg-primaryHome/90 text-backgroundDark font-bold py-3 rounded-xl active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
             onClick={handleCopyLink}
             disabled={!canAttemptShare}
           >
+            <img src={promoAssets.shareIcon || promoAssets.share} alt="" style={assetStyles.promoActionIcon} />
             {sharing ? tr('loading', 'Yuklanmoqda...') : tr('inviteFriends', 'Do‘stlarni taklif qilish')}
           </button>
           <button
@@ -296,7 +251,7 @@ const ClientReferral = memo(function ClientReferral() {
       </div>
 
       <div className="mt-5 neumorphic-dark rounded-2xl p-5">
-        <h2 className="text-base font-bold">{tr('shareReferral', 'Taklif ulashish')}</h2>
+        <h2 className="text-base font-bold flex items-center gap-2"><img src={promoAssets.promoCode} alt="" style={assetStyles.promoBonusImage} />{tr('shareReferral', 'Taklif ulashish')}</h2>
         <p className="mt-2 text-sm text-slate-400 leading-6">{sharePayload.text}</p>
       </div>
 

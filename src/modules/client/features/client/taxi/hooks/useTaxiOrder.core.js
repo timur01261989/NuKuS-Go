@@ -1,8 +1,5 @@
-import { translateClientPhrase } from "../../shared/i18n_clientLocalize";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { message } from "antd";
-import { haversineKm } from "../../shared/geo/haversine";
-import { nominatimReverse as _nominatimReverse } from "../../shared/geo/nominatim";
 import { useTaxiSearch, nominatimSearch } from "./useTaxiSearch";
 import { useTaxiRouteBuilder, osrmRouteMulti } from "./useTaxiRouteBuilder";
 import { useTaxiOrderCreate } from "./useTaxiOrderCreate";
@@ -13,51 +10,27 @@ import { useTaxiOrderDerived } from "./useTaxiOrderDerived";
 import { loadMyAddressesV1, loadSavedPlaces, loadTaxiShortcuts, savePlace } from "../lib/taxiStorage";
 import { speak } from "../lib/taxiSpeech";
 import { money, clamp } from "../lib/taxiPricing";
-
-// Constants
-export const MAX_KM = 50;
-export const tileDay = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
-export const tileNight = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
-
-// Backward-compatible nominatim reverse geocoding
-async function nominatimReverse(lat, lng, signal) {
-  return _nominatimReverse(lat, lng, { signal });
-}
-
-// Debounced reverse geocoding hook
-export function useDebouncedReverse(when, latlng, delay = 350) {
-  const [addr, setAddr] = useState("");
-  const abortRef = useRef(null);
-  const tRef = useRef(null);
-
-  useEffect(() => {
-    if (!when) return;
-    if (!latlng) return;
-
-    if (tRef.current) clearTimeout(tRef.current);
-    if (abortRef.current) abortRef.current.abort();
-
-    const ac = new AbortController();
-    abortRef.current = ac;
-
-    tRef.current = setTimeout(async () => {
-      const a = await nominatimReverse(latlng[0], latlng[1], ac.signal);
-      setAddr(a || "");
-    }, delay);
-
-    return () => {
-      if (tRef.current) clearTimeout(tRef.current);
-      if (abortRef.current) abortRef.current.abort();
-    };
-  }, [when, latlng?.[0], latlng?.[1], delay]);
-
-  return addr;
-}
+import taxiLogger from "../../../../../shared/taxi/utils/taxiLogger";
+import {
+  createTaxiTariffs,
+  getClientPhrase,
+  MAX_KM,
+  nominatimReverse,
+  tileDay,
+  tileNight,
+  useDebouncedReverse,
+} from "./useTaxiOrder.core.helpers";
+import {
+  getDistanceKm,
+  getDurationMin,
+  getSavedAddressByLabel,
+  getTotalPrice,
+  getVisibleSearchResults,
+} from "./useTaxiOrder.core.selectors";
 
 // Main taxi order hook
 export function useTaxiOrderCore() {
-  const currentLang = (() => { try { return localStorage.getItem("appLang") || "uz_lotin"; } catch { return "uz_lotin"; } })();
-  const cp = (x) => translateClientPhrase(currentLang, x);
+  const cp = getClientPhrase();
 
   // Flow state
   const [step, setStep] = useState("main");
@@ -89,14 +62,7 @@ export function useTaxiOrderCore() {
   // Route and tariff
   const [route, setRoute] = useState(null);
   const [tariff, setTariff] = useState({ id: "start", title: "Start", mult: 1, base: 4500, perKm: 1400 });
-  const tariffs = useMemo(
-    () => [
-      { id: "start", title: "Start", mult: 1, base: 4500, perKm: 1400 },
-      { id: "comfort", title: "Komfort", mult: 1.2, base: 6500, perKm: 1700 },
-      { id: "business", title: "Biznes", mult: 1.5, base: 9000, perKm: 2200 },
-    ],
-    []
-  );
+  const tariffs = useMemo(() => createTaxiTariffs(), []);
 
   // Order and driver
   const orderState = useTaxiOrderState();
@@ -117,6 +83,10 @@ export function useTaxiOrderCore() {
     setEarnedBonus,
     etaMin,
     setEtaMin,
+    etaUpdatedAt,
+    setEtaUpdatedAt,
+    etaUpdatedAt,
+    setEtaUpdatedAt,
   } = orderState;
 
   // Order extras
@@ -146,32 +116,18 @@ export function useTaxiOrderCore() {
   const destAddrFromCenter = useDebouncedReverse(step === "dest_map", centerLatLng, 300);
 
   // Memoized home/work addresses
-  const homeAddr = useMemo(() => myAddressesV1.find(x => String(x?.label || '').toLowerCase() === 'uy') || null, [myAddressesV1]);
-  const workAddr = useMemo(() => myAddressesV1.find(x => String(x?.label || '').toLowerCase() === 'ish') || null, [myAddressesV1]);
+  const homeAddr = useMemo(() => getSavedAddressByLabel(myAddressesV1, 'uy'), [myAddressesV1]);
+  const workAddr = useMemo(() => getSavedAddressByLabel(myAddressesV1, 'ish'), [myAddressesV1]);
 
   // Distance and price calculations
-  const distanceKm = useMemo(
-    () => route?.distanceKm || (pickup.latlng && dest.latlng ? haversineKm(pickup.latlng, dest.latlng) : 0),
-    [route?.distanceKm, pickup.latlng, dest.latlng]
-  );
+  const distanceKm = useMemo(() => getDistanceKm(route?.distanceKm, pickup.latlng, dest.latlng), [route?.distanceKm, pickup.latlng, dest.latlng]);
 
-  const durationMin = useMemo(
-    () => route?.durationMin || (distanceKm ? distanceKm * 2 : 0),
-    [route?.durationMin, distanceKm]
-  );
+  const durationMin = useMemo(() => getDurationMin(route?.durationMin, distanceKm), [route?.durationMin, distanceKm]);
 
-  const totalPrice = useMemo(() => {
-    const d = distanceKm || 0;
-    const p = (tariff.base + d * tariff.perKm) * (tariff.mult || 1);
-    return Math.round(p);
-  }, [distanceKm, tariff]);
+  const totalPrice = useMemo(() => getTotalPrice(distanceKm, tariff), [distanceKm, tariff]);
 
   // Search result filtering
-  const searchResults = useMemo(() => {
-    const qDest = (destSearchText || "").trim();
-    if (qDest) return destResults;
-    return pickupResults;
-  }, [destSearchText, destResults, pickupResults]);
+  const searchResults = useMemo(() => getVisibleSearchResults(destSearchText, destResults, pickupResults), [destSearchText, destResults, pickupResults]);
 
   // Update pickup address from map center
   useEffect(() => {
@@ -328,7 +284,9 @@ export function useTaxiOrderCore() {
         if (directValue && String(directValue).trim()) {
           return String(directValue).trim();
         }
-      } catch (_) {}
+      } catch (error) {
+        taxiLogger.warn("client.taxi.core.reverse_pickup_failed", { error });
+      }
     }
 
     const storages = [typeof localStorage !== "undefined" ? localStorage : null, typeof sessionStorage !== "undefined" ? sessionStorage : null].filter(Boolean);
@@ -359,9 +317,13 @@ export function useTaxiOrderCore() {
             const parsed = JSON.parse(raw);
             const resolved = readNestedUserId(parsed);
             if (resolved) return resolved;
-          } catch (_) {}
+          } catch (error) {
+            taxiLogger.warn("client.taxi.core.reverse_destination_failed", { error });
+          }
         }
-      } catch (_) {}
+      } catch (error) {
+        taxiLogger.warn("client.taxi.core.driver_tracker_start_failed", { error });
+      }
     }
 
     return null;
@@ -397,6 +359,7 @@ export function useTaxiOrderCore() {
     setRatingVisible,
     setEarnedBonus,
     setEtaMin,
+    setEtaUpdatedAt,
     cp,
     speak,
   });
@@ -482,6 +445,8 @@ export function useTaxiOrderCore() {
     setEarnedBonus,
     etaMin,
     setEtaMin,
+    etaUpdatedAt,
+    setEtaUpdatedAt,
     podyezdOpen,
     setPodyezdOpen,
     shareOpen,

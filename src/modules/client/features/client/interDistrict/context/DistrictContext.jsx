@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useMemo, useState } from "react";
+import { INTERDISTRICT_TRIP_STATUS, mapTripStatusToClientStep } from "@/modules/shared/interdistrict/domain/interDistrictStatuses";
 
 /**
  * DistrictContext.jsx (Client) - "Yagona Reys" Tizimi bilan boyitilgan
@@ -50,9 +51,22 @@ export function DistrictProvider({ children }) {
   // YANGI QO'SHILGAN "AQLLI TIZIM" STATE'LARI:
   // -------------------------------------------------------
 
-  // 8. Safar Holati (Trip Status)
-  // 'IDLE', 'SEARCHING', 'WAITING_DRIVER', 'PICKING_UP', 'ON_TRIP', 'COMPLETED', 'CANCELLED'
-  const [tripStatus, setTripStatus] = useState('IDLE');
+  // 8. Safar Holati
+  const [tripStatus, setTripStatusState] = useState(mapTripStatusToClientStep(INTERDISTRICT_TRIP_STATUS.DRAFT));
+  const [canonicalTripStatus, setCanonicalTripStatus] = useState(INTERDISTRICT_TRIP_STATUS.DRAFT);
+  const [activeTripRequest, setActiveTripRequest] = useState(null);
+
+  const setTripStatus = (nextStatus) => {
+    const nextCanonical = nextStatus && String(nextStatus).toLowerCase() === String(nextStatus)
+      ? nextStatus
+      : null;
+    if (nextCanonical) {
+      setCanonicalTripStatus(nextCanonical);
+      setTripStatusState(mapTripStatusToClientStep(nextCanonical));
+      return;
+    }
+    setTripStatusState(nextStatus);
+  };
 
   // 9. Haydovchi va GPS Monitoring
   const [activeDriver, setActiveDriver] = useState(null); // {id, name, car, phone, rating}
@@ -110,6 +124,10 @@ export function DistrictProvider({ children }) {
       setTripStatus,
       activeDriver,
       setActiveDriver,
+      activeTripRequest,
+      setActiveTripRequest,
+      canonicalTripStatus,
+      setCanonicalTripStatus,
       driverLocation,
       setDriverLocation,
       eta,
@@ -124,7 +142,7 @@ export function DistrictProvider({ children }) {
     [
       regionId, fromDistrict, toDistrict, doorToDoor, pickupPoint, pickupAddress,
       dropoffPoint, dropoffAddress, departDate, departTime, seatState, routeInfo,
-      filters, isHamyo, tripStatus, activeDriver, driverLocation, eta, 
+      filters, isHamyo, tripStatus, canonicalTripStatus, activeDriver, activeTripRequest, driverLocation, eta, 
       parcelInfo, fraudAlert, estimatedPrice
     ]
   );

@@ -169,7 +169,6 @@ serve(async (request) => {
     const metadata = {
       first_name: body.firstName ?? null,
       last_name: body.lastName ?? null,
-      password: body.password ?? null,
       referral_code: body.referralCode ?? null,
     };
 
@@ -177,7 +176,7 @@ serve(async (request) => {
       const { error: refreshError } = await supabaseAdmin.rpc('otp_refresh_pending', {
         p_id: pending.id,
         p_otp_hash: otpHash,
-        p_otp_code: otpCode,
+        p_otp_code: null,
         p_expires_at: expiresAtIso,
         p_last_sent_at: nowIso,
         p_resend_count: Number(pending.resend_count ?? 0) + 1,
@@ -198,7 +197,7 @@ serve(async (request) => {
         p_phone_e164: normalizedPhone,
         p_purpose: purpose,
         p_otp_hash: otpHash,
-        p_otp_code: otpCode,
+        p_otp_code: null,
         p_expires_at: expiresAtIso,
         p_last_sent_at: nowIso,
         p_metadata: metadata,

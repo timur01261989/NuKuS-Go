@@ -35,7 +35,7 @@ export default function Leaderboard({ onBack }) {
       {/* HEADER */}
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={onBack} shape="circle" border="none" />
-        <Title level={4} style={{ margin: '0 0 0 15px', fontFamily: 'YangoHeadline' }}>Reyting</Title>
+        <Title level={4} style={{ margin: '0 0 0 15px', fontFamily: 'AccentHeadline' }}>Reyting</Title>
       </div>
 
       {/* TOP 1 KARTA */}

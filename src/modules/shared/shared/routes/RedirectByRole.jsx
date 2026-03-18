@@ -2,26 +2,27 @@ import React, { useMemo } from "react";
 import { Navigate } from "react-router-dom";
 import Loader from "../../components/Loader.jsx";
 import { useAuth } from "../auth/AuthProvider.jsx";
-import { pickHomeForRole } from "./RoleGate.jsx";
+import { pickHomeForAuth, selectAccessState } from "../../auth/accessState.js";
 
 export default function RedirectByRole() {
   const auth = useAuth();
 
-  const target = useMemo(() => {
-    if (!auth?.authReady || auth?.loading) {
-      return null;
+  const redirectState = useMemo(() => {
+    const access = selectAccessState(auth);
+
+    if (access.mode === "loading") {
+      return { loading: true, target: null };
     }
 
-    if (!auth?.isAuthed || !auth?.user) {
-      return "/login";
-    }
-
-    return pickHomeForRole(auth);
+    return {
+      loading: false,
+      target: pickHomeForAuth(auth),
+    };
   }, [auth]);
 
-  if (!auth?.authReady || auth?.loading || !target) {
+  if (redirectState.loading || !redirectState.target) {
     return <Loader />;
   }
 
-  return <Navigate replace to={target} />;
+  return <Navigate replace to={redirectState.target} />;
 }

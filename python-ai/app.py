@@ -37,7 +37,7 @@ app = FastAPI(title="Nukus Go AI Backend", version="2.0.0")
 # CORS — Node.js api/pricing.js dan chaqiriladi
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[o.strip() for o in os.getenv("PY_AI_CORS_ORIGINS", "*").split(",") if o.strip()],
     allow_methods=["*"],
     allow_headers=["*"],
 )

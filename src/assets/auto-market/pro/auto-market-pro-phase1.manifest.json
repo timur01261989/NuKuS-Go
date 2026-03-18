@@ -1,0 +1,20 @@
+{
+  "assetGroup": "auto-market-pro-phase1",
+  "importMode": "copied-renamed",
+  "sourceGroup": "mixed-marketplace-curated",
+  "counts": {
+    "body-types": 27,
+    "finance": 4,
+    "inspection": 15,
+    "seller": 2,
+    "reservation": 6,
+    "pricing": 4,
+    "compare": 1
+  },
+  "goals": [
+    "simplify buyer decision making",
+    "improve seller photo and trust quality",
+    "surface deal-state and finance signals faster",
+    "make filters more intuitive for first-time users"
+  ]
+}

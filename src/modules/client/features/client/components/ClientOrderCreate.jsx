@@ -7,15 +7,10 @@ import { nominatimReverse as _nominatimReverse } from "../shared/geo/nominatim";
 
 // UI components ONLY from antd
 import {
-  Avatar,
   Button,
   Card,
   Drawer,
-  Input,
   List,
-  Modal,
-  Rate,
-  Space,
   Spin,
   Tag,
   Typography,
@@ -26,22 +21,37 @@ import {
 import {
   AimOutlined,
   ArrowLeftOutlined,
-  CloseOutlined,
   EnvironmentOutlined,
   ExclamationCircleOutlined,
   FlagOutlined,
-  SendOutlined,
-  SwapOutlined,
-  UserOutlined,
 } from "@ant-design/icons";
 
-import { MapContainer, Marker, Polyline, TileLayer, useMap } from "react-leaflet";
-import L from "leaflet";
+import { MapContainer, Marker, Polyline, TileLayer } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
 import api from "@/modules/shared/utils/apiHelper";
 import { supabase } from "@/services/supabase/supabaseClient";
 import { playAliceVoice } from "@/modules/shared/utils/AudioPlayer";
+import {
+  CenterTracker,
+  FitRoute,
+  FlyTo,
+  TARIFFS,
+  carIcon,
+  clamp,
+  destMarkerIcon,
+  fmtMoney,
+  nominatimSearch,
+  pickupMarkerIcon,
+  randAround,
+} from "./clientOrderCreate.helpers";
+import {
+  AcceptedPanel,
+  ChatModal,
+  DetailsDrawer,
+  RatingModal,
+  YG_STYLES,
+} from "./clientOrderCreate.sections.jsx";
 
 // Backward-compatible signature (lat, lng, signal)
 async function nominatimReverse(lat, lng, signal) {
@@ -52,7 +62,7 @@ async function nominatimReverse(lat, lng, signal) {
 const { Text, Title } = Typography;
 
 /**
- * YANDEX-LIKE CITY TAXI ORDER CREATE (single-file)
+ * PREMIUM-LIKE CITY TAXI ORDER CREATE (single-file)
  * - Map center pin with lift while dragging
  * - Pickup = center of map on main screen
  * - Destination can be typed or selected via map center
@@ -65,150 +75,9 @@ const { Text, Title } = Typography;
 
 /** ----------------------------- Helpers ----------------------------- */
 
-const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
-
-function fmtMoney(n) {
-  if (!Number.isFinite(n)) return "—";
-  return new Intl.NumberFormat("ru-RU").format(Math.round(n));
-}
-
-
-// OSRM yo'nalish topa olmasa ham xato bermaslik uchun:
-
-
-async function nominatimSearch(q, signal) {
-  // countrycodes=uz natijalarni faqat O'zbekiston bilan cheklaydi
-  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=7&addressdetails=1&q=${encodeURIComponent(
-    q
-  )}&countrycodes=uz`;
-  try {
-    const res = await fetch(url, { signal, headers: { "Accept-Language": "uz,ru,en" } });
-    const data = await res.json();
-    return (data || []).map((x) => ({
-      id: x.place_id,
-      label: x.display_name,
-      lat: parseFloat(x.lat),
-      lng: parseFloat(x.lon),
-    }));
-  } catch (e) {
-    if (e?.name === "AbortError") return [];
-    return [];
-  }
-}
-
-function randAround([lat, lng], meters = 900) {
-  // very rough: 1 deg lat ~ 111km; 1 deg lng ~ 111km*cos(lat)
-  const dLat = (meters / 111000) * (Math.random() - 0.5) * 2;
-  const dLng = (meters / (111000 * Math.cos((lat * Math.PI) / 180))) * (Math.random() - 0.5) * 2;
-  return [lat + dLat, lng + dLng];
-}
-
-/** ----------------------------- Leaflet icons ----------------------------- */
-
-// Center pin (pickup vs dest) like Yandex: square yellow with person & pole
-const svgPickupPin = `
-<svg width="70" height="86" viewBox="0 0 70 86" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect x="12" y="6" width="46" height="46" rx="12" fill="#FFD400"/>
-  <path d="M35 25c2.8 0 5-2.2 5-5s-2.2-5-5-5-5 2.2-5 5 2.2 5 5 5Z" fill="#111"/>
-  <path d="M23 42c2.5-7.5 7.5-12 12-12s9.5 4.5 12 12" stroke="#111" stroke-width="4" stroke-linecap="round"/>
-  <rect x="33" y="52" width="4" height="28" rx="2" fill="#111"/>
-</svg>`;
-
-const svgDestPin = `
-<svg width="70" height="86" viewBox="0 0 70 86" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect x="12" y="6" width="46" height="46" rx="12" fill="#EDEDED"/>
-  <path d="M25 34l10-12 10 12" stroke="#111" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M25 24l10 12 10-12" stroke="#111" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <rect x="33" y="52" width="4" height="28" rx="2" fill="#111"/>
-  <circle cx="35" cy="80" r="6" fill="#fff" stroke="#111" stroke-width="4"/>
-</svg>`;
-
-const pickupMarkerIcon = L.divIcon({
-  className: "",
-  html: `<div class='yg-miniPin'>${svgPickupPin}</div>`,
-  iconSize: [70, 86],
-  iconAnchor: [35, 80],
-});
-
-const destMarkerIcon = L.divIcon({
-  className: "",
-  html: `<div class='yg-miniPin'>${svgDestPin}</div>`,
-  iconSize: [70, 86],
-  iconAnchor: [35, 80],
-});
-
-const carIcon = (bearing = 0) =>
-  L.divIcon({
-    className: "",
-    html: `<div class='yg-car' style='transform: rotate(${bearing}deg);'>🚕</div>`,
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
-  });
-
-/** ----------------------------- Map helpers ----------------------------- */
-
-function FlyTo({ center, zoom = 16 }) {
-  const map = useMap();
-  useEffect(() => {
-    if (!center) return;
-    map.flyTo(center, zoom, { duration: 0.7 });
-  }, [map, center, zoom]);
-  return null;
-}
-
-function CenterTracker({ enabled, onCenter, setIsDragging }) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!enabled) return;
-
-    const onMoveStart = () => setIsDragging(true);
-    const onMoveEnd = () => {
-      setIsDragging(false);
-      const c = map.getCenter();
-      onCenter([c.lat, c.lng]);
-    };
-
-    map.on("movestart", onMoveStart);
-    map.on("moveend", onMoveEnd);
-
-    return () => {
-      map.off("movestart", onMoveStart);
-      map.off("moveend", onMoveEnd);
-    };
-  }, [enabled, map, onCenter, setIsDragging]);
-
-  return null;
-}
-
-function FitRoute({ from, to, bottomPad = 320 }) {
-  const map = useMap();
-  useEffect(() => {
-    if (!from || !to) return;
-    try {
-      const b = L.latLngBounds(from, to);
-      map.fitBounds(b, {
-        paddingTopLeft: [50, 50],
-        paddingBottomRight: [50, bottomPad],
-      });
-    } catch {
-      // ignore
-    }
-  }, [map, from, to, bottomPad]);
-  return null;
-}
-
-/** ----------------------------- Tariffs ----------------------------- */
-
-const TARIFFS = [
-  { id: "start", name: "Start", base: 6500, perKm: 1500, etaMin: 2 },
-  { id: "comfort", name: "Komfort", base: 7500, perKm: 1800, etaMin: 4 },
-  { id: "econom", name: "Shahar bo'yicha", base: 4500, perKm: 1300, etaMin: 6 },
-];
-
 /** ----------------------------- Main Component ----------------------------- */
 
-export default function ClientOrderCreateYandexStyle() {
+export default function ClientOrderCreatePremiumStyle() {
   // --- core states ---
   const [stage, setStage] = useState("home");
   // stages:
@@ -892,593 +761,46 @@ if (st === "searching" && !driver) {
         )}
       </div>
 
-      {/* HOME / CONFIRM bottom sheet (Drawer) */}
-      <Drawer
-        placement="bottom"
-        open={drawerOpen}
-        closable={false}
-        height={stage === "confirm" ? 380 : 300}
-        bodyStyle={{ padding: 0, borderTopLeftRadius: 22, borderTopRightRadius: 22, overflow: "hidden" }}
-        mask={false}
-        onClose={() => setDrawerOpen(false)}
-      >
-        {stage === "home" && (
-          <div className="yg-sheet">
-            <div className="yg-sheetHead">
-              <div className="yg-logo" />
-              <Title level={2} style={{ margin: 0 }}>
-                Taksi
-              </Title>
-            </div>
-
-            <div className="yg-bigRow" onClick={openDestSheet} role="button" tabIndex={0}>
-              <div className="yg-bigRowText">Qayerga borasiz?</div>
-              <div className="yg-bigRowArrow">›</div>
-            </div>
-
-            {/* history list */}
-            <div className="yg-history">
-              <List
-                dataSource={history}
-                locale={{ emptyText: "" }}
-                renderItem={(it) => (
-                  <List.Item className="yg-hItem" onClick={() => selectDestFromSuggestion(it)}>
-                    <div className="yg-hIcon">
-                      <EnvironmentOutlined />
-                    </div>
-                    <div className="yg-hText">
-                      <div className="yg-hTitle">{String(it.label || "").split(",")[0]}</div>
-                      <div className="yg-hSub">{it.label}</div>
-                    </div>
-                  </List.Item>
-                )}
-              />
-            </div>
-
-            {/* Call taxi without destination */}
-            <div className="yg-homeActions">
-              <Button
-                type="primary"
-                className="yg-orderBtn"
-                onClick={() => {
-                  // allow without destination
-                  setStage("confirm");
-                  setDrawerOpen(true);
-                }}
-              >
-                Buyurtma berish
-              </Button>
-              <Button className="yg-smallBtn" icon={<SwapOutlined />} />
-            </div>
-          </div>
-        )}
-
-        {stage === "confirm" && (
-          <div className="yg-sheet">
-            <div className="yg-confirmHeader">
-              <div className="yg-confirmTitle">{pickupTitle}</div>
-              <Button
-                className="yg-pill"
-                onClick={() => {
-                  // pickup change by map
-                  setSelecting("pickup");
-                  setStage("home");
-                  setDrawerOpen(false);
-                }}
-              >
-                Podyez
-              </Button>
-            </div>
-
-            <div className="yg-confirmHeader" style={{ marginTop: 8 }}>
-              <div className="yg-confirmTitle">
-                {dest.address ? destTitle : <span style={{ opacity: 0.65 }}>Qayerga borasiz?</span>}
-              </div>
-              <Button className="yg-pill" onClick={openDestSheet}>
-                {dest.address ? "O'zgartirish" : "Xarita"}
-              </Button>
-            </div>
-
-            <div className="yg-routeInfo">
-              <div className="yg-routePill">
-                <FlagOutlined />
-                <span>{durationMin ? `${Math.round(durationMin)} daq` : distanceKm ? `${Math.round(distanceKm * 2)} daq` : "—"}</span>
-              </div>
-              <div className="yg-routePill" style={{ fontWeight: 800 }}>
-                {fmtMoney(totalPrice)} {cp("so'm")}
-              </div>
-            </div>
-
-            <div className="yg-tabs">
-              <div className="yg-tab">Navigator</div>
-              <div className="yg-tab">Transport</div>
-              <div className="yg-tab yg-tabActive">Taksi va Yetkazish</div>
-            </div>
-
-            <div className="yg-tariffs">
-              {TARIFFS.map((t) => (
-                <div
-                  key={t.id}
-                  className={`yg-tariff ${tariff.id === t.id ? "active" : ""}`}
-                  onClick={() => setTariff(t)}
-                >
-                  <div className="yg-tariffEta">{t.etaMin} daq</div>
-                  <div className="yg-tariffName">{t.name}</div>
-                  <div className="yg-tariffPrice">
-                    {fmtMoney(t.base + ((distanceKm ?? approxDistanceKm) || 0) * t.perKm)} {cp("so'm")}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="yg-confirmActions">
-              <Button type="primary" className="yg-orderBtnYellow" onClick={handleOrder}>
-                Buyurtma berish
-              </Button>
-              <Button className="yg-smallBtn" icon={<SwapOutlined />} />
-            </div>
-          </div>
-        )}
-      </Drawer>
-
-      {/* DESTINATION SHEET */}
-      <Drawer
-        placement="bottom"
-        open={destSheetOpen}
-        closable={false}
-        height={560}
-        bodyStyle={{ padding: 0, borderTopLeftRadius: 22, borderTopRightRadius: 22, overflow: "hidden" }}
-        mask={false}
-        onClose={() => setDestSheetOpen(false)}
-      >
-        <div className="yg-destSheet">
-          <div className="yg-topRows">
-            <div className="yg-topRow">
-              <div className="yg-topIcon">{/* pickup icon */}</div>
-              <div className="yg-topText">
-                <div className="yg-topLabel">Yo'lovchini olish nuqtasi</div>
-                <div className="yg-topValue">{pickupTitle}</div>
-              </div>
-            </div>
-            <div className="yg-topRow">
-              <div className="yg-topIcon">{/* dest icon */}</div>
-              <div className="yg-topText" style={{ flex: 1 }}>
-                <div className="yg-topLabel">Yakuniy manzil</div>
-                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                  <Input
-                    value={destQuery}
-                    onChange={(e) => setDestQuery(e.target.value)}
-                    placeholder="Qayerga borasiz?"
-                    style={{ borderRadius: 14, height: 42 }}
-                    prefix={<EnvironmentOutlined />}
-                  />
-                  <Button className="yg-mapBtn" onClick={startDestMapPick}>
-                    Xarita
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="yg-suggestions">
-            {/* Suggestions first, then history */}
-            <List
-              dataSource={destSuggestions.length ? destSuggestions : history}
-              locale={{ emptyText: "" }}
-              renderItem={(it) => (
-                <List.Item className="yg-sItem" onClick={() => selectDestFromSuggestion(it)}>
-                  <div className="yg-hIcon">
-                    <EnvironmentOutlined />
-                  </div>
-                  <div className="yg-hText">
-                    <div className="yg-hTitle">{String(it.label || "").split(",")[0]}</div>
-                    <div className="yg-hSub">{it.label}</div>
-                  </div>
-                </List.Item>
-              )}
-            />
-          </div>
-
-          <div className="yg-sheetFooter">
-            <Button icon={<ArrowLeftOutlined />} onClick={goBackToHome}>
-              Orqaga
-            </Button>
-          </div>
-        </div>
-      </Drawer>
-
-      {/* DESTINATION MAP PICK SMALL PRICE CARD */}
-      {stage === "dest_map" && (
-        <div className="yg-miniCard">
-          <div className="yg-miniPrice">
-            <div className="yg-miniTime">{durationMin ? `${Math.round(durationMin)} daq` : "—"}</div>
-            <div className="yg-miniMoney">{fmtMoney(totalPrice)} {cp("so'm")}</div>
-          </div>
-          <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-            <Button danger icon={<CloseOutlined />} onClick={goBackToHome}>
-              Bekor
-            </Button>
-            <Button type="primary" onClick={confirmDest}>
-              Tayyor
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* SEARCHING BOTTOM PANEL */}
-      {stage === "searching" && (
-        <div className="yg-searchPanel">
-          <div className="yg-searchTitle">Yaqin-atrofda mos mashina qidiryapmiz</div>
-          <div className="yg-searchSub">Moslarini qidiryapmiz</div>
-          <div className="yg-searchBtns">
-            <Button className="yg-grayBtn" icon={<CloseOutlined />} onClick={handleCancel}>
-              Safarni bekor qilish
-            </Button>
-            <Button className="yg-grayBtn" icon={<ExclamationCircleOutlined />} onClick={() => message.info("Tafsilotlar keyin")}
-            >
-              Tafsilotlar
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* ACCEPTED BOTTOM PANEL */}
+      {/* ACCEPTED */}
       {stage === "accepted" && (
-        <div className="yg-accepted">
-          <div className="yg-notif">
-            <div className="yg-notifLeft">
-              <div className="yg-go">Go</div>
-              <div>
-                <div className="yg-notifTop">Yaqinda keladi</div>
-                <div className="yg-notifSub">1–3 daqiqadan keyin haydovchi yetib boradi</div>
-              </div>
-            </div>
-            <Button shape="circle" icon={<SwapOutlined />} onClick={() => setDetailsOpen(true)} />
-          </div>
-
-          <div className="yg-eta">~{assignedDriver?.eta_min || 2} daq va keladi</div>
-
-          <div className="yg-driverCard">
-            <div className="yg-driverRow">
-              <div className="yg-driverLeft">
-                <div className="yg-driverTitle">Haydovchi ★{assignedDriver?.rating || 4.83}</div>
-                <div className="yg-driverSub">{assignedDriver?.car_model || "Oq Chevrolet Cobalt"}</div>
-                <div className="yg-plate">{assignedDriver?.car_plate || "95S703RA"}</div>
-              </div>
-              <div className="yg-driverRight">
-                <Avatar size={64} src={assignedDriver?.avatar_url} icon={<UserOutlined />} />
-              </div>
-            </div>
-
-            <div className="yg-driverActions">
-              <Button className="yg-actionBtn" onClick={() => setChatOpen(true)}>
-                Aloqa
-              </Button>
-              <Button className="yg-actionBtn" onClick={() => message.info("Xavfsizlik")}
-              >
-                Xavfsizlik
-              </Button>
-              <Button className="yg-actionBtn" onClick={() => message.info("Ulashish")}
-              >
-                Ulashish
-              </Button>
-            </div>
-
-            <div className="yg-pickRow" onClick={() => setDetailsOpen(true)}>
-              <div className="yg-pickLabel">Mijozni olish ~{assignedDriver?.pickup_eta || "23:13"}</div>
-              <div className="yg-pickAddr">{pickupTitle}</div>
-            </div>
-          </div>
-
-          <div className="yg-detailsHint" onClick={() => setDetailsOpen(true)}>
-            <span>Yana ko'rsatish</span>
-          </div>
-        </div>
+        <AcceptedPanel
+          assignedDriver={assignedDriver}
+          pickupTitle={pickupTitle}
+          setDetailsOpen={setDetailsOpen}
+          setChatOpen={setChatOpen}
+          message={message}
+        />
       )}
 
-      {/* DETAILS (like screenshot #8) */}
-      <Drawer
-        placement="bottom"
-        open={detailsOpen}
-        closable={false}
-        height={560}
-        bodyStyle={{ padding: 0, borderTopLeftRadius: 22, borderTopRightRadius: 22, overflow: "hidden" }}
-        mask={false}
-        onClose={() => setDetailsOpen(false)}
-      >
-        <div className="yg-details">
-          <div className="yg-detailsTop">
-            <div className="yg-detailsHeader">
-              <div className="yg-go">Go</div>
-              <div className="yg-detailsHeaderText">Yandex Go • Hozir</div>
-            </div>
-            <Button shape="circle" icon={<CloseOutlined />} onClick={() => setDetailsOpen(false)} />
-          </div>
-
-          <div className="yg-detailBtns">
-            <Button className="yg-actionBtn" onClick={() => setChatOpen(true)}>
-              Aloqa
-            </Button>
-            <Button className="yg-actionBtn" onClick={() => message.info("Xavfsizlik")}
-            >
-              Xavfsizlik
-            </Button>
-            <Button className="yg-actionBtn" onClick={() => message.info("Ulashish")}
-            >
-              Ulashish
-            </Button>
-          </div>
-
-          <div className="yg-detailsList">
-            <div className="yg-lineItem">
-              <div className="yg-lineIcon">🙋</div>
-              <div className="yg-lineText">
-                <div className="yg-lineLabel">Mijozni olish</div>
-                <div className="yg-lineValue">{pickupTitle}</div>
-              </div>
-              <div className="yg-lineArrow">›</div>
-            </div>
-
-            <div className="yg-lineItem">
-              <div className="yg-lineIcon">🏁</div>
-              <div className="yg-lineText">
-                <div className="yg-lineLabel">Yetib kelish</div>
-                <div className="yg-lineValue">{destTitle}</div>
-              </div>
-              <div className="yg-lineArrow">›</div>
-            </div>
-
-            <div className="yg-lineItem" onClick={handleCancel}>
-              <div className="yg-lineIcon" style={{ color: "#ff4d4f" }}>
-                ✖
-              </div>
-              <div className="yg-lineText">
-                <div className="yg-lineValue" style={{ color: "#ff4d4f", fontWeight: 800 }}>
-                  Safarni bekor qilish
-                </div>
-              </div>
-              <div className="yg-lineArrow">›</div>
-            </div>
-          </div>
-
-          <div className="yg-detailsFooter">
-            <Button onClick={() => setDetailsOpen(false)} style={{ width: "100%", borderRadius: 16, height: 46 }}>
-              Yana ko'rsatish
-            </Button>
-          </div>
-        </div>
-      </Drawer>
+      {/* HOME / CONFIRM bottom sheet (Drawer) */}
+      <DetailsDrawer
+        detailsOpen={detailsOpen}
+        setDetailsOpen={setDetailsOpen}
+        setChatOpen={setChatOpen}
+        message={message}
+        pickupTitle={pickupTitle}
+        destTitle={destTitle}
+        handleCancel={handleCancel}
+      />
 
       {/* CHAT MODAL */}
-      <Modal
-        title={
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Avatar src={assignedDriver?.avatar_url} icon={<UserOutlined />} />
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>{assignedDriver?.first_name || cp("Haydovchi")}</div>
-              <div style={{ fontSize: 11, color: "#888" }}>{assignedDriver?.car_model}</div>
-            </div>
-          </div>
-        }
-        open={chatOpen}
-        onCancel={() => setChatOpen(false)}
-        footer={null}
-        centered
-        bodyStyle={{ padding: 0 }}
-      >
-        <div style={{ display: "flex", flexDirection: "column", height: "420px" }}>
-          <div style={{ flex: 1, overflowY: "auto", padding: 15, background: "#f5f5f5" }}>
-            {messagesState.length === 0 ? (
-              <div style={{ textAlign: "center", color: "#999", marginTop: 50 }}>
-                Henuz xabarlar yo'q.
-                <br /> Haydovchiga yozing!
-              </div>
-            ) : (
-              messagesState.map((msg) => {
-                const isMe = msg.sender_role === "client";
-                return (
-                  <div
-                    key={msg.id || msg.created_at}
-                    style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start", marginBottom: 10 }}
-                  >
-                    <div
-                      style={{
-                        maxWidth: "75%",
-                        padding: "8px 12px",
-                        borderRadius: 12,
-                        background: isMe ? "#1890ff" : "#fff",
-                        color: isMe ? "#fff" : "#000",
-                        boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
-                        borderTopRightRadius: isMe ? 0 : 12,
-                        borderTopLeftRadius: isMe ? 12 : 0,
-                      }}
-                    >
-                      <div style={{ fontSize: 14 }}>{msg.content}</div>
-                      <div style={{ fontSize: 10, opacity: 0.7, textAlign: "right", marginTop: 2 }}>
-                        {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-            <div ref={chatScrollRef} />
-          </div>
-
-          <div
-            style={{
-              padding: 10,
-              background: "#fff",
-              borderTop: "1px solid #eee",
-              display: "flex",
-              gap: 10,
-            }}
-          >
-            <Input
-              value={msgText}
-              onChange={(e) => setMsgText(e.target.value)}
-              onPressEnter={handleSendMessage}
-              placeholder="Xabar yozing..."
-              style={{ borderRadius: 20 }}
-            />
-            <Button type="primary" shape="circle" icon={<SendOutlined />} onClick={handleSendMessage} />
-          </div>
-        </div>
-      </Modal>
+      <ChatModal
+        assignedDriver={assignedDriver}
+        cp={cp}
+        chatOpen={chatOpen}
+        setChatOpen={setChatOpen}
+        messagesState={messagesState}
+        chatScrollRef={chatScrollRef}
+        msgText={msgText}
+        setMsgText={setMsgText}
+        handleSendMessage={handleSendMessage}
+      />
 
       {/* RATING */}
-      <Modal
-        title="Safar tugadi"
-        open={ratingOpen}
-        onCancel={() => setRatingOpen(false)}
-        onOk={() => setRatingOpen(false)}
-        okText="Yuborish"
-      >
-        <Space direction="vertical" style={{ width: "100%" }}>
-          <Text>Haydovchini baholang:</Text>
-          <Rate defaultValue={5} />
-        </Space>
-      </Modal>
+      <RatingModal ratingOpen={ratingOpen} setRatingOpen={setRatingOpen} />
 
       {/* styles */}
-      <style>{`
-        .yg-root{position:relative;height:100vh;width:100%;background:#fff;}
-        .yg-mapWrap{position:absolute;inset:0;}
-        .leaflet-container{background:#dfe6ee;}
-
-        .yg-back{position:absolute;left:16px;top:16px;z-index:900;}
-        .yg-locate{position:absolute;right:16px;bottom:340px;z-index:900;}
-        .yg-locate .ant-btn{box-shadow:0 6px 18px rgba(0,0,0,.18);border:none;}
-
-        /* Center pin */
-        .yg-centerpin{position:absolute;left:50%;top:50%;z-index:800;display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:none;transition:transform .2s cubic-bezier(.175,.885,.32,1.275);transform:translate(-50%,-68%);} 
-        .yg-centerpin.dragging{transform:translate(-50%,-90%) scale(1.15);} 
-        .yg-pinlabel{background:rgba(17,17,17,.85);color:#fff;padding:6px 10px;border-radius:12px;font-weight:700;font-size:12px;box-shadow:0 10px 24px rgba(0,0,0,.25);transition:opacity .2s;}
-        .yg-centerpin.dragging .yg-pinlabel{opacity:.5;}
-
-        .yg-miniPin{filter: drop-shadow(0 10px 18px rgba(0,0,0,.25));}
-
-        /* bottom sheet */
-        .yg-sheet{padding:16px 16px 18px 16px;}
-        .yg-sheetHead{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
-        .yg-logo{width:44px;height:44px;border-radius:12px;background:conic-gradient(from 180deg, #FFD400, #fff, #111);}
-
-        .yg-bigRow{height:54px;border-radius:18px;background:#f2f2f2;display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;}
-        .yg-bigRowText{font-size:16px;font-weight:700;}
-        .yg-bigRowArrow{position:absolute;right:16px;font-size:22px;opacity:.7;}
-
-        .yg-history{margin-top:12px;max-height:150px;overflow:auto;}
-        .yg-hItem{cursor:pointer;border-radius:14px;}
-        .yg-hItem:hover{background:#fafafa;}
-        .yg-hIcon{width:36px;height:36px;border-radius:18px;background:#f4f4f4;display:flex;align-items:center;justify-content:center;margin-right:10px;}
-        .yg-hText{flex:1;}
-        .yg-hTitle{font-weight:800;font-size:15px;}
-        .yg-hSub{font-size:12px;color:#8a8a8a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-
-        .yg-homeActions{display:flex;gap:10px;margin-top:12px;}
-        .yg-orderBtn{flex:1;height:52px;border-radius:20px;font-weight:900;font-size:16px;}
-        .yg-smallBtn{width:56px;height:52px;border-radius:20px;}
-
-        /* confirm */
-        .yg-confirmHeader{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;border-radius:18px;padding:10px 12px;box-shadow:0 12px 26px rgba(0,0,0,.08);} 
-        .yg-confirmTitle{font-weight:900;font-size:16px;line-height:1.1;}
-        .yg-pill{border-radius:999px;height:36px;padding:0 14px;background:#f3f3f3;border:none;font-weight:800;}
-
-        .yg-routeInfo{display:flex;align-items:center;justify-content:space-between;margin-top:10px;}
-        .yg-routePill{display:flex;align-items:center;gap:8px;border-radius:14px;background:#fff;padding:8px 12px;box-shadow:0 12px 26px rgba(0,0,0,.08);}
-
-        .yg-tabs{display:flex;gap:18px;margin-top:12px;color:#b5b5b5;font-weight:800;}
-        .yg-tabActive{color:#111;background:#efefef;border-radius:999px;padding:6px 12px;}
-
-        .yg-tariffs{display:flex;gap:12px;overflow:auto;padding-top:12px;padding-bottom:10px;}
-        .yg-tariff{min-width:150px;border-radius:18px;background:#fff;box-shadow:0 12px 26px rgba(0,0,0,.08);padding:12px;cursor:pointer;}
-        .yg-tariff.active{outline:3px solid #FFD400;}
-        .yg-tariffEta{font-weight:900;color:#111;}
-        .yg-tariffName{margin-top:6px;font-weight:800;color:#777;}
-        .yg-tariffPrice{margin-top:10px;font-weight:900;font-size:18px;}
-
-        .yg-confirmActions{display:flex;gap:10px;margin-top:10px;}
-        .yg-orderBtnYellow{flex:1;height:56px;border-radius:22px;font-weight:900;font-size:18px;background:#FFD400;color:#111;border:none;}
-        .yg-orderBtnYellow:hover{background:#ffdf2d;color:#111;}
-
-        /* destination sheet */
-        .yg-destSheet{height:100%;display:flex;flex-direction:column;}
-        .yg-topRows{padding:14px 16px 10px 16px;}
-        .yg-topRow{display:flex;gap:12px;align-items:flex-start;background:#fff;border-radius:18px;padding:12px;box-shadow:0 12px 26px rgba(0,0,0,.08);margin-bottom:10px;}
-        .yg-topIcon{width:46px;height:46px;border-radius:18px;background:#f2f2f2;}
-        .yg-topLabel{font-size:12px;color:#999;font-weight:700;}
-        .yg-topValue{font-size:18px;font-weight:900;}
-        .yg-mapBtn{height:42;border-radius:14px;font-weight:800;background:#efefef;border:none;}
-
-        .yg-suggestions{flex:1;overflow:auto;padding:0 10px 10px 10px;}
-        .yg-sItem{cursor:pointer;border-radius:14px;padding-left:10px;padding-right:10px;}
-        .yg-sItem:hover{background:#fafafa;}
-        .yg-sheetFooter{padding:10px 16px;border-top:1px solid #eee;}
-
-        /* dest map mini card */
-        .yg-miniCard{position:absolute;left:50%;transform:translateX(-50%);bottom:130px;z-index:950;background:#fff;border-radius:18px;box-shadow:0 18px 38px rgba(0,0,0,.18);padding:14px 14px;min-width:260px;}
-        .yg-miniPrice{display:flex;align-items:center;justify-content:space-between;gap:10px;}
-        .yg-miniTime{font-weight:900;font-size:14px;color:#111;}
-        .yg-miniMoney{font-weight:900;font-size:18px;color:#111;}
-
-        /* searching */
-        .yg-waves{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:700;pointer-events:none;}
-        .yg-wave{position:absolute;left:50%;top:50%;width:30px;height:30px;border-radius:50%;border:3px solid rgba(59,130,246,.35);transform:translate(-50%,-50%);animation:ygWave 2.2s infinite;}
-        .yg-wave:nth-child(2){animation-delay:.7s;}
-        .yg-wave:nth-child(3){animation-delay:1.4s;}
-        @keyframes ygWave{0%{opacity:.9;transform:translate(-50%,-50%) scale(.6);}100%{opacity:0;transform:translate(-50%,-50%) scale(7);}}
-
-        .yg-searchPanel{position:absolute;left:16px;right:16px;bottom:18px;z-index:950;background:#fff;border-radius:22px;box-shadow:0 18px 38px rgba(0,0,0,.18);padding:16px;}
-        .yg-searchTitle{font-size:18px;font-weight:900;}
-        .yg-searchSub{margin-top:4px;color:#888;font-weight:700;}
-        .yg-searchBtns{display:flex;gap:12px;margin-top:14px;}
-        .yg-grayBtn{flex:1;height:48px;border-radius:18px;background:#f2f2f2;border:none;font-weight:900;}
-
-        .yg-car{width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:20px;filter: drop-shadow(0 6px 10px rgba(0,0,0,.25));}
-
-        /* accepted */
-        .yg-accepted{position:absolute;left:16px;right:16px;bottom:18px;z-index:950;}
-        .yg-notif{background:rgba(255,255,255,.92);backdrop-filter: blur(10px);border-radius:22px;padding:12px 12px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 18px 38px rgba(0,0,0,.18);} 
-        .yg-notifLeft{display:flex;align-items:center;gap:10px;}
-        .yg-go{width:38px;height:38px;border-radius:19px;background:#2b2b2b;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;}
-        .yg-notifTop{font-weight:900;}
-        .yg-notifSub{font-size:12px;color:#666;font-weight:700;}
-        .yg-eta{margin-top:10px;background:#fff;border-radius:22px;padding:12px 14px;font-size:22px;font-weight:900;box-shadow:0 18px 38px rgba(0,0,0,.18);} 
-
-        .yg-driverCard{margin-top:10px;background:#fff;border-radius:22px;box-shadow:0 18px 38px rgba(0,0,0,.18);padding:14px;} 
-        .yg-driverRow{display:flex;justify-content:space-between;gap:12px;}
-        .yg-driverTitle{font-weight:900;font-size:16px;}
-        .yg-driverSub{color:#666;font-weight:800;margin-top:2px;}
-        .yg-plate{margin-top:8px;font-weight:900;font-size:40px;letter-spacing:2px;} 
-
-        .yg-driverActions{display:flex;gap:10px;margin-top:12px;}
-        .yg-actionBtn{flex:1;height:48px;border-radius:18px;background:#f2f2f2;border:none;font-weight:900;} 
-
-        .yg-pickRow{margin-top:14px;border-top:1px solid #eee;padding-top:10px;cursor:pointer;}
-        .yg-pickLabel{color:#777;font-weight:800;font-size:12px;}
-        .yg-pickAddr{font-weight:900;font-size:18px;margin-top:2px;} 
-
-        .yg-detailsHint{margin-top:10px;background:#fff;border-radius:18px;box-shadow:0 18px 38px rgba(0,0,0,.18);height:54px;display:flex;align-items:center;justify-content:center;font-weight:900;cursor:pointer;} 
-
-        /* details drawer */
-        .yg-details{height:100%;display:flex;flex-direction:column;padding:14px 16px 16px 16px;}
-        .yg-detailsTop{display:flex;justify-content:space-between;align-items:center;}
-        .yg-detailsHeader{display:flex;align-items:center;gap:10px;}
-        .yg-detailsHeaderText{font-weight:900;}
-        .yg-detailBtns{display:flex;gap:10px;margin-top:14px;}
-
-        .yg-detailsList{margin-top:16px;background:#fff;border-radius:22px;box-shadow:0 18px 38px rgba(0,0,0,.12);overflow:hidden;}
-        .yg-lineItem{display:flex;align-items:center;gap:12px;padding:14px 14px;border-bottom:1px solid #f0f0f0;cursor:pointer;}
-        .yg-lineItem:last-child{border-bottom:none;}
-        .yg-lineIcon{width:34px;height:34px;border-radius:17px;background:#f2f2f2;display:flex;align-items:center;justify-content:center;font-weight:900;}
-        .yg-lineText{flex:1;}
-        .yg-lineLabel{font-size:12px;color:#888;font-weight:800;}
-        .yg-lineValue{font-size:16px;font-weight:900;}
-        .yg-lineArrow{font-size:22px;opacity:.5;}
-
-        .yg-detailsFooter{margin-top:auto;}
-
-      `}</style>
+      <style>{YG_STYLES}</style>
     </div>
   );
 }

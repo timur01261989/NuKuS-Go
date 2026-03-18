@@ -1,0 +1,46 @@
+{
+  "assetGroup": "auto-market-extended-final",
+  "version": "batch75-final",
+  "importMode": "copied-renamed",
+  "sourceGroup": "cross-marketplace-curated",
+  "counts": {
+    "bodyTypes": 10,
+    "colors": 2,
+    "signals": 5,
+    "states": 2
+  },
+  "addedKeys": [
+    "body-camper",
+    "body-commercial",
+    "body-compact",
+    "body-coupe",
+    "body-ev",
+    "body-hybrid",
+    "body-phev",
+    "body-station-wagon",
+    "body-suv-large",
+    "body-suv-compact",
+    "body-suv-mid",
+    "signal-alert-boost",
+    "inspection-title",
+    "inspection-certificate",
+    "signal-price-drop",
+    "signal-vin-deep",
+    "filter-search-deep",
+    "signal-ev-deep",
+    "state-favorites-guidance"
+  ],
+  "copiedRenamedAssets": 48,
+  "addedPhase4Assets": [
+    "signal-qr-entry.svg",
+    "signal-barcode-entry.png",
+    "signal-compare-assist.png",
+    "signal-alert-market-2.svg",
+    "state-call-action.png",
+    "state-contact-action.png",
+    "signal-ev-europe.webp",
+    "filter-search-ot.png",
+    "signal-price-drop-alt.webp",
+    "signal-vin-tip-alt.webp"
+  ]
+}

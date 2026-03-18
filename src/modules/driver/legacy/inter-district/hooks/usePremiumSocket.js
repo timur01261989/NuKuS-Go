@@ -1,22 +1,33 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { message } from 'antd';
 import { supabase } from '@/services/supabase/supabaseClient';
 import { listPremiumRequests } from '../services/districtApi';
 
 // Premium rejim: seat requestlar real kelishi
-export function usePremiumSocket({ enabled, onRequest }) {
+export function usePremiumSocket({ enabled, onClientRequest, onRequest }) {
+  const requestHandler = onClientRequest || onRequest;
+  const [socketMeta, setSocketMeta] = useState({ state: enabled ? 'connecting' : 'idle', lastEventAt: null });
+
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      setSocketMeta({ state: 'idle', lastEventAt: null });
+      return;
+    }
 
     let isMounted = true;
+    setSocketMeta((prev) => ({ ...prev, state: 'connecting' }));
 
     async function bootstrap() {
       try {
-        const { data } = await listPremiumRequests();
+        const data = await listPremiumRequests();
         if (!isMounted) return;
-        (data || []).forEach((r) => onRequest?.(normalizeRequest(r)));
+        (data || []).forEach((r) => requestHandler?.(normalizeRequest(r)));
+        setSocketMeta({ state: 'ready', lastEventAt: new Date().toISOString() });
       } catch (e) {
         console.warn('Premium requests list error:', e);
+        if (isMounted) {
+          setSocketMeta((prev) => ({ ...prev, state: 'degraded' }));
+        }
       }
     }
 
@@ -32,7 +43,8 @@ export function usePremiumSocket({ enabled, onRequest }) {
         (payload) => {
           const r = payload?.new;
           const req = normalizeRequest(r);
-          onRequest?.(req);
+          requestHandler?.(req);
+          setSocketMeta({ state: 'ready', lastEventAt: new Date().toISOString() });
           message.info(`Yangi buyurtma: ${req.address || 'mijoz'}`);
         }
       )
@@ -42,10 +54,17 @@ export function usePremiumSocket({ enabled, onRequest }) {
         (payload) => {
           const r = payload?.new;
           const req = normalizeRequest(r);
-          onRequest?.(req);
+          requestHandler?.(req);
+          setSocketMeta({ state: 'ready', lastEventAt: new Date().toISOString() });
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (!isMounted) return;
+        setSocketMeta((prev) => ({
+          ...prev,
+          state: status === 'SUBSCRIBED' ? 'ready' : status === 'CHANNEL_ERROR' ? 'degraded' : prev.state,
+        }));
+      });
 
     return () => {
       isMounted = false;
@@ -53,7 +72,9 @@ export function usePremiumSocket({ enabled, onRequest }) {
         supabase.removeChannel(channel);
       } catch {}
     };
-  }, [enabled, onRequest]);
+  }, [enabled, requestHandler]);
+
+  return socketMeta;
 }
 
 function normalizeRequest(r) {

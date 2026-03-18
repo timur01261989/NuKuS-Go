@@ -1,3 +1,5 @@
+import { normalizeInterDistrictRequestPayload, normalizeInterDistrictTripPayload } from "@/modules/shared/interdistrict/domain/interDistrictSchemas";
+import { INTERDISTRICT_TRIP_STATUS, isFinishedInterDistrictStatus, normalizeInterDistrictStatus } from "@/modules/shared/interdistrict/domain/interDistrictStatuses";
 import { supabase } from "@/services/supabase/supabaseClient";
 
 export async function listPitaks({ region, from_district, to_district, activeOnly = true } = {}) {
@@ -43,33 +45,7 @@ export async function createTrip(trip) {
   if (!uid) throw new Error("Login qiling");
   const payload = {
     user_id: uid,
-    region: trip.region,
-    from_district: trip.from_district,
-    to_district: trip.to_district,
-    tariff: trip.tariff,
-    pitak_id: trip.pitak_id || null,
-    from_point: trip.from_point || null,
-    to_point: trip.to_point || null,
-    meeting_points: trip.meeting_points || [],
-    route_polyline: trip.route_polyline || [],
-    depart_at: trip.depart_at,
-    seats_total: trip.seats_total ?? null,
-    allow_full_salon: !!trip.allow_full_salon,
-    base_price_uzs: Number(trip.base_price_uzs || 0),
-    pickup_fee_uzs: Number(trip.pickup_fee_uzs || 0),
-    dropoff_fee_uzs: Number(trip.dropoff_fee_uzs || 0),
-    waiting_fee_uzs: Number(trip.waiting_fee_uzs || 0),
-    full_salon_price_uzs: trip.full_salon_price_uzs == null ? null : Number(trip.full_salon_price_uzs),
-    has_ac: !!trip.has_ac,
-    has_trunk: !!trip.has_trunk,
-    is_lux: !!trip.is_lux,
-    allow_smoking: !!trip.allow_smoking,
-    has_delivery: !!trip.has_delivery,
-    delivery_price_uzs: trip.delivery_price_uzs == null ? null : Number(trip.delivery_price_uzs),
-    notes: trip.notes || null,
-    women_only: !!trip.women_only,
-    booking_mode: trip.booking_mode || 'approval',
-    status: trip.status || "active",
+    ...normalizeInterDistrictTripPayload(trip),
     updated_at: new Date().toISOString(),
   };
   const { data, error } = await supabase.from("district_trips").insert(payload).select("*").single();
@@ -79,7 +55,7 @@ export async function createTrip(trip) {
 
 export async function searchTrips(params = {}) {
   const { region, from_district, to_district, depart_from, depart_to, has_ac, has_trunk, tariff, include_delivery = true } = params;
-  let q = supabase.from("district_trips").select("*").eq("status", "active").order("depart_at", { ascending: true });
+  let q = supabase.from("district_trips").select("*").in("status", [INTERDISTRICT_TRIP_STATUS.SEARCHING, INTERDISTRICT_TRIP_STATUS.MATCHED, INTERDISTRICT_TRIP_STATUS.ACCEPTED]).order("depart_at", { ascending: true });
   if (region) q = q.eq("region", region);
   if (from_district) q = q.eq("from_district", from_district);
   if (to_district) q = q.eq("to_district", to_district);
@@ -104,22 +80,8 @@ export async function requestTrip(req) {
   const uid = authData?.user?.id;
   if (!uid) throw new Error("Login qiling");
   const payload = {
-    trip_id: req.trip_id,
     user_id: uid,
-    seats_requested: req.seats_requested ?? null,
-    wants_full_salon: !!req.wants_full_salon,
-    pickup_address: req.pickup_address || null,
-    dropoff_address: req.dropoff_address || null,
-    pickup_point: req.pickup_point || null,
-    dropoff_point: req.dropoff_point || null,
-    meeting_point_id: req.meeting_point_id || null,
-    is_delivery: !!req.is_delivery,
-    delivery_notes: req.delivery_notes || null,
-    weight_category: req.weight_category || null,
-    payment_method: req.payment_method || null,
-    final_price: req.final_price == null ? null : Number(req.final_price),
-    selected_seats: Array.isArray(req.selected_seats) ? req.selected_seats : [],
-    status: req.status || "pending",
+    ...normalizeInterDistrictRequestPayload(req),
     updated_at: new Date().toISOString(),
   };
   const { data, error } = await supabase.from("district_trip_requests").insert(payload).select("*").single();
@@ -141,8 +103,46 @@ export async function listDriverRequests({ limit = 50 } = {}) {
   return data || [];
 }
 
+
+export async function getClientActiveTrip() {
+  const { data: authData, error: authErr } = await supabase.auth.getUser();
+  if (authErr) throw authErr;
+  const uid = authData?.user?.id;
+  if (!uid) throw new Error("Login qiling");
+  const { data, error } = await supabase
+    .from("district_trip_requests")
+    .select("*, district_trips(*)")
+    .eq("user_id", uid)
+    .order("updated_at", { ascending: false })
+    .limit(5);
+  if (error) throw error;
+  const active = (data || []).find((item) => !isFinishedInterDistrictStatus(item.status));
+  if (!active) return null;
+  return {
+    ...active,
+    status: normalizeInterDistrictStatus(active.status),
+    trip: active.district_trips || null,
+  };
+}
+
+export async function cancelTripRequest({ request_id, reason }) {
+  const payload = {
+    status: INTERDISTRICT_TRIP_STATUS.CANCELED,
+    cancel_reason: reason || "client_cancelled",
+    updated_at: new Date().toISOString(),
+  };
+  const { data, error } = await supabase
+    .from("district_trip_requests")
+    .update(payload)
+    .eq("id", request_id)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 export async function respondTripRequest({ request_id, status }) {
-  const { error } = await supabase.from("district_trip_requests").update({ status, updated_at: new Date().toISOString() }).eq("id", request_id);
+  const { error } = await supabase.from("district_trip_requests").update({ status: normalizeInterDistrictStatus(status), updated_at: new Date().toISOString() }).eq("id", request_id);
   if (error) throw error;
   return true;
 }

@@ -58,7 +58,7 @@ export default function DriverWallet({ onBack }) {
       {/* HEADER */}
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={onBack} type="text" size="large" />
-        <Title level={4} style={{ margin: '0 0 0 10px', fontFamily: 'YangoHeadline' }}>{cp('Hamyon')}</Title>
+        <Title level={4} style={{ margin: '0 0 0 10px', fontFamily: 'AccentHeadline' }}>{cp('Hamyon')}</Title>
       </div>
 
       {/* BALANS KARTASI */}

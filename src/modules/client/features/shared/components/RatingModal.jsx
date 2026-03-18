@@ -4,7 +4,7 @@
  *
  * Qanday ishlaydi:
  *  1. Yulduzcha tanlaydi (1-5)
- *  2. Tez tanlash teglari (Yandex Go uslubi)
+ *  2. Tez tanlash teglari (tez tanlash uslubi)
  *  3. Ixtiyoriy matn izoh
  *  4. Submit: order_ratings jadvaliga yozadi
  *  5. Supabase Trigger (supabase_new_tables.sql) driver_stats.rating_avg'ni yangilaydi

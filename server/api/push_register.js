@@ -39,3 +39,5 @@ export async function register(req, res) {
     return serverError(res, e?.message || String(e));
   }
 }
+
+export default register;

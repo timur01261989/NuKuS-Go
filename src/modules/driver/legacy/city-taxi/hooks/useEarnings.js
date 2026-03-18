@@ -1,16 +1,12 @@
 /**
  * useEarnings.js
  * Haydovchining bugungi va haftalik daromadini Supabase'dan oladi.
- *
- * Qanday ishlaydi:
- *  - Supabase'dan "completed" statusdagi buyurtmalar summasini hisoblaydi
- *  - Har 60 soniyada avtomatik yangilanadi
- *  - Xato bo'lsa ordersFeed.items dan fallback hisoblash
  */
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/services/supabase/supabaseClient";
 import { useTaxi } from "../context/TaxiProvider";
-import { TaxiOrderStatus } from "../context/taxiReducer";
+import { TAXI_STATUS, normalizeTaxiStatus } from "@/modules/shared/taxi/constants/taxiStatuses.js";
+import { taxiLogger } from "@/modules/shared/taxi/utils/taxiLogger.js";
 
 export function useEarnings() {
   const { state } = useTaxi();
@@ -30,22 +26,20 @@ export function useEarnings() {
       weekStart.setDate(weekStart.getDate() - 7);
       weekStart.setHours(0, 0, 0, 0);
 
-      // Bugungi yakunlangan safarlar
       const { data: todayData, error: todayErr } = await supabase
         .from("orders")
         .select("id, price, amount, priceUzs")
         .eq("driver_id", userId)
-        .eq("status", "completed")
+        .eq("status", TAXI_STATUS.COMPLETED)
         .gte("created_at", todayStart.toISOString());
 
       if (todayErr) throw todayErr;
 
-      // Haftalik yakunlangan safarlar
       const { data: weekData, error: weekErr } = await supabase
         .from("orders")
         .select("id, price, amount, priceUzs")
         .eq("driver_id", userId)
-        .eq("status", "completed")
+        .eq("status", TAXI_STATUS.COMPLETED)
         .gte("created_at", weekStart.toISOString());
 
       if (weekErr) throw weekErr;
@@ -58,12 +52,12 @@ export function useEarnings() {
         weekUzs: sumUzs(weekData),
         tripsToday: (todayData || []).length,
       });
-    } catch {
-      // Fallback: ordersFeed.items dan hisoblash (network yo'q bo'lganda)
+    } catch (error) {
+      taxiLogger.warn("useEarnings fallback engaged", {
+        error: error?.message || String(error),
+      });
       const items = state.ordersFeed.items || [];
-      const completed = items.filter(
-        (o) => (o.status || "").toUpperCase() === TaxiOrderStatus.COMPLETED
-      );
+      const completed = items.filter((o) => normalizeTaxiStatus(o.status) === TAXI_STATUS.COMPLETED);
       const todayUzs = completed.reduce((s, o) => s + Number(o.priceUzs || o.price || 0), 0);
       setEarnings({ todayUzs, weekUzs: todayUzs, tripsToday: completed.length });
     }
@@ -73,7 +67,6 @@ export function useEarnings() {
     fetchEarnings();
     intervalRef.current = setInterval(fetchEarnings, 60000);
     return () => clearInterval(intervalRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return { earnings };

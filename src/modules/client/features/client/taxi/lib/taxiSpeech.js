@@ -1,3 +1,5 @@
+import taxiLogger from "../../../../../shared/taxi/utils/taxiLogger";
+
 export function speak(text) {
   try {
     if (!("speechSynthesis" in window)) return;
@@ -7,5 +9,7 @@ export function speak(text) {
     u.pitch = 1;
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(u);
-  } catch {}
+  } catch (error) {
+    taxiLogger.warn("client.taxi.speech.failed", { error });
+  }
 }

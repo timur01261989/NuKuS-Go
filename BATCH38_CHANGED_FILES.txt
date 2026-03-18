@@ -1,0 +1,24 @@
+UNIGO batch38 changed files
+
+Phase:
+- batch38
+- focus: order assets phase3 final polish
+
+Updated files:
+- src/modules/client/features/client/delivery/components/Active/StatusTimeline.jsx
+- src/modules/client/features/client/delivery/components/Active/PinCodeDisplay.jsx
+- src/modules/client/features/client/delivery/components/Setup/ParcelTypeChips.jsx
+- src/modules/client/features/client/delivery/components/Setup/PhotoUploader.jsx
+- src/modules/client/features/client/delivery/DeliveryPage.helpers.jsx
+- tests/batch35-final-sanity.test.js
+- BATCH35_FINAL_CHANGED_FILES.txt
+
+Added files:
+- tests/batch38-order-assets-phase3.test.js
+- BATCH38_CHANGED_FILES.txt
+
+Validation:
+- npm test
+- result: pending local run
+- order asset integration extended to delivery setup and active flow
+- clean packaging retained

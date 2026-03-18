@@ -213,6 +213,6 @@ export default async function handler(req, res) {
     case 'seat-hold-calc':
       return await seat_hold_quote_handler(req, res);
     default:
-      return await wallet_balance_handler(req, res);
+      return json(res, 404, { ok: false, error: 'wallet_route_not_found', routeKey: rk || null });
   }
 }

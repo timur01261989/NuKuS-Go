@@ -4,6 +4,7 @@ import { AimOutlined, CheckOutlined, CloseOutlined } from "@ant-design/icons";
 import { MapContainer, Marker, Polyline, TileLayer, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { mapAssets } from "@/assets/map";
 
 import { useFreightRoute } from "./useFreightRoute";
 import { nominatimReverse } from "../services/freightApi";
@@ -13,6 +14,9 @@ import icon from "leaflet/dist/images/marker-icon.png";
 import iconShadow from "leaflet/dist/images/marker-shadow.png";
 
 // Leaflet marker icon fix
+const pickupMarker = L.icon({ iconUrl: mapAssets.pickupPin || mapAssets.clientPinDay || mapAssets.pickupPointLive || mapAssets.pickupPoint || icon, shadowUrl: iconShadow, iconSize: [38, 46], iconAnchor: [19, 42] });
+const dropoffMarker = L.icon({ iconUrl: mapAssets.finishPin || mapAssets.dropoffPin || mapAssets.deliveryPointLive || mapAssets.deliveryPoint || icon, shadowUrl: iconShadow, iconSize: [38, 46], iconAnchor: [19, 42] });
+const userMarker = L.icon({ iconUrl: mapAssets.pickupPin || mapAssets.userPlacemark || mapAssets.userSelfLive || mapAssets.userSelf || icon, shadowUrl: iconShadow, iconSize: [34, 34], iconAnchor: [17, 17] });
 let DefaultIcon = L.icon({
   iconUrl: icon,
   shadowUrl: iconShadow,
@@ -187,8 +191,9 @@ export default function FreightMap() {
         <MapClickPick enabled={!!selecting} onPick={handleTapPicked} />
 
         {/* Saved markers */}
-        {pickup?.latlng && <Marker position={pickup.latlng} />}
-        {dropoff?.latlng && <Marker position={dropoff.latlng} />}
+        {userLoc && !selecting && <Marker position={userLoc} icon={userMarker} />}
+        {pickup?.latlng && <Marker position={pickup.latlng} icon={pickupMarker} />}
+        {dropoff?.latlng && <Marker position={dropoff.latlng} icon={dropoffMarker} />}
 
         {/* Selecting marker (blue, draggable). No yellow center marker. */}
         {selecting && draft && (

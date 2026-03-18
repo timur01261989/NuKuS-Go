@@ -6,7 +6,12 @@ import axios from "axios";
  * - Individual services (cars/ai/payments/...) should only call this client.
  */
 export const axiosClient = axios.create({
-  baseURL: import.meta?.env?.VITE_API_BASE_URL || process.env.REACT_APP_API_BASE_URL || "",
+  baseURL:
+    import.meta?.env?.VITE_API_BASE_URL ||
+    import.meta?.env?.VITE_API_BASE ||
+    process.env.REACT_APP_API_BASE_URL ||
+    process.env.REACT_APP_API_BASE ||
+    "",
   timeout: 30_000,
 });
 

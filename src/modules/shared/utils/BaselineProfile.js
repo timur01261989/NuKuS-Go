@@ -1,9 +1,9 @@
 import { serviceT } from "../services/serviceI18n.js";
 
-// Yandex Go Baseline Profile mantiqi simulyatsiyasi
+// Baseline Profile mantiqi simulyatsiyasi
 export const prioritizeAssets = () => {
   const essentialAssets = [
-  '/assets/fonts/yango-headline-multi.woff',
+  '/assets/fonts/accent-headline-multi.woff',
 ];
 
 

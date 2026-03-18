@@ -66,11 +66,38 @@ export function CreateAdProvider({ children }) {
     try { localStorage.setItem(LS_KEY, JSON.stringify({ ad, step, updatedAt: Date.now() })); } catch {}
   }, [ad, step]);
 
-  const value = useMemo(() => ({
-    step, setStep, ad, setAd,
-    patch: (patch) => setAd((p) => ({ ...p, ...patch })),
-    reset: () => { setStep(0); setAd(defaultAd); try { localStorage.removeItem(LS_KEY); } catch {} },
-  }), [step, ad]);
+  const value = useMemo(() => {
+    const completeness = (() => {
+      const checks = [
+        ad?.brand,
+        ad?.model,
+        ad?.year,
+        ad?.price,
+        ad?.city || ad?.location?.city,
+        ad?.seller?.phone,
+        ad?.description,
+        Array.isArray(ad?.images) && ad.images.length >= 4,
+      ];
+      const passed = checks.filter(Boolean).length;
+      return Math.round((passed / checks.length) * 100);
+    })();
+    return {
+      step, setStep, ad, setAd,
+      patch: (patch) => setAd((p) => ({ ...p, ...patch })),
+      saveDraftNow: () => { try { localStorage.setItem(LS_KEY, JSON.stringify({ ad, step, updatedAt: Date.now() })); } catch {} },
+      getDraftMeta: () => {
+        try {
+          const raw = localStorage.getItem(LS_KEY);
+          const draft = safeParse(raw, null);
+          return draft ? { updatedAt: draft.updatedAt || null, step: draft.step || 0 } : null;
+        } catch {
+          return null;
+        }
+      },
+      completeness,
+      reset: () => { setStep(0); setAd(defaultAd); try { localStorage.removeItem(LS_KEY); } catch {} },
+    };
+  }, [step, ad]);
 
   return <CreateAdContext.Provider value={value}>{children}</CreateAdContext.Provider>;
 }

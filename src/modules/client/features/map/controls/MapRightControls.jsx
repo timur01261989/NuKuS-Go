@@ -1,4 +1,6 @@
 import React, { useMemo } from "react";
+import { realtimeAssets } from "@/assets/realtime";
+import { mapAssets } from "@/assets/map";
 import { useMap } from "react-leaflet";
 
 /**
@@ -7,7 +9,7 @@ import { useMap } from "react-leaflet";
  * - Toggle traffic overlay
  * - Toggle parking POIs
  *
- * This mimics the UX of Yandex-style right controls (original implementation).
+ * This mimics the UX of premium right controls (original implementation).
  */
 export default function MapRightControls({
   userLoc,
@@ -56,8 +58,7 @@ export default function MapRightControls({
     >
       {/* Recenter / "my location" */}
       <div onClick={recenter} title="Joyimga qaytish" style={btn(false)}>
-        {/* simple compass-like icon */}
-        <span style={{ fontSize: 18, lineHeight: 1 }}>◎</span>
+        <img src={mapAssets.controlLocation || realtimeAssets.navigation.trackingUserFocus || realtimeAssets.navigation.trackingCameraFocus} alt="" style={{ width: 20, height: 20, objectFit: "contain" }} />
       </div>
 
       {/* Parking toggle */}
@@ -66,7 +67,7 @@ export default function MapRightControls({
         title="Parking"
         style={btn(!!parkingOn)}
       >
-        <span style={{ fontWeight: 800 }}>P</span>
+        <img src={mapAssets.controlParking || mapAssets.controlCompass || realtimeAssets.navigation.trackingMapGlobe || realtimeAssets.markers.markerMapCursor} alt="" style={{ width: 20, height: 20, objectFit: "contain" }} />
       </div>
 
       {/* Traffic toggle */}
@@ -75,8 +76,7 @@ export default function MapRightControls({
         title="Traffic"
         style={btn(!!trafficOn)}
       >
-        {/* traffic icon */}
-        <span style={{ fontSize: 18, lineHeight: 1 }}>≋</span>
+        <img src={mapAssets.controlTraffic || mapAssets.poiGasFill || realtimeAssets.navigation.trackingRouteOutline || realtimeAssets.navigation.trackingRouteRefresh} alt="" style={{ width: 20, height: 20, objectFit: "contain" }} />
       </div>
     </div>
   );

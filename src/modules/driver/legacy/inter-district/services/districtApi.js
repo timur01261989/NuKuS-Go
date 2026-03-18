@@ -1,3 +1,5 @@
+import { normalizeInterDistrictTripPayload } from "@/modules/shared/interdistrict/domain/interDistrictSchemas";
+import { INTERDISTRICT_TRIP_STATUS } from "@/modules/shared/interdistrict/domain/interDistrictStatuses";
 import { supabase } from "@/services/supabase/supabaseClient";
 
 const TBL_QUEUE = "queues";
@@ -30,37 +32,12 @@ export async function createInterDistrictTrip(data) {
   const userId = data.user_id || await requireUserId();
   const payload = {
     user_id: userId,
-    region: data.region,
-    from_district: data.from_district,
-    to_district: data.to_district,
-    tariff: data.tariff,
-    pitak_id: data.pitak_id || null,
-    from_point: data.from_point || null,
-    to_point: data.to_point || null,
-    meeting_points: Array.isArray(data.meeting_points) ? data.meeting_points : [],
-    route_polyline: Array.isArray(data.route_polyline) ? data.route_polyline : [],
-    depart_at: data.depart_at,
-    seats_total: data.seats_total || 4,
-    allow_full_salon: !!data.allow_full_salon,
-    base_price_uzs: data.base_price_uzs,
-    pickup_fee_uzs: data.pickup_fee_uzs || 0,
-    dropoff_fee_uzs: data.dropoff_fee_uzs || 0,
-    waiting_fee_uzs: data.waiting_fee_uzs || 0,
-    full_salon_price_uzs: data.full_salon_price_uzs || null,
-    has_ac: !!data.has_ac,
-    has_trunk: !!data.has_trunk,
-    is_lux: !!data.is_lux,
-    has_delivery: !!data.has_delivery,
-    delivery_price_uzs: data.delivery_price_uzs || null,
-    notes: data.notes || "",
-    women_only: !!data.women_only,
-    booking_mode: data.booking_mode || "approval",
-    status: "active",
+    ...normalizeInterDistrictTripPayload(data),
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
 
-  const { data: result, error } = await supabase.from(TBL_TRIPS).insert([payload]).select();
+  const { data: result, error } = await supabase.from(TBL_TRIPS).insert([payload]).select().single();
   if (error) throw error;
   return result;
 }
@@ -95,7 +72,7 @@ export async function listPremiumRequests() {
   return supabase
     .from(TBL_REQUESTS)
     .select("*")
-    .in("status", ["new", "pending"])
+    .in("status", [INTERDISTRICT_TRIP_STATUS.SEARCHING, INTERDISTRICT_TRIP_STATUS.MATCHED])
     .order("created_at", { ascending: false });
 }
 
@@ -121,7 +98,7 @@ export async function acceptRequest({ request_id }) {
   return supabase
     .from(TBL_REQUESTS)
     .update({
-      status: "accepted",
+      status: INTERDISTRICT_TRIP_STATUS.ACCEPTED,
       accepted_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
@@ -146,7 +123,7 @@ export async function declineRequest({ request_id }) {
   return supabase
     .from(TBL_REQUESTS)
     .update({
-      status: "rejected",
+      status: INTERDISTRICT_TRIP_STATUS.CANCELED,
       rejected_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })

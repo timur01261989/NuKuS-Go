@@ -6,7 +6,7 @@
  * TO'G'IRLANDI: Null pointer error (car.price) va Narx formatlash mantiqi.
  */
 import React, { useEffect, useMemo, useState } from "react";
-import { Button, Spin, message, Tag, Divider, Card, Statistic, Progress } from "antd";
+import { Button, Spin, message, Tag, Divider, Card, Statistic, Progress, Timeline, Tooltip } from "antd";
 import { 
   ArrowLeftOutlined, 
   SwapOutlined, 
@@ -16,7 +16,11 @@ import {
   CheckCircleOutlined, 
   CalculatorOutlined,
   BgColorsOutlined,
-  InfoCircleOutlined
+  InfoCircleOutlined,
+  BellOutlined,
+  BankOutlined,
+  HistoryOutlined,
+  ShopOutlined
 } from "@ant-design/icons";
 import { useNavigate, useParams } from "react-router-dom";
 import GallerySlider from "../components/Details/GallerySlider";
@@ -26,6 +30,14 @@ import MainSpecsGrid from "../components/Details/MainSpecsGrid";
 import VinCheckBlock from "../components/Details/VinCheckBlock";
 import PriceHistoryGraph from "../components/Details/PriceHistoryGraph";
 import SellerProfile from "../components/Details/SellerProfile";
+import InspectionViewer from "../components/Details/InspectionViewer";
+import FinanceSnapshotCard from "../components/Details/FinanceSnapshotCard";
+import PriceDropCard from "../components/Details/PriceDropCard";
+import AppointmentBookingCard from "../components/Details/AppointmentBookingCard";
+import { buildDealerTrustProfile, buildFinanceOffers, buildAutoMarketNotifications, buildPriceHistorySummary } from "../services/autoMarketMarketplaceFinal";
+import { buildWarrantyBadgeSet, buildReservationReadinessStates, buildResidualSignalRail } from "../services/autoMarketExtendedSignals";
+import BookingFlowCard from "../components/Details/BookingFlowCard";
+import LocalPaymentOptionsCard from "../components/Details/LocalPaymentOptionsCard";
 import ComfortOptions from "../components/Details/ComfortOptions";
 import SafetyTipsCard from "../components/Details/SafetyTipsCard";
 import FairPriceBlock from "../components/Details/FairPriceBlock";
@@ -38,6 +50,13 @@ import { useGaraj } from "../context/GarajContext";
 import PromoModal from "../components/Details/PromoModal.jsx";
 import useWalletBalance from "../hooks/useWalletBalance";
 import { revealSellerPhone } from "../services/marketBackend";
+import { buildDetailConfidenceSteps } from "../services/autoMarketJourney";
+import { buildPremiumDetailActions } from "../services/autoMarketPremium";
+import { buildLuxuryDetailStory } from "../services/autoMarketLuxury";
+import { buildShowroomConciergePlan } from "../services/autoMarketShowroom";
+import { buildOwnershipEstimate, buildDecisionChecklist } from "../services/autoMarketBuyerCore";
+import { buildFinalDecisionRail } from "../services/autoMarketFinalPolish";
+import { buildWarrantyReservationSignals, buildVinInsightCard, buildInspectionCertificateCard } from "../services/autoMarketExtendedSignals";
 
 export default function DetailsPage() {
   const { id } = useParams();
@@ -50,6 +69,7 @@ export default function DetailsPage() {
   const [revealedPhone, setRevealedPhone] = useState(null);
   const [barterOpen, setBarterOpen] = useState(false);
   const [promoOpen, setPromoOpen] = useState(false);
+  const premiumActions = useMemo(() => buildPremiumDetailActions(car), [car]);
 
   // Yaqinda ko'rilganlar ro'yxatiga qo'shish
   useEffect(() => {
@@ -72,6 +92,14 @@ export default function DetailsPage() {
   };
   
   const loan = calculateLoan(car.price);
+  const confidenceSteps = buildDetailConfidenceSteps(car);
+  const luxuryStory = buildLuxuryDetailStory(car);
+  const ownershipEstimate = buildOwnershipEstimate(car);
+  const decisionChecklist = buildDecisionChecklist(car);
+  const finalDecisionRail = buildFinalDecisionRail(car);
+  const extendedSignals = buildWarrantyReservationSignals(car);
+  const vinInsight = buildVinInsightCard(car);
+  const inspectionCertificate = buildInspectionCertificateCard(car);
 
   // --- KUZOV STATUS RANGINI ANIQLASH ---
   const getPartColor = (status) => {
@@ -111,6 +139,80 @@ export default function DetailsPage() {
 
       <GallerySlider images={car.images || []} />
 
+      <div style={{ padding: "14px 16px 0" }}>
+        <Card style={{ borderRadius: 22, border: "1px solid #e2e8f0", boxShadow: "0 14px 34px rgba(15,23,42,.05)" }} bodyStyle={{ padding: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
+            <div>
+              <div style={{ fontWeight: 900, color: "#0f172a", fontSize: 18 }}>Bu e’lonni tushunish uchun 3 narsa kifoya</div>
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>Narx, tekshiruv va aloqa oqimi bitta professional detail qatlamida yig‘ildi.</div>
+            </div>
+            <Tag color="blue" style={{ borderRadius: 999, paddingInline: 12, margin: 0 }}>Professional detail flow</Tag>
+          </div>
+          <Timeline
+            style={{ marginTop: 16 }}
+            items={confidenceSteps.map((step) => ({
+              color: step.state === "good" || step.state === "ready" ? "green" : step.state === "warn" ? "orange" : "red",
+              children: <div><div style={{ fontWeight: 800, color: "#0f172a" }}>{step.title}</div><div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{step.text}</div></div>,
+            }))}
+          />
+        </Card>
+      </div>
+
+      <div style={{ padding: "0 16px", marginTop: 14 }}>
+        <Card style={{ borderRadius: 22, border: "1px solid #e2e8f0", overflow: "hidden", background: "linear-gradient(135deg,#fff7ed 0%,#ffffff 55%,#eff6ff 100%)", boxShadow: "0 16px 36px rgba(15,23,42,.05)" }} bodyStyle={{ padding: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontWeight: 900, color: "#0f172a", fontSize: 18 }}>Luxury qaror paneli</div>
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>Narx, ishonch va narx harakati bitta premium qatlamda ko‘rsatildi.</div>
+            </div>
+            <Tag color="gold" style={{ borderRadius: 999, paddingInline: 12, margin: 0 }}>Showroom detail</Tag>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginTop: 14 }}>
+            {luxuryStory.map((item) => (
+              <div key={item.key} style={{ borderRadius: 18, padding: 14, border: `1px solid ${item.tone}22`, background: `${item.tone}10` }}>
+                <div style={{ fontWeight: 900, color: "#0f172a" }}>{item.title}</div>
+                <div style={{ fontSize: 12, color: "#475569", marginTop: 6, lineHeight: 1.5 }}>{item.text}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+
+
+<div style={{ padding: "0 16px", marginTop: 14 }}>
+  <Card style={{ borderRadius: 22, border: "1px solid #e2e8f0", boxShadow: "0 16px 36px rgba(15,23,42,.05)" }} bodyStyle={{ padding: 16 }}>
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
+      <div>
+        <div style={{ fontWeight: 900, color: "#0f172a", fontSize: 18 }}>Marketplace decision center</div>
+        <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>Dealer, finance, narx tarixi va bildirishnomalar bir joyda yig‘ildi.</div>
+      </div>
+      <Tag color="geekblue" style={{ borderRadius: 999, paddingInline: 12, margin: 0 }}>Final ecosystem</Tag>
+    </div>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10, marginTop: 14 }}>
+      <div style={{ borderRadius: 18, padding: 14, background: "#eff6ff", border: "1px solid #bfdbfe" }}>
+        <div style={{ fontWeight: 900, color: "#0f172a" }}>{dealerTrustProfile.sellerName}</div>
+        <div style={{ fontSize: 12, color: "#475569", marginTop: 6 }}>Trust {dealerTrustProfile.trust}% • {dealerTrustProfile.response}</div>
+        <Button icon={<ShopOutlined />} style={{ marginTop: 12 }} onClick={() => nav(`/auto-market/dealer/${car?.seller_id || car?.seller?.id || "main"}`)}>Dealer profil</Button>
+      </div>
+      <div style={{ borderRadius: 18, padding: 14, background: "#faf5ff", border: "1px solid #e9d5ff" }}>
+        <div style={{ fontWeight: 900, color: "#0f172a" }}>{financeOffers[0]?.title}</div>
+        <div style={{ fontSize: 12, color: "#475569", marginTop: 6 }}>Oyiga {financeOffers[0]?.monthly}</div>
+        <Button icon={<BankOutlined />} style={{ marginTop: 12 }} onClick={() => nav(`/auto-market/finance-offers/${car?.id || "preview"}`)}>Finance offers</Button>
+      </div>
+      <div style={{ borderRadius: 18, padding: 14, background: "#fff7ed", border: "1px solid #fed7aa" }}>
+        <div style={{ fontWeight: 900, color: "#0f172a" }}>{priceHistorySummary.summary}</div>
+        <div style={{ fontSize: 12, color: "#475569", marginTop: 6 }}>Farq: {priceHistorySummary.deltaText}</div>
+        <Button icon={<HistoryOutlined />} style={{ marginTop: 12 }} onClick={() => nav(`/auto-market/price-history/${car?.id || "preview"}`)}>Narx tarixi</Button>
+      </div>
+      <div style={{ borderRadius: 18, padding: 14, background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
+        <div style={{ fontWeight: 900, color: "#0f172a" }}>{notificationSignals.length} ta signal</div>
+        <div style={{ fontSize: 12, color: "#475569", marginTop: 6 }}>Booking, narx va sotuvchi javoblari bo‘yicha</div>
+        <Button icon={<BellOutlined />} style={{ marginTop: 12 }} onClick={() => nav("/auto-market/notifications")}>Bildirishnomalar</Button>
+      </div>
+    </div>
+  </Card>
+</div>
+
       <div style={{ padding: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
@@ -142,6 +244,52 @@ export default function DetailsPage() {
 
         <div style={{ marginTop: 16 }}>
           <VinCheckBlock vin={car.vin} />
+        </div>
+
+        <div style={{ marginTop: 16 }}>
+          <InspectionViewer car={car} />
+        </div>
+
+        <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
+          <Card style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 14 }}>
+            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+              <img src={vinInsight.asset} alt={vinInsight.title} style={{ width: 72, height: 56, objectFit: "contain", borderRadius: 12, background: "#f8fafc", padding: 8 }} />
+              <div>
+                <div style={{ fontWeight: 900, color: "#0f172a" }}>{vinInsight.title}</div>
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{vinInsight.note}</div>
+              </div>
+            </div>
+          </Card>
+
+          <Card style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 14 }}>
+            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+              <img src={inspectionCertificate.image} alt={inspectionCertificate.title} style={{ width: 72, height: 56, objectFit: "contain", borderRadius: 12, background: "#f8fafc", padding: 8 }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                  <div style={{ fontWeight: 900, color: "#0f172a" }}>{inspectionCertificate.title}</div>
+                  <Tag color="success" style={{ borderRadius: 999, margin: 0 }}>{inspectionCertificate.badge}</Tag>
+                </div>
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{inspectionCertificate.note}</div>
+              </div>
+            </div>
+          </Card>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+            {extendedSignals.map((item) => (
+              <Card key={item.key} style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
+                  <div>
+                    <div style={{ fontWeight: 900, color: "#0f172a" }}>{item.title}</div>
+                    <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{item.note}</div>
+                  </div>
+                  <Tag color="blue" style={{ borderRadius: 999, margin: 0 }}>{item.cta}</Tag>
+                </div>
+                <div style={{ height: 6, borderRadius: 999, background: "#e2e8f0", marginTop: 12, overflow: "hidden" }}>
+                  <div style={{ width: "68%", background: item.accent, height: "100%" }} />
+                </div>
+              </Card>
+            ))}
+          </div>
         </div>
 
         <MainSpecsGrid car={car} />
@@ -198,6 +346,47 @@ export default function DetailsPage() {
 
         <FairPriceBlock car={car} />
 
+        <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+          {ownershipEstimate.map((item) => (
+            <Card key={item.key} style={{ borderRadius: 18, border: `1px solid ${item.tone}22`, background: `${item.tone}0D` }} bodyStyle={{ padding: 14 }}>
+              <div style={{ fontSize: 12, color: "#64748b" }}>{item.label}</div>
+              <div style={{ marginTop: 8, fontWeight: 900, color: "#0f172a" }}>{item.value}</div>
+            </Card>
+          ))}
+        </div>
+
+        <Card style={{ marginTop: 16, borderRadius: 18, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontWeight: 900, color: "#0f172a" }}>Qarorni yengillashtiruvchi checklist</div>
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>Ko'rishdan oldin aynan shu 3 narsani yopib oling.</div>
+            </div>
+            <Tag color="processing" style={{ borderRadius: 999, paddingInline: 12, margin: 0 }}>Buyer core</Tag>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginTop: 14 }}>
+            {decisionChecklist.map((item) => (
+              <div key={item.key} style={{ borderRadius: 16, border: `1px solid ${item.tone}22`, background: `${item.tone}12`, padding: 14 }}>
+                <div style={{ fontWeight: 900, color: "#0f172a" }}>{item.title}</div>
+                <div style={{ fontSize: 12, color: "#475569", marginTop: 6, lineHeight: 1.5 }}>{item.text}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <div style={{ marginTop: 16 }}>
+          <Card style={{ borderRadius: 20, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+              <div>
+                <div style={{ fontWeight: 900, color: "#0f172a" }}>Narx tushsa yoki shunga o‘xshash e’lon chiqsa signal oling</div>
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>Buyer core 2-bosqichda alert va kuzatuv qatlami qo‘shildi.</div>
+              </div>
+              <Button style={{ borderRadius: 12 }} onClick={() => { saveAlertDraft({ brand: car.brand, model: car.model, priceDropOnly: true }, `${car.brand} ${car.model} signal`); message.success("Alert saqlandi"); }}>
+                Shu model uchun alert yoqish
+              </Button>
+            </div>
+          </Card>
+        </div>
+
         <Divider style={{ margin: "20px 0" }} />
 
         <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 12 }}>Sotuvchi tavsifi</div>
@@ -214,8 +403,32 @@ export default function DetailsPage() {
         )}
 
         <PriceHistoryGraph history={car.price_history} />
-        
-        <SellerProfile seller={car.seller} isOwner={car.is_owner} onPromo={() => setPromoOpen(true)} />
+
+        <div style={{ marginTop: 16 }}>
+          <PriceDropCard history={car.price_history || []} />
+        </div>
+
+        <div style={{ marginTop: 16 }}>
+          <BookingFlowCard
+            ad={car}
+            seller={car.seller}
+            onSchedule={() => nav(`/auto-market/booking/${car.id}/checkout`)}
+            onReserve={() => nav(`/auto-market/booking/${car.id}/checkout`)}
+          />
+        </div>
+
+        <div style={{ marginTop: 16 }}>
+          <LocalPaymentOptionsCard
+            ad={car}
+            onPay={() => nav(`/auto-market/booking/${car.id}/checkout`)}
+          />
+        </div>
+
+        <SellerProfile seller={{ ...car.seller, seller_type: car.seller_type }} isOwner={car.is_owner} onPromo={() => setPromoOpen(true)} />
+
+        <div style={{ marginTop: 16 }}>
+          <AppointmentBookingCard seller={car.seller} onCall={() => window.location.href = `tel:${revealedPhone || car?.seller?.phone || ""}`} />
+        </div>
         
         <SafetyTipsCard />
       </div>

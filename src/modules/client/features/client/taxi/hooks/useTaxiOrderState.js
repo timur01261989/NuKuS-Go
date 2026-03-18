@@ -9,6 +9,7 @@ export function useTaxiOrderState() {
   const [bonusVisible, setBonusVisible] = useState(false);
   const [earnedBonus, setEarnedBonus] = useState(0);
   const [etaMin, setEtaMin] = useState(null);
+  const [etaUpdatedAt, setEtaUpdatedAt] = useState(null);
 
   return useMemo(() => ({
     orderId,
@@ -27,6 +28,8 @@ export function useTaxiOrderState() {
     setEarnedBonus,
     etaMin,
     setEtaMin,
+    etaUpdatedAt,
+    setEtaUpdatedAt,
   }), [
     orderId,
     orderStatus,
@@ -36,5 +39,6 @@ export function useTaxiOrderState() {
     bonusVisible,
     earnedBonus,
     etaMin,
+    etaUpdatedAt,
   ]);
 }

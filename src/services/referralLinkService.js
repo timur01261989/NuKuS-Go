@@ -1,37 +1,18 @@
-const PENDING_REFERRAL_STORAGE_KEY = 'unigo_pending_referral_context_v1';
-const BROWSER_DEVICE_SEED_KEY = 'unigo_browser_device_seed_v1';
-const OWN_REFERRAL_SNAPSHOT_STORAGE_KEY = 'unigo_own_referral_snapshot_v1';
-
-function getSafeWindow() {
-  return typeof window !== 'undefined' ? window : null;
-}
-
-function getSafeLocalStorage() {
-  const safeWindow = getSafeWindow();
-  try {
-    return safeWindow?.localStorage || null;
-  } catch {
-    return null;
-  }
-}
-
-export function normalizeReferralCode(rawValue) {
-  return String(rawValue || '')
-    .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9_-]/g, '')
-    .slice(0, 32);
-}
-
-export function getShareBaseUrl() {
-  const fromEnv = String(import.meta?.env?.VITE_APP_SHARE_BASE_URL || '').trim().replace(/\/$/, '');
-  if (fromEnv) {
-    return fromEnv;
-  }
-
-  const safeWindow = getSafeWindow();
-  return String(safeWindow?.location?.origin || '').replace(/\/$/, '');
-}
+import {
+  getSafeLocalStorage,
+  getSafeWindow,
+  getShareBaseUrl,
+  normalizeReferralCode,
+} from "./referralLinkService.helpers.js";
+import {
+  BROWSER_DEVICE_SEED_KEY,
+  OWN_REFERRAL_SNAPSHOT_STORAGE_KEY,
+  PENDING_REFERRAL_STORAGE_KEY,
+  normalizeOwnReferralSnapshot,
+  readStorageJson,
+  removeStorageKey,
+  writeStorageJson,
+} from "./referralLinkService.storage.js";
 
 export function buildReferralShareUrl(code) {
   const normalizedCode = normalizeReferralCode(code);
@@ -89,22 +70,8 @@ export function persistPendingReferralContext(context) {
 }
 
 export function getPendingReferralContext() {
-  const storage = getSafeLocalStorage();
-  if (!storage) {
-    return null;
-  }
-
-  try {
-    const rawValue = storage.getItem(PENDING_REFERRAL_STORAGE_KEY);
-    if (!rawValue) {
-      return null;
-    }
-
-    const parsed = JSON.parse(rawValue);
-    return createPendingReferralContext(parsed);
-  } catch {
-    return null;
-  }
+  const parsed = readStorageJson(PENDING_REFERRAL_STORAGE_KEY);
+  return parsed ? createPendingReferralContext(parsed) : null;
 }
 
 export function clearPendingReferralContext() {
@@ -113,46 +80,21 @@ export function clearPendingReferralContext() {
     return;
   }
 
-  storage.removeItem(PENDING_REFERRAL_STORAGE_KEY);
+  removeStorageKey(PENDING_REFERRAL_STORAGE_KEY);
 }
 
 export function persistOwnReferralSnapshot(snapshot) {
-  const storage = getSafeLocalStorage();
-  if (!storage) return null;
-
-  const normalizedCode = normalizeReferralCode(snapshot?.code?.code || snapshot?.code || snapshot?.referral_code || '');
-  if (!normalizedCode) return null;
-
-  const normalized = {
-    code: normalizedCode,
-    share_url: String(snapshot?.share_url || buildReferralShareUrl(normalizedCode)).trim(),
-    wallet: snapshot?.wallet && typeof snapshot.wallet === 'object' ? snapshot.wallet : null,
-    summary: snapshot?.summary && typeof snapshot.summary === 'object' ? snapshot.summary : null,
-    saved_at: new Date().toISOString(),
-  };
-
-  storage.setItem(OWN_REFERRAL_SNAPSHOT_STORAGE_KEY, JSON.stringify(normalized));
-  return normalized;
+  const normalized = normalizeOwnReferralSnapshot(snapshot);
+  if (!normalized) return null;
+  return writeStorageJson(OWN_REFERRAL_SNAPSHOT_STORAGE_KEY, normalized);
 }
 
 export function getOwnReferralSnapshot() {
-  const storage = getSafeLocalStorage();
-  if (!storage) return null;
-
-  try {
-    const rawValue = storage.getItem(OWN_REFERRAL_SNAPSHOT_STORAGE_KEY);
-    if (!rawValue) return null;
-    const parsed = JSON.parse(rawValue);
-    return persistOwnReferralSnapshot(parsed) || null;
-  } catch {
-    return null;
-  }
+  return readStorageJson(OWN_REFERRAL_SNAPSHOT_STORAGE_KEY);
 }
 
 export function clearOwnReferralSnapshot() {
-  const storage = getSafeLocalStorage();
-  if (!storage) return;
-  storage.removeItem(OWN_REFERRAL_SNAPSHOT_STORAGE_KEY);
+  removeStorageKey(OWN_REFERRAL_SNAPSHOT_STORAGE_KEY);
 }
 
 export function extractReferralCodeFromLocation(inputLocation) {

@@ -18,6 +18,7 @@ export function useTaxiOrderLifecycle(params) {
     setRatingVisible,
     setEarnedBonus,
     setEtaMin,
+    setEtaUpdatedAt,
     cp,
     speak,
   } = params;
@@ -35,6 +36,7 @@ export function useTaxiOrderLifecycle(params) {
     setRatingVisible,
     setEarnedBonus,
     setEtaMin,
+    setEtaUpdatedAt,
     cp,
     speak,
   });

@@ -5,9 +5,10 @@ import { TaxiOrderStatus } from "../context/taxiReducer";
 import { cityTaxiApi } from "../services/cityTaxiApi";
 import { useDriverOnline } from "../../core/useDriverOnline";
 import { canActivateService } from "../../core/serviceGuards";
+import { mapDriverTaxiStatus } from "@/modules/shared/taxi/mappers/mapDriverTaxiStatus.js";
+import { taxiLogger } from "@/modules/shared/taxi/utils/taxiLogger.js";
 
 /**
- * useOrderActions.js
  * Accept/Decline/Arrived/StartTrip/Complete/Cancel + Online toggle
  */
 export function useOrderActions() {
@@ -15,30 +16,33 @@ export function useOrderActions() {
   const { isOnline: globalOnline, activeService, setOnline, setOffline } = useDriverOnline();
   const serviceType = "taxi";
 
+  const toggleOnline = useCallback(async () => {
+    const next = !(globalOnline && activeService === serviceType);
+    if (next && !canActivateService(activeService, serviceType)) {
+      message.warning("Avval boshqa xizmatni offline qiling");
+      return;
+    }
 
-const toggleOnline = useCallback(async () => {
-  const next = !(globalOnline && activeService === serviceType);
-  if (next && !canActivateService(activeService, serviceType)) {
-    message.warning("Avval boshqa xizmatni offline qiling");
-    return;
-  }
+    dispatch({ type: "driver/setOnline", payload: next });
+    dispatch({ type: "ui/toast", payload: next ? "Online" : "Offline" });
 
-  dispatch({ type: "driver/setOnline", payload: next });
-  dispatch({ type: "ui/toast", payload: next ? "Online" : "Offline" });
+    try {
+      await cityTaxiApi.setDriverOnline(next);
+      if (next) await setOnline(serviceType);
+      else await setOffline();
+    } catch (error) {
+      taxiLogger.warn("Driver online holatini saqlashda xatolik", {
+        error: error?.message || String(error),
+        next,
+      });
+      message.error("Online holatni saqlab bo‘lmadi");
+    }
 
-  try {
-    await cityTaxiApi.setDriverOnline(next);
-    if (next) await setOnline(serviceType);
-    else await setOffline();
-  } catch {
-    // ignore
-  }
-
-  if (!next) {
-    dispatch({ type: "orders/setIncoming", payload: null });
-    dispatch({ type: "orders/setActive", payload: null });
-  }
-}, [globalOnline, activeService, dispatch, setOnline, setOffline]);
+    if (!next) {
+      dispatch({ type: "orders/setIncoming", payload: null });
+      dispatch({ type: "orders/setActive", payload: null });
+    }
+  }, [globalOnline, activeService, dispatch, setOnline, setOffline]);
 
   const accept = useCallback(async (id) => {
     const hide = message.loading("Buyurtma qabul qilinmoqda...", 0);
@@ -48,6 +52,7 @@ const toggleOnline = useCallback(async () => {
       dispatch({ type: "orders/setActive", payload: normalizeActive(res, TaxiOrderStatus.ACCEPTED) });
       message.success("Qabul qilindi");
     } catch (e) {
+      taxiLogger.error("Buyurtmani qabul qilishda xatolik", { id, error: e?.message || String(e) });
       message.error("Qabul qilishda xatolik: " + (e?.message || ""));
     } finally {
       hide();
@@ -60,6 +65,7 @@ const toggleOnline = useCallback(async () => {
       dispatch({ type: "orders/setIncoming", payload: null });
       message.info("Rad etildi");
     } catch (e) {
+      taxiLogger.error("Buyurtmani rad etishda xatolik", { id, error: e?.message || String(e) });
       message.error("Rad etishda xatolik: " + (e?.message || ""));
     }
   }, [dispatch]);
@@ -72,6 +78,7 @@ const toggleOnline = useCallback(async () => {
       message.success("Mijoz yoniga keldim");
       return r;
     } catch (e) {
+      taxiLogger.error("Arrived statusini yuborishda xatolik", { error: e?.message || String(e) });
       message.error("Status yangilash xatolik: " + (e?.message || ""));
     }
   }, [state.activeOrder?.id, dispatch]);
@@ -83,6 +90,7 @@ const toggleOnline = useCallback(async () => {
       dispatch({ type: "orders/updateActive", payload: { status: TaxiOrderStatus.ON_TRIP, startedAt: Date.now() } });
       message.success("Safar boshlandi");
     } catch (e) {
+      taxiLogger.error("Safarni boshlashda xatolik", { error: e?.message || String(e) });
       message.error("Boshlashda xatolik: " + (e?.message || ""));
     }
   }, [state.activeOrder?.id, dispatch]);
@@ -94,6 +102,7 @@ const toggleOnline = useCallback(async () => {
       dispatch({ type: "orders/updateActive", payload: { status: TaxiOrderStatus.COMPLETED, completedAt: Date.now() } });
       message.success("Safar yakunlandi");
     } catch (e) {
+      taxiLogger.error("Safarni yakunlashda xatolik", { error: e?.message || String(e) });
       message.error("Yakunlashda xatolik: " + (e?.message || ""));
     }
   }, [state.activeOrder?.id, dispatch]);
@@ -107,6 +116,7 @@ const toggleOnline = useCallback(async () => {
       dispatch({ type: "orders/setIncoming", payload: null });
       message.success("Buyurtma bekor qilindi");
     } catch (e) {
+      taxiLogger.error("Buyurtmani bekor qilishda xatolik", { error: e?.message || String(e) });
       message.error("Bekor qilishda xatolik: " + (e?.message || ""));
     } finally {
       hide();
@@ -121,7 +131,7 @@ function normalizeActive(o, fallbackStatus) {
   const raw = o?.data ?? o?.order ?? o ?? {};
   return {
     id,
-    status: raw.status || fallbackStatus,
+    status: mapDriverTaxiStatus(raw.status || fallbackStatus),
     priceUzs: raw.priceUzs || raw.price || raw.amount || 0,
     pickup_lat: raw.pickup_lat ?? raw.from_lat,
     pickup_lng: raw.pickup_lng ?? raw.from_lng,
@@ -129,7 +139,7 @@ function normalizeActive(o, fallbackStatus) {
     dropoff_lng: raw.dropoff_lng ?? raw.to_lng,
     pickup_address: raw.pickup_address ?? raw.pickup_location ?? raw.from_address ?? raw.pickupLocation ?? "",
     dropoff_address: raw.dropoff_address ?? raw.dropoff_location ?? raw.to_address ?? raw.dropoffLocation ?? "",
-    customer_name: raw.customer_name ?? raw.client_name ?? "Mijoz",
+    customer_name: raw.customer_name ?? raw.passenger_name ?? raw.client_name ?? "Mijoz",
     customer_phone: raw.customer_phone ?? raw.phone ?? "",
     startedAt: raw.startedAt ?? null,
   };

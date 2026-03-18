@@ -9,6 +9,7 @@ import {
 } from "../../../../utils/apiResponse";
 import { postJson } from "../../../../utils/apiHelper";
 import { supabase } from "@/services/supabase/supabaseClient";
+import taxiLogger from "../../../../../shared/taxi/utils/taxiLogger";
 
 const ORDER_ENDPOINT = "/api/order";
 
@@ -49,7 +50,8 @@ function tryParseJson(raw) {
   if (typeof raw !== "string" || !raw.trim()) return null;
   try {
     return JSON.parse(raw);
-  } catch {
+  } catch (error) {
+    taxiLogger.warn("client.taxi.order_create.read_uuid_failed", { error });
     return null;
   }
 }
@@ -130,7 +132,8 @@ export function useTaxiOrderCreate(options = {}) {
       try {
         const { data } = await supabase.auth.getUser();
         resolvedUserId = data?.user?.id || null;
-      } catch {
+      } catch (error) {
+        taxiLogger.warn("client.taxi.order_create.user_lookup_failed", { error });
         resolvedUserId = null;
       }
     }
@@ -253,7 +256,9 @@ export function useTaxiOrderCreate(options = {}) {
       if (typeof speak === "function") {
         try {
           speak(cp ? cp("Haydovchi qidirilmoqda") : "Haydovchi qidirilmoqda");
-        } catch (_) {}
+        } catch (error) {
+          taxiLogger.warn("client.taxi.order_create.profile_fallback_failed", { error });
+        }
       }
 
       return {

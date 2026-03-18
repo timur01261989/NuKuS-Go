@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Drawer, Button, List, Space, Tag, Typography, message, Divider, Tooltip } from "antd";
+import { Alert, Drawer, Button, List, Space, Tag, Typography, message, Divider, Tooltip } from "antd";
 import { 
   InboxOutlined, 
   ReconciliationOutlined, 
@@ -8,7 +8,8 @@ import {
   EnvironmentOutlined, 
   CopyOutlined,
   SafetyCertificateOutlined,
-  ArrowRightOutlined
+  ArrowRightOutlined,
+  CheckCircleFilled
 } from "@ant-design/icons";
 import { listDriverRequests, respondTripRequest } from "@/modules/client/features/shared/interDistrictTrips.js";
 
@@ -24,7 +25,7 @@ import { listDriverRequests, respondTripRequest } from "@/modules/client/feature
 const { Text, Title } = Typography;
 const money = (n) => (n == null ? "" : new Intl.NumberFormat("uz-UZ").format(Number(n)));
 
-export default function TripRequestsDrawer({ open, onClose }) {
+export default function TripRequestsDrawer({ open, onClose, activeTrip, conflictGuard, respondingRequestId, setRespondingRequestId }) {
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState([]);
 
@@ -48,12 +49,20 @@ export default function TripRequestsDrawer({ open, onClose }) {
 
   // So'rovga javob berish (Qabul/Rad)
   const respond = async (requestId, status) => {
+    if (respondingRequestId) return;
+    if (status === "accepted" && activeTrip?.id) {
+      message.warning("Aktiv reys mavjud. Avval joriy reys holatini tekshiring.");
+      return;
+    }
+    setRespondingRequestId?.(requestId);
     try {
-      await respondTripRequest(requestId, status);
+      await respondTripRequest({ request_id: requestId, status });
       message.success(status === "accepted" ? "So'rov qabul qilindi" : "So'rov rad etildi");
-      load(); // Ro'yxatni yangilash
+      load();
     } catch (e) {
       message.error("Amalni bajarishda xato");
+    } finally {
+      setRespondingRequestId?.(null);
     }
   };
 
@@ -62,6 +71,8 @@ export default function TripRequestsDrawer({ open, onClose }) {
     navigator.clipboard.writeText(text);
     message.success("Nusxalandi");
   };
+
+  const requestHealth = conflictGuard?.reason || null;
 
   return (
     <Drawer
@@ -81,6 +92,15 @@ export default function TripRequestsDrawer({ open, onClose }) {
         </Button>
       }
     >
+      {requestHealth ? (
+        <Alert
+          type={activeTrip?.id ? "warning" : "info"}
+          showIcon
+          style={{ marginBottom: 12, borderRadius: 14 }}
+          message={requestHealth}
+          description={activeTrip?.id ? "Yangi so‘rov qabul qilishdan oldin joriy reys holatini tekshiring." : "Queue bo‘yicha javoblar ketma-ket yuboriladi."}
+        />
+      ) : null}
       <List
         loading={loading}
         dataSource={items}
@@ -187,6 +207,7 @@ export default function TripRequestsDrawer({ open, onClose }) {
                       <Button 
                         type="primary" 
                         shape="round"
+                        disabled={Boolean(respondingRequestId)}
                         icon={<CheckCircleFilled />}
                         onClick={() => respond(r.id, "accepted")}
                         style={{ height: 45, width: 85, fontSize: 13 }}
@@ -198,6 +219,7 @@ export default function TripRequestsDrawer({ open, onClose }) {
                       <Button 
                         danger 
                         shape="round"
+                        disabled={Boolean(respondingRequestId)}
                         onClick={() => respond(r.id, "rejected")}
                         style={{ height: 45, width: 85, fontSize: 13 }}
                       >
@@ -214,6 +236,3 @@ export default function TripRequestsDrawer({ open, onClose }) {
     </Drawer>
   );
 }
-
-// Icons import fix (missing in original snippet but needed)
-import { CheckCircleFilled } from "@ant-design/icons";

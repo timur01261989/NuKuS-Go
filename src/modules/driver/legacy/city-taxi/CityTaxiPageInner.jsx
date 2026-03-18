@@ -1,26 +1,11 @@
 /**
  * CityTaxiPageInner
- * Asl funksionallik to'liq saqlangan:
- *  - TaxiMap, TopStatusPanel, BottomActionPanel
- *  - IncomingOrderModal, OrderInfoCard, Taximeter
- *  - Locate me tugmasi
- *  - Buyurtma tafsilotlari Drawer
- * Qo'shildi:
- *  - userId (supabase auth) → TopStatusPanel + LevelBadge uchun
- *  - missionsOpen state → DailyMissions Drawer
- *  - TopStatusPanel'ga userId va onOpenMissions prop
  */
-import React, { useEffect, useMemo, useState } from "react";
-import { Button, Drawer, message } from "antd";
+import React from "react";
+import { Button, Drawer } from "antd";
 import { AimOutlined, EnvironmentOutlined } from "@ant-design/icons";
-import { supabase } from "@/services/supabase/supabaseClient";
 
-import { useTaxi } from "./context/TaxiProvider";
-import { useDriverOnline } from "../core/useDriverOnline";
-import { useTaxiSocket } from "./hooks/useTaxiSocket";
-import { useDriverLocation } from "./hooks/useDriverLocation";
-import { useOrderActions } from "./hooks/useOrderActions";
-import { useEarnings } from "./hooks/useEarnings";
+import { useDriverTaxiController } from "./hooks/useDriverTaxiController";
 
 import TaxiMap from "./components/map/TaxiMap";
 import TopStatusPanel from "./components/panels/TopStatusPanel";
@@ -29,64 +14,33 @@ import IncomingOrderModal from "./components/modals/IncomingOrderModal";
 import OrderInfoCard from "./components/widgets/OrderInfoCard";
 import Taximeter from "./components/widgets/Taximeter";
 import DailyMissions from "./components/widgets/DailyMissions";
+import DriverConnectionBadge from "./components/widgets/DriverConnectionBadge";
+import DriverDaySnapshot from "./components/widgets/DriverDaySnapshot";
 
-/**
- * CityTaxiPageInner
- * - Xarita + panellar + modal + logikalar bir joyda
- */
 export default function CityTaxiPageInner() {
-  const { state, dispatch } = useTaxi();
-  const { isOnline: globalOnline, activeService } = useDriverOnline();
-  const isOnline = globalOnline && activeService === "taxi";
-  const { activeOrder, incomingOrder, ui } = state;
-
-  const actions = useOrderActions();
-
-  useEffect(() => {
-    dispatch({ type: "driver/setOnline", payload: isOnline });
-  }, [dispatch, isOnline]);
-  const { earnings } = useEarnings();
-
-  // realtime / polling
-  useTaxiSocket({ enabled: isOnline });
-
-  // GPS tracking + serverga yuborish
-  useDriverLocation({ enabled: isOnline });
-
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  // Missiyalar drawer
-  const [missionsOpen, setMissionsOpen] = useState(false);
-  // Supabase auth userId (LevelBadge va DailyMissions uchun)
-  const [userId, setUserId] = useState(null);
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data?.user?.id) setUserId(data.user.id);
-    }).catch(() => {});
-  }, []);
-
-  const canShowLocate = !!state.driverLocation?.latlng;
-
-  const bottomMode = useMemo(() => {
-    if (activeOrder?.status === "ON_TRIP") return "onTrip";
-    if (activeOrder?.status === "ACCEPTED") return "goingToClient";
-    if (activeOrder?.status === "ARRIVED") return "arrived";
-    if (activeOrder?.status === "COMPLETED") return "completed";
-    return "idle";
-  }, [activeOrder?.status]);
-
-  useEffect(() => {
-    if (ui.toast) {
-      message.info(ui.toast);
-      dispatch({ type: "ui/clearToast" });
-    }
-  }, [ui.toast, dispatch]);
+  const {
+    state,
+    dispatch,
+    isOnline,
+    activeOrder,
+    incomingOrder,
+    actions,
+    earnings,
+    detailsOpen,
+    setDetailsOpen,
+    missionsOpen,
+    setMissionsOpen,
+    userId,
+    canShowLocate,
+    heartbeatUpdatedAt,
+    gpsAccuracy,
+    bottomMode,
+  } = useDriverTaxiController();
 
   return (
     <div style={{ position: "relative", height: "100vh", width: "100%" }}>
       <TaxiMap />
 
-      {/* 🎯 Locate me button */}
       <div style={{ position: "absolute", right: 14, top: 88, zIndex: 900 }}>
         <Button
           shape="circle"
@@ -112,85 +66,63 @@ export default function CityTaxiPageInner() {
         activeOrder={activeOrder}
         onStartTrip={actions.startTrip}
         onArrived={actions.arrived}
-        onComplete={actions.completeTrip}
-        onCancel={actions.cancelOrder}
-        onOpenDetails={() => setDetailsOpen(true)}
+        onCompleteTrip={actions.completeTrip}
+        onCancelOrder={actions.cancelOrder}
       />
 
       <IncomingOrderModal
+        open={!!incomingOrder}
         order={incomingOrder}
-        visible={!!incomingOrder}
-        onAccept={() => incomingOrder && actions.accept(incomingOrder.id)}
-        onDecline={() => incomingOrder && actions.decline(incomingOrder.id)}
+        onAccept={() => actions.accept(incomingOrder?.id)}
+        onDecline={() => actions.decline(incomingOrder?.id)}
       />
 
-      {/* Widgets */}
-      {activeOrder && (
-        <div style={{ position: "absolute", left: 12, right: 12, bottom: 120, zIndex: 850 }}>
-          <OrderInfoCard order={activeOrder} />
-          <div style={{ height: 10 }} />
-          <Taximeter order={activeOrder} />
+      {!!activeOrder && (
+        <div style={{ position: "absolute", left: 12, right: 12, bottom: 86, zIndex: 901 }}>
+          <OrderInfoCard order={activeOrder} onOpenDetails={() => setDetailsOpen(true)} />
+          {bottomMode === "onTrip" ? <Taximeter order={activeOrder} /> : null}
         </div>
       )}
 
-      {/* Buyurtma tafsilotlari Drawer */}
       <Drawer
-        title="Buyurtma tafsilotlari"
+        title="Safar tafsilotlari"
         placement="bottom"
-        height="65vh"
+        height={380}
         open={detailsOpen}
         onClose={() => setDetailsOpen(false)}
-        bodyStyle={{ paddingBottom: 40 }}
       >
-        {!activeOrder ? (
-          <div style={{ opacity: 0.75 }}>Hozir aktiv buyurtma yo'q.</div>
-        ) : (
-          <>
-            <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 10 }}>
-              #{String(activeOrder.id).slice(-6)} • {activeOrder.status}
-            </div>
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <EnvironmentOutlined />
-                <div>
-                  <div style={{ fontWeight: 700 }}>Olish nuqtasi</div>
-                  <div style={{ opacity: 0.85 }}>{activeOrder.pickup_address || "-"}</div>
-                </div>
-              </div>
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <EnvironmentOutlined />
-                <div>
-                  <div style={{ fontWeight: 700 }}>Yakuniy manzil</div>
-                  <div style={{ opacity: 0.85 }}>{activeOrder.dropoff_address || "-"}</div>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <Button danger onClick={actions.cancelOrder}>
-                Buyurtmani bekor qilish
-              </Button>
-              <Button onClick={() => message.info("Chat keyin qo'shiladi")}>Chat</Button>
-              <Button type="primary" onClick={() => setDetailsOpen(false)}>
-                Yopish
-              </Button>
-            </div>
-          </>
-        )}
+        {!!activeOrder ? (<><OrderInfoCard order={activeOrder} expanded /><DriverDaySnapshot earnings={earnings} activeOrder={activeOrder} /></>) : <div style={{ color: "#667085" }}>Faol buyurtma yo‘q</div>}
       </Drawer>
 
-      {/* Kunlik missiyalar Drawer */}
-      <DailyMissions
-        userId={userId}
-        visible={missionsOpen}
+      <Drawer
+        title="Kunlik missiyalar"
+        placement="right"
+        width={380}
+        open={missionsOpen}
         onClose={() => setMissionsOpen(false)}
-      />
+      >
+        <DailyMissions userId={userId} />
+      </Drawer>
 
-      <style>{`
-        .citytaxi-map-wrap { position:absolute; inset:0; }
-      `}</style>
+      <div style={{ position: "absolute", left: 12, top: 88, zIndex: 900, display: "grid", gap: 8 }}>
+        <DriverConnectionBadge updatedAt={heartbeatUpdatedAt} accuracy={gpsAccuracy} isOnline={isOnline} />
+        {!!state.driverLocation?.accuracy ? (
+          <div
+            style={{
+              background: "rgba(255,255,255,0.92)",
+              borderRadius: 999,
+              padding: "6px 10px",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              boxShadow: "0 8px 22px rgba(0,0,0,0.12)",
+            }}
+          >
+            <EnvironmentOutlined />
+            <span>GPS aniqligi: {Math.round(state.driverLocation.accuracy)} m</span>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
