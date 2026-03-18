@@ -13,7 +13,7 @@ export default function ParcelTypeChips({ value, onChange }) {
     { id: "flowers", label: cp("Gul"), emoji: "💐", icon: orderAssets.orderMarket },
   ];
   return (
-    <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
+    <Card style={{ borderRadius: 18 }} styles={{ body: { padding: 14 } }}>
       <div style={{ fontWeight: 1000, marginBottom: 10 }}>{cp("Yuk turi")}</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
         {chips.map((c) => {

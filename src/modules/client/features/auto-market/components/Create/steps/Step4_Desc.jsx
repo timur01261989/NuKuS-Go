@@ -7,7 +7,7 @@ export default function Step4_Desc() {
   const { ad, patch } = useCreateAd();
   const { am } = useAutoMarketI18n();
   return (
-    <Card style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 14 }}>
+    <Card style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} styles={{ body: { padding: 14 } }}>
       <div style={{ fontWeight: 900, color: "#0f172a" }}>{am("autoExtra.priceAndDesc")}</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 140px", gap: 10, marginTop: 12 }}>
         <div>

@@ -15,7 +15,7 @@ export default function StatusTimeline({ status }) {
   ];
   const idx = Math.max(0, items.findIndex((x) => x.key === status));
   return (
-    <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
+    <Card style={{ borderRadius: 18 }} styles={{ body: { padding: 14 } }}>
       <div style={{ fontWeight: 1000, marginBottom: 10 }}>{cp("Holat")}</div>
       <Steps
         size="small"

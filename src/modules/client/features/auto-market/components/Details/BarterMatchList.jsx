@@ -47,7 +47,7 @@ export default function BarterMatchList({ car, visible, onClose }) {
       height="80vh"
       open={visible}
       onClose={onClose}
-      bodyStyle={{ padding: "16px 14px 40px" }}
+      styles={{ body: { padding: "16px 14px 40px" } }}
     >
       <div style={{ background:"#f0fdf4", borderRadius: 14, padding: 12, marginBottom: 16 }}>
         <div style={{ fontWeight:800, color:"#059669", marginBottom: 10 }}>Sizning mashinangiz:</div>

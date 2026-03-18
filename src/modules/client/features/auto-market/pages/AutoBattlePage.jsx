@@ -62,7 +62,7 @@ function BattleCard({ battle, onVote }) {
         boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
         overflow: "hidden"
       }}
-      bodyStyle={{ padding: 0 }}
+      styles={{ body: { padding: 0 } }}
     >
       <div style={{ background: "linear-gradient(90deg, #1e293b 0%, #0f172a 100%)", padding: "16px 20px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

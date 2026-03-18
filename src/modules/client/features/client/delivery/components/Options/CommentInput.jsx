@@ -6,7 +6,7 @@ const { Text } = Typography;
 export default function CommentInput({ value, onChange }) {
   const { cp } = useClientText();
   return (
-    <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
+    <Card style={{ borderRadius: 18 }} styles={{ body: { padding: 14 } }}>
       <div style={{ fontWeight: 1000, marginBottom: 8 }}>{cp("Kuryerga izoh")}</div>
       <Input.TextArea
         value={value || ""}

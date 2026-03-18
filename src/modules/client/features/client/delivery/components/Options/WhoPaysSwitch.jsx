@@ -6,7 +6,7 @@ const { Text } = Typography;
 export default function WhoPaysSwitch({ value = "sender", onChange }) {
   const { cp } = useClientText();
   return (
-    <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
+    <Card style={{ borderRadius: 18 }} styles={{ body: { padding: 14 } }}>
       <div style={{ fontWeight: 1000, marginBottom: 8 }}>{cp("Kim to‘laydi?")}</div>
       <Radio.Group value={value} onChange={(e) => onChange?.(e.target.value)} style={{ display: "flex", gap: 10 }}>
         <Radio.Button value="sender" style={{ borderRadius: 14 }}>{cp("Yuboruvchi")}</Radio.Button>

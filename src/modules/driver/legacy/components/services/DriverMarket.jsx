@@ -28,7 +28,7 @@ export default function DriverMarket() {
 
   return (
     <div style={{ padding: 16 }}>
-      <Card style={{ borderRadius: 16, marginBottom: 12 }} bodyStyle={{ padding: 14 }}>
+      <Card style={{ borderRadius: 16, marginBottom: 12 }} styles={{ body: { padding: 14 } }}>
         <Title level={4} style={{ margin: 0 }}>Market buyurtmalari</Title>
         <Text type="secondary">
           Hozircha umumiy yetkazib berish feed'i ishlatiladi (backend market feed tayyor bo'lsa, shu yerda ajratiladi).

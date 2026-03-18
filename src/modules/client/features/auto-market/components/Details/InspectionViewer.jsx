@@ -19,7 +19,7 @@ export default function InspectionViewer({ car }) {
   const summary = useMemo(() => summarizeInspection(items), [items]);
 
   return (
-    <Card style={{ borderRadius: 20, border: "1px solid #e2e8f0", overflow: "hidden" }} bodyStyle={{ padding: 16 }}>
+    <Card style={{ borderRadius: 20, border: "1px solid #e2e8f0", overflow: "hidden" }} styles={{ body: { padding: 16 } }}>
       <div style={{ display: "grid", gridTemplateColumns: "1.2fr .8fr", gap: 14, alignItems: "center" }}>
         <div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>

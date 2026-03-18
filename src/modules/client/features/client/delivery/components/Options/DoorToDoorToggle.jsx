@@ -6,7 +6,7 @@ const { Text } = Typography;
 export default function DoorToDoorToggle({ value, onChange }) {
   const { cp } = useClientText();
   return (
-    <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
+    <Card style={{ borderRadius: 18 }} styles={{ body: { padding: 14 } }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
         <div>
           <div style={{ fontWeight: 1000 }}>{cp("Eshikkacha (Door to Door)")}</div>

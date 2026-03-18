@@ -9,7 +9,7 @@ import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 export default function QuickOrderMap({ center = [42.46, 59.61], orders = [] }) {
   const points = Array.isArray(orders) ? orders : [];
   return (
-    <Card size="small" style={{ borderRadius: 16 }} bodyStyle={{ padding: 0, overflow: "hidden" }}>
+    <Card size="small" style={{ borderRadius: 16 }} styles={{ body: { padding: 0, overflow: "hidden" } }}>
       <div style={{ padding: 12, fontWeight: 800 }}>Tez buyurtmalar xaritasi</div>
       <div style={{ height: 260 }}>
         <MapContainer center={center} zoom={12} style={{ height: "100%", width: "100%" }}>

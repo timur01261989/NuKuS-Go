@@ -6,7 +6,7 @@ import certificateArt from "@/assets/auto-market/pro/inspection/inspection-certi
 
 export default function VinCheckBlock({ vin }) {
   return (
-    <Card style={{ borderRadius: 20, border: "1px solid #e2e8f0", overflow: "hidden" }} bodyStyle={{ padding: 14 }}>
+    <Card style={{ borderRadius: 20, border: "1px solid #e2e8f0", overflow: "hidden" }} styles={{ body: { padding: 14 } }}>
       <div style={{ display: "grid", gridTemplateColumns: "1.2fr .8fr", gap: 12, alignItems: "center" }}>
         <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
           <div style={{

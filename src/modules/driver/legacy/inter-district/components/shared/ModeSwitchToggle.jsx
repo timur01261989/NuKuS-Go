@@ -36,7 +36,7 @@ export default function ModeSwitchToggle() {
     <Card 
       size="small" 
       style={{ borderRadius: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}
-      bodyStyle={{ padding: '12px 16px' }}
+      styles={{ body: { padding: '12px 16px' } }}
     >
       <Space direction="vertical" style={{ width: '100%' }} size={12}>
         {/* REJIMNI TANLASH (STANDART / PREMIUM) */}

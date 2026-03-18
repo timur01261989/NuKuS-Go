@@ -35,7 +35,7 @@ const NewOrderModal = ({ order, onAccept, onDecline }) => {
       <Card 
         className="order-card"
         bordered={false}
-        bodyStyle={{ padding: "20px" }}
+        styles={{ body: { padding: "20px" } }}
       >
         <div style={{ textAlign: "center", marginBottom: 15 }}>
           <Title level={3} style={{ margin: 0, color: "#faad14" }}>

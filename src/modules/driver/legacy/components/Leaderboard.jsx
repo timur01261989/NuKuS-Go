@@ -75,7 +75,7 @@ export default function Leaderboard({ onBack }) {
           renderItem={(driver, index) => (
             <Card 
               style={{ borderRadius: 16, marginBottom: 10, border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.02)' }}
-              bodyStyle={{ padding: '12px 15px' }}
+              styles={{ body: { padding: '12px 15px' } }}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>

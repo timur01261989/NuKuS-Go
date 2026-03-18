@@ -12,7 +12,7 @@ export default function Step1_Brand() {
   const modelOptions = useMemo(() => (MODELS_BY_BRAND[ad.brand] || []).map((m) => ({ value: m, label: m })), [ad.brand]);
 
   return (
-    <Card style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 14 }}>
+    <Card style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} styles={{ body: { padding: 14 } }}>
       <div style={{ fontWeight: 900, color: "#0f172a" }}>{am("autoExtra.brandAndModel")}</div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>

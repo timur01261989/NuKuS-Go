@@ -60,7 +60,7 @@ export default function FraudFlagsPanel() {
           </Space>
         </Card>
 
-        <Card size="small" bodyStyle={{ padding: 0 }}>
+        <Card size="small" styles={{ body: { padding: 0 } }}>
           <List
             loading={loading}
             dataSource={rows || []}

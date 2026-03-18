@@ -114,7 +114,7 @@ export default function GarajPage() {
               <Card 
                 key={car.ad_id || car.id} 
                 style={{ borderRadius: 24, border: "none", boxShadow: "0 10px 30px rgba(0,0,0,0.04)" }}
-                bodyStyle={{ padding: 20 }}
+                styles={{ body: { padding: 20 } }}
               >
                 {/* 1. MASHINA ASOSIY MA'LUMOTI */}
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>

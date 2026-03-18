@@ -125,7 +125,7 @@ export default function RatingModal({ visible, order, onFinish }) {
       footer={null}
       closable={false}
       centered
-      bodyStyle={{ textAlign: "center", padding: "28px 24px" }}
+      styles={{ body: { textAlign: "center", padding: "28px 24px" } }}
     >
       <div style={{ marginBottom: 16 }}>{FaceIcon}</div>
 

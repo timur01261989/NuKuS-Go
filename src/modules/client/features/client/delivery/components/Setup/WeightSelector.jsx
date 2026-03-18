@@ -11,7 +11,7 @@ export default function WeightSelector({ value, onChange }) {
     { id: 4, label: '20 kg+', sub: cp('Juda og‘ir') },
   ];
   return (
-    <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
+    <Card style={{ borderRadius: 18 }} styles={{ body: { padding: 14 } }}>
       <div style={{ fontWeight: 1000, marginBottom: 10 }}>{cp('Og‘irlik')}</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
         {weights.map((w) => {

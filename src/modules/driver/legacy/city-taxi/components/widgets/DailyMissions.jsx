@@ -119,7 +119,7 @@ export default function DailyMissions({ userId, visible, onClose }) {
           Yangilash
         </Button>
       }
-      bodyStyle={{ padding: "16px 16px 40px" }}
+      styles={{ body: { padding: "16px 16px 40px" } }}
     >
       {/* Haydovchi daraja va bonus balllar */}
       {gamif && level && (

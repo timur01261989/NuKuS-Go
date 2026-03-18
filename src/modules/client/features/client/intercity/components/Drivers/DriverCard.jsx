@@ -18,7 +18,7 @@ export default function DriverCard({ offer, onSelect, selected }) {
         border: selected ? "1px solid #1677ff" : "1px solid #eee",
         boxShadow: selected ? "0 10px 30px rgba(22,119,255,0.18)" : "0 10px 30px rgba(0,0,0,0.06)",
       }}
-      bodyStyle={{ padding: 14 }}
+      styles={{ body: { padding: 14 } }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
         <div style={{ display: "grid", gap: 2 }}>

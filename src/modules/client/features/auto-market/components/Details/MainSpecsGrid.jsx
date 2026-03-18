@@ -9,7 +9,7 @@ function Spec({ icon, label, value }) {
 
 export default function MainSpecsGrid({ car }) {
   const { am } = useAutoMarketI18n();
-  return <Card style={{ borderRadius:18, border:"1px solid #e2e8f0" }} bodyStyle={{ padding:14 }} title={<div style={{ fontWeight:900, color:"#0f172a" }}>{am("autoExtra.mainSpecs")}</div>}>
+  return <Card style={{ borderRadius:18, border:"1px solid #e2e8f0" }} styles={{ body: { padding:14 } }} title={<div style={{ fontWeight:900, color:"#0f172a" }}>{am("autoExtra.mainSpecs")}</div>}>
     <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
       <Spec icon={<CalendarOutlined />} label={am("common.year")} value={car?.year} />
       <Spec icon={<DashboardOutlined />} label={am("common.mileage")} value={(car?.mileage ?? "-") + " km"} />

@@ -76,7 +76,7 @@ export default function TripHistory({ onBack }) {
             return (
               <Card
                 style={{ borderRadius: 20, marginBottom: 15, border: "none", boxShadow: "0 4px 15px rgba(0,0,0,0.05)" }}
-                bodyStyle={{ padding: "15px" }}
+                styles={{ body: { padding: "15px" } }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10, gap: 8, flexWrap: "wrap" }}>
                   <Tag color="default" icon={<ClockCircleOutlined />}>

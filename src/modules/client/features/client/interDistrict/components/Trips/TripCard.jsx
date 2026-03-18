@@ -29,7 +29,7 @@ export default function TripCard({ trip, onRequest }) {
   }, [trip]);
 
   return (
-    <Card style={{ borderRadius: 18, marginBottom: 12, border: "1px solid #e8e8e8" }} bodyStyle={{ padding: 16 }}>
+    <Card style={{ borderRadius: 18, marginBottom: 12, border: "1px solid #e8e8e8" }} styles={{ body: { padding: 16 } }}>
       <Space style={{ width: "100%", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div style={{ flex: 1 }}>
           <Typography.Text style={{ fontWeight: 800, fontSize: 16, color: "#333" }}>

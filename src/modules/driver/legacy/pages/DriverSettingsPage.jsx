@@ -140,7 +140,7 @@ export default function DriverSettingsPage({ forceTab = null }) {
               ))
             )}
 
-            <Card style={CARD_STYLE} bodyStyle={{ padding: 16 }}>
+            <Card style={CARD_STYLE} styles={{ body: { padding: 16 } }}>
               <Text style={{ color: "#f8fafc", fontWeight: 700, display: "block", marginBottom: 12 }}>
                 Registratsiyadagi asosiy mashina
               </Text>
@@ -154,7 +154,7 @@ export default function DriverSettingsPage({ forceTab = null }) {
               </Row>
             </Card>
 
-            <Card style={CARD_STYLE} bodyStyle={{ padding: 16 }}>
+            <Card style={CARD_STYLE} styles={{ body: { padding: 16 } }}>
               <Text style={{ color: "#f8fafc", fontWeight: 700, display: "block", marginBottom: 12 }}>
                 Mashina so'rovlari tarixi
               </Text>
@@ -235,7 +235,7 @@ export default function DriverSettingsPage({ forceTab = null }) {
           </div>
         </div>
 
-        <Card style={{ ...CARD_STYLE, marginBottom: 16 }} bodyStyle={{ padding: 20 }}>
+        <Card style={{ ...CARD_STYLE, marginBottom: 16 }} styles={{ body: { padding: 20 } }}>
           <Row gutter={[12, 12]}>
             <Col xs={24} md={8}>
               <Text style={SECTION_LABEL_STYLE}>Ariza holati:</Text>

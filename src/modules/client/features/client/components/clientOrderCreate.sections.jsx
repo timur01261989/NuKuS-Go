@@ -155,7 +155,7 @@ export function DetailsDrawer({ detailsOpen, setDetailsOpen, setChatOpen, messag
       open={detailsOpen}
       closable={false}
       height={560}
-      bodyStyle={{ padding: 0, borderTopLeftRadius: 22, borderTopRightRadius: 22, overflow: "hidden" }}
+      styles={{ body: { padding: 0, borderTopLeftRadius: 22, borderTopRightRadius: 22, overflow: "hidden" } }}
       mask={false}
       onClose={() => setDetailsOpen(false)}
     >
@@ -233,7 +233,7 @@ export function ChatModal({
       onCancel={() => setChatOpen(false)}
       footer={null}
       centered
-      bodyStyle={{ padding: 0 }}
+      styles={{ body: { padding: 0 } }}
     >
       <div style={{ display: "flex", flexDirection: "column", height: "420px" }}>
         <div style={{ flex: 1, overflowY: "auto", padding: 15, background: "#f5f5f5" }}>

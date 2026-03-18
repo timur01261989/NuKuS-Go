@@ -29,7 +29,7 @@ export default function CourierInfoCard({ courier }) {
 
   if (!courier) return null;
   return (
-    <Card style={{ borderRadius: 18, border: "1px solid rgba(15,23,42,0.06)" }} bodyStyle={{ padding: 14 }}>
+    <Card style={{ borderRadius: 18, border: "1px solid rgba(15,23,42,0.06)" }} styles={{ body: { padding: 14 } }}>
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <Avatar size={48} src={courier.avatar} icon={<UserOutlined />} />
         <div style={{ flex: 1, minWidth: 0 }}>

@@ -6,7 +6,7 @@ import reservationHero from "@/assets/auto-market/pro/reservation/reservation-he
 
 export default function AppointmentBookingCard({ seller, onCall }) {
   return (
-    <Card style={{ borderRadius: 20, border: "1px solid #e2e8f0", overflow: "hidden" }} bodyStyle={{ padding: 16 }}>
+    <Card style={{ borderRadius: 20, border: "1px solid #e2e8f0", overflow: "hidden" }} styles={{ body: { padding: 16 } }}>
       <div style={{ display: "grid", gridTemplateColumns: "1.15fr .85fr", gap: 14, alignItems: "center" }}>
         <div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>

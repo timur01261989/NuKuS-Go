@@ -28,7 +28,7 @@ export default function PhotoAngleGuide({ images = [] }) {
   const uploaded = Array.isArray(images) ? images.length : 0;
   const coachNotes = buildPhotoCoachNotes();
   return (
-    <Card style={{ marginTop: 14, borderRadius: 18, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 14 }}>
+    <Card style={{ marginTop: 14, borderRadius: 18, border: "1px solid #e2e8f0" }} styles={{ body: { padding: 14 } }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
         <div>
           <div style={{ fontWeight: 900, color: "#0f172a" }}>Professional foto reja</div>

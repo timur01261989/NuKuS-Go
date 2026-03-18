@@ -19,7 +19,7 @@ export default function QuarryLocator({ quarry, onChange, center = [42.46, 59.61
   }, [quarry]);
 
   return (
-    <Card size="small" style={{ borderRadius: 16 }} bodyStyle={{ padding: 0, overflow: "hidden" }}>
+    <Card size="small" style={{ borderRadius: 16 }} styles={{ body: { padding: 0, overflow: "hidden" } }}>
       <div style={{ padding: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
           <div style={{ fontWeight: 800 }}>Karyer lokatsiyasi</div>

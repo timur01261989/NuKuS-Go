@@ -85,7 +85,7 @@ export default function Step3_Photos() {
   };
 
   return (
-    <Card style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 14 }}>
+    <Card style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} styles={{ body: { padding: 14 } }}>
       <div style={{ fontWeight: 900, color: "#0f172a" }}>{am("autoExtra.photos")}</div>
       <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{am("autoExtra.photosHelp")}</div>
 

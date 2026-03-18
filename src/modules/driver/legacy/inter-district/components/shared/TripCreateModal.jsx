@@ -149,7 +149,7 @@ export default function TripCreateModal({
       footer={null}
       destroyOnClose
       width={600}
-      bodyStyle={{ padding: "20px 24px", maxHeight: "85vh", overflowY: "auto" }}
+      styles={{ body: { padding: "20px 24px", maxHeight: "85vh", overflowY: "auto" } }}
     >
       <Form layout="vertical" form={form} onFinish={handleSubmit}>
         

@@ -28,7 +28,7 @@ export default function Step2_Specs() {
     patch({ features: current.includes(f) ? current.filter((i) => i !== f) : [...current, f] });
   };
   return (
-    <Card style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 14 }}>
+    <Card style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} styles={{ body: { padding: 14 } }}>
       <div style={{ fontWeight: 900, color: "#0f172a", fontSize: 16 }}>{am("autoExtra.specs")}</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
         <div>

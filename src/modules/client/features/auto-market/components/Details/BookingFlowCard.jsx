@@ -14,7 +14,7 @@ export default function BookingFlowCard({ ad, seller, onReserve, onSchedule }) {
   const actions = buildBookingActions(ad, seller);
 
   return (
-    <Card style={{ borderRadius: 22, border: "1px solid #e2e8f0", boxShadow: "0 16px 36px rgba(15,23,42,.05)" }} bodyStyle={{ padding: 16 }}>
+    <Card style={{ borderRadius: 22, border: "1px solid #e2e8f0", boxShadow: "0 16px 36px rgba(15,23,42,.05)" }} styles={{ body: { padding: 16 } }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
         <div>
           <div style={{ fontWeight: 900, color: "#0f172a", fontSize: 18 }}>Booking va uchrashuv markazi</div>

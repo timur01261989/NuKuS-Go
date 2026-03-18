@@ -8,7 +8,7 @@ export default function SenderForm({ value, onChange }) {
   const set = (patch) => onChange?.({ ...v, ...patch });
   const { cp } = useClientText();
   return (
-    <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
+    <Card style={{ borderRadius: 18 }} styles={{ body: { padding: 14 } }}>
       <div style={{ fontWeight: 1000, marginBottom: 10 }}>{cp('Yuboruvchi')}</div>
       <Form layout="vertical">
         <Form.Item label={cp('Telefon raqam')} required><Input value={v.phone || ""} onChange={(e) => set({ phone: e.target.value })} placeholder="+998..." /></Form.Item>

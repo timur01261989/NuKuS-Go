@@ -6,7 +6,7 @@ const { Text } = Typography;
 export default function PinCodeDisplay({ code }) {
   if (!code) return null;
   return (
-    <Card style={{ borderRadius: 18, background: "rgba(255,255,255,.96)" }} bodyStyle={{ padding: 14 }}>
+    <Card style={{ borderRadius: 18, background: "rgba(255,255,255,.96)" }} styles={{ body: { padding: 14 } }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
         <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
           <img src={orderAssets.orderSupport || orderAssets.chatSupportPhone} alt="" style={{ width: 20, height: 20, objectFit: "contain", marginTop: 2 }} />

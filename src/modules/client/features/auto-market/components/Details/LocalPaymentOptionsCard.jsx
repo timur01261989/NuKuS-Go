@@ -7,7 +7,7 @@ export default function LocalPaymentOptionsCard({ ad, onPay }) {
   const summary = buildLocalPaymentSummary(ad);
 
   return (
-    <Card style={{ borderRadius: 22, border: "1px solid #e2e8f0", boxShadow: "0 16px 36px rgba(15,23,42,.05)" }} bodyStyle={{ padding: 16 }}>
+    <Card style={{ borderRadius: 22, border: "1px solid #e2e8f0", boxShadow: "0 16px 36px rgba(15,23,42,.05)" }} styles={{ body: { padding: 16 } }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div>
           <div style={{ fontWeight: 900, color: "#0f172a", fontSize: 18 }}>{summary.title}</div>

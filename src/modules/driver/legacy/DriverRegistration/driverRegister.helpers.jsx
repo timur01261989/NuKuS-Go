@@ -139,7 +139,7 @@ export function DriverRegisterLayout({
     <ConfigProvider theme={driverRegisterTheme}>
       <div style={pageStyles}>
         <div style={shellStyles}>
-          <Card loading={initialLoading} bordered={false} style={cardStyles} bodyStyle={{ padding: 0 }}>
+          <Card loading={initialLoading} bordered={false} style={cardStyles} styles={{ body: { padding: 0 } }}>
             <div style={heroStyles}>
               <Space direction="vertical" size={8} style={{ width: "100%" }}>
                 <Text style={{ color: "rgba(255,255,255,0.68)", fontWeight: 800, letterSpacing: 1.5 }}>

@@ -20,7 +20,7 @@ export default function SellerProfile({ seller, onChat }) {
   const localProviders = getLocalPaymentProviders();
 
   return (
-    <Card style={{ borderRadius: 20, border: "1px solid #e2e8f0", overflow: "hidden", boxShadow: "0 18px 34px rgba(2,6,23,.05)" }} bodyStyle={{ padding: 16 }}>
+    <Card style={{ borderRadius: 20, border: "1px solid #e2e8f0", overflow: "hidden", boxShadow: "0 18px 34px rgba(2,6,23,.05)" }} styles={{ body: { padding: 16 } }}>
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <div style={{
           width: 52, height: 52, borderRadius: 18,

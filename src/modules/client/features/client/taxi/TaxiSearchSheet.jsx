@@ -65,7 +65,7 @@ function TaxiSearchSheet({
         setSearchOpen?.(false);
         setStep?.("main");
       }}
-      bodyStyle={{ padding: 0 }}
+      styles={{ body: { padding: 0 } }}
       title={null}
       closeIcon={null}
     >

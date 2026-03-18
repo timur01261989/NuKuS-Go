@@ -117,7 +117,7 @@ export default function StepDocuments({
                     "linear-gradient(180deg, rgba(15,23,42,0.96) 0%, rgba(17,24,39,0.94) 100%)",
                   boxShadow: "0 16px 40px rgba(2, 6, 23, 0.24)",
                 }}
-                bodyStyle={{ padding: 16 }}
+                styles={{ body: { padding: 16 } }}
               >
                 <Space direction="vertical" size={12} style={{ width: "100%" }}>
                   {preview?.url ? (

@@ -57,7 +57,7 @@ export default function CarSeatVisualizer() {
         border: `1px solid ${cardBorderColor}`,
         background: isFemaleOnly ? femaleBg : '#fff'
       }}
-      bodyStyle={{ padding: '16px' }}
+      styles={{ body: { padding: '16px' } }}
     >
       {/* MASHINA VIZUAL SXEMASI */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>

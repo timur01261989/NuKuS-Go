@@ -101,7 +101,7 @@ export function MainSideMenu({ open, onClose, navigate, t, tx }) {
   ];
 
   return (
-    <Drawer placement="left" open={open} onClose={onClose} width={300} bodyStyle={{ padding: 12 }}>
+    <Drawer placement="left" open={open} onClose={onClose} width={300} styles={{ body: { padding: 12 } }}>
       <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 8 }}>{t.menu || tx("menu", "Menu")}</div>
       <Divider style={{ margin: "10px 0" }} />
       {menuButtons.map((item, index) => (

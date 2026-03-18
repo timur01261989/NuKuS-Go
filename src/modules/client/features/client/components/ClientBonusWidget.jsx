@@ -33,7 +33,7 @@ export default function ClientBonusWidget({ userId, earnedPoints, visible, onClo
       footer={null}
       closable={false}
       centered
-      bodyStyle={{ textAlign: "center", padding: "28px 24px" }}
+      styles={{ body: { textAlign: "center", padding: "28px 24px" } }}
     >
       <GiftOutlined style={{ fontSize: 52, color: "#FFD700", marginBottom: 12 }} />
       <Title level={3} style={{ marginBottom: 4 }}>Cashback yig'ildi!</Title>

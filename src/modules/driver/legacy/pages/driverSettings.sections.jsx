@@ -162,7 +162,7 @@ export const ServiceTypesEditor = memo(function ServiceTypesEditor({ value, onCh
         <CircleGuideHint guide={serviceTypesGuide} />
       </div>
       {SERVICE_AREA_OPTIONS.map((area) => (
-        <Card key={area.key} style={{ ...CARD_STYLE, marginBottom: 12 }} bodyStyle={{ padding: 16 }}>
+        <Card key={area.key} style={{ ...CARD_STYLE, marginBottom: 12 }} styles={{ body: { padding: 16 } }}>
           <Text style={{ color: "#f8fafc", fontWeight: 700, display: "block", marginBottom: 12 }}>
             {area.label}
           </Text>
@@ -191,7 +191,7 @@ export const ServiceTypesEditor = memo(function ServiceTypesEditor({ value, onCh
 export const VehicleCard = memo(function VehicleCard({ vehicle, onSetActive, onEditRequest }) {
   const preset = getVehiclePreset(vehicle.vehicleType || "light_car");
   return (
-    <Card style={{ ...CARD_STYLE, marginBottom: 12 }} bodyStyle={{ padding: 16 }}>
+    <Card style={{ ...CARD_STYLE, marginBottom: 12 }} styles={{ body: { padding: 16 } }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
           <Space size={8} wrap>

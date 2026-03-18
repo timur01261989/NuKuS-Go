@@ -140,7 +140,7 @@ function DriverPending({
     >
       <div style={pageStyles}>
         <div style={shellStyles}>
-          <Card bordered={false} style={cardStyles} bodyStyle={{ padding: 0 }}>
+          <Card bordered={false} style={cardStyles} styles={{ body: { padding: 0 } }}>
             <div style={heroStyles}>
               <Space direction="vertical" size={8} style={{ width: "100%" }}>
                 <Text

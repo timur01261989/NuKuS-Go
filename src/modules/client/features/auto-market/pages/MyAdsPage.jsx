@@ -162,7 +162,7 @@ export default function MyAdsPage() {
             style={{ display: ad.is_vip || ad.is_top ? "block" : "none" }}
           >
             <Card 
-              bodyStyle={{ padding: 12 }} 
+              styles={{ body: { padding: 12 } }} 
               style={{ borderRadius: 20, border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.03)" }}
             >
               <CarCardHorizontal ad={ad} onClick={() => nav(`/auto-market/ad/${ad.id}`)} />
@@ -321,7 +321,7 @@ export default function MyAdsPage() {
         <Button style={{ borderRadius: 12 }} onClick={() => nav("/auto-market/seller/leads")}>Leadlarni ochish</Button>
         <Button style={{ borderRadius: 12 }} onClick={() => nav("/auto-market/seller/appointments")}>Seller agenda</Button>
       </div>
-      <Card style={{ borderRadius: 22, marginBottom: 16, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 16 }}>
+      <Card style={{ borderRadius: 22, marginBottom: 16, border: "1px solid #e2e8f0" }} styles={{ body: { padding: 16 } }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
             <div>
               <div style={{ fontWeight: 900, color: "#0f172a" }}>Marketplace final center</div>

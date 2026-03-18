@@ -87,7 +87,7 @@ export default function RideHistory({ userId, role, onBack }) {
           renderItem={item => (
             <Card 
               style={{ borderRadius: 20, marginBottom: 15, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}
-              bodyStyle={{ padding: '15px 20px' }}
+              styles={{ body: { padding: '15px 20px' } }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
                 <Text type="secondary" style={{ fontSize: 12 }}>

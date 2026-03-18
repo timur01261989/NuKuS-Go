@@ -45,7 +45,7 @@ export function AddressFormCard({ form, onFinish, onOpenMap }) {
         marginBottom: 40,
         boxShadow: "0 12px 40px rgba(0,87,183,0.2)",
       }}
-      bodyStyle={{ padding: 35 }}
+      styles={{ body: { padding: 35 } }}
     >
       <Form form={form} layout="vertical" onFinish={onFinish} requiredMark={false}>
         <Form.Item name="latitude" noStyle><Input type="hidden" /></Form.Item>
@@ -105,7 +105,7 @@ export function AddressItem({ item, onRemove }) {
     <Card
       hoverable
       style={{ borderRadius: 20, border: "1px solid #e5e7eb" }}
-      bodyStyle={{ padding: 20 }}
+      styles={{ body: { padding: 20 } }}
       actions={[
         <Popconfirm
           key="delete"

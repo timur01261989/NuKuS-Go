@@ -20,7 +20,7 @@ export default function FilterBar() {
   };
 
   return (
-    <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: "12px 16px" }}>
+    <Card style={{ borderRadius: 18 }} styles={{ body: { padding: "12px 16px" } }}>
       <Typography.Text style={{ fontWeight: 700, display: "block", marginBottom: 10 }}>
         {cp("Qo‘shimcha qulayliklar")}
       </Typography.Text>

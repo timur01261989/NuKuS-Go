@@ -43,7 +43,7 @@ export default function AddressAutocomplete({ onSelect }) {
           zIndex: 1000, 
           borderRadius: 16,
           boxShadow: '0 10px 30px rgba(0,0,0,0.1)'
-        }} bodyStyle={{ padding: 10 }}>
+        }} styles={{ body: { padding: 10 } }}>
           <List
             dataSource={results}
             renderItem={item => (

@@ -28,7 +28,7 @@ export default function DatePickerSheet() {
         height={320}
         open={open}
         onClose={() => setOpen(false)}
-        bodyStyle={{ paddingBottom: 18 }}
+        styles={{ body: { paddingBottom: 18 } }}
       >
         <div style={{ display: "grid", gap: 12 }}>
           <Text type="secondary">Qachon yo'lga chiqasiz?</Text>

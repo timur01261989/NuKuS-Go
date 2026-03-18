@@ -130,7 +130,7 @@ export default function SupportChatPage({ role, orderId: orderIdProp }) {
   return (
     <div style={{ padding: 16, maxWidth: 900, margin: "0 auto" }}>
       <Space direction="vertical" size={12} style={{ width: "100%" }}>
-        <Card size="small" style={{ borderRadius: 24, overflow: "hidden", border: "1px solid rgba(59,130,246,0.14)" }} bodyStyle={{ padding: 0 }}>
+        <Card size="small" style={{ borderRadius: 24, overflow: "hidden", border: "1px solid rgba(59,130,246,0.14)" }} styles={{ body: { padding: 0 } }}>
           <div style={{ position: "relative", padding: 18, background: "linear-gradient(135deg,#eff6ff 0%,#f8fafc 65%,#ffffff 100%)" }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr minmax(120px,160px)", gap: 16, alignItems: "center" }}>
               <div>
@@ -169,7 +169,7 @@ export default function SupportChatPage({ role, orderId: orderIdProp }) {
 
         {err ? <Alert type="error" showIcon message={err} /> : null}
 
-        <Card size="small" style={{ borderRadius: 16 }} bodyStyle={{ padding: 12 }}>
+        <Card size="small" style={{ borderRadius: 16 }} styles={{ body: { padding: 12 } }}>
           <Space wrap>
             {QUICK_ACTIONS.map((action) => (
               <Button
@@ -196,7 +196,7 @@ export default function SupportChatPage({ role, orderId: orderIdProp }) {
           </div>
         </Card>
 
-        <Card bodyStyle={{ padding: 0 }}>
+        <Card styles={{ body: { padding: 0 } }}>
           <div style={{ maxHeight: 420, overflowY: "auto", padding: 12 }}>
             <List
               dataSource={messages}

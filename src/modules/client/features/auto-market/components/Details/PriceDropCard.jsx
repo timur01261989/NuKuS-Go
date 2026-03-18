@@ -13,7 +13,7 @@ export default function PriceDropCard({ history = [] }) {
   const supportVisual = insight.dropped ? downVisual : upVisual;
 
   return (
-    <Card style={{ borderRadius: 20, border: `1px solid ${color}22` }} bodyStyle={{ padding: 16 }}>
+    <Card style={{ borderRadius: 20, border: `1px solid ${color}22` }} styles={{ body: { padding: 16 } }}>
       <div style={{ display: "grid", gridTemplateColumns: ".9fr 1.1fr", gap: 14, alignItems: "center" }}>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <img src={priceDropVisual} alt="" style={{ width: 76, borderRadius: 14 }} />

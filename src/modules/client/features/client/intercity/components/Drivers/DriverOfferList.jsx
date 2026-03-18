@@ -65,7 +65,7 @@ export default function DriverOfferList() {
         height="86vh"
         open={open}
         onClose={() => setOpen(false)}
-        bodyStyle={{ paddingBottom: 18 }}
+        styles={{ body: { paddingBottom: 18 } }}
       >
         <div style={{ display: "grid", gap: 12 }}>
           <Input

@@ -8,7 +8,7 @@ export default function Step5_Contact() {
   const { ad, patch } = useCreateAd();
   const { am } = useAutoMarketI18n();
   return (
-    <Card style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 14 }}>
+    <Card style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} styles={{ body: { padding: 14 } }}>
       <div style={{ fontWeight: 900, color: "#0f172a" }}>{am("autoExtra.contact")}</div>
       <div style={{ marginTop: 12 }}>
         <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700, marginBottom: 6 }}>{am("autoExtra.name")}</div>

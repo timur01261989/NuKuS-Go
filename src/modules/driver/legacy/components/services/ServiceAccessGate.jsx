@@ -42,7 +42,7 @@ function ServiceAccessGateComponent({
   if (!serviceEnabled) {
     return (
       <div style={{ maxWidth: 960, margin: "0 auto", padding: 16 }}>
-        <Card style={{ borderRadius: 20 }} bodyStyle={{ padding: 20 }}>
+        <Card style={{ borderRadius: 20 }} styles={{ body: { padding: 20 } }}>
           <Space direction="vertical" size={16} style={{ width: "100%" }}>
             <Title level={4} style={{ margin: 0 }}>{title}</Title>
             <Alert
@@ -66,7 +66,7 @@ Haydovchi sozlamalari
   if (!activeVehicle) {
     return (
       <div style={{ maxWidth: 960, margin: "0 auto", padding: 16 }}>
-        <Card style={{ borderRadius: 20 }} bodyStyle={{ padding: 20 }}>
+        <Card style={{ borderRadius: 20 }} styles={{ body: { padding: 20 } }}>
           <Space direction="vertical" size={16} style={{ width: "100%" }}>
             <Title level={4} style={{ margin: 0 }}>{title}</Title>
             <Alert

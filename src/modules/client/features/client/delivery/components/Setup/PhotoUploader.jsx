@@ -18,7 +18,7 @@ export default function PhotoUploader({ photos = [], onChange }) {
   }), [photos, onChange]);
 
   return (
-    <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
+    <Card style={{ borderRadius: 18 }} styles={{ body: { padding: 14 } }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <img src={orderAssets.chatAttachmentCamera || orderAssets.chatCamera} alt="" style={{ width: 22, height: 22, objectFit: "contain" }} />

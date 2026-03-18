@@ -200,7 +200,7 @@ export default function PriceAnalyticsPage() {
 
             {/* LIQUIDITY INDEX */}
             <Col span={12}>
-              <Card style={{ borderRadius: 24, border: "none", height: "100%" }} bodyStyle={{ padding: 20 }}>
+              <Card style={{ borderRadius: 24, border: "none", height: "100%" }} styles={{ body: { padding: 20 } }}>
                 <Space direction="vertical" size={0}>
                   <Text type="secondary" style={{ fontSize: 12 }}><CompassOutlined /> Likvidlik</Text>
                   <Title level={4} style={{ margin: "4px 0", fontWeight: 800 }}>
@@ -221,7 +221,7 @@ export default function PriceAnalyticsPage() {
 
             {/* MARKET SENTIMENT */}
             <Col span={12}>
-              <Card style={{ borderRadius: 24, border: "none", height: "100%" }} bodyStyle={{ padding: 20 }}>
+              <Card style={{ borderRadius: 24, border: "none", height: "100%" }} styles={{ body: { padding: 20 } }}>
                 <Text type="secondary" style={{ fontSize: 12 }}><ThunderboltOutlined /> Bozor Trendi</Text>
                 <div style={{ marginTop: 8 }}>
                   <Text strong style={{ fontSize: 14, color: analytics.isRising ? "#f59e0b" : "#3b82f6" }}>

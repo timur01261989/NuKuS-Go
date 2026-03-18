@@ -181,7 +181,7 @@ const Support = memo(() => {
               border: "1px solid rgba(15,23,42,0.08)",
               background: `linear-gradient(135deg, ${item.accent} 0%, #ffffff 100%)`,
             }}
-            bodyStyle={{ padding: 16 }}
+            styles={{ body: { padding: 16 } }}
           >
             <Space align="start" size={12}>
               <span
@@ -218,7 +218,7 @@ const Support = memo(() => {
             key={card.key}
             hoverable
             style={{ borderRadius: 16, border: "1px solid #f0f0f0", overflow: "hidden" }}
-            bodyStyle={{ padding: 24 }}
+            styles={{ body: { padding: 24 } }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
               <div style={{ flex: "1 1 200px" }}>

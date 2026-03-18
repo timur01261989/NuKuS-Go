@@ -11,7 +11,7 @@ export default function ComfortOptions({ comfort }) {
   ];
 
   return (
-    <Card style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 14 }}
+    <Card style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} styles={{ body: { padding: 14 } }}
       title={<div style={{ fontWeight: 900, color: "#0f172a" }}>Komfort</div>}
     >
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>

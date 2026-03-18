@@ -11,7 +11,7 @@ export default function ActiveFreightPanel({
   if (!mode) return null;
 
   return (
-    <Card style={{ borderRadius: 18, background: "rgba(255,255,255,.95)" }} bodyStyle={{ padding: 14 }}>
+    <Card style={{ borderRadius: 18, background: "rgba(255,255,255,.95)" }} styles={{ body: { padding: 14 } }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontWeight: 1000, fontSize: 14 }}>{mode === "searching" ? cp("Haydovchi qidirilmoqda...") : cp("Haydovchi kelmoqda...")}</div>

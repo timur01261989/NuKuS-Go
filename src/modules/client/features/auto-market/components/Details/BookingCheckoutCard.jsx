@@ -34,7 +34,7 @@ export default function BookingCheckoutCard({
   const paymentTimeline = buildPaymentStatusTimeline("pending", state?.provider || "click");
 
   return (
-    <Card style={{ borderRadius: 24, border: "1px solid #e2e8f0", boxShadow: "0 18px 40px rgba(15,23,42,.06)" }} bodyStyle={{ padding: 18 }}>
+    <Card style={{ borderRadius: 24, border: "1px solid #e2e8f0", boxShadow: "0 18px 40px rgba(15,23,42,.06)" }} styles={{ body: { padding: 18 } }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
         <div>
           <div style={{ fontWeight: 950, color: "#0f172a", fontSize: 18 }}>{checkout.title}</div>

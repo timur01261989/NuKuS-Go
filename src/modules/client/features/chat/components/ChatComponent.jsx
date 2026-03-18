@@ -93,7 +93,7 @@ export default function ChatComponent({ orderId, userId, visible, onClose }) {
       height="70vh"
       onClose={onClose}
       open={visible}
-      bodyStyle={{ display: 'flex', flexDirection: 'column', padding: '10px' }}
+      styles={{ body: { display: 'flex', flexDirection: 'column', padding: '10px' } }}
     >
       <div style={{ flex: 1, overflowY: 'auto', marginBottom: 15 }}>
         <List

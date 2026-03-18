@@ -245,7 +245,7 @@ function Inner() {
         </div>
 
         <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
-          <Card className="unigo-surface-card" style={{ borderRadius: 24 }} bodyStyle={{ padding: 16 }}>
+          <Card className="unigo-surface-card" style={{ borderRadius: 24 }} styles={{ body: { padding: 16 } }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
               <div>
                 <div style={{ fontWeight: 1000 }}>{cp("Yuk")}: {cargo?.title || "-"}</div>
@@ -265,7 +265,7 @@ function Inner() {
             ) : null}
           </Card>
 
-          <Card className="unigo-surface-card" style={{ borderRadius: 24 }} bodyStyle={{ padding: 16 }}>
+          <Card className="unigo-surface-card" style={{ borderRadius: 24 }} styles={{ body: { padding: 16 } }}>
             <div style={{ fontWeight: 1000, marginBottom: 10 }}>{cp("Haydovchi takliflari")}</div>
             {activeOffers.length === 0 ? (
               <div style={{ fontSize: 12, opacity: 0.75 }}>
@@ -299,7 +299,7 @@ function Inner() {
             )}
           </Card>
 
-          <Card className="unigo-surface-card" style={{ borderRadius: 24 }} bodyStyle={{ padding: 16 }}>
+          <Card className="unigo-surface-card" style={{ borderRadius: 24 }} styles={{ body: { padding: 16 } }}>
             <div style={{ fontWeight: 1000, marginBottom: 10 }}>Mos mashinalar (informatsion)</div>
             <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 10 }}>
               Bu ro‘yxat — kimlar potensial mos. Real tanlov taklif (offer) orqali bo‘ladi.
@@ -376,7 +376,7 @@ function Inner() {
 
       <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
         
-        <Card className="unigo-surface-card" style={{ borderRadius: 24 }} bodyStyle={{ padding: 16 }}>
+        <Card className="unigo-surface-card" style={{ borderRadius: 24 }} styles={{ body: { padding: 16 } }}>
           <div style={{ fontWeight: 1000, marginBottom: 10 }}>{cp("Manzillar")}</div>
           <div style={{ display: "grid", gap: 10 }}>
             <Button
@@ -409,7 +409,7 @@ function Inner() {
           </div>
         </Card>
 
-<Card className="unigo-surface-card" style={{ borderRadius: 24 }} bodyStyle={{ padding: 16 }}>
+<Card className="unigo-surface-card" style={{ borderRadius: 24 }} styles={{ body: { padding: 16 } }}>
           <div style={{ fontWeight: 1000, marginBottom: 10 }}>Mashina sinfi (tavsiya)</div>
           <TruckSelector />
           <div style={{ fontSize: 12, opacity: 0.75, marginTop: 8 }}>
@@ -417,7 +417,7 @@ function Inner() {
           </div>
         </Card>
 
-        <Card className="unigo-surface-card" style={{ borderRadius: 24 }} bodyStyle={{ padding: 16 }}>
+        <Card className="unigo-surface-card" style={{ borderRadius: 24 }} styles={{ body: { padding: 16 } }}>
           <div style={{ fontWeight: 1000, marginBottom: 10 }}>{cp("Yuk detali")}</div>
           <div style={{ display: "grid", gap: 12 }}>
             <CargoPhotoUpload />

@@ -15,7 +15,7 @@ export default function ReceiverForm({ value, onChange }) {
   const canOpen = useMemo(() => true, []);
   const openContacts = async () => { if (!canOpen) return; setOpen(true); setLoading(true); await loadContacts(); setLoading(false); };
   return (
-    <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
+    <Card style={{ borderRadius: 18 }} styles={{ body: { padding: 14 } }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
         <div style={{ fontWeight: 1000 }}>{cp('Qabul qiluvchi')}</div>
         <Button icon={<ContactsOutlined />} onClick={openContacts} style={{ borderRadius: 14 }}>{cp('Kontaktlar')}</Button>

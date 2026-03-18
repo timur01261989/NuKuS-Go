@@ -127,7 +127,7 @@ export default function RouteBuilder() {
           {/* AYOLLAR REJIMI KARTASI */}
           <Card
             style={{ borderRadius: 14, background: "#fff0f6", border: "1px solid #ffadd2", marginTop: 10 }}
-            bodyStyle={{ padding: 12 }}
+            styles={{ body: { padding: 12 } }}
           >
             <Space style={{ width: "100%", justifyContent: "space-between" }}>
               <Space>

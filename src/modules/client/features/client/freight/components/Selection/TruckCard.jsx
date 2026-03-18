@@ -6,7 +6,7 @@ const { Text } = Typography;
 export default function TruckCard({ truck, selected, onClick }) {
   const { cp } = useClientText();
   return (
-    <Card hoverable onClick={onClick} style={{ borderRadius: 18, border: selected ? "2px solid #1677ff" : "1px solid rgba(0,0,0,.08)" }} bodyStyle={{ padding: 14 }}>
+    <Card hoverable onClick={onClick} style={{ borderRadius: 18, border: selected ? "2px solid #1677ff" : "1px solid rgba(0,0,0,.08)" }} styles={{ body: { padding: 14 } }}>
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <div style={{ width: 54, height: 54, borderRadius: 16, background: "rgba(22,119,255,.08)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }} aria-hidden>
           {truck.icon}

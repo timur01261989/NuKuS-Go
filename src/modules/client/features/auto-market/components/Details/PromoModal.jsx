@@ -78,7 +78,7 @@ export default function PromoModal({ open, onClose, adId, onNeedTopup }) {
       footer={null}
       centered
       width={380}
-      bodyStyle={{ padding: "24px 20px" }}
+      styles={{ body: { padding: "24px 20px" } }}
       style={{ borderRadius: 20, overflow: 'hidden' }}
     >
       <div style={{ textAlign: 'center', marginBottom: 20 }}>
@@ -112,7 +112,7 @@ export default function PromoModal({ open, onClose, adId, onNeedTopup }) {
                 background: selected === item.id ? `${item.color}05` : '#fff',
                 transition: 'all 0.2s'
               }}
-              bodyStyle={{ padding: 12 }}
+              styles={{ body: { padding: 12 } }}
             >
               <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                 <Radio value={item.id} />

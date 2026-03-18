@@ -51,7 +51,7 @@ export default function ServiceBookWidget({ book, onAddRecord }) {
   };
 
   return (
-    <Card style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 16 }}>
+    <Card style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} styles={{ body: { padding: 16 } }}>
       <div style={{ display:"flex", gap: 10, alignItems:"center", marginBottom: 14 }}>
         <div style={{
           width: 40, height: 40, borderRadius: 14,

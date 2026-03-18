@@ -45,7 +45,7 @@ export function DashboardDrawer({ title, subtitle, open, onClose, menuItems, onS
       placement="left"
       onClose={onClose}
       open={open}
-      bodyStyle={{ padding: 0 }}
+      styles={{ body: { padding: 0 } }}
     >
       <List
         dataSource={menuItems}

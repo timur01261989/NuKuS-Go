@@ -12,7 +12,7 @@ export default function PriceEstimator() {
   const minLabel = useMemo(() => (Number.isFinite(durationMin) ? `${Math.round(durationMin)} daq` : "—"), [durationMin]);
 
   return (
-    <Card style={{ borderRadius: 18 }} bodyStyle={{ padding: 14 }}>
+    <Card style={{ borderRadius: 18 }} styles={{ body: { padding: 14 } }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontWeight: 1000, fontSize: 14 }}>{truck?.title}</div>

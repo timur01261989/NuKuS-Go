@@ -27,7 +27,7 @@ export default function FairPriceBlock({ car }) {
   const trendVisual = result.deltaPercent > 0 ? trendUp : trendDown;
 
   return (
-    <Card style={{ borderRadius: 20, border: `1px solid ${meta.color}26` }} bodyStyle={{ padding: 16 }}>
+    <Card style={{ borderRadius: 20, border: `1px solid ${meta.color}26` }} styles={{ body: { padding: 16 } }}>
       <div style={{ display:"grid", gridTemplateColumns: "1.1fr .9fr", gap: 14, alignItems: "center" }}>
         <div>
           <div style={{ display:"flex", gap: 10, alignItems:"center" }}>

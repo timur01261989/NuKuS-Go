@@ -72,7 +72,7 @@ export default function DriverServiceSelect({ onSelectService }) {
 
   const renderCard = (service) => (
     <Col xs={24} sm={12} key={service.key}>
-      <Card hoverable onClick={() => isOnline ? onSelectService(service.key) : message.error('Avval online bo‘ling')} style={{ borderRadius: 24, border: 'none', background: isOnline ? service.bg : '#f5f5f5', opacity: isOnline ? 1 : 0.7, height: 160 }} bodyStyle={{ padding: 18, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+      <Card hoverable onClick={() => isOnline ? onSelectService(service.key) : message.error('Avval online bo‘ling')} style={{ borderRadius: 24, border: 'none', background: isOnline ? service.bg : '#f5f5f5', opacity: isOnline ? 1 : 0.7, height: 160 }} styles={{ body: { padding: 18, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' } }}>
         <div style={{ fontSize: 30, color: isOnline ? service.color : '#bfbfbf', marginBottom: 14 }}>{service.icon}</div>
         <Text strong style={{ fontSize: 16, textAlign: 'center' }}>{service.title}</Text>
       </Card>
@@ -87,7 +87,7 @@ export default function DriverServiceSelect({ onSelectService }) {
           <div style={{ background: '#f0f0f0', padding: '6px 16px', borderRadius: 20, fontWeight: 'bold', fontSize: 14 }}>{currentLanguageMeta.shortLabel}</div>
         </div>
 
-        <Card style={{ marginBottom: 24, borderRadius: 24 }} bodyStyle={{ padding: '18px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Card style={{ marginBottom: 24, borderRadius: 24 }} styles={{ body: { padding: '18px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
               <Badge status={isOnline ? 'success' : 'default'} />

@@ -182,7 +182,7 @@ export default function ServiceBookPage() {
               <Card 
                 key={book.id} 
                 style={{ borderRadius: 20, border: "none", boxShadow: "0 10px 25px rgba(0,0,0,0.05)" }}
-                bodyStyle={{ padding: 20 }}
+                styles={{ body: { padding: 20 } }}
               >
                 {/* 1. MASHINA VA PROBEG */}
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>

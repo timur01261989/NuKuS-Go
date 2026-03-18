@@ -9,7 +9,7 @@ export default function UnifiedOrdersFeed({ orders, onBid, compact = false }) {
     <Card
       size="small"
       style={{ borderRadius: 16 }}
-      bodyStyle={{ padding: compact ? 10 : 16 }}
+      styles={{ body: { padding: compact ? 10 : 16 } }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
         <div style={{ fontWeight: 800 }}>Mos buyurtmalar</div>

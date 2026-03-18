@@ -7,7 +7,7 @@ import { buildFinanceHighlights } from "../../services/financeEstimator";
 export default function FinanceSnapshotCard({ car }) {
   const items = buildFinanceHighlights(car);
   return (
-    <Card style={{ borderRadius: 20, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 16 }}>
+    <Card style={{ borderRadius: 20, border: "1px solid #e2e8f0" }} styles={{ body: { padding: 16 } }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "center" }}>
         <div>
           <div style={{ fontWeight: 900, color: "#0f172a" }}>Moliyalashtirish ko‘rinishi</div>

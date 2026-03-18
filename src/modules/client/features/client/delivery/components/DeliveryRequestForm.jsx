@@ -15,7 +15,7 @@ export default function DeliveryRequestForm({
   openContacts, comment, setComment, matchedTrip, canSubmit, loading, handleSubmit, resetForm,
 }) {
   return (
-    <Card className="unigo-surface-card" style={{ marginTop: 14, borderRadius: 24, background: "#ffffff", border: "1px solid rgba(87,119,255,0.12)", boxShadow: "0 18px 40px rgba(64,96,160,0.08)" }} bodyStyle={{ padding: 18 }}>
+    <Card className="unigo-surface-card" style={{ marginTop: 14, borderRadius: 24, background: "#ffffff", border: "1px solid rgba(87,119,255,0.12)", boxShadow: "0 18px 40px rgba(64,96,160,0.08)" }} styles={{ body: { padding: 18 } }}>
       <Space direction="vertical" size={14} style={{ width: "100%" }}>
         <div>
           <Title level={4} style={{ margin: 0 }}>{editingId ? cp("Buyurtmani tahrirlash") : cp("Eltish xizmati")}</Title>

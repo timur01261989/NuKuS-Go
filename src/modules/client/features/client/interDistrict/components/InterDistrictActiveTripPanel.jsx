@@ -40,7 +40,7 @@ export default function InterDistrictActiveTripPanel() {
   };
 
   return (
-    <Card style={{ borderRadius: 18, marginTop: 12, border: "2px solid #1677ff", boxShadow: "0 4px 12px rgba(22, 119, 255, 0.15)" }} bodyStyle={{ padding: 16 }}>
+    <Card style={{ borderRadius: 18, marginTop: 12, border: "2px solid #1677ff", boxShadow: "0 4px 12px rgba(22, 119, 255, 0.15)" }} styles={{ body: { padding: 16 } }}>
       <Typography.Title level={5} style={{ marginTop: 0 }}>Aktiv Safar</Typography.Title>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <div>

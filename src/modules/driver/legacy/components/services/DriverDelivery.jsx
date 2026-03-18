@@ -22,7 +22,7 @@ function ActionCard({ order, onAction, cp }) {
       : null;
 
   return (
-    <Card style={{ borderRadius: 18, width: "100%" }} bodyStyle={{ padding: 14 }}>
+    <Card style={{ borderRadius: 18, width: "100%" }} styles={{ body: { padding: 14 } }}>
       <Space direction="vertical" size={10} style={{ width: "100%" }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
           <div>
@@ -142,7 +142,7 @@ export default function DriverDelivery() {
 
   return (
     <div style={{ maxWidth: 920, margin: "0 auto", padding: 16, paddingBottom: 90 }}>
-      <Card style={{ borderRadius: 18, marginBottom: 14 }} bodyStyle={{ padding: 16 }}>
+      <Card style={{ borderRadius: 18, marginBottom: 14 }} styles={{ body: { padding: 16 } }}>
         <Space direction="vertical" size={8} style={{ width: "100%" }}>
           <Title level={4} style={{ margin: 0 }}>{cp("Haydovchi — Eltish paneli")}</Title>
           <Text type="secondary">{cp("Shahar, tumanlar aro va viloyatlar aro eltish buyurtmalarini shu yerdan qabul qilasiz.")} {capability?.activeVehicle ? `${capability.activeVehicle.maxWeightKg}kg / ${capability.activeVehicle.maxVolumeM3}m³` : cp("Aktiv mashina tanlanmagan")}</Text>

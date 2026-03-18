@@ -20,7 +20,7 @@ export default function FullFilterDrawer({ open, onClose }) {
   const extendedBodyVisuals = useMemo(() => buildExtendedBodyTypeOptions().slice(0, 10), []);
 
   return (
-    <Drawer title={am("autoExtra.filterExpanded")} placement="bottom" open={open} onClose={onClose} height="84vh" bodyStyle={{ paddingBottom: 90 }}>
+    <Drawer title={am("autoExtra.filterExpanded")} placement="bottom" open={open} onClose={onClose} height="84vh" styles={{ body: { paddingBottom: 90 } }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <div><div style={{ fontSize: 12, color: "#64748b", fontWeight: 700, marginBottom: 6 }}>{am("autoExtra.query")}</div><Input value={filters.q} onChange={(e)=>patchFilters({ q: e.target.value })} placeholder="Gentra, Cobalt..." /></div>
         <div><div style={{ fontSize: 12, color: "#64748b", fontWeight: 700, marginBottom: 6 }}>{am("autoExtra.city")}</div><Select value={filters.city || undefined} onChange={(v)=>patchFilters({ city: v })} allowClear style={{ width:"100%" }} options={CITIES.map((x)=>({value:x,label:x}))} /></div>

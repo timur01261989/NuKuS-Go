@@ -140,7 +140,7 @@ export default function DetailsPage() {
       <GallerySlider images={car.images || []} />
 
       <div style={{ padding: "14px 16px 0" }}>
-        <Card style={{ borderRadius: 22, border: "1px solid #e2e8f0", boxShadow: "0 14px 34px rgba(15,23,42,.05)" }} bodyStyle={{ padding: 16 }}>
+        <Card style={{ borderRadius: 22, border: "1px solid #e2e8f0", boxShadow: "0 14px 34px rgba(15,23,42,.05)" }} styles={{ body: { padding: 16 } }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
             <div>
               <div style={{ fontWeight: 900, color: "#0f172a", fontSize: 18 }}>Bu e’lonni tushunish uchun 3 narsa kifoya</div>
@@ -159,7 +159,7 @@ export default function DetailsPage() {
       </div>
 
       <div style={{ padding: "0 16px", marginTop: 14 }}>
-        <Card style={{ borderRadius: 22, border: "1px solid #e2e8f0", overflow: "hidden", background: "linear-gradient(135deg,#fff7ed 0%,#ffffff 55%,#eff6ff 100%)", boxShadow: "0 16px 36px rgba(15,23,42,.05)" }} bodyStyle={{ padding: 16 }}>
+        <Card style={{ borderRadius: 22, border: "1px solid #e2e8f0", overflow: "hidden", background: "linear-gradient(135deg,#fff7ed 0%,#ffffff 55%,#eff6ff 100%)", boxShadow: "0 16px 36px rgba(15,23,42,.05)" }} styles={{ body: { padding: 16 } }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
             <div>
               <div style={{ fontWeight: 900, color: "#0f172a", fontSize: 18 }}>Luxury qaror paneli</div>
@@ -180,7 +180,7 @@ export default function DetailsPage() {
 
 
 <div style={{ padding: "0 16px", marginTop: 14 }}>
-  <Card style={{ borderRadius: 22, border: "1px solid #e2e8f0", boxShadow: "0 16px 36px rgba(15,23,42,.05)" }} bodyStyle={{ padding: 16 }}>
+  <Card style={{ borderRadius: 22, border: "1px solid #e2e8f0", boxShadow: "0 16px 36px rgba(15,23,42,.05)" }} styles={{ body: { padding: 16 } }}>
     <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
       <div>
         <div style={{ fontWeight: 900, color: "#0f172a", fontSize: 18 }}>Marketplace decision center</div>
@@ -251,7 +251,7 @@ export default function DetailsPage() {
         </div>
 
         <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
-          <Card style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 14 }}>
+          <Card style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} styles={{ body: { padding: 14 } }}>
             <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
               <img src={vinInsight.asset} alt={vinInsight.title} style={{ width: 72, height: 56, objectFit: "contain", borderRadius: 12, background: "#f8fafc", padding: 8 }} />
               <div>
@@ -261,7 +261,7 @@ export default function DetailsPage() {
             </div>
           </Card>
 
-          <Card style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 14 }}>
+          <Card style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} styles={{ body: { padding: 14 } }}>
             <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
               <img src={inspectionCertificate.image} alt={inspectionCertificate.title} style={{ width: 72, height: 56, objectFit: "contain", borderRadius: 12, background: "#f8fafc", padding: 8 }} />
               <div style={{ flex: 1 }}>
@@ -276,7 +276,7 @@ export default function DetailsPage() {
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
             {extendedSignals.map((item) => (
-              <Card key={item.key} style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 14 }}>
+              <Card key={item.key} style={{ borderRadius: 18, border: "1px solid #e2e8f0" }} styles={{ body: { padding: 14 } }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
                   <div>
                     <div style={{ fontWeight: 900, color: "#0f172a" }}>{item.title}</div>
@@ -348,14 +348,14 @@ export default function DetailsPage() {
 
         <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
           {ownershipEstimate.map((item) => (
-            <Card key={item.key} style={{ borderRadius: 18, border: `1px solid ${item.tone}22`, background: `${item.tone}0D` }} bodyStyle={{ padding: 14 }}>
+            <Card key={item.key} style={{ borderRadius: 18, border: `1px solid ${item.tone}22`, background: `${item.tone}0D` }} styles={{ body: { padding: 14 } }}>
               <div style={{ fontSize: 12, color: "#64748b" }}>{item.label}</div>
               <div style={{ marginTop: 8, fontWeight: 900, color: "#0f172a" }}>{item.value}</div>
             </Card>
           ))}
         </div>
 
-        <Card style={{ marginTop: 16, borderRadius: 18, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 16 }}>
+        <Card style={{ marginTop: 16, borderRadius: 18, border: "1px solid #e2e8f0" }} styles={{ body: { padding: 16 } }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
             <div>
               <div style={{ fontWeight: 900, color: "#0f172a" }}>Qarorni yengillashtiruvchi checklist</div>
@@ -374,7 +374,7 @@ export default function DetailsPage() {
         </Card>
 
         <div style={{ marginTop: 16 }}>
-          <Card style={{ borderRadius: 20, border: "1px solid #e2e8f0" }} bodyStyle={{ padding: 16 }}>
+          <Card style={{ borderRadius: 20, border: "1px solid #e2e8f0" }} styles={{ body: { padding: 16 } }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
               <div>
                 <div style={{ fontWeight: 900, color: "#0f172a" }}>Narx tushsa yoki shunga o‘xshash e’lon chiqsa signal oling</div>
