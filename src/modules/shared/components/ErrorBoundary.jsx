@@ -44,12 +44,20 @@ class ErrorBoundary extends React.Component {
     }
 
     // Ensure debug info is available even if componentDidCatch didn't run
+    const err = this.state.error;
+    const safeMessage = err?.message
+      ? String(err.message)
+      : err
+        ? Object.prototype.toString.call(err)
+        : "Unknown error";
+    const safeStack = err?.stack ? String(err.stack) : "";
+
     try {
       if (typeof window !== "undefined") {
         window.__UNIGO_LAST_ERROR = {
           name: this.state.error?.name || "Error",
-          message: this.state.error?.message || "",
-          stack: this.state.error?.stack || "",
+          message: safeMessage,
+          stack: safeStack,
         };
       }
     } catch {
@@ -60,9 +68,8 @@ class ErrorBoundary extends React.Component {
       <div style={{ padding: 16, textAlign: "center" }}>
         <h2>Something went wrong.</h2>
         <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-          {this.state.error?.stack ||
-            (this.state.error?.message ? String(this.state.error.message) : null) ||
-            String(this.state.error || "Unknown error")}
+          {safeMessage}
+          {safeStack ? "\n\n" + safeStack : ""}
         </pre>
       </div>
     );
