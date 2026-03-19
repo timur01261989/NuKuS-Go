@@ -35,8 +35,9 @@ export function formatPrice(price, currency = "UZS") {
   if (!p) return "Kelishiladi";
   
   const formatted = formatNumber(p);
-  if (currency === "USD") return ${formatted} $;
-  return ${formatted} so'm;
+  // SINTAKSIS XATO TUZATILDI: Backticklar qo'shildi
+  if (currency === "USD") return `${formatted} $`;
+  return `${formatted} so'm`;
 }
 
 /**
