@@ -130,6 +130,7 @@ export default function CreateAdWizard() {
     recommendedMin: null,
     recommendedMax: null,
   };
+  const promotePackages = buildPromotePackages(ad) || [];
 
   // 2. AI Video-Review Generatori
   const handleGenerateVideo = () => {
