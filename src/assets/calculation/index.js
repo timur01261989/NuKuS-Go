@@ -1,21 +1,40 @@
-// Auto-generated calculation assets index (batch48 phase1)
-export { default as tariffEconomy } from './tariffs/tariff-economy.webp';
-export { default as tariffComfort } from './tariffs/tariff-comfort.webp';
-export { default as tariffComfortPlus } from './tariffs/tariff-comfort-plus.webp';
-export { default as tariffBusiness } from './tariffs/tariff-business.webp';
-export { default as pricingAccess } from './pricing/pricing-access.svg';
-export { default as pricingSurgeUp } from './pricing/pricing-surge-up.svg';
-export { default as pricingDown } from './pricing/pricing-down.svg';
-export { default as pricingFair } from './pricing/pricing-fair.svg';
-export { default as pricingUp } from './pricing/pricing-up.svg';
-export { default as paymentArtCard } from './payment/payment-art-card.webp';
-export { default as paymentArtDetails } from './payment/payment-art-details.webp';
-export { default as paymentArtPro } from './payment/payment-art-pro.webp';
-export { default as promoCodeEntry } from './promo/promo-code-entry.svg';
-export { default as promoBadgeFill } from './promo/promo-badge-fill.svg';
-export { default as promoBadgeOutline } from './promo/promo-badge-outline.svg';
-export { default as promoGoalFlag } from './promo/promo-goal-flag.webp';
-export { default as promoReferralCode } from './promo/promo-referral-code.png';
+import tariffEconomy from './tariffs/tariff-economy.webp';
+import tariffComfort from './tariffs/tariff-comfort.webp';
+import tariffComfortPlus from './tariffs/tariff-comfort-plus.webp';
+import tariffBusiness from './tariffs/tariff-business.webp';
+import pricingAccess from './pricing/pricing-access.svg';
+import pricingSurgeUp from './pricing/pricing-surge-up.svg';
+import pricingDown from './pricing/pricing-down.svg';
+import pricingFair from './pricing/pricing-fair.svg';
+import pricingUp from './pricing/pricing-up.svg';
+import paymentArtCard from './payment/payment-art-card.webp';
+import paymentArtDetails from './payment/payment-art-details.webp';
+import paymentArtPro from './payment/payment-art-pro.webp';
+import promoCodeEntry from './promo/promo-code-entry.svg';
+import promoBadgeFill from './promo/promo-badge-fill.svg';
+import promoBadgeOutline from './promo/promo-badge-outline.svg';
+import promoGoalFlag from './promo/promo-goal-flag.webp';
+import promoReferralCode from './promo/promo-referral-code.png';
+
+export {
+  tariffEconomy,
+  tariffComfort,
+  tariffComfortPlus,
+  tariffBusiness,
+  pricingAccess,
+  pricingSurgeUp,
+  pricingDown,
+  pricingFair,
+  pricingUp,
+  paymentArtCard,
+  paymentArtDetails,
+  paymentArtPro,
+  promoCodeEntry,
+  promoBadgeFill,
+  promoBadgeOutline,
+  promoGoalFlag,
+  promoReferralCode,
+};
 
 export const calculationAssets = {
   tariffs: {
