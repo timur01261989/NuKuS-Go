@@ -25,9 +25,20 @@ export function assertClientEnv() {
   const missing = [];
   if (!env.VITE_SUPABASE_URL) missing.push("VITE_SUPABASE_URL");
   if (!env.VITE_SUPABASE_ANON_KEY) missing.push("VITE_SUPABASE_ANON_KEY");
+
   if (missing.length) {
-    throw new Error(`Missing client env: ${missing.join(", ")}`);
+    const message = `Missing client env: ${missing.join(", ")}`;
+
+    if (import.meta.env.DEV) {
+      // Devda xatoni otib, tez ko‘rish uchun
+      throw new Error(message);
+    }
+
+    // Prod/Vercel’da ilovani yiqitmasdan faqat log qilamiz
+    // eslint-disable-next-line no-console
+    console.error("[client env] " + message);
   }
+
   return env;
 }
 
