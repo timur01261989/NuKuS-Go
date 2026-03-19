@@ -85,7 +85,7 @@ function AppRouterComponent({ appRole }) {
           {/* Client Segment (Protected) */}
           <Route element={<AuthGuard />}>
             <Route element={<ClientLayout />}>
-              {ClientRoutes()}
+              <Route path="/*" element={<ClientRoutes />} />
             </Route>
           </Route>
 
@@ -96,7 +96,7 @@ function AppRouterComponent({ appRole }) {
           {/* Driver Segment (Protected) */}
           <Route element={<DriverGuard />}>
             <Route element={<DriverLayout />}>
-              {DriverRoutes()}
+              <Route path="/*" element={<DriverRoutes />} />
             </Route>
           </Route>
 
