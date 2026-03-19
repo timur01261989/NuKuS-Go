@@ -82,20 +82,10 @@ function AppRouterComponent({ appRole }) {
           <Route path={ROUTES.referral.invite} element={<ReferralInviteLanding />} />
           <Route path={ROUTES.auth.resetPassword} element={<ResetPasswordPage />} />
 
-          {/* Client Segment (Protected & Isolated) */}
+          {/* Client Segment (Protected) */}
           <Route element={<AuthGuard />}>
             <Route element={<ClientLayout />}>
-              <Route
-                path="/*"
-                element={
-                  // Route-level ErrorBoundary + Suspense to isolate client routes
-                  <ErrorBoundary>
-                    <Suspense fallback={<RouteFallback />}>
-                      <ClientRoutes />
-                    </Suspense>
-                  </ErrorBoundary>
-                }
-              />
+              {ClientRoutes()}
             </Route>
           </Route>
 
@@ -103,20 +93,10 @@ function AppRouterComponent({ appRole }) {
           <Route path={ROUTES.driver.register} element={<DriverRegisterPage />} />
           <Route path={ROUTES.driver.pending} element={<DriverPendingPage />} />
 
-          {/* Driver Segment (Protected & Isolated) */}
+          {/* Driver Segment (Protected) */}
           <Route element={<DriverGuard />}>
             <Route element={<DriverLayout />}>
-              <Route
-                path="/*"
-                element={
-                  // Route-level ErrorBoundary + Suspense to isolate driver routes
-                  <ErrorBoundary>
-                    <Suspense fallback={<RouteFallback />}>
-                      <DriverRoutes />
-                    </Suspense>
-                  </ErrorBoundary>
-                }
-              />
+              {DriverRoutes()}
             </Route>
           </Route>
 
