@@ -4,6 +4,9 @@ import {
   getShareBaseUrl,
   normalizeReferralCode,
 } from "./referralLinkService.helpers.js";
+
+// Re-export normalizeReferralCode so callers can import it directly from here
+export { normalizeReferralCode } from "./referralLinkService.helpers.js";
 import {
   BROWSER_DEVICE_SEED_KEY,
   OWN_REFERRAL_SNAPSHOT_STORAGE_KEY,
