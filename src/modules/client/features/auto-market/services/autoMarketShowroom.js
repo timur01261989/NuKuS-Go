@@ -5,7 +5,7 @@ export function buildShowroomConciergeDeck(items = [], filters = {}) {
   const list = Array.isArray(items) ? items.filter(Boolean) : [];
   const inspected = list.filter((item) => Number(item?.inspection_score || 0) >= 85).length;
   const dealers = list.filter((item) => (item?.seller?.seller_type || item?.seller_type || item?.seller?.type) === "dealer").length;
-  const drops = list.filter((item) => buildPriceDropInsight(item?.price_history || []).dropped).length;
+  const drops = list.filter((item) => buildPriceDropInsight(item?.price_history || [])?.dropped).length;
   return {
     title: "Showroom + concierge",
     subtitle: "Tanlash, tekshirish va uchrashuvni premium maslahatchi bilan ishlayotgandek soddalashtiring.",
@@ -43,7 +43,7 @@ export function buildShowroomConciergePlan(car = {}) {
     {
       key: "price",
       title: "2. Narxni baholang",
-      text: `${dealMeta.label}. Baholangan qiymat ${formatPrice(deal.estimatedValue || car?.price || 0, car?.currency || "USD")}${priceDrop.dropped ? ". Narx pasaygan." : ""}`,
+      text: `${dealMeta.label}. Baholangan qiymat ${formatPrice(deal.estimatedValue || car?.price || 0, car?.currency || "USD")}${priceDrop?.dropped ? ". Narx pasaygan." : ""}`,
       tone: dealMeta.color,
     },
     {
@@ -79,7 +79,7 @@ export function buildCreateShowroomChecklist(ad = {}) {
 
 export function buildFavoritesConciergeHints(items = []) {
   const list = Array.isArray(items) ? items.filter(Boolean) : [];
-  const drops = list.filter((item) => buildPriceDropInsight(item?.price_history || []).dropped).length;
+  const drops = list.filter((item) => buildPriceDropInsight(item?.price_history || [])?.dropped).length;
   return {
     title: "Concierge kuzatuv",
     text: drops ? `${drops} ta saqlangan e'londa narx harakati bor. Eng foydali variantlarni bugun solishtiring.` : "Saqlangan e'lonlarni narx, ishonch va uchrashuv bo‘yicha saralab boring.",
