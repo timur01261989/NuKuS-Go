@@ -28,6 +28,7 @@ export default function CreateAdWizard() {
   const titles = am("create.steps");
   const nav = useNavigate();
   const { step, setStep, ad, reset, saveDraftNow, getDraftMeta, completeness } = useCreateAd();
+  const draftMeta = getDraftMeta();
   const premiumSteps = useMemo(() => buildPremiumCreateSteps(ad), [ad]);
   const [preview, setPreview] = useState(false);
   const showroomChecklist = useMemo(() => buildCreateShowroomChecklist(ad), [ad]);
