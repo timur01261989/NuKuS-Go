@@ -1,39 +1,61 @@
-import React, { memo } from 'react';
+import React, { memo, useMemo } from 'react';
 import Lottie from 'lottie-react';
 import { lottieAssets } from '@/assets/lottie';
 import { assetSizes } from '@/assets/assetPolish';
 import { integratedAssets } from '@/assets/integrated';
 import { securityAssets } from '@/assets/security';
 import { paymentAssets } from '@/assets/payment';
+import { essentialsAssets } from '@/assets/essentials';
 
 /**
- * AuthHero.jsx — Финальная версия для UniGo.
- * Все отладочные элементы и лишние виджеты (Badges/Score) удалены.
- * Реализована строгая визуальная иерархия и оптимизация рендеринга.
+ * AuthHero.jsx — UniGo Super App brending va xavfsizlik indikatorlari.
+ * Senior Architect talabi: To'liq optimallashgan va xatolarga chidamli.
  */
-function AuthHero({ t }) {
+function AuthHero({ t, authTrustState }) {
+  // Verifikatsiya qadamlarini xavfsiz render qilish uchun memoizatsiya
+  const verificationSteps = useMemo(() => [
+    {
+      key: 'phone',
+      title: t?.phoneOtp || 'PHONE',
+      description: 'OTP',
+      icon: securityAssets.auth?.authIconPhone
+    },
+    {
+      key: 'document',
+      title: t?.documentVerify || 'DOCUMENT',
+      description: 'Verify',
+      icon: essentialsAssets.auth?.authMaskLicense
+    },
+    {
+      key: 'trust',
+      title: t?.trustSecure || 'TRUST',
+      description: 'Secure',
+      icon: securityAssets.trust?.trustCertificate
+    }
+  ], [t]);
+
   return (
     <header className="text-center mb-8" data-purpose="brand-header">
       <div className="relative overflow-hidden rounded-[40px] border border-white/40 bg-white/60 px-6 py-10 shadow-[0_20px_60px_rgba(15,23,42,0.05)] backdrop-blur-xl">
-        {/* Фоновый слой для глубины */}
+        {/* Orqa fon qatlami (xavfsiz yuklanish) */}
         <img
-          src={securityAssets.auth.authOnboardingSelfRegister || integratedAssets.auth.onboardingTaxi}
+          src={securityAssets.auth?.authOnboardingSelfRegister || integratedAssets.auth?.onboardingTaxi}
           alt=""
           className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-5"
         />
         
         <div className="relative z-10 flex flex-col items-center">
-          {/* Центральный визуальный элемент (Lottie) */}
+          {/* Lottie animatsiyasi */}
           <div className={`mb-6 inline-flex items-center justify-center overflow-hidden rounded-[32px] bg-white/90 shadow-sm ring-1 ring-slate-100 ${assetSizes.authHeroShell}`}>
             <Lottie 
-              animationData={lottieAssets.auth.lock} 
+              animationData={lottieAssets.auth?.lock} 
               loop 
               autoplay 
               className={assetSizes.authHeroAnimation} 
             />
           </div>
 
-          {/* Профессиональные индикаторы статуса */}
+          {/* Brend indikatorlari */}
           <div className="mb-6 flex items-center justify-center gap-5">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-slate-50">
               <img 
@@ -44,7 +66,7 @@ function AuthHero({ t }) {
             </div>
             <div className="relative">
               <img 
-                src={integratedAssets.auth.userOrb} 
+                src={integratedAssets.auth?.userOrb} 
                 alt="User" 
                 className="h-14 w-14 rounded-full object-cover ring-4 ring-white shadow-lg" 
               />
@@ -58,7 +80,6 @@ function AuthHero({ t }) {
             </div>
           </div>
 
-          {/* Текстовая группа */}
           <div className="space-y-2">
             <h1 className="text-4xl font-black text-slate-900 tracking-tight">
               {t?.appName || 'UniGo'}
@@ -70,11 +91,34 @@ function AuthHero({ t }) {
         </div>
       </div>
 
-      {/* АРХИТЕКТУРНОЕ РЕШЕНИЕ:
-        Блок со статусами "PHONE OTP", "DOCUMENT Verify" и "Score" полностью вырезан. 
-        Эти данные являются приватными и должны отображаться только внутри защищенного профиля
-        после успешной авторизации, чтобы не перегружать когнитивную нагрузку на входе.
-      */}
+      {/* Trust Badges — Xatolarni oldini olish uchun xavfsiz map */}
+      <div className="mt-4 overflow-hidden rounded-[28px] border border-white/30 bg-white/70 p-4 shadow-sm">
+        <div className="grid grid-cols-3 gap-2">
+          {verificationSteps.map((step) => (
+            <div key={step.key} className="rounded-2xl bg-white/70 px-3 py-3 shadow-sm border border-white/50">
+              <img
+                src={step.icon}
+                alt=""
+                className="mx-auto mb-2 h-5 w-5 object-contain opacity-70"
+              />
+              <div className="text-[10px] font-black uppercase tracking-wider text-slate-800">{step.title}</div>
+              <div className="text-[9px] font-medium text-slate-400">{step.description}</div>
+            </div>
+          ))}
+        </div>
+
+        {authTrustState && (
+          <div className="mt-4 flex items-center justify-between rounded-2xl bg-slate-900 px-4 py-3 text-white">
+            <div className="flex items-center gap-3">
+              <div className="h-2 w-2 animate-pulse rounded-full bg-orange-500" />
+              <span className="text-[11px] font-bold uppercase tracking-widest">{authTrustState.level || 'Growing'}</span>
+            </div>
+            <div className="text-[11px] font-black text-orange-500 uppercase">
+              Score {authTrustState.profileScore || 0}
+            </div>
+          </div>
+        )}
+      </div>
     </header>
   );
 }
