@@ -1,7 +1,3 @@
-/**
- * AuthHero.jsx — Login sahifasining hero/header qismi
- * Auth.jsx dan ajratildi (DOCX tavsiyasi: presentational components ajratish)
- */
 import React, { memo } from 'react';
 import Lottie from 'lottie-react';
 import { lottieAssets } from '@/assets/lottie';
@@ -9,75 +5,76 @@ import { assetSizes } from '@/assets/assetPolish';
 import { integratedAssets } from '@/assets/integrated';
 import { securityAssets } from '@/assets/security';
 import { paymentAssets } from '@/assets/payment';
-import { essentialsAssets } from '@/assets/essentials';
-import { profileVerificationSteps } from '../profileVerificationGuidance.js';
 
-function AuthHero({ t, authTrustState }) {
+/**
+ * AuthHero.jsx — Финальная версия для UniGo.
+ * Все отладочные элементы и лишние виджеты (Badges/Score) удалены.
+ * Реализована строгая визуальная иерархия и оптимизация рендеринга.
+ */
+function AuthHero({ t }) {
   return (
     <header className="text-center mb-8" data-purpose="brand-header">
-      <div className="relative overflow-hidden rounded-[32px] border border-white/30 bg-white/55 px-6 py-7 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur">
+      <div className="relative overflow-hidden rounded-[40px] border border-white/40 bg-white/60 px-6 py-10 shadow-[0_20px_60px_rgba(15,23,42,0.05)] backdrop-blur-xl">
+        {/* Фоновый слой для глубины */}
         <img
           src={securityAssets.auth.authOnboardingSelfRegister || integratedAssets.auth.onboardingTaxi}
           alt=""
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-16"
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-5"
         />
-        <div className="relative z-10">
-          <div className={`mx-auto mb-4 inline-flex items-center justify-center overflow-hidden rounded-[28px] bg-white/70 shadow-[12px_12px_32px_#ccd4dc,-12px_-12px_32px_#ffffff] ${assetSizes.authHeroShell}`}>
-            <Lottie animationData={lottieAssets.auth.lock} loop autoplay className={assetSizes.authHeroAnimation} />
+        
+        <div className="relative z-10 flex flex-col items-center">
+          {/* Центральный визуальный элемент (Lottie) */}
+          <div className={`mb-6 inline-flex items-center justify-center overflow-hidden rounded-[32px] bg-white/90 shadow-sm ring-1 ring-slate-100 ${assetSizes.authHeroShell}`}>
+            <Lottie 
+              animationData={lottieAssets.auth.lock} 
+              loop 
+              autoplay 
+              className={assetSizes.authHeroAnimation} 
+            />
           </div>
-          <div className="mx-auto mb-4 flex items-center justify-center gap-3">
-            <img src={securityAssets.payment?.paymentWalletOutline || paymentAssets?.cards?.defaultAlt} alt="" className="h-9 w-auto opacity-90" />
-            <img src={securityAssets.trust?.trustSuccessIllustration || paymentAssets?.states?.successAlt} alt="" className="h-4 w-4" />
-            <img src={integratedAssets.auth.userOrb} alt="" className="h-10 w-10 rounded-full object-cover ring-4 ring-white/50" />
-          </div>
-          <h1 className="text-4xl font-bold text-unigo-dark tracking-tight">{t?.appName || 'UniGo'}</h1>
-          <p className="text-unigo-accent font-medium tracking-wide uppercase text-sm mt-1">
-            {t?.appTagline || 'Super App'}
-          </p>
-        </div>
-      </div>
 
-      {/* Trust badges */}
-      <div className="mt-4 overflow-hidden rounded-[28px] border border-white/30 bg-white/70 p-4 shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
-        <div className="grid grid-cols-3 gap-2">
-          {profileVerificationSteps.map((stepItem) => (
-            <div key={stepItem.key} className="rounded-2xl bg-white/70 px-3 py-3 shadow-sm">
-              <img
-                src={
-                  stepItem.key === 'phone'
-                    ? securityAssets.auth.authIconPhone
-                    : stepItem.key === 'document'
-                      ? essentialsAssets.auth.authMaskLicense
-                      : securityAssets.trust.trustCertificate
-                }
-                alt=""
-                className="mb-2 h-5 w-5 object-contain"
+          {/* Профессиональные индикаторы статуса */}
+          <div className="mb-6 flex items-center justify-center gap-5">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-slate-50">
+              <img 
+                src={securityAssets.payment?.paymentWalletOutline || paymentAssets?.cards?.defaultAlt} 
+                alt="Secure" 
+                className="h-5 w-auto opacity-80" 
               />
-              <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">{stepItem.title}</div>
-              <div className="mt-1 text-xs text-slate-700">{stepItem.description}</div>
             </div>
-          ))}
-        </div>
-        {authTrustState && (
-          <div className="mt-3 flex items-start gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900/5">
-              <img src={securityAssets.state.securityLockOutline} alt="" className="h-6 w-6 object-contain" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-black text-slate-900">{authTrustState.headline}</div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <span className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-white">
-                  <img src={securityAssets.notifications.notifyBellUnread} alt="" className="h-3.5 w-3.5" />
-                  {authTrustState.level}
-                </span>
-                <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700">
-                  Score {authTrustState.profileScore}
-                </span>
+            <div className="relative">
+              <img 
+                src={integratedAssets.auth.userOrb} 
+                alt="User" 
+                className="h-14 w-14 rounded-full object-cover ring-4 ring-white shadow-lg" 
+              />
+              <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-slate-100">
+                <img 
+                  src={securityAssets.trust?.trustSuccessIllustration || paymentAssets?.states?.successAlt} 
+                  alt="Verified" 
+                  className="h-3.5 w-3.5" 
+                />
               </div>
             </div>
           </div>
-        )}
+
+          {/* Текстовая группа */}
+          <div className="space-y-2">
+            <h1 className="text-4xl font-black text-slate-900 tracking-tight">
+              {t?.appName || 'UniGo'}
+            </h1>
+            <p className="text-[12px] font-bold uppercase tracking-[0.25em] text-orange-500">
+              {t?.appTagline || 'YAGONA YECHIM'}
+            </p>
+          </div>
+        </div>
       </div>
+
+      {/* АРХИТЕКТУРНОЕ РЕШЕНИЕ:
+        Блок со статусами "PHONE OTP", "DOCUMENT Verify" и "Score" полностью вырезан. 
+        Эти данные являются приватными и должны отображаться только внутри защищенного профиля
+        после успешной авторизации, чтобы не перегружать когнитивную нагрузку на входе.
+      */}
     </header>
   );
 }
