@@ -9,8 +9,6 @@ class ErrorBoundary extends React.Component {
       componentStack: "",
     };
 
-    // componentDidCatch() ichida setState async bo'lishi mumkin.
-    // Shuning uchun render()da darhol ko'rinishi uchun componentStack'ni instance variablega yozamiz.
     this.lastComponentStack = "";
   }
 
@@ -22,13 +20,23 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, info) {
+    // Konsolga to‘liq log
     console.error("[ErrorBoundary] render failure", {
       error,
       info,
       at: new Date().toISOString(),
     });
 
-    // Debug helper: Vercel productionda minified stack bo'lsa ham xatoni aniq ko'rish uchun
+    // Monitoring servislarga yuborish (agar mavjud bo‘lsa)
+    try {
+      if (typeof window !== "undefined" && window.Sentry) {
+        window.Sentry.captureException(error, { extra: info });
+      }
+    } catch {
+      // ignore
+    }
+
+    // Debug helper: brauzerda oxirgi xatoni saqlash
     try {
       if (typeof window !== "undefined") {
         window.__UNIGO_LAST_ERROR = {
@@ -42,25 +50,19 @@ class ErrorBoundary extends React.Component {
       // ignore
     }
 
-    try {
-      this.setState({ componentStack: info?.componentStack || "" });
-    } catch {
-      // ignore
-    }
-
-    try {
-      this.lastComponentStack = info?.componentStack || "";
-    } catch {
-      // ignore
-    }
+    this.setState({ componentStack: info?.componentStack || "" });
+    this.lastComponentStack = info?.componentStack || "";
   }
+
+  handleRetry = () => {
+    this.setState({ hasError: false, error: null, componentStack: "" });
+  };
 
   render() {
     if (!this.state.hasError) {
       return this.props.children;
     }
 
-    // Ensure debug info is available even if componentDidCatch didn't run
     const err = this.state.error;
     const safeMessage = err?.message
       ? String(err.message)
@@ -68,12 +70,12 @@ class ErrorBoundary extends React.Component {
         ? Object.prototype.toString.call(err)
         : "Unknown error";
     const safeStack = err?.stack ? String(err.stack) : "";
-    const safeComponentStack = this.lastComponentStack
-      ? String(this.lastComponentStack)
-      : this.state.componentStack
-        ? String(this.state.componentStack)
-        : "";
+    const safeComponentStack =
+      this.lastComponentStack ||
+      this.state.componentStack ||
+      "";
 
+    // Debug helper: oxirgi xatoni globalga yozish
     try {
       if (typeof window !== "undefined") {
         window.__UNIGO_LAST_ERROR = {
@@ -95,6 +97,20 @@ class ErrorBoundary extends React.Component {
           {safeStack ? "\n\n" + safeStack : ""}
           {safeComponentStack ? "\n\n" + safeComponentStack : ""}
         </pre>
+        <button
+          onClick={this.handleRetry}
+          style={{
+            marginTop: 12,
+            padding: "8px 16px",
+            backgroundColor: "#f97316",
+            color: "#fff",
+            border: "none",
+            borderRadius: 6,
+            cursor: "pointer",
+          }}
+        >
+          Retry
+        </button>
       </div>
     );
   }
