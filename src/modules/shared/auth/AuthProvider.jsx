@@ -1,6 +1,17 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { bootstrapReferralSummary } from "@/services/referralApi.js";
-import { clearOwnReferralSnapshot, persistOwnReferralSnapshot } from "@/services/referralLinkService.js";
+import {
+  clearOwnReferralSnapshot,
+  persistOwnReferralSnapshot,
+} from "@/services/referralLinkService.js";
 import {
   buildSessionFingerprint,
   getSession,
@@ -45,9 +56,9 @@ export function AuthProvider({ children }) {
 
   const commit = useCallback((updater) => {
     if (!mountedRef.current) return;
-
     setState((previousState) => {
-      const nextState = typeof updater === "function" ? updater(previousState) : updater;
+      const nextState =
+        typeof updater === "function" ? updater(previousState) : updater;
       return {
         ...previousState,
         ...nextState,
@@ -69,8 +80,10 @@ export function AuthProvider({ children }) {
 
       try {
         const resolved = await resolveAuthSession(requestedSession, reason);
-        lastResolvedFingerprintRef.current = resolved?.lastSessionFingerprint ?? buildSessionFingerprint(requestedSession);
-        commit(resolved);
+        lastResolvedFingerprintRef.current =
+          resolved?.lastSessionFingerprint ??
+          buildSessionFingerprint(requestedSession);
+        commit(resolved || {});
       } catch (error) {
         console.error("[AuthProvider] resolveSession error", error);
         commit({
@@ -79,18 +92,7 @@ export function AuthProvider({ children }) {
           isAuthed: !!requestedSession?.user,
           session: requestedSession,
           user: requestedSession?.user ?? null,
-          profile: null,
           role: requestedSession?.user ? "client" : null,
-          isAdmin: false,
-          driver: null,
-          driverRow: null,
-          driverExists: false,
-          driverApproved: false,
-          driverApp: null,
-          application: null,
-          applicationStatus: null,
-          transportType: null,
-          allowedServices: [],
           error,
           lastResolvedUserId: requestedSession?.user?.id || null,
           lastSessionFingerprint: buildSessionFingerprint(requestedSession),
@@ -98,11 +100,13 @@ export function AuthProvider({ children }) {
         });
       } finally {
         inFlightRef.current = false;
-
         if (queuedSessionRef.current !== undefined) {
           const queuedSession = queuedSessionRef.current;
           queuedSessionRef.current = undefined;
-          if (buildSessionFingerprint(queuedSession) !== lastResolvedFingerprintRef.current) {
+          if (
+            buildSessionFingerprint(queuedSession) !==
+            lastResolvedFingerprintRef.current
+          ) {
             void resolveSession(queuedSession, "queued");
           }
         }
@@ -118,7 +122,6 @@ export function AuthProvider({ children }) {
       commit({ loading: false, authReady: true, error });
       return;
     }
-
     await resolveSession(data?.session ?? null, "manual-refetch");
   }, [commit, resolveSession]);
 
@@ -144,8 +147,9 @@ export function AuthProvider({ children }) {
           });
           return;
         }
-
-        lastResolvedFingerprintRef.current = buildSessionFingerprint(data?.session ?? null);
+        lastResolvedFingerprintRef.current = buildSessionFingerprint(
+          data?.session ?? null
+        );
         void resolveSession(data?.session ?? null, "bootstrap");
       })
       .catch((error) => {
@@ -160,53 +164,51 @@ export function AuthProvider({ children }) {
         });
       });
 
-    const { data: authSubscription } = onAuthStateChange((event, nextSession) => {
-      const fingerprint = `${event}:${buildSessionFingerprint(nextSession)}`;
+    const { data: authSubscription } = onAuthStateChange(
+      (event, nextSession) => {
+        const fingerprint = `${event}:${buildSessionFingerprint(nextSession)}`;
+        if (lastAuthEventRef.current === fingerprint) return;
+        lastAuthEventRef.current = fingerprint;
 
-      if (lastAuthEventRef.current === fingerprint) {
-        return;
+        if (authDebounceRef.current) {
+          clearTimeout(authDebounceRef.current);
+        }
+
+        authDebounceRef.current = setTimeout(() => {
+          void resolveSession(nextSession ?? null, `auth:${event || "change"}`);
+        }, 120);
       }
-      lastAuthEventRef.current = fingerprint;
-
-      if (authDebounceRef.current) {
-        clearTimeout(authDebounceRef.current);
-      }
-
-      authDebounceRef.current = setTimeout(() => {
-        void resolveSession(nextSession ?? null, `auth:${event || "change"}`);
-      }, 120);
-    });
+    );
 
     return () => {
       mountedRef.current = false;
       if (authDebounceRef.current) {
         clearTimeout(authDebounceRef.current);
       }
-      authSubscription?.subscription?.unsubscribe?.();
+      authSubscription?.unsubscribe?.();
     };
   }, [commit, resolveSession]);
 
   useEffect(() => {
-    if (!state.authReady) {
-      return;
-    }
-
+    if (!state.authReady) return;
     if (!state.isAuthed || !state.user?.id) {
       clearOwnReferralSnapshot();
       return;
     }
 
     let cancelled = false;
-
     (async () => {
       try {
         const response = await bootstrapReferralSummary();
-        if (!cancelled) {
+        if (!cancelled && response?.ok) {
           persistOwnReferralSnapshot(response);
         }
       } catch (error) {
         if (import.meta.env.DEV) {
-          console.warn('[AuthProvider] referral bootstrap skipped', error?.message || error);
+          console.warn(
+            "[AuthProvider] referral bootstrap skipped",
+            error?.message || error
+          );
         }
       }
     })();
@@ -226,7 +228,11 @@ export function AuthProvider({ children }) {
     [refetch, signOut, state]
   );
 
-  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={contextValue}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {
