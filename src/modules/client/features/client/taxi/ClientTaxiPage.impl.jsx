@@ -48,6 +48,7 @@ import { normalizeLatLng, toNum } from "./utils/latlng";
 import TaxiSearchSheet from "./TaxiSearchSheet";
 import DestinationPicker from "./DestinationPicker";
 import { haversineKm } from "../shared/geo/haversine";
+import TaxiEtaBadge from "./components/TaxiEtaBadge";
 import ClientTaxiScreen from "./containers/ClientTaxiScreen";
 import RatingModal from "@/modules/client/features/shared/components/RatingModal.jsx";
 import ClientBonusWidget from "@/modules/client/features/client/components/ClientBonusWidget.jsx";
