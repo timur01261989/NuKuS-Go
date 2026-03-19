@@ -1,0 +1,15 @@
+BATCH57_AUTO_MARKET_PREMIUM_CHANGED_FILES
+
+NEW
+- src/modules/client/features/auto-market/services/autoMarketPremium.js
+- tests/batch57-auto-market-premium.test.js
+
+UPDATED
+- src/modules/client/features/auto-market/components/Feed/CarCardHorizontal.jsx
+- src/modules/client/features/auto-market/components/Details/SellerProfile.jsx
+- src/modules/client/features/auto-market/components/Create/CreateAdWizard.jsx
+- src/modules/client/features/auto-market/pages/FeedPage.jsx
+- src/modules/client/features/auto-market/pages/DetailsPage.jsx
+- src/modules/client/features/auto-market/pages/FavoritesPage.jsx
+- src/modules/client/features/auto-market/pages/ComparePage.jsx
+- src/modules/client/features/auto-market/pages/MyAdsPage.jsx

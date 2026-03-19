@@ -1,0 +1,8 @@
+Batch69 changed files
+- src/modules/client/features/auto-market/services/autoMarketMarketplaceFinal.js
+- src/modules/client/features/auto-market/pages/DealerProfilePage.jsx
+- src/modules/client/features/auto-market/pages/FinanceOffersPage.jsx
+- src/modules/client/features/auto-market/pages/AutoMarketNotificationsPage.jsx
+- src/modules/client/features/auto-market/pages/NotificationRulesPage.jsx
+- src/modules/client/features/auto-market/AutoMarketEntry.jsx
+- tests/batch69-auto-market-dealer-finance-notification-rules.test.js

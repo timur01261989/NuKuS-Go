@@ -1,0 +1,16 @@
+BATCH60 AUTO MARKET BOOKING + LOCAL PAYMENT + SELLER CRM
+
+Added:
+- src/modules/client/features/auto-market/services/autoMarketBooking.js
+- src/modules/client/features/auto-market/services/autoMarketLocalPayments.js
+- src/modules/client/features/auto-market/services/autoMarketSellerCrm.js
+- src/modules/client/features/auto-market/components/Details/BookingFlowCard.jsx
+- src/modules/client/features/auto-market/components/Details/LocalPaymentOptionsCard.jsx
+- src/modules/client/features/auto-market/components/Seller/SellerCrmBoard.jsx
+- tests/batch60-auto-market-booking-payments-crm.test.js
+
+Updated:
+- src/modules/client/features/auto-market/pages/DetailsPage.jsx
+- src/modules/client/features/auto-market/components/Details/SellerProfile.jsx
+- src/modules/client/features/auto-market/pages/MyAdsPage.jsx
+- src/modules/client/features/auto-market/components/Create/CreateAdWizard.jsx

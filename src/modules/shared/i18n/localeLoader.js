@@ -1,9 +1,9 @@
-const uzLatn = "./uz_lotin.json";
-const uzKir = "./uz_kirill.json";
-const qqLatn = "./qq_lotin.json";
-const qqKir = "./qq_kirill.json";
-const ru = "./ru.json";
-const en = "./en.json";
+import uzLatn from './uz_lotin.json';
+import uzKir from './uz_kirill.json';
+import qqLatn from './qq_lotin.json';
+import qqKir from './qq_kirill.json';
+import ru from './ru.json';
+import en from './en.json';
 import { DEFAULT_LANGUAGE } from './languages';
 
 export const translations = {

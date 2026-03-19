@@ -1,0 +1,15 @@
+BATCH58_AUTO_MARKET_LUXURY_CHANGED_FILES.txt
+
+Added:
+- src/modules/client/features/auto-market/services/autoMarketLuxury.js
+- tests/batch58-auto-market-luxury.test.js
+
+Updated:
+- src/modules/client/features/auto-market/pages/FeedPage.jsx
+- src/modules/client/features/auto-market/pages/DetailsPage.jsx
+- src/modules/client/features/auto-market/pages/FavoritesPage.jsx
+- src/modules/client/features/auto-market/pages/ComparePage.jsx
+- src/modules/client/features/auto-market/pages/MyAdsPage.jsx
+- src/modules/client/features/auto-market/components/Feed/CarCardHorizontal.jsx
+- src/modules/client/features/auto-market/components/Details/SellerProfile.jsx
+- src/modules/client/features/auto-market/components/Create/CreateAdWizard.jsx

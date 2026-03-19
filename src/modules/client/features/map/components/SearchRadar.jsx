@@ -1,6 +1,6 @@
 import React from "react";
 import Lottie from "lottie-react";
-const radarAnim = "/assets/lottie/radar_animation.json";
+import radarAnim from "../../../assets/lottie/radar_animation.json";
 
 const SearchRadar = ({ isVisible }) => {
   if (!isVisible) return null;

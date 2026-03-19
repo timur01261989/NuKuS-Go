@@ -1,0 +1,27 @@
+
+BATCH63 AUTO MARKET BUYER CORE PHASE2
+
+NEW FILES
+- src/modules/client/features/auto-market/pages/SavedAlertsPage.jsx
+- tests/batch63-auto-market-buyer-core-phase2.test.js
+
+UPDATED FILES
+- src/modules/client/features/auto-market/services/autoMarketBuyerCore.js
+- src/modules/client/features/auto-market/context/MarketContext.jsx
+- src/modules/client/features/auto-market/services/marketApi.seed.js
+- src/modules/client/features/auto-market/AutoMarketEntry.jsx
+- src/modules/client/features/auto-market/components/Filters/FullFilterDrawer.jsx
+- src/modules/client/features/auto-market/components/Feed/SmartFilterBar.jsx
+- src/modules/client/features/auto-market/pages/FeedPage.jsx
+- src/modules/client/features/auto-market/pages/SavedSearchesPage.jsx
+- src/modules/client/features/auto-market/pages/FavoritesPage.jsx
+- src/modules/client/features/auto-market/pages/DetailsPage.jsx
+- src/modules/client/features/auto-market/pages/ComparePage.jsx
+
+SUMMARY
+- saved alerts page and route added
+- advanced buyer filters expanded
+- feed alert/save actions expanded
+- favorites and compare alert actions added
+- detail page price signal CTA added
+- mock filter engine expanded for advanced filters

@@ -1,0 +1,7 @@
+Phase 3 city taxi product strengthening
+- Added shared taxi product signal helpers
+- Added ETA freshness and route fallback messaging
+- Added cancel reasons into client taxi cancel flow
+- Added driver heartbeat/connection badge
+- Added driver daily snapshot metrics
+- Added phase3 regression tests

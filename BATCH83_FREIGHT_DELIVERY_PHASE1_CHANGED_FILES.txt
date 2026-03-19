@@ -1,0 +1,17 @@
+
+Batch83 Freight + Delivery Phase1 Stabilized
+
+New files
+- src/modules/shared/domain/delivery/statusMap.js
+- src/modules/shared/domain/freight/statusMap.js
+- src/modules/shared/domain/logistics/logisticsLogger.js
+- tests/batch83-freight-delivery-phase1.test.js
+
+Updated files
+- src/modules/client/features/client/delivery/services/deliveryApi.js
+- src/modules/client/features/client/delivery/services/deliveryStore.js
+- src/modules/driver/legacy/delivery-integration/services/integrationApi.js
+- src/modules/driver/legacy/delivery-integration/hooks/useParcelSocket.js
+- src/modules/driver/legacy/freight/FreightPage.helpers.jsx
+- src/modules/driver/legacy/freight/hooks/useFreightSocket.js
+- src/modules/client/features/client/freight/ClientFreightPage.jsx

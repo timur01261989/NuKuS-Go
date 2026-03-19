@@ -1,7 +1,7 @@
 import React from "react";
 import { Card, Button } from "antd";
-const calendarIcon = "@/assets/auto-market/pro/reservation/reservation-calendar.svg";
-const callIcon = "@/assets/auto-market/pro/reservation/reservation-call.svg";
+import calendarIcon from "@/assets/auto-market/pro/reservation/reservation-calendar.svg";
+import callIcon from "@/assets/auto-market/pro/reservation/reservation-call.svg";
 import reservationHero from "@/assets/auto-market/pro/reservation/reservation-hero-button.png";
 
 export default function AppointmentBookingCard({ seller, onCall }) {

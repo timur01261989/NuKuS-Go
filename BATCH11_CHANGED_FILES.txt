@@ -1,0 +1,9 @@
+src/modules/driver/legacy/components/DriverHome.jsx
+src/modules/driver/legacy/components/DriverHome.helpers.jsx
+src/modules/client/pages/pages/Dashboard.jsx
+src/modules/client/pages/pages/dashboard.helpers.jsx
+server/api/freight.js
+server/api/freight.shared.js
+tests/batch11-structure.test.js
+PATCH_NOTES_BATCH11_APPLIED.md
+BATCH11_CHANGED_FILES.txt

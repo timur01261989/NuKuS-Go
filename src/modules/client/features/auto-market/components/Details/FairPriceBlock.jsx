@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { Card, Progress, Tag } from "antd";
 import { RobotOutlined } from "@ant-design/icons";
 import { evaluateInstantMarketValue, getDealBadgeMeta } from "../../services/instantMarketValue";
-const estimateVisual = "@/assets/auto-market/pro/pricing/price-estimate.svg";
+import estimateVisual from "@/assets/auto-market/pro/pricing/price-estimate.svg";
 import trendDown from "@/assets/auto-market/pro/pricing/price-trend-down.png";
 import trendUp from "@/assets/auto-market/pro/pricing/price-trend-up.png";
 

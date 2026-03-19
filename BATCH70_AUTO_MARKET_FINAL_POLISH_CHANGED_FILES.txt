@@ -1,0 +1,16 @@
+BATCH70 AUTO MARKET FINAL POLISH
+
+New files:
+- src/modules/client/features/auto-market/services/autoMarketFinalPolish.js
+- src/modules/client/features/auto-market/pages/AutoMarketHubPage.jsx
+- tests/batch70-auto-market-final-polish.test.js
+- BATCH70_AUTO_MARKET_FINAL_POLISH_CHANGED_FILES.txt
+
+Updated files:
+- src/modules/client/features/auto-market/AutoMarketEntry.jsx
+- src/modules/client/features/auto-market/pages/FeedPage.jsx
+- src/modules/client/features/auto-market/pages/DetailsPage.jsx
+- src/modules/client/features/auto-market/pages/MyAdsPage.jsx
+- src/modules/client/features/auto-market/pages/DealerProfilePage.jsx
+- src/modules/client/features/auto-market/pages/FinanceOffersPage.jsx
+- src/modules/client/features/auto-market/pages/AutoMarketNotificationsPage.jsx

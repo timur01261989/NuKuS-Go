@@ -1,7 +1,7 @@
 import React from "react";
 import { Card } from "antd";
 import loanVisual from "@/assets/auto-market/pro/finance/finance-loan-calculator.png";
-const screeningVisual = "@/assets/auto-market/pro/finance/finance-screening.svg";
+import screeningVisual from "@/assets/auto-market/pro/finance/finance-screening.svg";
 import { buildFinanceHighlights } from "../../services/financeEstimator";
 
 export default function FinanceSnapshotCard({ car }) {

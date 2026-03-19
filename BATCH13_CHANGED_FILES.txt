@@ -1,0 +1,10 @@
+PATCH_NOTES_BATCH13_APPLIED.md
+src/modules/client/pages/pages/MainPage.jsx
+src/modules/client/pages/pages/mainPage.sections.jsx
+src/modules/driver/legacy/DriverRegistration/DriverRegister.jsx
+src/modules/driver/legacy/DriverRegistration/driverRegister.helpers.jsx
+src/modules/client/features/client/taxi/hooks/useTaxiOrder.core.js
+src/modules/client/features/client/taxi/hooks/useTaxiOrder.core.helpers.js
+src/modules/client/features/client/components/ClientOrderCreate.jsx
+src/modules/client/features/client/components/clientOrderCreate.sections.jsx
+tests/batch13-structure.test.js

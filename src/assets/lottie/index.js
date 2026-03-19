@@ -1,13 +1,13 @@
-const authOtpChallenge = "./auth/auth-otp-challenge.json";
-const authLock = "./auth/auth-lock.json";
-const statusAwaitLight = "./status/status-await-light.json";
-const statusAwaitDark = "./status/status-await-dark.json";
-const statusResult = "./status/status-result.json";
-const statusConfetti = "./status/status-confetti.json";
-const paymentCardBind = "./payment/payment-card-bind.json";
-const paymentCardCvv = "./payment/payment-card-cvv.json";
-const paymentChallengeFooter = "./payment/payment-challenge-footer.json";
-const paymentBankSelect = "./payment/payment-bank-select.json";
+import authOtpChallenge from "./auth/auth-otp-challenge.json";
+import authLock from "./auth/auth-lock.json";
+import statusAwaitLight from "./status/status-await-light.json";
+import statusAwaitDark from "./status/status-await-dark.json";
+import statusResult from "./status/status-result.json";
+import statusConfetti from "./status/status-confetti.json";
+import paymentCardBind from "./payment/payment-card-bind.json";
+import paymentCardCvv from "./payment/payment-card-cvv.json";
+import paymentChallengeFooter from "./payment/payment-challenge-footer.json";
+import paymentBankSelect from "./payment/payment-bank-select.json";
 
 export const lottieAssets = {
   auth: {

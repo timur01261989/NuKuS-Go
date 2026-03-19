@@ -1,0 +1,12 @@
+src/modules/driver/legacy/LEGACY_NOTE.md
+src/modules/client/pages/pages/LEGACY_NOTE.md
+PWA_SW_POLICY.md
+LOGGING_ERROR_POLICY.md
+src/modules/client/features/auto-market/services/marketMode.js
+src/modules/shared/utils/errorAdapter.js
+src/modules/client/features/auth/pages/Auth.jsx
+src/modules/client/features/auth/pages/Register.jsx
+src/modules/client/features/client/delivery/DeliveryPage.jsx
+src/modules/client/features/auto-market/services/marketBackend.js
+public/sw.js
+tests/batch23-structure.test.js

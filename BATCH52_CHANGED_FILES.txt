@@ -1,0 +1,9 @@
+src/modules/client/features/client/pages/ClientWallet.jsx
+src/modules/client/features/client/pages/ClientPaymentMethods.jsx
+src/modules/client/features/client/pages/ClientProfile.jsx
+src/modules/client/pages/pages/Support.jsx
+src/modules/client/features/support/SupportChatPage.jsx
+src/modules/client/features/client/pages/ClientPromo.jsx
+src/modules/client/features/payments/PaymentsModule.jsx
+tests/batch52-essentials-assets-phase2.test.js
+BATCH52_CHANGED_FILES.txt

@@ -1,0 +1,26 @@
+
+BATCH74 AUTO MARKET EXTENDED ASSETS PHASE3
+
+Added assets
+- src/assets/auto-market/extended/signals/body-overview-1.png
+- src/assets/auto-market/extended/signals/body-overview-2.png
+- src/assets/auto-market/extended/signals/body-overview-3.png
+- src/assets/auto-market/extended/states/state-call-cta.png
+- src/assets/auto-market/extended/states/state-contact-cta.png
+- src/assets/auto-market/extended/inspection/inspection-icon.png
+- src/assets/auto-market/extended/signals/signal-price-allow-down.png
+- src/assets/auto-market/extended/signals/signal-price-allow-up.png
+- src/assets/auto-market/extended/signals/signal-ev-market.webp
+- src/assets/auto-market/extended/signals/filter-search-market.png
+
+Updated
+- src/assets/auto-market/extended/index.js
+- src/assets/auto-market/extended/auto-market-extended-phase1.manifest.json
+- src/modules/client/features/auto-market/services/autoMarketExtendedSignals.js
+- src/modules/client/features/auto-market/pages/SavedSearchesPage.jsx
+- src/modules/client/features/auto-market/pages/DealerProfilePage.jsx
+- src/modules/client/features/auto-market/pages/DetailsPage.jsx
+- src/modules/client/features/auto-market/pages/FavoritesPage.jsx
+
+Added tests
+- tests/batch74-auto-market-extended-assets-phase3.test.js

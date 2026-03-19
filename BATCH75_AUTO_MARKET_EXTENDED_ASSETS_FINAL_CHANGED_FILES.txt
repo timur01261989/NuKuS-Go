@@ -1,0 +1,25 @@
+BATCH75 AUTO MARKET EXTENDED ASSETS FINAL
+
+Added remaining useful curated assets:
+- signal-qr-entry.svg
+- signal-barcode-entry.png
+- signal-compare-assist.png
+- signal-alert-market-2.svg
+- state-call-action.png
+- state-contact-action.png
+- signal-ev-europe.webp
+- filter-search-ot.png
+- signal-price-drop-alt.webp
+- signal-vin-tip-alt.webp
+
+Updated:
+- src/assets/auto-market/extended/index.js
+- src/assets/auto-market/extended/auto-market-extended-phase1.manifest.json
+- src/modules/client/features/auto-market/services/autoMarketExtendedSignals.js
+- src/modules/client/features/auto-market/pages/PaymentReceiptPage.jsx
+- src/modules/client/features/auto-market/pages/ComparePage.jsx
+- src/modules/client/features/auto-market/pages/DealerProfilePage.jsx
+- src/modules/client/features/auto-market/pages/NotificationRulesPage.jsx
+
+Added:
+- tests/batch75-auto-market-extended-assets-final.test.js

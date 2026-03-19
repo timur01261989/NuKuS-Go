@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "mode": "tts",
+  "language": "uz-UZ",
+  "rate": 1.0,
+  "pitch": 1.0,
+  "volume": 1.0,
+  "phrases": {
+    "arrived": "Taksi yetib keldi, iltimos, chiqing.",
+    "order_received": "Yangi buyurtma keldi.",
+    "rerouting": "Marshrut qayta qurilmoqda.",
+    "turn_left": "Chapga buriling.",
+    "turn_right": "O‘ngga buriling.",
+    "go_straight": "To‘g‘ri davom eting."
+  }
+}

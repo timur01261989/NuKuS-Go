@@ -1,0 +1,17 @@
+BATCH71 AUTO MARKET FINAL AUDIT CLEANUP
+
+Scope
+- Final vendor-trace audit
+- Auto-market route/import sanity re-check
+- Full node:test suite rerun
+- Cleanup of legacy source-brand literals left inside audit tests
+
+Files changed
+- tests/batch67-auto-market-marketplace-final.test.js
+- tests/batch70-auto-market-final-polish.test.js
+
+Results
+- Vendor source-brand literals removed from remaining tests
+- Auto-market final polish package remains clean
+- node_modules excluded from deliverable zip
+- Full test suite rerun after cleanup
