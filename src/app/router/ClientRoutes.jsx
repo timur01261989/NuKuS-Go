@@ -23,6 +23,7 @@ const FreightOrder = safeLazy(() => import("../../modules/client/pages/FreightOr
 const IntercityOrder = safeLazy(() => import("../../modules/client/pages/IntercityOrder.jsx"), "IntercityOrder");
 const InterdistrictOrder = safeLazy(() => import("../../modules/client/pages/InterdistrictOrder.jsx"), "InterdistrictOrder");
 const Wallet = safeLazy(() => import("../../modules/client/pages/Wallet.jsx"), "Wallet");
+const ClientOrders = safeLazy(() => import("../../modules/client/pages/pages/ClientOrders.jsx"), "ClientOrders");
 const Profile = safeLazy(() => import("../../modules/client/pages/Profile.jsx"), "Profile");
 const Referral = safeLazy(() => import("../../modules/client/pages/Referral.jsx"), "Referral");
 const Settings = safeLazy(() => import("../../modules/client/pages/Settings.jsx"), "Settings");
@@ -81,6 +82,7 @@ export default function ClientRoutes() {
       <Route path={ROUTES.client.intercity} element={withRouteWrappers(IntercityOrder, "IntercityOrder")} />
       <Route path={ROUTES.client.interdistrict} element={withRouteWrappers(InterdistrictOrder, "InterdistrictOrder")} />
       <Route path={ROUTES.client.wallet} element={withRouteWrappers(Wallet, "Wallet")} />
+      <Route path={ROUTES.client.orders} element={withRouteWrappers(ClientOrders, "ClientOrders")} />
       <Route path={ROUTES.client.profile} element={withRouteWrappers(Profile, "Profile")} />
       <Route path={ROUTES.client.referral} element={withRouteWrappers(Referral, "Referral")} />
       <Route path={ROUTES.client.promo} element={withRouteWrappers(ClientPromo, "ClientPromo")} />
@@ -97,6 +99,7 @@ export default function ClientRoutes() {
       <Route path={ROUTES.legacy.clientInterProvincial} element={<Navigate replace to={ROUTES.client.intercity} />} />
       <Route path={ROUTES.legacy.clientInterDistrict} element={<Navigate replace to={ROUTES.client.interdistrict} />} />
       <Route path={ROUTES.legacy.clientWallet} element={<Navigate replace to={ROUTES.client.wallet} />} />
+      <Route path="/client/orders" element={<Navigate replace to={ROUTES.client.orders} />} />
       <Route path={ROUTES.legacy.clientProfile} element={<Navigate replace to={ROUTES.client.profile} />} />
       <Route path={ROUTES.legacy.clientReferral} element={<Navigate replace to={ROUTES.client.referral} />} />
       <Route path={ROUTES.legacy.clientPromo} element={<Navigate replace to={ROUTES.client.promo} />} />

@@ -172,7 +172,7 @@ function ClientHome() {
         <div className="mx-auto flex max-w-3xl items-center justify-around rounded-[28px] bg-white/90 backdrop-blur-xl p-2 shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-white/50">
           {[
             { id: 'home', icon: 'home', label: t?.home || 'Asosiy', path: '/client/home' },
-            { id: 'orders', icon: 'receipt_long', label: t?.orders || 'Buyurtmalar', path: '/client/orders' },
+            { id: 'orders', icon: 'receipt_long', label: t?.orders || 'Buyurtmalar', path: '/orders' },
             { id: 'wallet', icon: 'account_balance_wallet', label: t?.wallet || 'Hamyon', path: '/client/wallet' },
             { id: 'profile', icon: 'person', label: t?.profile || 'Profil', path: '/client/profile' }
           ].map((item) => (

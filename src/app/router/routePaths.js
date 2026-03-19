@@ -16,6 +16,7 @@ export const ROUTES = {
     intercity: "/intercity",
     interdistrict: "/interdistrict",
     wallet: "/wallet",
+    orders: "/orders",
     profile: "/profile",
     referral: "/referral",
     promo: "/promo",
