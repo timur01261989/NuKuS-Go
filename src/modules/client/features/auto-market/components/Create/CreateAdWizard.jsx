@@ -123,6 +123,7 @@ export default function CreateAdWizard() {
   const postingChecklist = buildSellerPostingChecklist(ad);
   const sellingPoints = buildProfessionalSellingPoints();
   const luxuryCreateCards = buildLuxuryCreateExperience(ad);
+  const completenessInfo = buildListingCompleteness(ad);
 
   // 2. AI Video-Review Generatori
   const handleGenerateVideo = () => {
