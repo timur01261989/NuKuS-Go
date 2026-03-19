@@ -27,6 +27,7 @@ export default function SellerAppointmentsPage() {
   }, []);
 
   const [status, setStatus] = useState("all");
+  const insights = useMemo(() => buildSellerInsights(items), [items]);
   const leads = useMemo(() => buildSellerLeads(items).slice(0, 8).map((lead, index) => enrichLeadForCrm(lead, index)), [items]);
   const appointmentGroups = useMemo(() => ([
     { key: "all", title: "Barchasi" },
