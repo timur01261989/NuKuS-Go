@@ -8,6 +8,10 @@ class ErrorBoundary extends React.Component {
       error: null,
       componentStack: "",
     };
+
+    // componentDidCatch() ichida setState async bo'lishi mumkin.
+    // Shuning uchun render()da darhol ko'rinishi uchun componentStack'ni instance variablega yozamiz.
+    this.lastComponentStack = "";
   }
 
   static getDerivedStateFromError(error) {
@@ -43,6 +47,12 @@ class ErrorBoundary extends React.Component {
     } catch {
       // ignore
     }
+
+    try {
+      this.lastComponentStack = info?.componentStack || "";
+    } catch {
+      // ignore
+    }
   }
 
   render() {
@@ -58,7 +68,11 @@ class ErrorBoundary extends React.Component {
         ? Object.prototype.toString.call(err)
         : "Unknown error";
     const safeStack = err?.stack ? String(err.stack) : "";
-    const safeComponentStack = this.state.componentStack ? String(this.state.componentStack) : "";
+    const safeComponentStack = this.lastComponentStack
+      ? String(this.lastComponentStack)
+      : this.state.componentStack
+        ? String(this.state.componentStack)
+        : "";
 
     try {
       if (typeof window !== "undefined") {
