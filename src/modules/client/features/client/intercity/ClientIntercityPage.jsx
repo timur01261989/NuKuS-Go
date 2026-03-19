@@ -36,6 +36,7 @@ import { listMarketCars } from "../../../services/marketService.js";
 
 import "leaflet/dist/leaflet.css";
 
+import RegionDistrictSelect from "@/modules/shared/components/RegionDistrictSelect";
 import {
   FitBounds,
   PickupPicker,

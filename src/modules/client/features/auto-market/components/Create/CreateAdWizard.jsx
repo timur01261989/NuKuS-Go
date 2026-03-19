@@ -124,6 +124,12 @@ export default function CreateAdWizard() {
   const sellingPoints = buildProfessionalSellingPoints();
   const luxuryCreateCards = buildLuxuryCreateExperience(ad);
   const completenessInfo = buildListingCompleteness(ad);
+  const pricingRecommendation = buildPricingRecommendation(ad) || {
+    headline: "—",
+    text: "—",
+    recommendedMin: null,
+    recommendedMax: null,
+  };
 
   // 2. AI Video-Review Generatori
   const handleGenerateVideo = () => {
