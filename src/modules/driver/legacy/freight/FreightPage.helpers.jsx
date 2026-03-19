@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
-// IMPORT FIX: To'g'ri manzil ko'rsatildi
-import { nominatimReverse } from "@/modules/client/features/client/shared/geo/nominatim";
+import { nominatimReverse } from "@/modules/client/features/shared/geo/nominatim";
 
 export const BODY_TYPES = [
   { value: "motoroller", label: "Motoruller" },
@@ -224,3 +223,4 @@ export function LocationPickerModal({ open, initialPoint, onCancel, onSave }) {
     </div>
   );
 }
+

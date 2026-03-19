@@ -1,0 +1,76 @@
+{
+  "assetGroup": "calculation-assets-curated",
+  "version": "batch48-phase1",
+  "importMode": "copied-renamed",
+  "sourceGroup": "pricing-tariff-promo-visual-curated",
+  "assets": [
+    {
+      "dest": "src/assets/calculation/tariffs/tariff-economy.webp",
+      "category": "tariffs"
+    },
+    {
+      "dest": "src/assets/calculation/tariffs/tariff-comfort.webp",
+      "category": "tariffs"
+    },
+    {
+      "dest": "src/assets/calculation/tariffs/tariff-comfort-plus.webp",
+      "category": "tariffs"
+    },
+    {
+      "dest": "src/assets/calculation/tariffs/tariff-business.webp",
+      "category": "tariffs"
+    },
+    {
+      "dest": "src/assets/calculation/pricing/pricing-access.svg",
+      "category": "pricing"
+    },
+    {
+      "dest": "src/assets/calculation/pricing/pricing-surge-up.svg",
+      "category": "pricing"
+    },
+    {
+      "dest": "src/assets/calculation/pricing/pricing-down.svg",
+      "category": "pricing"
+    },
+    {
+      "dest": "src/assets/calculation/pricing/pricing-fair.svg",
+      "category": "pricing"
+    },
+    {
+      "dest": "src/assets/calculation/pricing/pricing-up.svg",
+      "category": "pricing"
+    },
+    {
+      "dest": "src/assets/calculation/payment/payment-art-card.webp",
+      "category": "payment"
+    },
+    {
+      "dest": "src/assets/calculation/payment/payment-art-details.webp",
+      "category": "payment"
+    },
+    {
+      "dest": "src/assets/calculation/payment/payment-art-pro.webp",
+      "category": "payment"
+    },
+    {
+      "dest": "src/assets/calculation/promo/promo-code-entry.svg",
+      "category": "promo"
+    },
+    {
+      "dest": "src/assets/calculation/promo/promo-badge-fill.svg",
+      "category": "promo"
+    },
+    {
+      "dest": "src/assets/calculation/promo/promo-badge-outline.svg",
+      "category": "promo"
+    },
+    {
+      "dest": "src/assets/calculation/promo/promo-goal-flag.webp",
+      "category": "promo"
+    },
+    {
+      "dest": "src/assets/calculation/promo/promo-referral-code.png",
+      "category": "promo"
+    }
+  ]
+}

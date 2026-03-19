@@ -6,10 +6,10 @@ import { securityAssets } from '@/assets/security';
 import { calculationAssets } from '@/assets/calculation';
 
 // Yuklangan fayllarni import qilish (manzilni loyihangizga qarab tekshiring)
-import introAnim from "../../../assets/lottie/sdk_gas_lottie_payment_intro.json";
-import progressAnim from "../../../assets/lottie/sdk_gas_lottie_payment.json";
-import connectionAnim from "../../../assets/lottie/sdk_gas_lottie_connection.json";
-import successAnim from "../../../assets/lottie/sdk_gas_lottie_pay2connect.json";
+const introAnim = "/assets/lottie/sdk_gas_lottie_payment_intro.json";
+const progressAnim = "/assets/lottie/sdk_gas_lottie_payment.json";
+const connectionAnim = "/assets/lottie/sdk_gas_lottie_connection.json";
+const successAnim = "/assets/lottie/sdk_gas_lottie_pay2connect.json";
 
 const { Title, Text } = Typography;
 

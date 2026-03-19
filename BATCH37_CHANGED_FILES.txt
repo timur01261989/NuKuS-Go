@@ -1,8 +1,0 @@
-src/modules/client/pages/pages/Support.jsx
-src/modules/client/features/support/SupportChatPage.jsx
-src/modules/client/features/chat/components/ChatComponent.jsx
-src/modules/client/features/client/components/TripHistory.jsx
-src/modules/client/features/client/delivery/components/Active/CourierInfoCard.jsx
-src/modules/client/features/client/delivery/map/CourierMarker.jsx
-src/modules/client/features/client/delivery/map/DeliveryMap.jsx
-tests/batch37-order-assets-phase2.test.js

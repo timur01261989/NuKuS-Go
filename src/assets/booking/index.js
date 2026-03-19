@@ -1,12 +1,12 @@
-import warningIcon from "./booking-warning.svg";
-import discountIcon from "./booking-discount.svg";
+const warningIcon = "./booking-warning.svg";
+const discountIcon = "./booking-discount.svg";
 import watchIcon from "./booking-watch.png";
 import watchLargeIcon from "./booking-watch-large.png";
 import watchLineIcon from "./booking-watch-line.png";
 import checkIcon from "./booking-check.png";
-import checkLineIcon from "./booking-check-line.svg";
+const checkLineIcon = "./booking-check-line.svg";
 import crossIcon from "./booking-cross.png";
-import crossLineIcon from "./booking-cross-line.svg";
+const crossLineIcon = "./booking-cross-line.svg";
 import scheduleIcon from "./booking-schedule.png";
 
 export const bookingAssets = {

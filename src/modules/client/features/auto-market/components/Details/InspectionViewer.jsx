@@ -1,8 +1,8 @@
 import React, { useMemo } from "react";
 import { Card, Progress, Tag } from "antd";
-import inspectionTitle from "@/assets/auto-market/pro/inspection/inspection-title.svg";
+const inspectionTitle = "@/assets/auto-market/pro/inspection/inspection-title.svg";
 import certificateArt from "@/assets/auto-market/pro/inspection/inspection-certificate.png";
-import carFrontDim from "@/assets/auto-market/pro/inspection/photo-guide-front-dim.svg";
+const carFrontDim = "@/assets/auto-market/pro/inspection/photo-guide-front-dim.svg";
 import { buildInspectionItemsFromCar, summarizeInspection } from "../../services/inspectionScoring";
 
 const statusMeta = {

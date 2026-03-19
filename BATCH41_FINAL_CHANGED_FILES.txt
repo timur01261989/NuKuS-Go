@@ -1,7 +1,0 @@
-BATCH41 REALTIME FINAL
-Final cleanup for renamed realtime asset layer and final sanity coverage.
-
-src/assets/realtime/realtime-assets-phase1.manifest.json
-tests/batch39-realtime-assets-phase1.test.js
-tests/batch41-realtime-assets-final.test.js
-BATCH39_CHANGED_FILES.txt

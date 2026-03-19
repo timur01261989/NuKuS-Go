@@ -39,7 +39,6 @@ export function buildDealerReviews(seller = {}) {
     count: Number(seller.reviewCount || 138),
     highlights: [
       { key: "response", title: "Javob tezligi", value: seller.responseSpeed || "12 daqiqa" },
-      // SINTAKSIS XATO TUZATILDI: Backticklar qo'shildi
       { key: "completion", title: "Uchrashuv bajarilishi", value: `${seller.completionRate || 94}%` },
       { key: "repeat", title: "Qayta xaridorlar", value: `${seller.repeatBuyers || 28}%` },
     ],

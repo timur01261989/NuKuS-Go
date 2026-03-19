@@ -1,14 +1,14 @@
-import searchHomeAlt from "./search-home-alt.svg";
-import searchBookmarkFill from "./search-bookmark-fill.svg";
-import searchWorkAlt from "./search-work-alt.svg";
-import searchHomeUser from "./search-home-user.svg";
-import searchHome from "./search-home.svg";
-import searchWork from "./search-work.svg";
-import searchBookmark from "./search-bookmark.svg";
-import searchPoiPin from "./search-poi-pin.svg";
-import searchPoiPinLive from "./search-poi-pin-live.svg";
-import searchMagnifier from "./search-magnifier.svg";
-import searchMagnifierLive from "./search-magnifier-live.svg";
+const searchHomeAlt = "./search-home-alt.svg";
+const searchBookmarkFill = "./search-bookmark-fill.svg";
+const searchWorkAlt = "./search-work-alt.svg";
+const searchHomeUser = "./search-home-user.svg";
+const searchHome = "./search-home.svg";
+const searchWork = "./search-work.svg";
+const searchBookmark = "./search-bookmark.svg";
+const searchPoiPin = "./search-poi-pin.svg";
+const searchPoiPinLive = "./search-poi-pin-live.svg";
+const searchMagnifier = "./search-magnifier.svg";
+const searchMagnifierLive = "./search-magnifier-live.svg";
 
 export const searchAssets = {
   home: searchHome,

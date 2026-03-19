@@ -1,6 +1,0 @@
-UNIGO batch49 changed files
-src/modules/client/features/client/pages/ClientWallet.jsx
-src/modules/client/features/client/pages/ClientPaymentMethods.jsx
-src/modules/client/features/payments/PaymentsModule.jsx
-src/modules/client/features/client/components/PaymentStatus.jsx
-tests/batch49-calculation-assets-phase2.test.js

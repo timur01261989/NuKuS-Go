@@ -5,11 +5,11 @@ import {
   FireOutlined, ShopOutlined
 } from "@ant-design/icons";
 
-import taxiImg from "../assets/taxi.jpg";
-import cityImg from "../assets/city.jpg";
-import villageImg from "../assets/village.jpg";
-import truckImg from "../assets/truck.jpg";
-import deliveryImg from "../assets/delivery.jpg";
+import taxiImg from "/assets/taxi.jpg";
+import cityImg from "/assets/city.jpg";
+import villageImg from "/assets/village.jpg";
+import truckImg from "/assets/truck.jpg";
+import deliveryImg from "/assets/delivery.jpg";
 
 export function applyNightModeClass(enabled) {
   if (enabled) document.body.classList.add("night-mode-active");

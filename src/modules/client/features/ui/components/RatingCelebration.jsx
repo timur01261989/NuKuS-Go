@@ -1,5 +1,5 @@
 import Lottie from "lottie-react";
-import fiveStarAnim from "../../../assets/lottie/selfie_cool_dog_light.json";
+const fiveStarAnim = "/assets/lottie/selfie_cool_dog_light.json";
 
 const RatingCelebration = ({ show }) => {
   if (!show) return null;

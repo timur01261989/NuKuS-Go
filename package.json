@@ -1,50 +1,18 @@
 {
-  "name": "nukus-go-taxi-driver",
+  "name": "unigo-fixed",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "version": "1.0.0",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview",
-    "test": "node --test tests/*.test.js",
-    "check:env": "node -e \"import('./server/_shared/env.js').then(m=>m.assertServerEnv())\""
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@ant-design/icons": "^5.6.1",
-    "@eslint/js": "^9.39.2",
-    "@supabase/supabase-js": "^2.94.0",
-    "@tanstack/react-query": "^5.59.0",
-    "antd": "^5.29.3",
-    "axios": "^1.7.9",
-    "browser-image-compression": "^2.0.2",
-    "dayjs": "^1.11.19",
-    "globals": "^17.2.0",
-    "leaflet": "^1.9.4",
-    "leaflet-routing-machine": "^3.2.12",
-    "lottie-react": "^2.4.1",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-leaflet": "^4.2.1",
-    "react-leaflet-routing-machine": "^0.0.5",
-    "react-router-dom": "^6.30.3",
-    "recharts": "^3.7.0"
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
-    "autoprefixer": "^10.4.24",
-    "eslint": "^8.57.0",
-    "eslint-plugin-react": "^7.34.3",
-    "eslint-plugin-react-hooks": "^4.6.2",
-    "eslint-plugin-react-refresh": "^0.4.7",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^3.4.17",
-    "vite": "^5.3.4"
-  },
-  "engines": {
-    "node": ">=18"
+    "vite": "^5.0.0",
+    "@vitejs/plugin-react": "^4.0.0"
   }
 }

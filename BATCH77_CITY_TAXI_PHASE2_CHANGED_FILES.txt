@@ -1,7 +1,0 @@
-src/modules/client/features/client/taxi/ClientTaxiPage.impl.jsx
-src/modules/client/features/client/taxi/components/TaxiMainSheet.jsx
-src/modules/client/features/client/taxi/components/TaxiRouteSheet.jsx
-src/modules/driver/legacy/city-taxi/CityTaxiPageInner.jsx
-src/modules/driver/legacy/city-taxi/hooks/useDriverTaxiController.js
-tests/batch77-city-taxi-phase2.test.js
-BATCH77_CITY_TAXI_PHASE2_CHANGED_FILES.txt

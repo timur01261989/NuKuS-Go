@@ -1,6 +1,0 @@
-tests/auth-register.smoke.test.js
-tests/delivery-referral.smoke.test.js
-tests/driver-client-routes.smoke.test.js
-tests/batch25-structure.test.js
-src/modules/client/features/client/delivery/DeliveryPage.logic.js
-src/modules/client/features/client/delivery/services/deliveryPure.js

@@ -1,8 +1,0 @@
-src/modules/shared/interdistrict/domain/interDistrictStatuses.js
-src/modules/shared/interdistrict/domain/interDistrictSchemas.js
-src/modules/client/features/shared/interDistrictTrips.js
-src/modules/driver/legacy/inter-district/services/districtApi.js
-src/modules/driver/legacy/inter-district/components/shared/TripCreateModal.jsx
-src/modules/client/features/client/interDistrict/context/DistrictContext.jsx
-src/modules/client/features/client/interDistrict/ClientInterDistrictPage.jsx
-tests/batch80-interdistrict-phase1.test.js

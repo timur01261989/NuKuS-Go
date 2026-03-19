@@ -1,15 +1,15 @@
 
-import iconCall from "./communication/icon-call.svg";
-import iconCallOff from "./communication/icon-call-off.svg";
-import iconChat from "./communication/icon-chat.svg";
-import iconHeadset from "./communication/icon-headset.svg";
-import iconCheck from "./common/icon-check.svg";
-import iconStarFill from "./common/icon-star-fill.svg";
-import iconChevronRight from "./actions/icon-chevron-right.svg";
-import iconCloseMd from "./actions/icon-close-md.svg";
-import iconCameraFill from "./actions/icon-camera-fill.svg";
-import iconMicFill from "./actions/icon-mic-fill.svg";
-import iconMicOffFill from "./actions/icon-mic-off-fill.svg";
+const iconCall = "./communication/icon-call.svg";
+const iconCallOff = "./communication/icon-call-off.svg";
+const iconChat = "./communication/icon-chat.svg";
+const iconHeadset = "./communication/icon-headset.svg";
+const iconCheck = "./common/icon-check.svg";
+const iconStarFill = "./common/icon-star-fill.svg";
+const iconChevronRight = "./actions/icon-chevron-right.svg";
+const iconCloseMd = "./actions/icon-close-md.svg";
+const iconCameraFill = "./actions/icon-camera-fill.svg";
+const iconMicFill = "./actions/icon-mic-fill.svg";
+const iconMicOffFill = "./actions/icon-mic-off-fill.svg";
 
 export const iconAssets = {
   communication: {

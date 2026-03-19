@@ -1,0 +1,92 @@
+{
+  "assetGroup": "essentials-phase1",
+  "importMode": "copied-renamed",
+  "sourceGroup": "curated-remaining-assets",
+  "categories": {
+    "auth": [
+      "auth-mask-license.svg",
+      "auth-mask-selfie.svg",
+      "auth-profile-moto.svg",
+      "auth-reward-badge.svg",
+      "auth-userpic.svg"
+    ],
+    "support": [
+      "chat-attach-camera.png",
+      "chat-attach-card.png",
+      "chat-attach-fine.png",
+      "chat-attach-location.png",
+      "chat-attach-media.png",
+      "chat-attach-ride.png",
+      "chat-attach.png",
+      "chat-jump-latest.png",
+      "comm-user-fill.svg",
+      "support-bug-dark.svg",
+      "support-bug-light.svg",
+      "support-main.svg",
+      "support-report-doc.svg",
+      "support-reports.svg",
+      "support-video-report.svg"
+    ],
+    "finance": [
+      "finance-advance-done.svg",
+      "finance-card-pro-fill.svg",
+      "finance-card-pro.svg",
+      "finance-credit.svg",
+      "finance-payment-card.webp",
+      "finance-payment-details.webp",
+      "finance-payment-pro.webp",
+      "finance-split.svg",
+      "finance-top-up-pro.svg",
+      "finance-top-up.svg",
+      "finance-withdraw-pro.svg",
+      "finance-withdraw.svg"
+    ],
+    "loyalty": [
+      "debt-warning.png",
+      "loyalty-reward-badge.svg",
+      "loyalty-reward.webp",
+      "promo-code.svg",
+      "promo-fill.svg",
+      "promo-goal-flag.webp",
+      "promo-outline.svg",
+      "promo-referral.png",
+      "tier-bronze.svg",
+      "tier-gold.svg",
+      "tier-platinum.svg",
+      "tier-silver.svg"
+    ],
+    "auto": [
+      "service-garage-black.svg",
+      "service-garage-circle-day.svg",
+      "service-garage-circle-night.svg",
+      "service-garage-fill.svg",
+      "service-garage-yellow.svg",
+      "service-gas-fill.svg",
+      "service-gas-list.svg",
+      "service-gas-pin.png",
+      "service-wagon-fill.svg",
+      "service-wagon-outline.svg"
+    ],
+    "core": [
+      "comm-bell.svg",
+      "comm-edited.svg",
+      "comm-read.svg",
+      "comm-sent.svg",
+      "comm-time.svg",
+      "comm-user-fill.svg",
+      "comm-views.svg",
+      "core-star.svg",
+      "nav-auto.svg",
+      "nav-bike-path.svg",
+      "nav-stairs.svg"
+    ]
+  },
+  "counts": {
+    "auth": 5,
+    "support": 15,
+    "finance": 12,
+    "loyalty": 12,
+    "auto": 10,
+    "core": 11
+  }
+}
