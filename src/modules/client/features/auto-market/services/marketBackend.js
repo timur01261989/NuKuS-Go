@@ -11,7 +11,7 @@ import { supabase } from "@/services/supabase/supabaseClient.js";
 import { clientLogger } from "@/modules/shared/utils/clientLogger.js";
 import { toUserError } from "@/modules/shared/utils/errorAdapter.js";
 import * as mock from "./marketApi";
-export {
+import {
   buyPromotion,
   createPayment,
   getWalletBalance,
@@ -19,6 +19,14 @@ export {
   revealPhone,
   revealSellerPhone,
 } from "./marketPayments";
+export {
+  buyPromotion,
+  createPayment,
+  getWalletBalance,
+  promoteAd,
+  revealPhone,
+  revealSellerPhone,
+};
 import {
   SB_READY,
   getAuthUserId,
