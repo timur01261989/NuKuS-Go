@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { Button } from "antd";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/services/supabase/supabaseClient.js";
 import { useLanguage } from "../../../shared/i18n/useLanguage";
 import DriverHome from "../components/DriverHome";
 import { DriverOnlineProvider } from "../core/DriverOnlineContext";
-
 
 import {
   loadLegacyDriverDashboardProfile,
@@ -20,14 +18,12 @@ export default function DriverDashboard() {
   const navigate = useNavigate();
 
   // Gate: driver must have an application before accessing dashboard
-  const [gateLoading, setGateLoading] = useState(false);
-  const [gateAllowed, setGateAllowed] = useState(true);
+  const [gateLoading, setGateLoading] = useState(true);
+  const [gateAllowed, setGateAllowed] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
 
-    // RoleGate already enforces driver access.
-    // Dashboard should not perform extra redirects (prevents redirect loops).
     const run = async () => {
       try {
         const { data: authData, error: authErr } = await supabase.auth.getUser();
@@ -35,16 +31,14 @@ export default function DriverDashboard() {
 
         const userId = authData?.user?.id;
         if (!userId) {
-          // NOTE: RoleGate handles auth redirects. Avoid redirect loops here.
-          // navigate("/login", { replace: true });
+          console.warn("[DriverDashboard] No userId found, RoleGate handles redirect.");
           return;
         }
 
         if (isMounted) setGateAllowed(true);
       } catch (e) {
-        console.error("Driver dashboard gate error:", e);
-        // NOTE: RoleGate handles auth redirects. Avoid redirect loops here.
-        // navigate("/login", { replace: true });
+        console.error("[DriverDashboard] gate error:", e);
+        // RoleGate handles redirect, avoid loops
       } finally {
         if (isMounted) setGateLoading(false);
       }
@@ -57,21 +51,13 @@ export default function DriverDashboard() {
     };
   }, [navigate]);
 
-  /**
-   * Driver bosh sahifada xizmatlar (Shahar ichida / Viloyatlar aro / Tumanlar aro / Eltish / Yuk tashish)
-   * ko‘rinishi kerak. Hozirgi oqimda Drawer-menu asosidagi dashboard o‘rniga
-   * DriverHome (xizmatlar menyusi) ko‘rsatiladi.
-   *
-   * Eski dashboard kodi pastda qoldirilgan (o‘chirilmadi) — keyin qayta yoqish mumkin.
-   */
   const onLogout = async () => {
     try {
       await supabase.auth.signOut();
+    } catch (err) {
+      console.error("[DriverDashboard] logout error:", err);
     } finally {
-      // Logoutdan keyin client home'ga yuborish "rol aralashuvi" va redirect loop keltirib chiqarishi mumkin.
-      // Eng toza oqim: login sahifasiga qaytish.
-      // NOTE: RoleGate handles auth redirects. Avoid redirect loops here.
-      // navigate("/login", { replace: true });
+      // RoleGate handles redirect, avoid loops
     }
   };
 
@@ -98,19 +84,12 @@ export default function DriverDashboard() {
 /**
  * LegacyDriverDashboard
  * Old dashboard implementation preserved for reference.
- * Not used by default to avoid hook/TDZ issues and runtime crashes.
  */
 function LegacyDriverDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useLanguage();
 
-  // keep location referenced so linter/build optimizers don't rewrite unexpectedly
-  void location;
-
-  // =========================
-  // STATE
-  // =========================
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profile, setProfile] = useState({ fullName: "", avatarUrl: "", phone: "" });
   const [loading, setLoading] = useState(false);
@@ -120,26 +99,21 @@ function LegacyDriverDashboard() {
     return v === "1";
   });
 
-  // =========================
-  // 1. MA'LUMOTLARNI YUKLASH
-  // =========================
   useEffect(() => {
     let mounted = true;
 
     const fetchProfile = async () => {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error) throw error;
         if (!user) {
-          // NOTE: RoleGate handles auth redirects. Avoid redirect loops here.
-          // navigate("/login", { replace: true });
+          console.warn("[LegacyDriverDashboard] No user found, RoleGate handles redirect.");
           return;
         }
 
         const data = await loadLegacyDriverDashboardProfile({
           onUnauthed: () => {
-            // navigate("/login", { replace: true });
+            console.warn("[LegacyDriverDashboard] Unauthed, RoleGate handles redirect.");
           },
         });
 
@@ -154,7 +128,7 @@ function LegacyDriverDashboard() {
           localStorage.setItem("driverOnline", data.onlineStatus ? "1" : "0");
         }
       } catch (err) {
-        console.error("Kutilmagan xato:", err);
+        console.error("[LegacyDriverDashboard] fetchProfile error:", err);
       }
     };
 
@@ -165,34 +139,32 @@ function LegacyDriverDashboard() {
     };
   }, [navigate]);
 
-  // =========================
-  // 2. ONLINE / OFFLINE TUGMASI (TUZATILDI)
-  // =========================
   const toggleOnline = async (checked) => {
-    await toggleDriverPresence({
-      checked,
-      setLoading,
-      setIsOnline,
-    });
+    try {
+      await toggleDriverPresence({
+        checked,
+        setLoading,
+        setIsOnline,
+      });
+    } catch (err) {
+      console.error("[LegacyDriverDashboard] toggleOnline error:", err);
+    }
   };
 
-  // =========================
-  // 3. SAHIFA OTISH
-  // =========================
   const go = (path) => {
     setDrawerOpen(false);
     navigate(path);
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    localStorage.clear();
-    // navigate("/login");
+    try {
+      await supabase.auth.signOut();
+      localStorage.clear();
+    } catch (err) {
+      console.error("[LegacyDriverDashboard] logout error:", err);
+    }
   };
 
-  // =========================
-  // 4. RENDER
-  // =========================
   return (
     <div style={{ background: "#f5f5f5", minHeight: "100vh", paddingBottom: 80 }}>
       <LegacyDashboardHeader profile={profile} onOpenMenu={() => setDrawerOpen(true)} />
@@ -201,7 +173,12 @@ function LegacyDriverDashboard() {
 
       <LegacyDashboardPrimaryMenu t={t} go={go} onLogout={handleLogout} />
 
-      <LegacyDashboardDrawer drawerOpen={drawerOpen} onClose={() => setDrawerOpen(false)} profile={profile} go={go} />
+      <LegacyDashboardDrawer
+        drawerOpen={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        profile={profile}
+        go={go}
+      />
     </div>
   );
 }
