@@ -2,6 +2,69 @@ import React from "react";
 import { Drawer, Switch } from "antd";
 import DriverProfile from "./DriverProfile";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DriverServiceErrorBoundary
+// Xizmat sahifasi crash bo'lganda foydalanuvchini menuga qaytaradi.
+// ─────────────────────────────────────────────────────────────────────────────
+export class DriverServiceErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, info) {
+    console.error("[DriverServiceErrorBoundary] caught:", error, info?.componentStack);
+  }
+
+  componentDidUpdate(prevProps) {
+    // resetKey o'zgarganda (boshqa xizmat tanlanganda) xatoni tozala
+    if (prevProps.resetKey !== this.props.resetKey) {
+      this.setState({ hasError: false, error: null });
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-backgroundLightDriver p-6 gap-6">
+          <div className="neumorphic-pop rounded-2xl p-6 w-full max-w-sm text-center space-y-4">
+            <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto">
+              <span
+                className="material-symbols-outlined text-red-500 text-3xl"
+                data-no-auto-translate="true"
+              >
+                error_outline
+              </span>
+            </div>
+            <h2 className="font-bold text-slate-900 text-lg">Xizmatda xatolik yuz berdi</h2>
+            <p className="text-sm text-slate-500">
+              {this.state.error?.message || "Kutilmagan xato. Iltimos qaytadan urinib ko'ring."}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                this.setState({ hasError: false, error: null });
+                this.props.onBack?.();
+              }}
+              className="w-full rounded-xl bg-primarySidebar py-3 text-sm font-bold text-white shadow-lg"
+            >
+              Menyuga qaytish
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DriverHomeTopBar
+// ─────────────────────────────────────────────────────────────────────────────
 export function DriverHomeTopBar({ onOpenSidebar, driverHeader, tr, onOpenProfile }) {
   return (
     <header className="px-4 pt-4 pb-2 flex items-center justify-between gap-3">
@@ -27,7 +90,11 @@ export function DriverHomeTopBar({ onOpenSidebar, driverHeader, tr, onOpenProfil
 
         <div className="w-12 h-12 rounded-full neumorphic-pop p-1">
           {driverHeader?.avatarUrl ? (
-            <img alt="Driver Profile" className="w-full h-full rounded-full object-cover" src={driverHeader.avatarUrl} />
+            <img
+              alt="Driver Profile"
+              className="w-full h-full rounded-full object-cover"
+              src={driverHeader.avatarUrl}
+            />
           ) : (
             <div className="w-full h-full rounded-full bg-white flex items-center justify-center text-primarySidebar">
               <span className="material-symbols-outlined" data-no-auto-translate="true">person</span>
@@ -39,6 +106,9 @@ export function DriverHomeTopBar({ onOpenSidebar, driverHeader, tr, onOpenProfil
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DriverStatusCard
+// ─────────────────────────────────────────────────────────────────────────────
 export function DriverStatusCard({ isOnline, activeServiceLabel, loading, onToggle, tr }) {
   return (
     <div className="px-4 py-2">
@@ -54,16 +124,31 @@ export function DriverStatusCard({ isOnline, activeServiceLabel, loading, onTogg
         </div>
 
         <label
-          className={`relative flex h-8 w-14 items-center rounded-full p-1 transition-colors ${isOnline ? "bg-primarySidebar" : "bg-slate-200"} ${loading ? "opacity-60" : "cursor-pointer"}`}
+          className={`relative flex h-8 w-14 items-center rounded-full p-1 transition-colors ${
+            isOnline ? "bg-primarySidebar" : "bg-slate-200"
+          } ${loading ? "opacity-60" : "cursor-pointer"}`}
         >
-          <input type="checkbox" className="sr-only" checked={isOnline} disabled={loading} onChange={(e) => onToggle(e.target.checked)} />
-          <div className={`h-6 w-6 rounded-full bg-white shadow-md transition-transform ${isOnline ? "translate-x-6" : "translate-x-0"}`} />
+          <input
+            type="checkbox"
+            className="sr-only"
+            checked={isOnline}
+            disabled={loading}
+            onChange={(e) => onToggle(e.target.checked)}
+          />
+          <div
+            className={`h-6 w-6 rounded-full bg-white shadow-md transition-transform ${
+              isOnline ? "translate-x-6" : "translate-x-0"
+            }`}
+          />
         </label>
       </div>
     </div>
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DriverVehicleCard
+// ─────────────────────────────────────────────────────────────────────────────
 export function DriverVehicleCard({ summary, onOpenVehicles }) {
   return (
     <div className="px-4">
@@ -84,6 +169,9 @@ export function DriverVehicleCard({ summary, onOpenVehicles }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DriverServiceMenu
+// ─────────────────────────────────────────────────────────────────────────────
 export function DriverServiceMenu({ cards, onSelectService, emptyText }) {
   return (
     <main className="p-4 space-y-6 pb-24">
@@ -97,7 +185,9 @@ export function DriverServiceMenu({ cards, onSelectService, emptyText }) {
           >
             <div className="flex items-center gap-5">
               <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${card.iconClassName}`}>
-                <span className="material-symbols-outlined text-4xl" data-no-auto-translate="true">{card.icon}</span>
+                <span className="material-symbols-outlined text-4xl" data-no-auto-translate="true">
+                  {card.icon}
+                </span>
               </div>
               <div>
                 <h3 className={`${card.titleClassName} font-bold text-slate-900`}>{card.title}</h3>
@@ -120,6 +210,9 @@ export function DriverServiceMenu({ cards, onSelectService, emptyText }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DriverBottomNav
+// ─────────────────────────────────────────────────────────────────────────────
 export function DriverBottomNav({ tr, onHome, onOrders, onSettings }) {
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-slate-200 px-6 py-2 flex justify-around items-center z-50">
@@ -139,6 +232,9 @@ export function DriverBottomNav({ tr, onHome, onOrders, onSettings }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DriverProfileDrawer
+// ─────────────────────────────────────────────────────────────────────────────
 export function DriverProfileDrawer({
   open,
   onClose,
@@ -153,7 +249,15 @@ export function DriverProfileDrawer({
   tr,
 }) {
   return (
-    <Drawer placement="right" width="100%" closable={false} onClose={onClose} open={open} styles={{ body: { padding: 0 } }} maskClosable>
+    <Drawer
+      placement="right"
+      width="100%"
+      closable={false}
+      onClose={onClose}
+      open={open}
+      styles={{ body: { padding: 0 } }}
+      maskClosable
+    >
       <div
         ref={drawerInnerRef}
         style={{ height: "100%", background: "#fff", willChange: "transform", touchAction: "pan-y" }}
@@ -161,15 +265,33 @@ export function DriverProfileDrawer({
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
       >
-        <div style={{ padding: 12, background: "#111", color: "white", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+        <div
+          style={{
+            padding: 12,
+            background: "#111",
+            color: "white",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
           <div style={{ fontWeight: 900 }}>Profil</div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ fontSize: 12, opacity: 0.9 }}>{isOnline ? tr("online", "Online") : tr("offline", "Offline")}</div>
+            <div style={{ fontSize: 12, opacity: 0.9 }}>
+              {isOnline ? tr("online", "Online") : tr("offline", "Offline")}
+            </div>
             <Switch size="small" checked={isOnline} onChange={onToggle} loading={loading} />
           </div>
         </div>
 
-        <DriverProfile onBack={onClose} onLogout={() => { onClose(); onLogout?.(); }} />
+        <DriverProfile
+          onBack={onClose}
+          onLogout={() => {
+            onClose();
+            onLogout?.();
+          }}
+        />
       </div>
     </Drawer>
   );
