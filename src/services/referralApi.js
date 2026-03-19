@@ -4,8 +4,17 @@ export function getReferralSummary() {
   return getJson('/api/referral');
 }
 
-export function bootstrapReferralSummary() {
-  return getJson('/api/referral?action=bootstrap');
+export async function bootstrapReferralSummary() {
+  try {
+    // getJson may throw on network or non-2xx; catch and return structured error
+    const res = await getJson('/api/referral?action=bootstrap');
+    return res;
+  } catch (err) {
+    // Normalize error so frontend doesn't crash on thrown exception
+    const message = err?.message || String(err) || 'Unknown error';
+    console.warn('[referralApi] bootstrapReferralSummary failed', message);
+    return { ok: false, error: message };
+  }
 }
 
 export function resolveReferralCode(code) {

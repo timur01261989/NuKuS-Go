@@ -60,35 +60,41 @@ function buildShareUrl(req, code) {
 async function loadInviterProfile(sb, inviterUserId) {
   if (!inviterUserId) return null;
 
-  const primaryResult = await sb
-    .from('profiles')
-    .select('id,phone,full_name,avatar_url')
-    .eq('id', inviterUserId)
-    .maybeSingle();
+  try {
+    const primaryResult = await sb
+      .from('profiles')
+      .select('id,phone,full_name,avatar_url')
+      .eq('id', inviterUserId)
+      .maybeSingle();
 
-  if (!primaryResult.error) {
-    return primaryResult.data || null;
+    if (!primaryResult.error) {
+      return primaryResult.data || null;
+    }
+
+    const message = String(primaryResult.error?.message || '').toLowerCase();
+    if (!message.includes('column')) {
+      throw primaryResult.error;
+    }
+
+    const fallbackResult = await sb
+      .from('profiles')
+      .select('id,phone')
+      .eq('id', inviterUserId)
+      .maybeSingle();
+    if (fallbackResult.error) throw fallbackResult.error;
+
+    return fallbackResult.data
+      ? {
+          ...fallbackResult.data,
+          full_name: null,
+          avatar_url: null,
+        }
+      : null;
+  } catch (error) {
+    console.error('[referral] loadInviterProfile error', { inviterUserId, error });
+    // If profile loading fails, return null so caller can fallback to codeRow.user_id
+    return null;
   }
-
-  const message = String(primaryResult.error?.message || '').toLowerCase();
-  if (!message.includes('column')) {
-    throw primaryResult.error;
-  }
-
-  const fallbackResult = await sb
-    .from('profiles')
-    .select('id,phone')
-    .eq('id', inviterUserId)
-    .maybeSingle();
-  if (fallbackResult.error) throw fallbackResult.error;
-
-  return fallbackResult.data
-    ? {
-        ...fallbackResult.data,
-        full_name: null,
-        avatar_url: null,
-      }
-    : null;
 }
 
 async function logReferralBonusEvent(sb, payload) {
@@ -124,46 +130,51 @@ async function resolveReferralPublic(sb, req, res, url) {
     return badRequest(res, 'referral code kerak');
   }
 
-  const codeRow = await rewardService.repositories.referrals.getCodeByCode(referralCodeValue);
-  if (!codeRow) {
-    return json(res, 404, {
-      ok: false,
-      valid: false,
-      error: 'Referral code topilmadi',
-      code: referralCodeValue,
-    });
-  }
+  try {
+    const codeRow = await rewardService.repositories.referrals.getCodeByCode(referralCodeValue);
+    if (!codeRow) {
+      return json(res, 404, {
+        ok: false,
+        valid: false,
+        error: 'Referral code topilmadi',
+        code: referralCodeValue,
+      });
+    }
 
-  const inviterProfile = await loadInviterProfile(sb, codeRow.user_id);
+    const inviterProfile = await loadInviterProfile(sb, codeRow.user_id);
 
-  await logReferralBonusEvent(sb, {
-    related_user_id: codeRow.user_id,
-    source_id: codeRow.id,
-    code: codeRow.code,
-    ip_address: getRequestIp(req),
-    user_agent: getUserAgent(req),
-    referer: String(req?.headers?.referer || req?.headers?.Referer || '').trim() || null,
-    path: url.pathname,
-  });
-
-  return json(res, 200, {
-    ok: true,
-    valid: true,
-    code: {
-      id: codeRow.id,
+    await logReferralBonusEvent(sb, {
+      related_user_id: codeRow.user_id,
+      source_id: codeRow.id,
       code: codeRow.code,
-      user_id: codeRow.user_id,
-      is_active: codeRow.is_active,
-      created_at: codeRow.created_at,
-      updated_at: codeRow.updated_at,
-    },
-    inviter: {
-      user_id: inviterProfile?.id || codeRow.user_id,
-      full_name: inviterProfile?.full_name || 'UniGo foydalanuvchisi',
-      avatar_url: inviterProfile?.avatar_url || null,
-      phone: inviterProfile?.phone || null,
-    },
-  });
+      ip_address: getRequestIp(req),
+      user_agent: getUserAgent(req),
+      referer: String(req?.headers?.referer || req?.headers?.Referer || '').trim() || null,
+      path: url.pathname,
+    });
+
+    return json(res, 200, {
+      ok: true,
+      valid: true,
+      code: {
+        id: codeRow.id,
+        code: codeRow.code,
+        user_id: codeRow.user_id,
+        is_active: codeRow.is_active,
+        created_at: codeRow.created_at,
+        updated_at: codeRow.updated_at,
+      },
+      inviter: {
+        user_id: inviterProfile?.id || codeRow.user_id,
+        full_name: inviterProfile?.full_name || 'UniGo foydalanuvchisi',
+        avatar_url: inviterProfile?.avatar_url || null,
+        phone: inviterProfile?.phone || null,
+      },
+    });
+  } catch (error) {
+    console.error('[referral] resolveReferralPublic error', { referralCodeValue, error });
+    return serverError(res, error);
+  }
 }
 
 export default async function handler(req, res) {
@@ -180,7 +191,19 @@ export default async function handler(req, res) {
       return await resolveReferralPublic(sb, req, res, url);
     }
 
-    const { sb, user, userId, ipAddress } = await getAuthedContext(req);
+    // Authenticated paths: wrap getAuthedContext to log and return proper error if it fails
+    let sb, user, userId, ipAddress;
+    try {
+      const authed = await getAuthedContext(req);
+      sb = authed.sb;
+      user = authed.user;
+      userId = authed.userId;
+      ipAddress = authed.ipAddress;
+    } catch (error) {
+      console.error('[referral] getAuthedContext failed', { error });
+      return serverError(res, error);
+    }
+
     if (!userId || !getBearerToken(req)) {
       return json(res, 401, { ok: false, error: 'Unauthorized' });
     }
@@ -194,6 +217,7 @@ export default async function handler(req, res) {
     try {
       profile = await rewardService.repositories.profiles.getByUserId(userId);
     } catch (error) {
+      console.error('[referral] profiles.getByUserId error', { userId, error });
       warnings.push(`profile:${String(error?.message || error)}`);
     }
 
@@ -204,6 +228,7 @@ export default async function handler(req, res) {
         { authUser: user },
       );
     } catch (error) {
+      console.error('[referral] getOrCreateReferralCode initial error', { userId, error });
       warnings.push(`code:${String(error?.message || error)}`);
       try {
         if (user?.id) {
@@ -211,6 +236,7 @@ export default async function handler(req, res) {
           myCode = await rewardService.getOrCreateReferralCode(userId, profile?.phone || userId, { authUser: user });
         }
       } catch (retryError) {
+        console.error('[referral] getOrCreateReferralCode retry error', { userId, retryError });
         warnings.push(`code_retry:${String(retryError?.message || retryError)}`);
       }
     }
@@ -241,15 +267,18 @@ export default async function handler(req, res) {
       try {
         summary = await rewardService.repositories.referrals.listSummary(userId);
       } catch (error) {
+        console.error('[referral] referrals.listSummary error', { userId, error });
         summaryWarnings.push(`summary:${String(error?.message || error)}`);
       }
 
       try {
         wallet = await rewardService.repositories.wallets.ensureWallet(userId);
       } catch (error) {
+        console.error('[referral] wallets.ensureWallet error', { userId, error });
         summaryWarnings.push(`wallet:${String(error?.message || error)}`);
       }
 
+      // Always return a structured response; include warnings so frontend can handle gracefully
       return json(res, 200, {
         ok: true,
         code: myCode,
@@ -269,19 +298,32 @@ export default async function handler(req, res) {
       const deviceHash = String(body.device_hash || '').trim() || null;
       if (!referralCodeValue) return badRequest(res, 'referral code kerak');
 
-      const codeRow = await rewardService.repositories.referrals.getCodeByCode(referralCodeValue);
+      let codeRow;
+      try {
+        codeRow = await rewardService.repositories.referrals.getCodeByCode(referralCodeValue);
+      } catch (error) {
+        console.error('[referral] getCodeByCode error', { referralCodeValue, error });
+        return serverError(res, error);
+      }
+
       if (!codeRow) return badRequest(res, 'Referral code topilmadi');
       if (String(codeRow.user_id) === String(userId)) {
         return badRequest(res, 'O\'zingizning referral codingizni ishlata olmaysiz');
       }
 
-      const referral = await rewardService.applyReferral({
-        referrerUserId: codeRow.user_id,
-        referredUserId: userId,
-        referralCodeId: codeRow.id,
-        ipAddress,
-        deviceHash,
-      });
+      let referral;
+      try {
+        referral = await rewardService.applyReferral({
+          referrerUserId: codeRow.user_id,
+          referredUserId: userId,
+          referralCodeId: codeRow.id,
+          ipAddress,
+          deviceHash,
+        });
+      } catch (error) {
+        console.error('[referral] applyReferral error', { userId, codeRow, error });
+        return serverError(res, error);
+      }
 
       return json(res, 200, {
         ok: true,
@@ -297,6 +339,7 @@ export default async function handler(req, res) {
 
     return badRequest(res, 'action noto\'g\'ri');
   } catch (error) {
+    console.error('[referral] handler outer catch', error);
     return serverError(res, error);
   }
 }
