@@ -1,2 +1,2 @@
-export { default } from '../push.js';
-export * from '../push.js';
+// Re-export from parent (safe bridge for legacy imports)
+export { initPush } from '../push.js';

@@ -34,8 +34,13 @@ export default defineConfig({
   },
   build: {
     minify: "esbuild",
+    chunkSizeWarningLimit: 1500,
     rollupOptions: {
       output: {
+        // Hash prevents chunk name collision between same-named files in different dirs
+        chunkFileNames: "assets/[name]-[hash].js",
+        entryFileNames: "assets/[name]-[hash].js",
+        assetFileNames: "assets/[name]-[hash].[ext]",
         manualChunks: {
           "vendor-react": ["react", "react-dom", "react-router-dom"],
           "vendor-antd": ["antd", "@ant-design/icons"],

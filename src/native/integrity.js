@@ -1,15 +1,17 @@
 // src/native/integrity.js
-// Play Integrity requires native Android code.
-// Start with a placeholder so your app architecture is ready.
-//
-// Later you will:
-// 1) Implement native module that returns an integrity token
-// 2) Verify token on server (Google Play Integrity API)
-// 3) Enforce rules (block tampered devices)
-import { Capacitor } from '@capacitor/core';
+// Play Integrity API — safe web stub (no hard Capacitor import).
 
 export async function getIntegrityToken() {
-  if (!Capacitor.isNativePlatform()) return null;
-  // TODO: implement native plugin call
-  return null;
+  try {
+    const isNative = typeof window !== 'undefined' &&
+      typeof window.Capacitor !== 'undefined' &&
+      window.Capacitor.isNativePlatform?.() === true;
+
+    if (!isNative) return null;
+
+    // TODO: implement native Capacitor plugin once @capacitor/core is added as dep
+    return null;
+  } catch {
+    return null;
+  }
 }
