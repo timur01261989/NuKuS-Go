@@ -6,6 +6,7 @@ class ErrorBoundary extends React.Component {
     this.state = {
       hasError: false,
       error: null,
+      componentStack: "",
     };
   }
 
@@ -36,6 +37,12 @@ class ErrorBoundary extends React.Component {
     } catch {
       // ignore
     }
+
+    try {
+      this.setState({ componentStack: info?.componentStack || "" });
+    } catch {
+      // ignore
+    }
   }
 
   render() {
@@ -51,6 +58,7 @@ class ErrorBoundary extends React.Component {
         ? Object.prototype.toString.call(err)
         : "Unknown error";
     const safeStack = err?.stack ? String(err.stack) : "";
+    const safeComponentStack = this.state.componentStack ? String(this.state.componentStack) : "";
 
     try {
       if (typeof window !== "undefined") {
@@ -58,6 +66,7 @@ class ErrorBoundary extends React.Component {
           name: this.state.error?.name || "Error",
           message: safeMessage,
           stack: safeStack,
+          componentStack: safeComponentStack,
         };
       }
     } catch {
@@ -70,6 +79,7 @@ class ErrorBoundary extends React.Component {
         <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
           {safeMessage}
           {safeStack ? "\n\n" + safeStack : ""}
+          {safeComponentStack ? "\n\n" + safeComponentStack : ""}
         </pre>
       </div>
     );
