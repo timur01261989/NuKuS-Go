@@ -1,7 +1,6 @@
 import React, { memo } from 'react';
 import { useLanguage } from '@/modules/shared/i18n/useLanguage.js';
 import { useLoginController } from './useLoginController.js';
-import AuthHero from './AuthHero.jsx';
 import AuthForm from './AuthForm.jsx';
 
 /**
@@ -36,10 +35,6 @@ function AuthPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] p-4 font-sans selection:bg-orange-100">
       <main className="w-full max-w-[400px] flex flex-col space-y-6" data-purpose="login-container" role="main">
-        
-        {/* Brending va Hero qismi */}
-        <AuthHero t={t} authTrustState={ctrl?.authTrustState} />
-
         {/* Login formasi */}
         <section className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100" aria-labelledby="login-heading">
           <h2 id="login-heading" className="sr-only">Login</h2>
