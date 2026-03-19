@@ -1,5 +1,5 @@
 import React, { Suspense, memo } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Route, Navigate } from "react-router-dom";
 import { ROUTES } from "./routePaths.js";
 import ErrorBoundary from "../../modules/shared/components/ErrorBoundary.jsx";
 
@@ -69,14 +69,9 @@ function withRouteWrappers(Component, name) {
   );
 }
 
-/**
- * ClientRoutes
- * Returns a self-contained <Routes> tree so it can be rendered as an element.
- * Each route element is wrapped with Suspense + ErrorBoundary to isolate failures.
- */
 export default function ClientRoutes() {
   return (
-    <Routes>
+    <>
       {/* Primary client routes */}
       <Route index element={withRouteWrappers(Home, "Home")} />
       <Route path={ROUTES.client.home} element={withRouteWrappers(Home, "Home")} />
@@ -107,6 +102,6 @@ export default function ClientRoutes() {
       <Route path={ROUTES.legacy.clientPromo} element={<Navigate replace to={ROUTES.client.promo} />} />
       <Route path={ROUTES.legacy.clientSettings} element={<Navigate replace to={ROUTES.client.settings} />} />
       <Route path={`${ROUTES.legacy.market}/*`} element={<Navigate replace to={ROUTES.client.autoMarket} />} />
-    </Routes>
+    </>
   );
 }

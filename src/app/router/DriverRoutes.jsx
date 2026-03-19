@@ -1,5 +1,5 @@
 import React, { lazy } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Route, Navigate } from "react-router-dom";
 import { ROUTES } from "./routePaths.js";
 
 /* Lazy-loaded driver pages */
@@ -15,7 +15,7 @@ const DriverReferral = lazy(() => import("../../modules/driver/pages/DriverRefer
 
 function DriverRoutes() {
   return (
-    <Routes>
+    <>
       <Route path={ROUTES.driver.home} element={<DriverHome />} />
       <Route path={ROUTES.driver.orders} element={<DriverOrders />} />
       <Route path={ROUTES.driver.activeOrder} element={<DriverActiveOrder />} />
@@ -29,7 +29,7 @@ function DriverRoutes() {
       {/* Legacy redirects */}
       <Route path={ROUTES.legacy.driverHome} element={<Navigate replace to={ROUTES.driver.home} />} />
       <Route path={ROUTES.legacy.driverDashboard} element={<Navigate replace to={ROUTES.driver.home} />} />
-    </Routes>
+    </>
   );
 }
 
