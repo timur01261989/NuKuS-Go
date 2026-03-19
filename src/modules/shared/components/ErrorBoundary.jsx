@@ -21,11 +21,15 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, info) {
     // Konsolga to‘liq log
-    console.error("[ErrorBoundary] render failure", {
-      error,
-      info,
-      at: new Date().toISOString(),
-    });
+    try {
+      console.error("[ErrorBoundary] render failure", {
+        error,
+        info,
+        at: new Date().toISOString(),
+      });
+    } catch {
+      // ignore
+    }
 
     // Monitoring servislarga yuborish (agar mavjud bo‘lsa)
     try {
@@ -55,6 +59,14 @@ class ErrorBoundary extends React.Component {
   }
 
   handleRetry = () => {
+    // Tozalash: global xatoni ham o'chirish
+    try {
+      if (typeof window !== "undefined") {
+        window.__UNIGO_LAST_ERROR = null;
+      }
+    } catch {
+      // ignore
+    }
     this.setState({ hasError: false, error: null, componentStack: "" });
   };
 
@@ -67,13 +79,11 @@ class ErrorBoundary extends React.Component {
     const safeMessage = err?.message
       ? String(err.message)
       : err
-        ? Object.prototype.toString.call(err)
-        : "Unknown error";
+      ? Object.prototype.toString.call(err)
+      : "Unknown error";
     const safeStack = err?.stack ? String(err.stack) : "";
     const safeComponentStack =
-      this.lastComponentStack ||
-      this.state.componentStack ||
-      "";
+      this.lastComponentStack || this.state.componentStack || "";
 
     // Debug helper: oxirgi xatoni globalga yozish
     try {
@@ -92,25 +102,49 @@ class ErrorBoundary extends React.Component {
     return (
       <div style={{ padding: 16, textAlign: "center" }}>
         <h2>Something went wrong.</h2>
-        <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+        <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", textAlign: "left", maxHeight: 400, overflow: "auto" }}>
           {safeMessage}
           {safeStack ? "\n\n" + safeStack : ""}
           {safeComponentStack ? "\n\n" + safeComponentStack : ""}
         </pre>
-        <button
-          onClick={this.handleRetry}
-          style={{
-            marginTop: 12,
-            padding: "8px 16px",
-            backgroundColor: "#f97316",
-            color: "#fff",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-          }}
-        >
-          Retry
-        </button>
+        <div style={{ marginTop: 12 }}>
+          <button
+            onClick={this.handleRetry}
+            style={{
+              marginRight: 8,
+              padding: "8px 16px",
+              backgroundColor: "#f97316",
+              color: "#fff",
+              border: "none",
+              borderRadius: 6,
+              cursor: "pointer",
+            }}
+          >
+            Retry
+          </button>
+          <button
+            onClick={() => {
+              try {
+                if (typeof window !== "undefined") {
+                  // Ba'zan to'liq sahifani qayta yuklash kerak bo'ladi
+                  window.location.reload();
+                }
+              } catch {
+                // ignore
+              }
+            }}
+            style={{
+              padding: "8px 16px",
+              backgroundColor: "#e5e7eb",
+              color: "#111827",
+              border: "none",
+              borderRadius: 6,
+              cursor: "pointer",
+            }}
+          >
+            Reload page
+          </button>
+        </div>
       </div>
     );
   }
