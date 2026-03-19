@@ -22,6 +22,7 @@ export default defineConfig({
       "react",
       "react-dom",
       "react-router-dom",
+      "react-is",
       "@supabase/supabase-js",
       "leaflet",
       "react-leaflet",
@@ -36,18 +37,21 @@ export default defineConfig({
     minify: "esbuild",
     chunkSizeWarningLimit: 1500,
     rollupOptions: {
+      // Prevent Rollup from externalizing react-is — must be bundled
+      external: [],
       output: {
         // Hash prevents chunk name collision between same-named files in different dirs
         chunkFileNames: "assets/[name]-[hash].js",
         entryFileNames: "assets/[name]-[hash].js",
         assetFileNames: "assets/[name]-[hash].[ext]",
-        manualChunks: {
-          "vendor-react": ["react", "react-dom", "react-router-dom"],
-          "vendor-antd": ["antd", "@ant-design/icons"],
-          "vendor-map": ["leaflet", "react-leaflet"],
-          "vendor-supabase": ["@supabase/supabase-js"],
-          "vendor-chart": ["recharts"],
-          "vendor-query": ["@tanstack/react-query"],
+        manualChunks(id) {
+          if (id.includes('node_modules/react-is')) return 'vendor-react';
+          if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/') || id.includes('node_modules/react-router-dom')) return 'vendor-react';
+          if (id.includes('node_modules/antd') || id.includes('node_modules/@ant-design')) return 'vendor-antd';
+          if (id.includes('node_modules/leaflet') || id.includes('node_modules/react-leaflet')) return 'vendor-map';
+          if (id.includes('node_modules/@supabase')) return 'vendor-supabase';
+          if (id.includes('node_modules/recharts')) return 'vendor-chart';
+          if (id.includes('node_modules/@tanstack')) return 'vendor-query';
         },
       },
     },
