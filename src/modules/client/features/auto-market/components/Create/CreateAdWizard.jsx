@@ -142,16 +142,14 @@ export default function CreateAdWizard() {
   };
 
   // 3. AI Smart Tips (Aqlli maslahatlar)
-  const getAiTip = () => {
-    switch(step) {
-        case 0: return "Mashinangizning aniq modelini tanlang. Biz bazadan eng mos xarakteristikalarni avtomatik tortib olamiz.";
-        case 1: return "Kraska holati va ehtiyot qismlarni shaffof belgilang. Rostgo'ylik xaridorlar ishonchini 2 barobar oshiradi.";
-        case 2: return "Mashinani yorug' joyda, 4 ta tomondan rasmga oling. AI davlat raqamini avtomatik yashiradi.";
-        case 3: return "Qancha ko'p ma'lumot yozsangiz, shuncha tez sotiladi. O'rtacha bozor narxiga e'tibor bering.";
-        case 4: return "Telefon raqamingiz to'g'riligini tekshiring. Xaridorlar siz bilan darhol bog'lana olishi muhim.";
-        default: return "";
-    }
-  };
+  const aiTips = [
+    am("autoExtra.aiTip0", "Mashinangizning aniq modelini tanlang. Biz bazadan eng mos xarakteristikalarni avtomatik tortib olamiz."),
+    am("autoExtra.aiTip1", "Kraska holati va ehtiyot qismlarni shaffof belgilang. Rostgo'ylik xaridorlar ishonchini 2 barobar oshiradi."),
+    am("autoExtra.aiTip2", "Mashinani yorug' joyda, 4 ta tomondan rasmga oling. AI davlat raqamini avtomatik yashiradi."),
+    am("autoExtra.aiTip3", "Qancha ko'p ma'lumot yozsangiz, shuncha tez sotiladi. O'rtacha bozor narxiga e'tibor bering."),
+    am("autoExtra.aiTip4", "Telefon raqamingiz to'g'riligini tekshiring. Xaridorlar siz bilan darhol bog'lana olishi muhim."),
+  ];
+  const getAiTip = () => aiTips[step] || "";
 
   return (
     <div style={{ padding: 14, paddingBottom: 100 }}>
@@ -161,20 +159,20 @@ export default function CreateAdWizard() {
       </div>
 
       <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <Button onClick={() => { saveDraftNow(); message.success("Draft saqlandi"); }} style={{ borderRadius: 12 }}>Draft saqlash</Button>
+        <Button onClick={() => { saveDraftNow(); message.success(am("autoExtra.draftSaved", "Draft saqlandi")); }} style={{ borderRadius: 12 }}>{am("create.save", "Draft saqlash")}</Button>
         {draftMeta?.updatedAt ? (
           <Tag color="blue" style={{ borderRadius: 999, padding: "6px 10px", margin: 0 }}>
-            So‘nggi draft: {new Date(draftMeta.updatedAt).toLocaleString("uz-UZ")}
+            {am("autoExtra.lastDraft", "So‘nggi draft")}: {new Date(draftMeta.updatedAt).toLocaleString("uz-UZ")}
           </Tag>
         ) : null}
         <Tag color="purple" style={{ borderRadius: 999, padding: "6px 10px", margin: 0 }}>
-          To‘liqlik: {completeness}%
+          {am("autoExtra.completeness", "To‘liqlik")}: {completeness}%
         </Tag>
       </div>
 
       {/* YANGI: AI Smart Tip Banner */}
       <Alert
-        message={<span style={{ fontWeight: 'bold' }}>AI Yordamchi</span>}
+        message={<span style={{ fontWeight: 'bold' }}>{am("autoExtra.aiAssistant", "AI Yordamchi")}</span>}
         description={getAiTip()}
         type="info"
         showIcon
@@ -198,24 +196,24 @@ export default function CreateAdWizard() {
         <Alert
           type="info"
           showIcon
-          message="Sotuvchi uchun qulay professional oqim"
-          description="Bosqichlar xaridorni chalg‘itmaydigan e’lon tuzish uchun tartiblandi: ishonch, foto va aniq narx birinchi o‘rinda."
+          message={am("autoExtra.sellerFlowTitle", "Sotuvchi uchun qulay professional oqim")}
+          description={am("autoExtra.sellerFlowDesc", "Bosqichlar xaridorni chalg‘itmaydigan e’lon tuzish uchun tartiblandi: ishonch, foto va aniq narx birinchi o‘rinda.")}
           style={{ borderRadius: 16 }}
         />
         <div style={{ display: "grid", gridTemplateColumns: "1.1fr .9fr", gap: 12 }}>
           <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 18, padding: 14 }}>
-            <div style={{ fontWeight: 900, color: "#0f172a" }}>E’lon tayyorlik checklisti</div>
+            <div style={{ fontWeight: 900, color: "#0f172a" }}>{am("autoExtra.checklistTitle", "E’lon tayyorlik checklisti")}</div>
             <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
               {postingChecklist.map((item) => (
                 <div key={item.key} style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", borderRadius: 14, background: item.done ? "rgba(22,163,74,.08)" : "#f8fafc", padding: "10px 12px", border: `1px solid ${item.done ? "rgba(22,163,74,.18)" : "#e2e8f0"}` }}>
                   <span style={{ fontWeight: 700, color: "#0f172a" }}>{item.label}</span>
-                  <Tag color={item.done ? "green" : "default"} style={{ borderRadius: 999, margin: 0 }}>{item.done ? "Tayyor" : "Kutilmoqda"}</Tag>
+                  <Tag color={item.done ? "green" : "default"} style={{ borderRadius: 999, margin: 0 }}>{item.done ? am("autoExtra.ready", "Tayyor") : am("autoExtra.pending", "Kutilmoqda")}</Tag>
                 </div>
               ))}
             </div>
           </div>
           <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 18, padding: 14 }}>
-            <div style={{ fontWeight: 900, color: "#0f172a" }}>Nega shu e’lon yaxshiroq sotiladi</div>
+            <div style={{ fontWeight: 900, color: "#0f172a" }}>{am("autoExtra.whyBetterTitle", "Nega shu e’lon yaxshiroq sotiladi")}</div>
             <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
               {sellingPoints.map((item) => (
                 <div key={item} style={{ borderRadius: 14, background: "#f8fafc", padding: "10px 12px", color: "#475569", fontSize: 13, lineHeight: 1.45 }}>{item}</div>
@@ -240,7 +238,7 @@ export default function CreateAdWizard() {
           </div>
         </div>
         <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 18, padding: 14 }}>
-          <div style={{ fontWeight: 900, color: "#0f172a" }}>Narx tavsiyasi</div>
+          <div style={{ fontWeight: 900, color: "#0f172a" }}>{am("autoExtra.priceAdviceTitle", "Narx tavsiyasi")}</div>
           <div style={{ marginTop: 10, fontSize: 16, fontWeight: 900, color: "#0f172a" }}>{pricingRecommendation.headline}</div>
           <div style={{ marginTop: 8, fontSize: 13, color: "#475569", lineHeight: 1.5 }}>{pricingRecommendation.text}</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
@@ -266,7 +264,7 @@ export default function CreateAdWizard() {
         />
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
           <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 18, padding: 14 }}>
-            <div style={{ fontWeight: 900, color: "#0f172a" }}>Mahalliy to‘lov tayyorligi</div>
+            <div style={{ fontWeight: 900, color: "#0f172a" }}>{am("autoExtra.localPaymentTitle", "Mahalliy to‘lov tayyorligi")}</div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
               {localPaymentProviders.map((provider) => (
                 <div key={provider.key} style={{ borderRadius: 999, padding: "8px 12px", border: `1px solid ${provider.accent}22`, background: `${provider.accent}10`, color: "#0f172a", fontWeight: 800 }}>
@@ -276,7 +274,7 @@ export default function CreateAdWizard() {
             </div>
           </div>
           <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 18, padding: 14 }}>
-            <div style={{ fontWeight: 900, color: "#0f172a" }}>Seller CRM readiness</div>
+            <div style={{ fontWeight: 900, color: "#0f172a" }}>{am("autoExtra.crmReadinessTitle", "Seller CRM readiness")}</div>
             <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
               {[
                 "Lead kelganda 5 daqiqada javob berish",
@@ -292,7 +290,7 @@ export default function CreateAdWizard() {
 
 
       <div style={{ marginTop: 18, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 18, padding: 14 }}>
-        <div style={{ fontWeight: 900, color: "#0f172a" }}>Promote / VIP tayyorligi</div>
+        <div style={{ fontWeight: 900, color: "#0f172a" }}>{am("autoExtra.promoteReadinessTitle", "Promote / VIP tayyorligi")}</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginTop: 12 }}>
           {promotePackages.map((item) => (
             <div key={item.key} style={{ borderRadius: 16, padding: 14, background: `${item.accent}10`, border: `1px solid ${item.accent}22` }}>
