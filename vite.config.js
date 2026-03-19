@@ -35,6 +35,8 @@ export default defineConfig({
   },
   build: {
     minify: "esbuild",
+    // Enable source maps to debug production errors on Vercel
+    sourcemap: true,
     chunkSizeWarningLimit: 1500,
     rollupOptions: {
       // Prevent Rollup from externalizing react-is — must be bundled

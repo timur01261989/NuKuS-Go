@@ -5,6 +5,7 @@ import ErrorBoundary from "./modules/shared/components/ErrorBoundary.jsx";
 import AppErrorBoundary from "./modules/shared/debug/AppErrorBoundary.jsx";
 import AppProviders from "./app/providers/AppProviders.jsx";
 import { bootstrapRuntime } from "./bootstrap/runtimeBootstrap.js";
+import { BrowserRouter } from "react-router-dom";
 
 import "antd/dist/reset.css";
 import "leaflet/dist/leaflet.css";
@@ -24,9 +25,11 @@ ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     <AppErrorBoundary>
       <AppProviders>
-        <ErrorBoundary>
-          <App />
-        </ErrorBoundary>
+        <BrowserRouter>
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
+        </BrowserRouter>
       </AppProviders>
     </AppErrorBoundary>
   </React.StrictMode>,

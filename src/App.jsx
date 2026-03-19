@@ -8,23 +8,39 @@ function AppComponent() {
   const auth = useAuth();
 
   const appState = useMemo(() => {
-    const access = selectAccessState(auth);
-
-    if (access.mode === "loading") {
+    // 1-HIMOYA: Auth context mavjudligini tekshirish
+    if (!auth) {
+      console.error("Auth context is missing! Check AuthProvider wrapping.");
       return { status: "loading", role: null };
     }
 
-    return {
-      status: access.mode === "guest" ? "guest" : "ready",
-      role: access.appRole,
-    };
+    try {
+      const access = selectAccessState(auth);
+
+      // 2-HIMOYA: selectAccessState natijasini tekshirish
+      if (!access || access.mode === "loading") {
+        return { status: "loading", role: null };
+      }
+
+      return {
+        status: access.mode === "guest" ? "guest" : "ready",
+        role: access.appRole || null,
+      };
+    } catch (err) {
+      // 3-HIMOYA: Mantiqiy xatoliklarni tutib qolish
+      console.error("Access state selection failed:", err);
+      return { status: "loading", role: null };
+    }
   }, [auth]);
 
+  // Agar yuklanish jarayonida bo'lsa yoki auth hali kelmagan bo'lsa Loader chiqarish
   if (appState.status === "loading") {
     return <Loader />;
   }
 
+  // Faqat holat aniq bo'lgandagina routerni ishga tushirish
   return <AppRouter appRole={appState.role} />;
 }
 
+// React.memo renderlarni optimallashtirish uchun qoladi
 export default React.memo(AppComponent);
