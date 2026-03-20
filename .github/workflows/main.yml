@@ -8,6 +8,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    # UniGo loyihasi uchun zarur bo'lgan environment o'zgaruvchilari
     env:
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
@@ -51,7 +52,7 @@ jobs:
       - name: Verify dist folder exists
         run: |
           if [ ! -d "dist" ]; then
-            echo "ERROR: dist/ papkasi topilmadi!"
+            echo "ERROR: dist/ papkasi topilmadi! Build xato berdi."
             exit 1
           fi
           ls -la dist/
@@ -62,11 +63,11 @@ jobs:
       - name: Build Android APK
         run: |
           cd android
-          # CRITICAL FIX: Windows CRLF formatini Linux LF formatiga o'tkazish
+          # ASOSIY TUZATISH: Windows formatidagi gradlew ni Linux formatiga o'tkazish
           sed -i 's/\r$//' gradlew
-          # Ijro etish ruxsatini berish
+          # Faylga ruxsat berish
           chmod +x gradlew
-          # Build jarayonini boshlash
+          # Gradle buildni boshlash
           ./gradlew assembleDebug \
             --no-daemon \
             --stacktrace \
@@ -75,6 +76,6 @@ jobs:
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: UniGo-App-Debug
+          name: UniGo-Android-App
           path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 7
