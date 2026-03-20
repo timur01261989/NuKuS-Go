@@ -8,9 +8,13 @@ const PROFILE_SELECTORS = [
   "id,phone,role",
 ];
 const DRIVER_APPLICATION_SELECTORS = [
-  "id,user_id,status,vehicle_type,brand,model,plate_number,requested_max_weight_kg,requested_max_volume_m3,seat_count,created_at",
-  "id,user_id,status,vehicle_type,brand,model,plate_number,seat_count,created_at",
-  "id,user_id,status,transport_type,brand,model,plate_number,created_at",
+  // driver_applications schema:
+  // - transport_type
+  // - vehicle_brand, vehicle_model, vehicle_plate
+  // - requested_max_freight_weight_kg, requested_payload_volume_m3
+  "id,user_id,status,transport_type,vehicle_brand,vehicle_model,vehicle_plate,requested_max_freight_weight_kg,requested_payload_volume_m3,seat_count,created_at",
+  "id,user_id,status,transport_type,vehicle_brand,vehicle_model,vehicle_plate,seat_count,created_at",
+  "id,user_id,status,transport_type,created_at",
   "id,user_id,status,created_at",
 ];
 const DRIVER_SETTINGS_COLUMNS = [
@@ -25,7 +29,9 @@ const DRIVER_SETTINGS_COLUMNS = [
   "interdistrict_delivery",
   "interdistrict_freight",
 ].join(",");
-const VEHICLE_COLUMNS = "id,user_id,vehicle_type,brand,model,plate_number,seat_count,max_weight_kg,max_volume_m3,approval_status,status,is_active,created_at";
+// vehicles schema (compat):
+// - status does NOT exist on public.vehicles (it exists on other tables), so do not select it.
+const VEHICLE_COLUMNS = "id,user_id,vehicle_type,brand,model,plate_number,seat_count,max_weight_kg,max_volume_m3,approval_status,is_active,created_at";
 const PRESENCE_COLUMNS = "driver_id,is_online,last_seen_at,current_order_id,updated_at";
 
 function normalizeStatus(value) {
@@ -97,17 +103,30 @@ export function serviceTypesToAllowedServices(serviceTypes = {}) {
 }
 
 function normalizeVehicle(row = {}) {
-  const preset = VEHICLE_TYPE_PRESETS[row.vehicle_type] || null;
+  const vehicleType = row.vehicle_type || row.transport_type || "light_car";
+  const preset = VEHICLE_TYPE_PRESETS[vehicleType] || null;
 
   return {
     id: row.id,
-    vehicle_type: row.vehicle_type || "light_car",
+    vehicle_type: vehicleType,
     brand: row.brand || row.vehicle_brand || "",
     model: row.model || row.vehicle_model || "",
     plate_number: row.plate_number || row.vehicle_plate || "",
     seat_count: Number(row.seat_count || row.seats || preset?.seats || 0),
-    max_weight_kg: Number(row.max_weight_kg || row.requested_max_weight_kg || preset?.cargoKg || 0),
-    max_volume_m3: Number(row.max_volume_m3 || row.requested_max_volume_m3 || preset?.cargoM3 || 0),
+    max_weight_kg: Number(
+      row.max_weight_kg ||
+        row.requested_max_weight_kg ||
+        row.requested_max_freight_weight_kg ||
+        preset?.cargoKg ||
+        0
+    ),
+    max_volume_m3: Number(
+      row.max_volume_m3 ||
+        row.requested_max_volume_m3 ||
+        row.requested_payload_volume_m3 ||
+        preset?.cargoM3 ||
+        0
+    ),
     approval_status: row.approval_status || row.status || "pending",
     is_active: !!row.is_active,
   };
@@ -125,12 +144,11 @@ export async function fetchDriverCore(userId) {
     ]),
     tryListQuery([
       () => supabase.from("vehicles").select(VEHICLE_COLUMNS).eq("user_id", userId).order("is_active", { ascending: false }).order("created_at", { ascending: false }),
-      () => supabase.from("vehicles").select("id,driver_id,vehicle_type,brand,model,plate_number,seat_count,max_weight_kg,max_volume_m3,approval_status,status,is_active,created_at").eq("driver_id", userId).order("is_active", { ascending: false }).order("created_at", { ascending: false }),
       () => Promise.resolve({ data: [], error: null }),
     ]),
     trySingleQuery([
       () => supabase.from("driver_presence").select(PRESENCE_COLUMNS).eq("driver_id", userId).maybeSingle(),
-      () => supabase.from("driver_presence").select("driver_id,is_online,last_seen,updated_at").eq("driver_id", userId).maybeSingle(),
+      () => supabase.from("driver_presence").select("driver_id,is_online,last_seen_at,updated_at").eq("driver_id", userId).maybeSingle(),
       () => Promise.resolve({ data: null, error: null }),
     ]),
   ]);
