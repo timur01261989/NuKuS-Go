@@ -156,19 +156,22 @@ async function getTariffConfig(sb, serviceType) {
 
 // ─── GET handler ──────────────────────────────────────────────────────────────
 async function handleGetPricing(sb, searchParams) {
-  const serviceType = searchParams.get("service_type") || "standard";
-  const distanceKm  = Number(searchParams.get("distance_km") || 0);
-  const durationMin = Number(searchParams.get("duration_min") || 0);
-  const lat = searchParams.get("lat") ? Number(searchParams.get("lat")) : null;
-  const lng = searchParams.get("lng") ? Number(searchParams.get("lng")) : null;
+  const serviceType = String(searchParams.get("service_type") || "standard").trim();
+  const distanceKm  = Number.isFinite(Number(searchParams.get("distance_km"))) ? Number(searchParams.get("distance_km")) : 0;
+  const durationMin = Number.isFinite(Number(searchParams.get("duration_min"))) ? Number(searchParams.get("duration_min")) : 0;
+  const lat = Number.isFinite(Number(searchParams.get("lat"))) ? Number(searchParams.get("lat")) : null;
+  const lng = Number.isFinite(Number(searchParams.get("lng"))) ? Number(searchParams.get("lng")) : null;
 
   const [tariff, { multiplier, reason }] = await Promise.all([
     getTariffConfig(sb, serviceType),
     calcSurge(sb, serviceType, lat, lng),
   ]);
 
-  const basePrice = Number(tariff.base || 0) + Number(tariff.per_km || 0) * distanceKm + Number(tariff.per_min || 0) * durationMin;
-  const defaultPrice = Math.max(Number(tariff.min_fare || 0), Math.round(basePrice * multiplier));
+  const safeNumber = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
+  const basePrice = safeNumber(tariff.base) + safeNumber(tariff.per_km) * distanceKm + safeNumber(tariff.per_min) * durationMin;
+  const rawMultiplier = Number.isFinite(Number(multiplier)) && Number(multiplier) >= 1 ? Number(multiplier) : 1;
+  const minFare = Math.max(0, safeNumber(tariff.min_fare));
+  const defaultPrice = Math.max(minFare, Math.ceil(basePrice * rawMultiplier));
 
   let finalPrice = defaultPrice;
   if (["intercity", "interdistrict", "airport_transfer"].includes(serviceType)) {

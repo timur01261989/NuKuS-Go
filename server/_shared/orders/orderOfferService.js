@@ -78,6 +78,20 @@ export async function acceptOrderOffer(supabase, {
   if (!orderBefore) throw new Error('order_not_found');
   if (orderBefore.driver_id && String(orderBefore.driver_id) !== safeDriverId) throw new Error('order_taken');
 
+  // Enforce atomic order assignment and race protection in DB.
+  const { data: acceptResult, error: acceptError } = await supabase.rpc('accept_order_atomic', {
+    p_order_id: safeOrderId,
+    p_driver_id: safeDriverId,
+  });
+
+  if (acceptError) {
+    if (/Order already assigned|order_already_taken|Order not found/i.test(acceptError.message || '')) {
+      throw new Error('order_already_taken');
+    }
+    throw acceptError;
+  }
+
+  // Accept only this offer and reject the rest after the order has been reserved.
   const { error: offerAcceptError } = await supabase
     .from('order_offers')
     .update({ status: 'accepted', responded_at: nowIso() })
@@ -94,20 +108,16 @@ export async function acceptOrderOffer(supabase, {
     .eq('status', 'sent');
   if (rejectOthersError) throw rejectOthersError;
 
-  const { data: orderAfter, error: orderUpdateError } = await supabase
+  const { data: orderAfter, error: orderAfterError } = await supabase
     .from('orders')
-    .update({ driver_id: safeDriverId, status: 'accepted', accepted_at: nowIso(), updated_at: nowIso() })
-    .eq('id', safeOrderId)
-    .is('driver_id', null)
     .select('id,status,driver_id,service_type,pickup,dropoff,price_uzs,user_id')
+    .eq('id', safeOrderId)
     .maybeSingle();
 
-  if (orderUpdateError) throw orderUpdateError;
-  const effectiveOrder = orderAfter || {
-    ...orderBefore,
-    driver_id: safeDriverId,
-    status: 'accepted',
-  };
+  if (orderAfterError) throw orderAfterError;
+  if (!orderAfter) throw new Error('order_not_found_after_accept');
+
+  const effectiveOrder = orderAfter; 
 
   await emitOrderEvent(supabase, {
     order_id: safeOrderId,

@@ -2518,38 +2518,14 @@ stable
 as $$
   select
     dp.driver_id,
-    (
-      6371 * acos(
-        least(
-          1,
-          greatest(
-            -1,
-            cos(radians(p_lat))
-            * cos(radians(dp.lat))
-            * cos(radians(dp.lng) - radians(p_lng))
-            + sin(radians(p_lat)) * sin(radians(dp.lat))
-          )
-        )
-      )
-    )::numeric as distance_km
+    (earth_distance(ll_to_earth(p_lat, p_lng), ll_to_earth(dp.lat, dp.lng)) / 1000.0)::numeric as distance_km
   from public.driver_presence dp
   where dp.is_online = true
     and dp.lat is not null
     and dp.lng is not null
-    and (
-      6371 * acos(
-        least(
-          1,
-          greatest(
-            -1,
-            cos(radians(p_lat))
-            * cos(radians(dp.lat))
-            * cos(radians(dp.lng) - radians(p_lng))
-            + sin(radians(p_lat)) * sin(radians(dp.lat))
-          )
-        )
-      )
-    ) <= p_radius_km;
+    and dp.geo_point is not null
+    and earth_box(ll_to_earth(p_lat, p_lng), p_radius_km * 1000) @> ll_to_earth(dp.lat, dp.lng)
+    and earth_distance(ll_to_earth(p_lat, p_lng), ll_to_earth(dp.lat, dp.lng)) <= p_radius_km * 1000;
 $$;
 
 create or replace function public.dispatch_match_order_phase7(p_order_id uuid)
