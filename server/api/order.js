@@ -44,6 +44,44 @@ async function getAuthedUserId(req, supabase) {
   return data?.user?.id || null;
 }
 
+function inferOrderActionFromUrl(req) {
+  try {
+    const url = new URL(req?.url || "", "http://localhost");
+    const path = String(url.pathname || "")
+      .replace(/^\/api\/?/u, "") // strip leading /api
+      .replace(/^\/+/u, "");
+
+    // Expected forms:
+    //  - order/active
+    //  - order/list-available
+    //  - order/cancel
+    //  - order/get
+    const parts = path.split("/").filter(Boolean);
+    const orderIdx = parts.indexOf("order");
+    const afterOrder = orderIdx >= 0 ? parts[orderIdx + 1] : parts[0] === "order" ? parts[1] : null;
+    if (!afterOrder) return "";
+
+    const cleaned = String(afterOrder).replace(/!\d+$/u, ""); // chrome sometimes shows !<n> suffix in paths
+    const seg = cleaned.toLowerCase();
+
+    if (seg === "active") return "active";
+    if (seg === "get") return "get";
+    if (seg === "cancel") return "cancel";
+    if (seg === "list-available") return "list_available";
+
+    // Other routes are not required for the red errors screenshot,
+    // but mapping them prevents falling into create-order by accident.
+    if (seg === "accept") return "accept";
+    if (seg === "decline") return "decline";
+    if (seg === "status") return "update_status";
+    if (seg === "complete") return "complete";
+
+    return "";
+  } catch {
+    return "";
+  }
+}
+
 
 async function handleGetById(supabase, body, req = null, authedUserId = null) {
   const orderId = toText(
@@ -79,14 +117,15 @@ async function handleGetById(supabase, body, req = null, authedUserId = null) {
     }
   }
 
+  const order = buildResponseOrder(data);
   return {
     status: 200,
     payload: {
       ok: true,
-      order: buildResponseOrder(data),
+      order,
       id: data?.id ?? null,
       orderId: data?.id ?? null,
-      data: data ? { id: data.id } : null,
+      data: order,
     },
   };
 }
@@ -132,9 +171,46 @@ async function handleActiveOrder(supabase, body, authedUserId = null) {
       order: buildResponseOrder(data),
       id: data.id,
       orderId: data.id,
-      data: { id: data.id },
+      data: buildResponseOrder(data),
     },
   };
+}
+
+async function handleListAvailableOrders(supabase, body, authedUserId = null) {
+  const driverId = normalizeUuid(authedUserId ?? body?.driver_id ?? body?.driverId);
+  if (!driverId) {
+    return { status: 200, payload: { ok: true, data: [] } };
+  }
+
+  const nowIso = new Date().toISOString();
+  const { data: offers, error: offersError } = await supabase
+    .from("order_offers")
+    .select("order_id,expires_at,status")
+    .eq("driver_id", driverId)
+    .eq("status", "sent")
+    .gt("expires_at", nowIso);
+
+  if (offersError) {
+    return { status: 500, payload: { ok: false, error: offersError.message } };
+  }
+
+  const orderIds = Array.isArray(offers) ? [...new Set(offers.map((o) => o?.order_id).filter(Boolean))] : [];
+  if (!orderIds.length) {
+    return { status: 200, payload: { ok: true, data: [] } };
+  }
+
+  const { data: orders, error: ordersError } = await supabase
+    .from("orders")
+    .select(ORDER_SELECT)
+    .in("id", orderIds)
+    .order("created_at", { ascending: false });
+
+  if (ordersError) {
+    return { status: 500, payload: { ok: false, error: ordersError.message } };
+  }
+
+  const list = Array.isArray(orders) ? orders.map((r) => buildResponseOrder(r)).filter(Boolean) : [];
+  return { status: 200, payload: { ok: true, data: list } };
 }
 
 async function handleCancel(supabase, body, authedUserId = null) {
@@ -216,7 +292,7 @@ async function handleCancel(supabase, body, authedUserId = null) {
       order: buildResponseOrder(data),
       id: data?.id ?? null,
       orderId: data?.id ?? null,
-      data: data ? { id: data.id } : null,
+      data: buildResponseOrder(data),
     },
   };
 }
@@ -315,7 +391,7 @@ async function handleCreateOrder(supabase, body, authedUserId = null) {
       order: buildResponseOrder(data),
       id: data?.id ?? null,
       orderId: data?.id ?? null,
-      data: data ? { id: data.id } : null,
+      data: buildResponseOrder(data),
     },
   };
 }
@@ -324,7 +400,8 @@ export default async function handler(req, res) {
   try {
     const method = getMethod(req);
     const body = await readBody(req);
-    const action = toText(body?.action).toLowerCase();
+    let action = toText(body?.action).toLowerCase();
+    if (!action) action = inferOrderActionFromUrl(req);
     const supabase = await getSupabaseAdmin();
     const authedUserId = await getAuthedUserId(req, supabase);
 
@@ -349,6 +426,11 @@ export default async function handler(req, res) {
 
     if (action === "cancel") {
       const result = await handleCancel(supabase, body, authedUserId);
+      return json(res, result.status, result.payload);
+    }
+
+    if (action === "list_available") {
+      const result = await handleListAvailableOrders(supabase, body, authedUserId);
       return json(res, result.status, result.payload);
     }
 

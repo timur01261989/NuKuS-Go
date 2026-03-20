@@ -213,14 +213,45 @@ export function buildResponseOrder(row) {
   const pricing = normalizeJsonObject(routeMeta.pricing);
   const options = normalizeJsonObject(routeMeta.options);
 
+  const pickup = row.pickup ?? null;
+  const dropoff = row.dropoff ?? null;
+
+  // Legacy/compat fields used by taxi client code.
+  // (Some clients read `from_lat/from_lng`, others read `pickup.lat/lng`.)
+  const pickupLocation =
+    pickup && typeof pickup === "object"
+      ? { address: pickup.address ?? null, lat: pickup.lat ?? null, lng: pickup.lng ?? null }
+      : null;
+  const dropoffLocation =
+    dropoff && typeof dropoff === "object"
+      ? { address: dropoff.address ?? null, lat: dropoff.lat ?? null, lng: dropoff.lng ?? null }
+      : null;
+
   return {
     id: row.id,
     user_id: row.user_id ?? null,
     driver_id: row.driver_id ?? null,
     service_type: row.service_type ?? "taxi",
     status: row.status ?? null,
-    pickup: row.pickup ?? null,
-    dropoff: row.dropoff ?? null,
+    pickup,
+    dropoff,
+
+    // Taxi compat fields
+    pickup_location: pickupLocation,
+    dropoff_location: dropoffLocation,
+    pickup_address: pickup?.address ?? null,
+    dropoff_address: dropoff?.address ?? null,
+    pickup_lat: pickup?.lat ?? null,
+    pickup_lng: pickup?.lng ?? null,
+    dropoff_lat: dropoff?.lat ?? null,
+    dropoff_lng: dropoff?.lng ?? null,
+    from_address: pickup?.address ?? null,
+    to_address: dropoff?.address ?? null,
+    from_lat: pickup?.lat ?? null,
+    from_lng: pickup?.lng ?? null,
+    to_lat: dropoff?.lat ?? null,
+    to_lng: dropoff?.lng ?? null,
+
     payment_method: row.payment_method ?? null,
     car_type: pricing.car_type ?? null,
     comment: row.note ?? null,
