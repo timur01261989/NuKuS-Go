@@ -1,7 +1,8 @@
 
-import { INTERDISTRICT_TRIP_STATUS, normalizeInterDistrictStatus } from "./interDistrictStatuses";
+import { INTERDISTRICT_TRIP_STATUS, INTERDISTRICT_TRIP_STATUS_DB, normalizeInterDistrictStatus, toDbInterDistrictStatus } from "./interDistrictStatuses";
 
 export function normalizeInterDistrictTripPayload(input = {}) {
+  const safeStatus = normalizeInterDistrictStatus(input.status || INTERDISTRICT_TRIP_STATUS.SEARCHING);
   return {
     region: input.region || input.region_id || "karakalpakstan",
     from_district: input.from_district || input.fromDistrict || null,
@@ -30,7 +31,7 @@ export function normalizeInterDistrictTripPayload(input = {}) {
     notes: input.notes || "",
     women_only: !!(input.women_only || input.female_only),
     booking_mode: input.booking_mode || "approval",
-    status: normalizeInterDistrictStatus(input.status || INTERDISTRICT_TRIP_STATUS.SEARCHING),
+    status: toDbInterDistrictStatus(safeStatus),
     active_vehicle_id: input.active_vehicle_id || null,
     active_vehicle_max_weight_kg: input.active_vehicle_max_weight_kg == null ? null : Number(input.active_vehicle_max_weight_kg),
     active_vehicle_max_volume_m3: input.active_vehicle_max_volume_m3 == null ? null : Number(input.active_vehicle_max_volume_m3),
@@ -38,6 +39,7 @@ export function normalizeInterDistrictTripPayload(input = {}) {
 }
 
 export function normalizeInterDistrictRequestPayload(input = {}) {
+  const safeStatus = normalizeInterDistrictStatus(input.status || INTERDISTRICT_TRIP_STATUS.SEARCHING);
   return {
     trip_id: input.trip_id,
     seats_requested: input.seats_requested == null ? null : Number(input.seats_requested),
@@ -53,7 +55,7 @@ export function normalizeInterDistrictRequestPayload(input = {}) {
     payment_method: input.payment_method || "cash",
     final_price: input.final_price == null ? null : Number(input.final_price),
     selected_seats: Array.isArray(input.selected_seats) ? input.selected_seats : [],
-    status: normalizeInterDistrictStatus(input.status || INTERDISTRICT_TRIP_STATUS.SEARCHING),
+    status: toDbInterDistrictStatus(safeStatus),
     cancel_reason: input.cancel_reason || null,
   };
 }

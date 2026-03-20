@@ -1,5 +1,5 @@
 import { normalizeInterDistrictTripPayload } from "@/modules/shared/interdistrict/domain/interDistrictSchemas";
-import { INTERDISTRICT_TRIP_STATUS } from "@/modules/shared/interdistrict/domain/interDistrictStatuses";
+import { INTERDISTRICT_TRIP_STATUS, toDbInterDistrictStatus } from "@/modules/shared/interdistrict/domain/interDistrictStatuses";
 import { supabase } from "@/services/supabase/supabaseClient";
 
 const TBL_QUEUE = "queues";
@@ -72,7 +72,10 @@ export async function listPremiumRequests() {
   return supabase
     .from(TBL_REQUESTS)
     .select("*")
-    .in("status", [INTERDISTRICT_TRIP_STATUS.SEARCHING, INTERDISTRICT_TRIP_STATUS.MATCHED])
+    .in("status", [
+      toDbInterDistrictStatus(INTERDISTRICT_TRIP_STATUS.SEARCHING),
+      toDbInterDistrictStatus(INTERDISTRICT_TRIP_STATUS.MATCHED),
+    ])
     .order("created_at", { ascending: false });
 }
 
@@ -98,7 +101,7 @@ export async function acceptRequest({ request_id }) {
   return supabase
     .from(TBL_REQUESTS)
     .update({
-      status: INTERDISTRICT_TRIP_STATUS.ACCEPTED,
+      status: toDbInterDistrictStatus(INTERDISTRICT_TRIP_STATUS.ACCEPTED),
       accepted_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
@@ -109,7 +112,7 @@ export async function respondTripRequest(requestId, status) {
   const { data, error } = await supabase
     .from(TBL_REQUESTS)
     .update({
-      status,
+      status: toDbInterDistrictStatus(status),
       responded_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
@@ -123,7 +126,7 @@ export async function declineRequest({ request_id }) {
   return supabase
     .from(TBL_REQUESTS)
     .update({
-      status: INTERDISTRICT_TRIP_STATUS.CANCELED,
+      status: toDbInterDistrictStatus(INTERDISTRICT_TRIP_STATUS.CANCELED),
       rejected_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })

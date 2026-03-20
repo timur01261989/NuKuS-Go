@@ -5,6 +5,18 @@ export function getDefaultApiConfig() {
       (typeof import.meta !== "undefined" && import.meta?.env?.VITE_API_BASE) ||
       "",
     timeoutMs: 20000,
+    retry: {
+      enabled: false,
+      max: 1,
+      methods: ["GET"],
+      statuses: [429, 500, 502, 503, 504],
+      baseDelayMs: 300,
+    },
+    cache: {
+      enabled: false,
+      ttlMs: 0,
+    },
+    // Legacy compatibility
     retries: 0,
     retryDelayMs: 300,
     retryJitterMs: 150,

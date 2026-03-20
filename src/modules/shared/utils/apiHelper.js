@@ -126,8 +126,21 @@ const api = {
     // Key for cache/dedupe (exclude AbortController by default; user can pass requestId to force)
     const key = opts.requestId || buildKey({ method, url, query: opts.query, body: opts.body, bodyType });
 
+    const retryConfig = {
+      enabled: this._cfg.retry?.enabled ?? (this._cfg.retries > 0),
+      max: this._cfg.retry?.max ?? this._cfg.retries ?? 0,
+      methods: this._cfg.retry?.methods ?? ["GET"],
+      statuses: this._cfg.retry?.statuses ?? [429, 500, 502, 503, 504],
+      baseDelayMs: this._cfg.retry?.baseDelayMs ?? this._cfg.retryDelayMs ?? 300,
+    };
+
+    const cacheConfig = {
+      enabled: this._cfg.cache?.enabled ?? false,
+      ttlMs: this._cfg.cache?.ttlMs ?? this._cfg.cacheTtlMs ?? 0,
+    };
+
     // GET cache
-    const canCache = this._cfg.cache.enabled && opts.cache !== false && method === "GET";
+    const canCache = cacheConfig.enabled && opts.cache !== false && method === "GET";
     if (canCache) {
       const hit = getCached(key);
       if (hit != null) return hit;
@@ -236,10 +249,10 @@ const api = {
       };
 
       const shouldRetry = (err) => {
-        if (!this._cfg.retry.enabled) return false;
+        if (!retryConfig.enabled) return false;
         if (err?.isAbort || err?.name === "AbortError") return false;
 
-        const allowedMethods = this._cfg.retry.methods || ["GET"];
+        const allowedMethods = retryConfig.methods || ["GET"];
         const isMethodOk = allowedMethods.includes(method);
         if (!isMethodOk) return false;
 
@@ -248,7 +261,7 @@ const api = {
 
         // Retry on selected HTTP statuses
         const st = err instanceof ApiError ? err.status : null;
-        if (typeof st === "number" && (this._cfg.retry.statuses || []).includes(st)) return true;
+        if (typeof st === "number" && (retryConfig.statuses || []).includes(st)) return true;
 
         return false;
       };
@@ -256,7 +269,7 @@ const api = {
       const withRetry = async () => {
         let attempt = 0;
         let lastErr = null;
-        const max = Math.max(0, this._cfg.retry.max || 0);
+        const max = Math.max(0, retryConfig.max || 0);
 
         while (attempt <= max) {
           try {

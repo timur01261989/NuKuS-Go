@@ -47,7 +47,10 @@ export function buildClientTripSignals({ activeTripRequest, routeInfo, canonical
 
 export function buildQueueHealthMeta({ requests = [], serviceActive = false, mode = "standard", lastSocketEventAt = null }) {
   const count = requests.length;
-  const hotCount = requests.filter((item) => normalizeInterDistrictStatus(item.status) === INTERDISTRICT_TRIP_STATUS.MATCHED || item.status === "new").length;
+  const hotCount = requests.filter((item) => {
+    const normalizedStatus = normalizeInterDistrictStatus(item.status);
+    return normalizedStatus === INTERDISTRICT_TRIP_STATUS.MATCHED || normalizedStatus === INTERDISTRICT_TRIP_STATUS.SEARCHING;
+  }).length;
   const stalenessMs = lastSocketEventAt ? Math.max(0, Date.now() - new Date(lastSocketEventAt).getTime()) : null;
   return {
     count,

@@ -1,5 +1,5 @@
 import { normalizeInterDistrictRequestPayload, normalizeInterDistrictTripPayload } from "@/modules/shared/interdistrict/domain/interDistrictSchemas";
-import { INTERDISTRICT_TRIP_STATUS, isFinishedInterDistrictStatus, normalizeInterDistrictStatus } from "@/modules/shared/interdistrict/domain/interDistrictStatuses";
+import { INTERDISTRICT_TRIP_STATUS, isFinishedInterDistrictStatus, normalizeInterDistrictStatus, toDbInterDistrictStatus } from "@/modules/shared/interdistrict/domain/interDistrictStatuses";
 import { supabase } from "@/services/supabase/supabaseClient";
 
 export async function listPitaks({ region, from_district, to_district, activeOnly = true } = {}) {
@@ -55,7 +55,15 @@ export async function createTrip(trip) {
 
 export async function searchTrips(params = {}) {
   const { region, from_district, to_district, depart_from, depart_to, has_ac, has_trunk, tariff, include_delivery = true } = params;
-  let q = supabase.from("district_trips").select("*").in("status", [INTERDISTRICT_TRIP_STATUS.SEARCHING, INTERDISTRICT_TRIP_STATUS.MATCHED, INTERDISTRICT_TRIP_STATUS.ACCEPTED]).order("depart_at", { ascending: true });
+  let q = supabase
+    .from("district_trips")
+    .select("*")
+    .in("status", [
+      toDbInterDistrictStatus(INTERDISTRICT_TRIP_STATUS.SEARCHING),
+      toDbInterDistrictStatus(INTERDISTRICT_TRIP_STATUS.MATCHED),
+      toDbInterDistrictStatus(INTERDISTRICT_TRIP_STATUS.ACCEPTED),
+    ])
+    .order("depart_at", { ascending: true });
   if (region) q = q.eq("region", region);
   if (from_district) q = q.eq("from_district", from_district);
   if (to_district) q = q.eq("to_district", to_district);
@@ -127,7 +135,7 @@ export async function getClientActiveTrip() {
 
 export async function cancelTripRequest({ request_id, reason }) {
   const payload = {
-    status: INTERDISTRICT_TRIP_STATUS.CANCELED,
+    status: toDbInterDistrictStatus(INTERDISTRICT_TRIP_STATUS.CANCELED),
     cancel_reason: reason || "client_cancelled",
     updated_at: new Date().toISOString(),
   };
@@ -142,7 +150,10 @@ export async function cancelTripRequest({ request_id, reason }) {
 }
 
 export async function respondTripRequest({ request_id, status }) {
-  const { error } = await supabase.from("district_trip_requests").update({ status: normalizeInterDistrictStatus(status), updated_at: new Date().toISOString() }).eq("id", request_id);
+  const { error } = await supabase
+    .from("district_trip_requests")
+    .update({ status: toDbInterDistrictStatus(status), updated_at: new Date().toISOString() })
+    .eq("id", request_id);
   if (error) throw error;
   return true;
 }
