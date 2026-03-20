@@ -49,7 +49,12 @@ async function tripSearch(sb, body) {
 }
 
 async function resolveOrder(sb, order_id) {
-  const { data, error } = await sb.from('orders').select('*').eq('id', order_id).maybeSingle();
+  // Dispatch uchun faqat kerakli maydonlarni tanlaymiz:
+  // - id/service_type: offer yaratish va routing
+  // - pickup: radius search (orderDispatchBatch)
+  // - driver_id/user_id/status: ixtiyoriy contract/validatsiyalar uchun
+  const selectCols = 'id,user_id,driver_id,status,service_type,pickup,dropoff,route_meta';
+  const { data, error } = await sb.from('orders').select(selectCols).eq('id', order_id).maybeSingle();
   if (error) throw error;
   return data;
 }
