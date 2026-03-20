@@ -8,13 +8,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    # UniGo loyihasi uchun zarur bo'lgan environment o'zgaruvchilari
-    env:
-      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-      VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
-      VITE_AUTO_MARKET_MODE: mock
-
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
@@ -35,27 +28,17 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Accept Android SDK Licenses
-        run: yes | sdkmanager --licenses || true
-
       - name: Install Dependencies
         run: npm install --legacy-peer-deps
 
+      # ─── BUILD VAQTIDA SECRETS LARNI O'ZLASHTIRISH ───
       - name: Build Web Project
         run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
-          VITE_AUTO_MARKET_MODE: mock
-
-      - name: Verify dist folder exists
-        run: |
-          if [ ! -d "dist" ]; then
-            echo "ERROR: dist/ papkasi topilmadi! Build xato berdi."
-            exit 1
-          fi
-          ls -la dist/
+          VITE_AUTO_MARKET_MODE: production
 
       - name: Sync Capacitor to Android
         run: npx cap sync android
@@ -63,19 +46,17 @@ jobs:
       - name: Build Android APK
         run: |
           cd android
-          # ASOSIY TUZATISH: Windows formatidagi gradlew ni Linux formatiga o'tkazish
+          # Windows formatidagi gradlew ni Linux ga moslash
           sed -i 's/\r$//' gradlew
-          # Faylga ruxsat berish
           chmod +x gradlew
-          # Gradle buildni boshlash
           ./gradlew assembleDebug \
             --no-daemon \
             --stacktrace \
-            -Dorg.gradle.jvmargs="-Xmx2048m -XX:MaxMetaspaceSize=512m"
+            -Dorg.gradle.jvmargs="-Xmx2048m"
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: UniGo-Android-App
+          name: UniGo-Production-Ready-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 7
