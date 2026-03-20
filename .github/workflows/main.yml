@@ -8,20 +8,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    # ─── GitHub Secrets dan o'zgaruvchilarni olish ───────────────────────────
-    # Vercel → Settings → Environment Variables dagi qiymatlarni
-    # GitHub → Settings → Secrets → Actions ga qo'shing:
-    #   VITE_SUPABASE_URL
-    #   VITE_SUPABASE_ANON_KEY
-    #   VITE_API_BASE_URL   (Vercel deployment URL: https://nukus-jkkxjfc3n-timurs-projects-d16b2b83.vercel.app)
-    #   VITE_AUTO_MARKET_MODE
-    # ─────────────────────────────────────────────────────────────────────────
     env:
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
-      VITE_AUTO_MARKET_MODE: ${{ secrets.VITE_AUTO_MARKET_MODE || 'mock' }}
-      VITE_PYTHON_AI_URL: ${{ secrets.VITE_PYTHON_AI_URL || '' }}
+      VITE_AUTO_MARKET_MODE: mock
 
     steps:
       - name: Checkout Source Code
@@ -30,13 +21,11 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: '20'
 
       - name: Install Dependencies
-        run: npm ci
+        run: npm install --legacy-peer-deps
 
-      # ─── JDK setup OLDIN bo'lishi kerak (cap sync uchun ham kerak bo'ladi) ─
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -46,39 +35,23 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # ─── Web loyihasini build qilish (env o'zgaruvchilar bilan) ─────────────
       - name: Build Web Project
         run: npm run build
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
-          VITE_AUTO_MARKET_MODE: ${{ secrets.VITE_AUTO_MARKET_MODE || 'mock' }}
-          NODE_ENV: production
 
-      # ─── Build natijasini tekshirish ─────────────────────────────────────
       - name: Verify dist folder exists
         run: |
-          if [ ! -d "dist" ]; then
-            echo "ERROR: dist/ papkasi topilmadi! Build muvaffaqiyatsiz bo'ldi."
-            exit 1
-          fi
-          echo "dist/ papkasi mavjud:"
-          ls -la dist/
+          ls -la dist/ || (echo "dist/ topilmadi!" && exit 1)
 
-      # ─── Capacitor: web fayllarni Android ga ko'chirish ──────────────────
       - name: Sync Capacitor to Android
         run: npx cap sync android
 
-      # ─── Android APK build ───────────────────────────────────────────────
       - name: Build Android APK
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
 
-      # ─── APK ni artifact sifatida saqlash ────────────────────────────────
-      - name: Upload APK Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: UniGo-Debug-APK
