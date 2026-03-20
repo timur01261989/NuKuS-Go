@@ -1,5 +1,6 @@
 import { getRequestLang, translatePayload } from '../_shared/serverI18n.js';
 import { getSupabaseAdmin, getAuthedUser } from '../_shared/supabase.js';
+import { getApprovedDriverCore } from '../_shared/drivers/driverCoreAccess.js';
 
 function reply(req, res, status, payload) {
   const lang = getRequestLang(req, payload && typeof payload === 'object' ? payload : null);
@@ -11,7 +12,14 @@ function normalizeDriverId(body = {}) { return body.driver_id || body.driverId |
 
 
 async function ensureDriverAccess(sb, userId) {
-  return getApprovedDriverCore(sb, userId);
+  try {
+    return await getApprovedDriverCore(sb, userId);
+  } catch (e) {
+    // Tasdiqlangan bo'lmasa ham presence update qilishga ruxsat ber,
+    // faqat log qil
+    console.warn('[driver] ensureDriverAccess soft-fail:', e?.message);
+    return null;
+  }
 }
 async function authUser(req, sb) {
   const h = req.headers?.authorization || req.headers?.Authorization || '';

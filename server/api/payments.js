@@ -255,28 +255,51 @@ async function handleClickCheckout(_req, res, body) {
 
 
 export default async function handler(req, res) {
-  const body = await parseBody(req);
-  const action = getPaymentAction(req, body);
-  const supabase = getSupabaseAdmin();
-  const authedUserId = await getAuthedUserId(req, supabase);
+  // Supabase env yo'q bo'lsa darhol 503 qaytaramiz
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return json(res, 503, {
+      ok: false,
+      error: 'server_config_missing',
+      code: 'SERVER_CONFIG_MISSING',
+    });
+  }
 
-  switch (action) {
-    case "wallet_checkout":
-      return handleWalletCheckout(req, res, body, supabase, authedUserId);
-    case "wallet_complete":
-      return handleWalletComplete(req, res, body, supabase, authedUserId);
-    case "promo_apply":
-      return handlePromoApply(req, res, body, supabase, authedUserId);
-    case "payme_checkout":
-      return handlePaymeCheckout(req, res, body, supabase, authedUserId);
-    case "payme_transaction":
-      return handlePaymeTransaction(req, res, body, supabase, authedUserId);
-    case "click_checkout":
-      return handleClickCheckout(req, res, body, supabase, authedUserId);
-    case "click_transaction":
-      return handleClickTransaction(req, res, body, supabase, authedUserId);
-    default:
-      return json(res, 404, { ok: false, error: "payment_route_not_found", code: "PAYMENT_ROUTE_NOT_FOUND", action });
+  try {
+    const body = await parseBody(req);
+    const action = getPaymentAction(req, body);
+    const supabase = getSupabaseAdmin();
+    const authedUserId = await getAuthedUserId(req, supabase);
+
+    switch (action) {
+      case "wallet_checkout":
+        return handleWalletCheckout(req, res, body, supabase, authedUserId);
+      case "wallet_complete":
+        return handleWalletComplete(req, res, body, supabase, authedUserId);
+      case "promo_apply":
+        return handlePromoApply(req, res, body, supabase, authedUserId);
+      case "payme_checkout":
+        return handlePaymeCheckout(req, res, body, supabase, authedUserId);
+      case "payme_transaction":
+        return handlePaymeTransaction(req, res, body, supabase, authedUserId);
+      case "click_checkout":
+        return handleClickCheckout(req, res, body, supabase, authedUserId);
+      case "click_transaction":
+        return handleClickTransaction(req, res, body, supabase, authedUserId);
+      default:
+        return json(res, 404, {
+          ok: false,
+          error: "payment_route_not_found",
+          code: "PAYMENT_ROUTE_NOT_FOUND",
+          action,
+        });
+    }
+  } catch (err) {
+    logger.error("payments_handler_error", { message: err?.message || String(err) });
+    return json(res, 500, {
+      ok: false,
+      error: "internal_server_error",
+      code: "INTERNAL_SERVER_ERROR",
+    });
   }
 }
 

@@ -1,5 +1,5 @@
 import React from "react";
-import { Button } from "antd";
+import { Button, Tag } from "antd";
 import { EnvironmentOutlined } from "@ant-design/icons";
 import { useMapEvents } from "react-leaflet";
 import { UZ_REGIONS } from "@/modules/shared/constants/uzRegions";

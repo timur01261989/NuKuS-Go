@@ -5,6 +5,7 @@ import driverHandler from "../server/api/driver.js";
 import dispatchHandler from "../server/api/dispatch.js";
 import dispatchArchitectureHandler from "../server/api/dispatch_architecture.js";
 import dispatchEnqueueHandler from "../server/api/dispatch_enqueue.js";
+import dispatchEnqueueGlobalHandler from "../server/api/dispatch_enqueue_global.js";
 import dispatchPredictionsHandler from "../server/api/dispatch_predictions.js";
 import cityDispatchHandler from "../server/api/city_dispatch.js";
 import eventStreamHandler from "../server/api/event_stream.js";
@@ -28,12 +29,15 @@ import referralHandler from "../server/api/referral.js";
 import rewardWorkerHandler from "../server/api/reward_worker.js";
 import deliveryHandler from "../server/api/delivery.js";
 import paymentsHandler from "../server/api/payments.js";
+import paymentsLedgerTransferHandler from "../server/api/payments_ledger_transfer.js";
 import intercityHandler from "../server/api/intercity.js";
 import analyticsHandler from "../server/api/analytics.js";
-// FIX: push.js va push_register.js bir xil mantiqni takrorlagan edi (DOCX: push endpoint contract nomosligi).
-// push.js route "push" ga qo'yilgan, lekin o'zining kommentida POST /api/push/register deydi.
-// Klient src/native/push.js: "send token to server: /api/push/register" — bu to'g'ri endpoint.
-// Yechim: pushHandler (push.js) ni olib tashlash, "push" route ni ham push_register ga yo'naltirish.
+import driverHeartbeatHandler from "../server/api/driver_heartbeat.js";
+import workerRunHandler from "../server/api/worker_run.js";
+// FIX: push.js va push_register.js bir xil mantiqni takrorlagan edi.
+// push.js route "push" ga qo'yilgan, lekin /api/push/register deydi.
+// Klient src/native/push.js: "send token to server: /api/push/register"
+// Yechim: pushHandler (push.js) ni olib tashlash, "push" route ni push_register ga yo'naltirish.
 import pushRegisterHandler from "../server/api/push_register.js";
 import pushSendHandler from "../server/api/push_send.js";
 import healthHandler from "../server/api/health.js";
@@ -58,6 +62,8 @@ export const ROUTE_REGISTRY = new Map([
   ["dispatch", dispatchHandler],
   ["dispatch-enqueue", dispatchEnqueueHandler],
   ["dispatch_enqueue", dispatchEnqueueHandler],
+  ["dispatch-enqueue-global", dispatchEnqueueGlobalHandler],
+  ["dispatch_enqueue_global", dispatchEnqueueGlobalHandler],
   ["dispatch-predictions", dispatchPredictionsHandler],
   ["dispatch_predictions", dispatchPredictionsHandler],
   ["dispatch-architecture", dispatchArchitectureHandler],
@@ -91,8 +97,14 @@ export const ROUTE_REGISTRY = new Map([
   ["reward_worker", rewardWorkerHandler],
   ["delivery", deliveryHandler],
   ["payments", paymentsHandler],
+  ["payments/ledger/transfer", paymentsLedgerTransferHandler],
+  ["payments_ledger_transfer", paymentsLedgerTransferHandler],
   ["intercity", intercityHandler],
   ["analytics", analyticsHandler],
+  ["driver_heartbeat", driverHeartbeatHandler],
+  ["driver-heartbeat", driverHeartbeatHandler],
+  ["worker-run", workerRunHandler],
+  ["worker_run", workerRunHandler],
   // FIX: "push" → push_register handler (avval push.js edi — noto'g'ri duplicate)
   ["push", pushRegisterHandler],
   ["push/register", pushRegisterHandler],
@@ -106,23 +118,42 @@ export const ROUTE_REGISTRY = new Map([
   ["fleet", fleetHandler],
   ["dispatch-match", dispatchHandler],
   ["dispatch_match", dispatchHandler],
-  ["driver_heartbeat", driverHandler],
-  ["driver-heartbeat", driverHandler],
 ]);
 
 export function resolveRouteHandler(path) {
   const normalized = normalizePath(path);
 
+  // To'liq path mos kelsa
   if (ROUTE_REGISTRY.has(normalized)) {
     return ROUTE_REGISTRY.get(normalized);
   }
 
+  // payments/ledger/transfer kabi nested path uchun
+  // yuqoridan pastga tekshir (eng uzun mos keluvchini topish)
+  let bestMatch = null;
+  let bestLen = 0;
+  for (const [key] of ROUTE_REGISTRY) {
+    if (normalized === key || normalized.startsWith(key + "/")) {
+      if (key.length > bestLen) {
+        bestLen = key.length;
+        bestMatch = key;
+      }
+    }
+  }
+  if (bestMatch) {
+    return ROUTE_REGISTRY.get(bestMatch);
+  }
+
+  // Root segment mos kelsa
   const rootSegment = normalized.split("/")[0];
   if (ROUTE_REGISTRY.has(rootSegment)) {
     return ROUTE_REGISTRY.get(rootSegment);
   }
 
-  if (normalized.startsWith("auto-market/") || normalized.startsWith("auto_market/")) {
+  if (
+    normalized.startsWith("auto-market/") ||
+    normalized.startsWith("auto_market/")
+  ) {
     return autoMarketHandler;
   }
 

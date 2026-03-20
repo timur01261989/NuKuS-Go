@@ -181,6 +181,15 @@ export default async function handler(req, res) {
   applyCors(req, res);
   if (req.method === 'OPTIONS') return json(res, 204, { ok: true });
 
+  // Supabase env yo'q bo'lsa darhol xabar ber
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return json(res, 503, {
+      ok: false,
+      error: 'server_config_missing',
+      details: 'SUPABASE_URL yoki SUPABASE_SERVICE_ROLE_KEY env o\'zgaruvchisi sozlanmagan',
+    });
+  }
+
   try {
     const body = await readBody(req);
     const url = getUrl(req);
