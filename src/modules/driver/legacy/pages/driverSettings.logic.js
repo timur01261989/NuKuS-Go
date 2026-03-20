@@ -25,18 +25,30 @@ export async function loadDriverSettingsData() {
 
   if (applicationError) throw applicationError;
 
-  const [serviceSettingsRows, vehicleRows, vehicleRequestRows] = await Promise.all([
+  const [serviceSettingsRows, vehicleRowsResponse, vehicleRequestRowsResponse] = await Promise.all([
     safeSelectDriverServiceSettings(user.id),
     safeSelectVehicles(user.id),
     safeSelectVehicleRequests(user.id),
   ]);
 
+  const pickupRows = (vehicleRowsResponse?.data && Array.isArray(vehicleRowsResponse.data))
+    ? vehicleRowsResponse.data
+    : [];
+
+  const requestRows = (vehicleRequestRowsResponse?.data && Array.isArray(vehicleRequestRowsResponse.data))
+    ? vehicleRequestRowsResponse.data
+    : [];
+
+  const serviceRows = (serviceSettingsRows?.data && Array.isArray(serviceSettingsRows.data))
+    ? serviceSettingsRows.data
+    : serviceSettingsRows?.data ? [serviceSettingsRows.data] : [];
+
   return {
     user,
     applicationData: applicationData || null,
-    serviceSettingsRows,
-    vehicleRows,
-    vehicleRequestRows,
+    serviceSettingsRows: serviceRows,
+    vehicleRows: pickupRows,
+    vehicleRequestRows: requestRows,
   };
 }
 

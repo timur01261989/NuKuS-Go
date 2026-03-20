@@ -10,8 +10,27 @@ import { BrowserRouter } from "react-router-dom";
 import "antd/dist/reset.css";
 import "leaflet/dist/leaflet.css";
 import "./styles/globals.css";
+import api from "@/modules/shared/utils/apiHelper";
 
 bootstrapRuntime();
+
+api.configure({
+  baseUrl: import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_BASE || "",
+  retry: {
+    enabled: true,
+    max: 1,
+    methods: ["GET", "POST", "PUT", "PATCH"],
+    statuses: [429, 500, 502, 503, 504],
+    baseDelayMs: 300,
+  },
+  cache: {
+    enabled: false,
+    ttlMs: 0,
+  },
+  onError: ({ url, method, status, error }) => {
+    console.warn("apiHelper error", { url, method, status, error });
+  },
+});
 
 // Service worker bootstrap disabled in web deployment to avoid stale cache/manifest issues.
 

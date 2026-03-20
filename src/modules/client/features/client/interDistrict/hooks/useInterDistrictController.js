@@ -3,7 +3,12 @@ import { useEffect, useMemo, useState } from "react";
 import { message } from "antd";
 import { cancelTripRequest, getClientActiveTrip, searchTrips, requestTrip, listPitaks } from "@/modules/client/features/shared/interDistrictTrips.js";
 import { nominatimReverse } from "../../shared/geo/nominatim";
-import { INTERDISTRICT_TRIP_STATUS, mapTripStatusToClientStep, normalizeInterDistrictStatus } from "@/modules/shared/interdistrict/domain/interDistrictStatuses";
+import {
+  INTERDISTRICT_TRIP_STATUS,
+  mapTripStatusToClientStep,
+  normalizeInterDistrictStatus,
+  toDbInterDistrictStatus,
+} from "@/modules/shared/interdistrict/domain/interDistrictStatuses";
 import { useDistrictRoute } from "../map/useDistrictRoute";
 import { buildClientTripTimeline } from "@/modules/shared/interdistrict/domain/interDistrictSignals";
 
@@ -55,8 +60,12 @@ export function useInterDistrictController(state) {
         const active = await getClientActiveTrip();
         if (cancelled || !active) return;
         setActiveTripRequest?.(active);
-        setCanonicalTripStatus?.(normalizeInterDistrictStatus(active.status));
-        setTripStatus(mapTripStatusToClientStep(active.status));
+        const normalized = normalizeInterDistrictStatus(active.status);
+        setCanonicalTripStatus?.(normalized);
+        setTripStatus(mapTripStatusToClientStep(normalized));
+        // 100% synx to DB status map for auditing/logging
+        const dbStatus = toDbInterDistrictStatus(normalized);
+        console.debug("interdistrict:active-status", { normalized, dbStatus });
         if (active?.trip) {
           setActiveDriver?.({
             id: active.trip.user_id || active.trip.driver_id || "driver",
@@ -191,6 +200,8 @@ export function useInterDistrictController(state) {
     if (!selectedTrip) return;
     const hide = message.loading("So‘rov yuborilmoqda...", 0);
     try {
+      const normalizedStatus = normalizeInterDistrictStatus(INTERDISTRICT_TRIP_STATUS.SEARCHING);
+      const dbStatus = toDbInterDistrictStatus(normalizedStatus);
       const createdRequest = await requestTrip({
         trip_id: selectedTrip.id,
         wants_full_salon: !!payload.wants_full_salon,
@@ -204,7 +215,9 @@ export function useInterDistrictController(state) {
         payment_method: payload.payment_method || "cash",
         final_price: payload.final_price || 0,
         selected_seats: Array.from(seatState.selected || []),
+        status: dbStatus,
       });
+      console.debug("interdistrict:request-queued", { normalizedStatus, dbStatus });
       message.success("So‘rov yuborildi");
       setRequestOpen(false);
       setActiveDriver?.({
