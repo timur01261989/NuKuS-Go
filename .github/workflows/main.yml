@@ -51,7 +51,7 @@ jobs:
       - name: Verify dist folder exists
         run: |
           if [ ! -d "dist" ]; then
-            echo "dist/ papkasi topilmadi! Build jarayoni muvaffaqiyatsiz."
+            echo "ERROR: dist/ papkasi topilmadi!"
             exit 1
           fi
           ls -la dist/
@@ -62,7 +62,11 @@ jobs:
       - name: Build Android APK
         run: |
           cd android
+          # CRITICAL FIX: Windows CRLF formatini Linux LF formatiga o'tkazish
+          sed -i 's/\r$//' gradlew
+          # Ijro etish ruxsatini berish
           chmod +x gradlew
+          # Build jarayonini boshlash
           ./gradlew assembleDebug \
             --no-daemon \
             --stacktrace \
