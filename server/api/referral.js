@@ -201,7 +201,7 @@ export default async function handler(req, res) {
       ipAddress = authed.ipAddress;
     } catch (error) {
       console.error('[referral] getAuthedContext failed', { error });
-      return serverError(res, error);
+      return json(res, 401, { ok: false, error: 'Unauthorized', details: String(error?.message || error) });
     }
 
     if (!userId || !getBearerToken(req)) {
@@ -340,6 +340,17 @@ export default async function handler(req, res) {
     return badRequest(res, 'action noto\'g\'ri');
   } catch (error) {
     console.error('[referral] handler outer catch', error);
+
+    // Convert known HTTP errors to JSON responses and avoid generic 500 for normal client-side invalid data
+    const status = Number(error?.status || 0);
+    if ([400, 401, 403, 404].includes(status)) {
+      return json(res, status, {
+        ok: false,
+        error: String(error?.message || 'Request failed'),
+        details: String(error?.details || ''),
+      });
+    }
+
     return serverError(res, error);
   }
 }

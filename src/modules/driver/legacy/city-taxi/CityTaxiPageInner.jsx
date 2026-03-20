@@ -17,7 +17,7 @@ import DailyMissions from "./components/widgets/DailyMissions";
 import DriverConnectionBadge from "./components/widgets/DriverConnectionBadge";
 import DriverDaySnapshot from "./components/widgets/DriverDaySnapshot";
 
-export default function CityTaxiPageInner() {
+export default function CityTaxiPageInner({ onBack }) {
   const {
     state,
     dispatch,
@@ -59,6 +59,7 @@ export default function CityTaxiPageInner() {
         onOpenDetails={() => setDetailsOpen(true)}
         userId={userId}
         onOpenMissions={() => setMissionsOpen(true)}
+        onBack={onBack}
       />
 
       <BottomActionPanel

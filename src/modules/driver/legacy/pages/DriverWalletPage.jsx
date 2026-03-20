@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/services/supabase/supabaseClient';
 import { getWalletBalance } from '@/services/walletApi';
+import { fetchDriverWalletTransactions } from '@/modules/driver/services/driverWalletService';
 
 function formatMoney(value) {
   const amount = Number.isFinite(Number(value)) ? Number(value) : 0;
@@ -16,6 +17,7 @@ export default function DriverWalletPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [balance, setBalance] = useState(0);
+  const [transactions, setTransactions] = useState([]);
   const [errorText, setErrorText] = useState('');
 
   const load = useCallback(async () => {
@@ -24,11 +26,20 @@ export default function DriverWalletPage() {
     try {
       const { data: authData } = await supabase.auth.getUser();
       const user = authData?.user;
-      if (!user?.id) return;
+      if (!user?.id) {
+        setErrorText('Foydalanuvchi aniqlanmadi');
+        return;
+      }
+
       const response = await getWalletBalance(user.id);
-      setBalance(Number(response?.balance_uzs || response?.wallet?.balance_uzs || 0));
+      setBalance(Number(response?.balance_uzs || response?.wallet?.balance_uzs || response?.wallet?.balance || 0));
+
+      const txList = await fetchDriverWalletTransactions(user.id);
+      setTransactions(Array.isArray(txList) ? txList : txList?.rows || txList?.items || []);
     } catch (error) {
+      console.error('[DriverWalletPage] load error', error);
       setErrorText(String(error?.message || 'Hamyon ma’lumotini olishda xatolik yuz berdi'));
+      setTransactions([]);
     } finally {
       setLoading(false);
     }
@@ -63,7 +74,25 @@ export default function DriverWalletPage() {
 
         <section className="unigo-soft-card p-5">
           <div className="text-base font-black text-slate-900">Oxirgi tranzaksiyalar</div>
-          <div className="mt-2 text-sm text-slate-500">Hozircha tranzaksiya tarixi mavjud emas.</div>
+          {loading ? (
+            <div className="mt-2 text-sm text-slate-500">Yuklanmoqda...</div>
+          ) : transactions.length > 0 ? (
+            <ul className="mt-2 space-y-2">
+              {transactions.slice(0, 8).map((tx, idx) => (
+                <li key={tx.id || tx.transaction_id || idx} className="flex justify-between items-start gap-2">
+                  <div>
+                    <div className="text-sm font-semibold">{tx.description || tx.type || 'Tranzaksiya'}</div>
+                    <div className="text-xs text-slate-500">{tx.created_at ? new Date(tx.created_at).toLocaleString() : ''}</div>
+                  </div>
+                  <div className={Number(tx.amount_uzs || tx.amount || 0) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                    {Number(tx.amount_uzs || tx.amount || 0).toLocaleString('uz-UZ')} so‘m
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="mt-2 text-sm text-slate-500">Hozircha tranzaksiya tarixi mavjud emas.</div>
+          )}
         </section>
       </main>
     </div>

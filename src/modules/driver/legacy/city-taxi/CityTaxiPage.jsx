@@ -8,10 +8,10 @@ import CityTaxiPageInner from "./CityTaxiPageInner";
  * - Provider (context+reducer) ni ulaydi
  * - UI ni CityTaxiPageInner ga beradi
  */
-export default function CityTaxiPage() {
+export default function CityTaxiPage({ onBack }) {
   return (
     <TaxiProvider>
-      <CityTaxiPageInner />
+      <CityTaxiPageInner onBack={onBack} />
     </TaxiProvider>
   );
 }

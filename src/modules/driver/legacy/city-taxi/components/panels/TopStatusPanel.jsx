@@ -11,9 +11,10 @@
 import React from "react";
 import { Button, Tag } from "antd";
 import { ArrowLeftOutlined, ThunderboltFilled, TrophyOutlined } from "@ant-design/icons";
+import { safeBack } from "@/modules/shared/navigation/safeBack";
 import LevelBadge from "../widgets/LevelBadge";
 
-export default function TopStatusPanel({ isOnline, onToggleOnline, earnings, onOpenDetails, userId, onOpenMissions }) {
+export default function TopStatusPanel({ isOnline, onToggleOnline, earnings, onOpenDetails, userId, onOpenMissions, onBack }) {
   return (
     <div style={{
       position: "absolute",
@@ -28,7 +29,17 @@ export default function TopStatusPanel({ isOnline, onToggleOnline, earnings, onO
     }}>
       {/* SOL TOMON: orqaga + online toggle */}
       <div style={{ pointerEvents: "auto", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <Button shape="circle" icon={<ArrowLeftOutlined />} onClick={() => window.history.back()} />
+        <Button
+          shape="circle"
+          icon={<ArrowLeftOutlined />}
+          onClick={() => {
+            if (typeof onBack === "function") {
+              onBack();
+            } else {
+              safeBack(undefined, "/driver");
+            }
+          }}
+        />
         <div style={{
           padding: "10px 14px",
           background: "rgba(255,255,255,0.96)",
