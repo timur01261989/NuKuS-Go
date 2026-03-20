@@ -31,9 +31,17 @@ function getApiBase() {
 async function resolveDriverId() {
   if (currentDriverId) return currentDriverId;
   const { data, error } = await supabase.auth.getUser();
-  if (error) throw error;
+  if (error) {
+    console.warn('[driverPresenceManager] supabase getUser error', error?.status || error?.message || error);
+    if (error?.status === 400 || error?.status === 401) {
+      await supabase.auth.signOut().catch(() => null);
+    }
+    throw error;
+  }
   const userId = data?.user?.id;
-  if (!userId) throw new Error("driver_not_authenticated");
+  if (!userId) {
+    throw new Error('driver_not_authenticated');
+  }
   currentDriverId = userId;
   return userId;
 }

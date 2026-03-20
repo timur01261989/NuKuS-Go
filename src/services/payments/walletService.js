@@ -1,10 +1,15 @@
 import { buildQueryString, getJson, postJson } from "./paymentHttp.js";
 
-export function getWalletBalance(userId) {
-  return getJson(`/api/wallet${buildQueryString({ user_id: userId })}`);
+export async function getWalletBalance(userId) {
+  try {
+    return await getJson(`/api/wallet${buildQueryString({ user_id: userId })}`);
+  } catch (error) {
+    console.warn('[walletService] getWalletBalance failed', error?.message || error);
+    return { balance_uzs: 0, currency: 'UZS', wallet: { balance_uzs: 0 } };
+  }
 }
 
-export function getBalance(userId) {
+export async function getBalance(userId) {
   return getWalletBalance(userId);
 }
 

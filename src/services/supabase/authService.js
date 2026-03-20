@@ -30,12 +30,41 @@ export async function signOut() {
 
 export async function getSession() {
   assertSupabase();
-  return supabase.auth.getSession();
+  try {
+    const result = await supabase.auth.getSession();
+    if (result?.error) {
+      // Normalize Supabase 400/invalid session errors.
+      if (result.error?.status === 400 || result.error?.status === 401) {
+        console.warn('[AuthService] getSession invalid session, forcing sign out', result.error.message);
+        await supabase.auth.signOut().catch(() => null);
+        return { data: null, error: result.error };
+      }
+      return { data: null, error: result.error };
+    }
+    return result;
+  } catch (error) {
+    console.error('[AuthService] getSession failed', error);
+    // On auth service network failures, keep app usable with anonymous fallback.
+    return { data: null, error };
+  }
 }
 
 export async function getUser() {
   assertSupabase();
-  return supabase.auth.getUser();
+  try {
+    const result = await supabase.auth.getUser();
+    if (result?.error) {
+      if (result.error?.status === 400 || result.error?.status === 401) {
+        console.warn('[AuthService] getUser invalid session, forcing sign out', result.error.message);
+        await supabase.auth.signOut().catch(() => null);
+      }
+      return { data: null, error: result.error };
+    }
+    return result;
+  } catch (error) {
+    console.error('[AuthService] getUser failed', error);
+    return { data: null, error };
+  }
 }
 
 export function onAuthStateChange(callback) {

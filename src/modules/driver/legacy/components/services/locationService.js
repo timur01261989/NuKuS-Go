@@ -28,13 +28,29 @@ function publish(next) {
 
 function ensureWatch() {
   if (watchId != null || !navigator.geolocation) return watchId;
+
   watchId = navigator.geolocation.watchPosition(
     (position) => publish(normalizePosition(position)),
-    (error) => console.error('GPS xatosi:', error),
+    (error) => {
+      console.warn('GPS xatosi:', error?.code || error?.message || error);
+      if (error?.code === 3) {
+        // timeout expired, keep existing latest position and keep trying
+        return;
+      }
+      if (error?.code === 1) {
+        // permission denied, no location updates available
+        listeners.forEach((cb) => {
+          try {
+            cb({ ...latest, error: 'location_permission_denied' });
+          } catch {}
+        });
+      }
+    },
     {
       enableHighAccuracy: true,
       maximumAge: 1000,
       timeout: 12000,
+      distanceFilter: 5,
     }
   );
   return watchId;

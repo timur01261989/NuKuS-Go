@@ -7,6 +7,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { supabase } from "@/services/supabase/supabaseClient.js";
 import { bootstrapReferralSummary } from "@/services/referralApi.js";
 import {
   clearOwnReferralSnapshot,
@@ -137,6 +138,9 @@ export function AuthProvider({ children }) {
       .then(({ data, error }) => {
         if (error) {
           console.error("[AuthProvider] bootstrap getSession error", error);
+          if (error?.status === 400 || error?.status === 401) {
+            void supabase.auth.signOut().catch(() => null);
+          }
           commit({
             loading: false,
             authReady: true,
@@ -147,6 +151,7 @@ export function AuthProvider({ children }) {
           });
           return;
         }
+
         lastResolvedFingerprintRef.current = buildSessionFingerprint(
           data?.session ?? null
         );
