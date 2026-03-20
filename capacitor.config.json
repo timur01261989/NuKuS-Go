@@ -1,5 +1,10 @@
 {
   "appId": "uz.unigo.app",
   "appName": "UniGo",
-  "webDir": "dist"
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  }
 }
