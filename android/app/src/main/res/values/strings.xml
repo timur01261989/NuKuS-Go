@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">UniGo</string>
+    <string name="title_activity_main">UniGo</string>
+    <string name="package_name">uz.unigo.app</string>
+    <string name="custom_url_scheme">uz.unigo.app</string>
+</resources>
