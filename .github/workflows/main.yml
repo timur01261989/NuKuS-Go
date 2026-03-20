@@ -3,16 +3,22 @@ name: Build UniGo Android
 on:
   push:
     branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
+    # GitHub Secrets-dan o'zgaruvchilarni tizimga yuklash. 
+    # Build vaqtida Vite ushbu qiymatlarni kodga embedding qiladi.
     env:
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
-      VITE_AUTO_MARKET_MODE: mock
+      VITE_AUTO_MARKET_MODE: ${{ secrets.VITE_AUTO_MARKET_MODE || 'production' }}
+      VITE_PYTHON_AI_URL: ${{ secrets.VITE_PYTHON_AI_URL }}
+      NODE_ENV: production
 
     steps:
       - name: Checkout Source Code
@@ -21,26 +27,37 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22' # Capacitor CLI v6+ va eng so'nggi kutubxonalar uchun talab
+          cache: 'npm'
 
       - name: Install Dependencies
-        run: npm install --legacy-peer-deps
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        run: npm ci # Reproducible build uchun 'npm install' o'rniga 'npm ci' tavsiya etiladi
 
       - name: Build Web Project
         run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          VITE_AUTO_MARKET_MODE: ${{ secrets.VITE_AUTO_MARKET_MODE || 'production' }}
 
       - name: Verify dist folder exists
         run: |
-          ls -la dist/ || (echo "dist/ topilmadi!" && exit 1)
+          if [ ! -d "dist" ]; then
+            echo "ERROR: 'dist/' papkasi builddan so'ng topilmadi! Pipeline to'xtatiladi."
+            exit 1
+          fi
+          ls -la dist/
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21' # Eng so'nggi Android Gradle Plugin va Java 21 imkoniyatlari uchun
+          distribution: 'zulu'
+          cache: 'gradle'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
       - name: Sync Capacitor to Android
         run: npx cap sync android
@@ -51,9 +68,9 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
 
-      - name: Upload APK
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: UniGo-Debug-APK
+          name: UniGo-Android-Build
           path: android/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 7
+          retention-days: 14
