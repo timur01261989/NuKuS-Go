@@ -1,19 +1,46 @@
 import { getJson, postJson } from './payments/paymentHttp.js';
 
-export function getReferralSummary() {
-  return getJson('/api/referral');
+async function safeApiCall(callFn, retries = 2, initialDelayMs = 250) {
+  let attempt = 0;
+  let delay = initialDelayMs;
+
+  while (attempt <= retries) {
+    try {
+      const result = await callFn();
+      if (result?.ok === false) {
+        throw new Error(result?.error || 'API returned error');
+      }
+      return result;
+    } catch (error) {
+      attempt += 1;
+      if (attempt > retries) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      delay *= 2;
+    }
+  }
+
+  throw new Error('safeApiCall: unreachable');
+}
+
+export async function getReferralSummary() {
+  try {
+    const result = await safeApiCall(() => getJson('/api/referral'));
+    return result;
+  } catch (error) {
+    console.warn('[referralApi] getReferralSummary failed', error?.message || error);
+    return { ok: false, error: error?.message || 'Referral summary load failed' };
+  }
 }
 
 export async function bootstrapReferralSummary() {
   try {
-    // getJson may throw on network or non-2xx; catch and return structured error
-    const res = await getJson('/api/referral?action=bootstrap');
-    return res;
-  } catch (err) {
-    // Normalize error so frontend doesn't crash on thrown exception
-    const message = err?.message || String(err) || 'Unknown error';
-    console.warn('[referralApi] bootstrapReferralSummary failed', message);
-    return { ok: false, error: message };
+    const result = await safeApiCall(() => getJson('/api/referral?action=bootstrap'));
+    return result;
+  } catch (error) {
+    console.warn('[referralApi] bootstrapReferralSummary failed', error?.message || error);
+    return { ok: false, error: error?.message || 'Referral bootstrap failed' };
   }
 }
 

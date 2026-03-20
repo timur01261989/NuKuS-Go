@@ -49,14 +49,22 @@ const ClientReferral = memo(function ClientReferral() {
   }, []);
 
   const applyResponse = useCallback((response) => {
-    setSummaryState((previousState) => mergeReferralState(response, previousState));
+    if (!response || response.ok === false) {
+      const reason = String(response?.error || tr('referral.shareUnavailable', 'Taklif havolasi hali tayyor emas.'));
+      setErrorText(reason);
+      setCodeStatus('error');
+      return false;
+    }
+
     const normalizedCode = String(response?.code?.code || response?.code || '').trim();
-    setCodeStatus(normalizedCode ? 'ready' : 'loading');
-  }, []);
+    setErrorText('');
+    setCodeStatus(normalizedCode ? 'ready' : 'missing');
+    setSummaryState((previousState) => mergeReferralState(response, previousState));
+    return true;
+  }, [tr]);
 
   const loadSummary = useCallback(async (mode = 'summary') => {
     setLoading(true);
-    setErrorText('');
     if (!referralCode) {
       setCodeStatus('loading');
     }
@@ -65,11 +73,16 @@ const ClientReferral = memo(function ClientReferral() {
       const response = mode === 'bootstrap'
         ? await bootstrapReferralSummary()
         : await getReferralSummary();
-      applyResponse(response);
+
+      const got = applyResponse(response);
+      if (!got && mode === 'summary') {
+        // fallback to bootstrap only after initial summary error
+        await loadSummary('bootstrap');
+      }
     } catch (error) {
-      setErrorText(String(error?.message || tr('error', 'Xatolik')));
+      const messageText = String(error?.message || tr('referral.shareUnavailable', 'Taklif havolasi hali tayyor emas.'));
+      setErrorText(messageText);
       setCodeStatus('error');
-      throw error;
     } finally {
       setLoading(false);
     }
@@ -165,13 +178,23 @@ const ClientReferral = memo(function ClientReferral() {
     safeBack(navigate, fallbackPath);
   }, [location?.pathname, navigate]);
 
-  const inlineStatusText = useMemo(
-    () => buildInlineStatusText({ loading, codeStatus, errorText, tr }),
-    [loading, codeStatus, errorText, tr]
-  );
+  const referralStatusText = useMemo(() => {
+    if (loading) return tr('loading', 'Yuklanmoqda...');
+    if (errorText) return errorText;
+    if (codeStatus === 'error') return tr('referral.error', 'Referral xizmatida muammo yuz berdi');
+    if (codeStatus === 'missing') return tr('referral.notReady', 'Taklif kodi hali aktiv emas');
+    if (codeStatus === 'partial') return tr('referral.partial', 'Taklif kodi mavjud, lekin ma’lumot to‘liq emas');
+    if (codeStatus === 'ready') return tr('referral.ready', 'Taklif havolasi tayyor');
+    return tr('referral.unavailable', 'Taklif havolasi mavjud emas');
+  }, [loading, codeStatus, errorText, tr]);
 
   const warningsText = useMemo(() => buildWarningsText(summaryState), [summaryState]);
 
+  const canAttemptShareEnhanced = useMemo(() => {
+    if (loading || sharing) return false;
+    if (codeStatus === 'ready') return true;
+    return false;
+  }, [loading, sharing, codeStatus]);
 
   return (
     <div className="min-h-screen bg-softBlue dark:bg-backgroundDark font-display text-slate-900 dark:text-slate-100 p-4">
@@ -206,12 +229,22 @@ const ClientReferral = memo(function ClientReferral() {
           <div className="mt-2 text-sm break-all text-slate-200">{shareUrl || '—'}</div>
         </div>
 
+        <div className="mt-2 rounded-xl border border-amber-400 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+          {referralStatusText}
+        </div>
+
+        {warningsText ? (
+          <div className="mt-2 rounded-xl border border-blue-400 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700">
+            {warningsText}
+          </div>
+        ) : null}
+
         <div className="mt-4 flex flex-col gap-3 sm:flex-row">
           <button
             type="button"
             className="flex-1 bg-primaryHome hover:bg-primaryHome/90 text-backgroundDark font-bold py-3 rounded-xl active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
             onClick={handleCopyLink}
-            disabled={!canAttemptShare}
+            disabled={!canAttemptShareEnhanced}
           >
             <img src={promoAssets.shareIcon || promoAssets.share} alt="" style={assetStyles.promoActionIcon} />
             {sharing ? tr('loading', 'Yuklanmoqda...') : tr('inviteFriends', 'Do‘stlarni taklif qilish')}
