@@ -23,14 +23,14 @@ jobs:
       - name: Build Web Project
         run: npm run build
 
-      - name: Sync Capacitor
-        run: npx cap sync android
-
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '21' # Java versiyasi 21 ga ko'tarildi
+          java-version: '21'
           distribution: 'zulu'
+
+      - name: Sync Capacitor
+        run: npx cap sync android
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
