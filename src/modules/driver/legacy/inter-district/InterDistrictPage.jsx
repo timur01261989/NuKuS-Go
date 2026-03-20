@@ -1,7 +1,7 @@
 
 import React from "react";
 import { Layout, Row, Col, Space, Typography, Button, Badge, Tooltip } from "antd";
-import { BellOutlined, CarOutlined, PlusOutlined } from "@ant-design/icons";
+import { BellOutlined, CarOutlined, PlusOutlined, ArrowLeftOutlined } from "@ant-design/icons";
 import { DistrictProvider } from "./context/DistrictContext";
 import TripCreateModal from "./components/shared/TripCreateModal";
 import PitakAdminModal from "./components/shared/PitakAdminModal";
@@ -16,7 +16,7 @@ import "./styles/theme.css";
 const { Header, Content } = Layout;
 const { Title } = Typography;
 
-function Inner() {
+function Inner({ onBack }) {
   const {
     cp,
     mode,
@@ -64,6 +64,12 @@ function Inner() {
         }}
       >
         <Space align="center">
+          <Button
+            type="text"
+            icon={<ArrowLeftOutlined />}
+            onClick={onBack}
+            style={{ fontSize: 18 }}
+          />
           <div style={{ width: 35, height: 35, background: "#1677ff", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <CarOutlined style={{ color: "#fff", fontSize: 20 }} />
           </div>

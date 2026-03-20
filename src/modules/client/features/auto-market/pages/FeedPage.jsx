@@ -12,7 +12,8 @@ import {
   ThunderboltOutlined, 
   FireOutlined, 
   EyeOutlined,
-  SearchOutlined
+  SearchOutlined,
+  ArrowLeftOutlined
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import StoriesRail from "../components/Feed/StoriesRail";
@@ -113,6 +114,10 @@ export default function FeedPage() {
     <div style={{ paddingBottom: 80, background: "#f8fafc", minHeight: "100vh" }}>
       {/* Header Section */}
       <div style={{ padding: "14px 16px", background: "#fff", borderBottom: "1px solid #e2e8f0", position: "sticky", top: 0, zIndex: 100 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+          <Button icon={<ArrowLeftOutlined />} onClick={() => nav(-1)} style={{ borderRadius: 14 }} />
+          <div style={{ fontWeight: 800, fontSize: 18 }}>{am("feed.title")}</div>
+        </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <Input
             prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}

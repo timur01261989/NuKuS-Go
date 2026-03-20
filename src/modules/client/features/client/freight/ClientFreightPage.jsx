@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useClientText } from "../shared/i18n_clientLocalize";
 import { Avatar, Button, Card, Divider, List, message, Typography } from "antd";
-import { SendOutlined, ReloadOutlined, StopOutlined, CheckCircleOutlined } from "@ant-design/icons";
+import { SendOutlined, ReloadOutlined, StopOutlined, CheckCircleOutlined, ArrowLeftOutlined } from "@ant-design/icons";
 import { statusTag } from "./ClientFreightPage.helpers.jsx";
 
 import FreightMap from "./map/FreightMap";
@@ -217,11 +217,15 @@ function Inner() {
 
     return (
       <div style={{ padding: 14, maxWidth: 840, margin: "0 auto" }}>
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)} />
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}><img src={supportAssets.services.truckAlt || supportAssets.services.truck} alt="" style={{ width: 18, height: 18, objectFit: "contain" }} /><Title level={4} style={{ margin: 0 }}>{cp("Yuk tashish")}</Title></div>
             <Text type="secondary" style={{ fontSize: 12 }}>{cp("Yuk e’loni va haydovchi takliflari.")}</Text>
           </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
+          <div></div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             {statusTag(st)}
             <Button icon={<ReloadOutlined />} onClick={() => refresh({ silent: false })} loading={loading} />

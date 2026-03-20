@@ -5,9 +5,11 @@ import { ContactPickerModal, LocationPickerDrawer, pageBg } from "./DeliveryPage
 import DeliveryRequestForm from "./components/DeliveryRequestForm.jsx";
 import DeliveryOrdersSection from "./components/DeliveryOrdersSection.jsx";
 import { useDeliveryPageController } from "./hooks/useDeliveryPageController.js";
+import { useNavigate } from "react-router-dom";
 
-export default function DeliveryPage({ onBack }) {
+export default function DeliveryPage() {
   const controller = useDeliveryPageController();
+  const navigate = useNavigate();
   const {
     cp,
     price,
@@ -27,7 +29,7 @@ export default function DeliveryPage({ onBack }) {
   return (
     <div className="unigo-page" style={{ maxWidth: 920, margin: "0 auto", padding: 16, paddingBottom: 100, minHeight: "100vh", background: pageBg }}>
       <Space align="center" style={{ width: "100%", justifyContent: "space-between" }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={onBack}>{cp("Orqaga")}</Button>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)}>{cp("Orqaga")}</Button>
         <div style={{ textAlign: "right" }}>
           <div style={{ fontSize: 12, opacity: 0.75 }}>{cp("Hisoblangan narx")}</div>
           <div style={{ fontWeight: 900, fontSize: 22 }}>{price.toLocaleString("uz-UZ")} {cp("so'm")}</div>

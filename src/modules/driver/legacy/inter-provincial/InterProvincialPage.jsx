@@ -21,7 +21,8 @@ import {
   EnvironmentOutlined, 
   CarOutlined, 
   ThunderboltOutlined, 
-  InboxOutlined 
+  InboxOutlined,
+  ArrowLeftOutlined
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { MapContainer, TileLayer, Marker, Polyline } from "react-leaflet";
@@ -49,7 +50,7 @@ L.Icon.Default.mergeOptions({
 });
 
 
-export default function InterProvincialPage() {
+export default function InterProvincialPage({ onBack }) {
   const { cp } = useDriverText();
   const { user } = useAuth();
   const { serviceTypes, activeVehicle } = useDriverOnline();
@@ -348,7 +349,10 @@ export default function InterProvincialPage() {
 
   return (
     <div style={{ padding: 16, maxWidth: 800, margin: "0 auto", paddingBottom: 80 }}>
-      <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 16 }}>Haydovchi paneli</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <Button type="text" icon={<ArrowLeftOutlined />} onClick={onBack} />
+        <div style={{ fontSize: 18, fontWeight: 800 }}>Viloyatlararo reys yaratish</div>
+      </div>
 
       {/* MAP PREVIEW */}
       <div style={{ borderRadius: 16, overflow: "hidden", border: "1px solid #ddd", marginBottom: 16 }}>

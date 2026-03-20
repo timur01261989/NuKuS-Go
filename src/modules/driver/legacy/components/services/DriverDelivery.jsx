@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Card, Empty, List, Segmented, Space, Steps, Tag, Typography, message } from "antd";
-import { CheckCircleOutlined, PhoneOutlined } from "@ant-design/icons";
+import { CheckCircleOutlined, PhoneOutlined, ArrowLeftOutlined } from "@ant-design/icons";
 
 import { useAuth } from "@/modules/shared/auth/AuthProvider";
 import { listDriverDeliveryOrders, driverUpdateDeliveryStatusApi } from '@/services/deliveryApi.js';
@@ -64,7 +64,7 @@ function ActionCard({ order, onAction, cp }) {
   );
 }
 
-export default function DriverDelivery() {
+export default function DriverDelivery({ onBack }) {
   const { cp } = useDriverText();
   const { user } = useAuth();
   const [orders, setOrders] = useState([]);
@@ -142,6 +142,9 @@ export default function DriverDelivery() {
 
   return (
     <div style={{ maxWidth: 920, margin: "0 auto", padding: 16, paddingBottom: 90 }}>
+      <div style={{ marginBottom: 14 }}>
+        <Button type="text" icon={<ArrowLeftOutlined />} onClick={onBack} style={{ fontSize: 16 }} />
+      </div>
       <Card style={{ borderRadius: 18, marginBottom: 14 }} styles={{ body: { padding: 16 } }}>
         <Space direction="vertical" size={8} style={{ width: "100%" }}>
           <Title level={4} style={{ margin: 0 }}>{cp("Haydovchi — Eltish paneli")}</Title>

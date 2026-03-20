@@ -3,7 +3,8 @@
 // Agar keyin backendda market order pipeline bo'lsa, shu fayl ichida filter/service key qo'shiladi.
 
 import React, { useMemo } from "react";
-import { Card, Typography } from "antd";
+import { Button, Card, Typography } from "antd";
+import { ArrowLeftOutlined } from "@ant-design/icons";
 import {
   IntegrationProvider,
   UnifiedParcelFeed,
@@ -12,7 +13,7 @@ import {
 
 const { Title, Text } = Typography;
 
-export default function DriverMarket() {
+export default function DriverMarket({ onBack }) {
   const driverId = useMemo(() => {
     return (
       localStorage.getItem("driverUserId") ||
@@ -28,6 +29,9 @@ export default function DriverMarket() {
 
   return (
     <div style={{ padding: 16 }}>
+      <div style={{ marginBottom: 12 }}>
+        <Button type="text" icon={<ArrowLeftOutlined />} onClick={onBack} />
+      </div>
       <Card style={{ borderRadius: 16, marginBottom: 12 }} styles={{ body: { padding: 14 } }}>
         <Title level={4} style={{ margin: 0 }}>Market buyurtmalari</Title>
         <Text type="secondary">

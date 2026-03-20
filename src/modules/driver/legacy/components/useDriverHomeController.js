@@ -85,7 +85,10 @@ export function useDriverHomeController({ tr, t }) {
       return;
     }
     setSelectedService(key);
-    if (typeof window !== "undefined") localStorage.setItem("driver_active_service", key);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("driver_active_service", key);
+      window.history.pushState({ service: key }, '', window.location.pathname);
+    }
   }, [canUseService, tr]);
 
   const toggleOnline = useCallback(async (checked) => {

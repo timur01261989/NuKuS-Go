@@ -92,7 +92,7 @@ export default function ClientWallet() {
     <div className="unigo-page pb-8">
       <header className="unigo-topbar px-4 py-4">
         <div className="mx-auto flex max-w-2xl items-center gap-3">
-          <button type="button" className="unigo-soft-card flex h-11 w-11 items-center justify-center p-0" onClick={() => navigate('/client/home')}>
+          <button type="button" className="unigo-soft-card flex h-11 w-11 items-center justify-center p-0" onClick={() => navigate(-1)}>
             <span className="material-symbols-outlined">arrow_back</span>
           </button>
           <h1 className="text-lg font-black text-slate-900">{cp("Hamyon", "wallet")}</h1>

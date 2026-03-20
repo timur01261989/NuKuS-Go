@@ -1,4 +1,6 @@
 import React from "react";
+import { Button } from "antd";
+import { ArrowLeftOutlined } from "@ant-design/icons";
 import { supabase } from "@/services/supabase/supabaseClient";
 import UnifiedParcelFeed from "../delivery-integration/feed/UnifiedParcelFeed";
 import { IntegrationProvider } from "../delivery-integration/context/IntegrationContext";
@@ -7,7 +9,7 @@ import { useFreightDriverController } from "./hooks/useFreightDriverController.j
 import FreightVehicleSetupCard from "./components/FreightVehicleSetupCard.jsx";
 import FreightStatusDeck from "./components/FreightStatusDeck.jsx";
 
-export default function FreightPage() {
+export default function FreightPage({ onBack }) {
   const controller = useFreightDriverController();
   const {
     error, info, loading, pickerOpen, setPickerOpen, currentPoint, setCurrentPoint, setCurrentAddress, vehicleId,
@@ -18,9 +20,12 @@ export default function FreightPage() {
   return (
     <div className="w-full max-w-5xl mx-auto p-4">
       <div className="flex items-start justify-between gap-3 mb-4">
-        <div>
-          <div className="text-xl font-semibold">YUK TASHISH (HAYDOVCHI)</div>
-          <div className="text-sm opacity-80">Moshina turini tanlang → joylashuvni xaritadan saqlang → online bo‘ling.</div>
+        <div className="flex items-center gap-3">
+          <Button type="text" icon={<ArrowLeftOutlined />} onClick={onBack} />
+          <div>
+            <div className="text-xl font-semibold">YUK TASHISH (HAYDOVCHI)</div>
+            <div className="text-sm opacity-80">Moshina turini tanlang → joylashuvni xaritadan saqlang → online bo‘ling.</div>
+          </div>
         </div>
         <button type="button" onClick={() => setPickerOpen(true)} disabled={loading} className="px-4 py-2 rounded-lg bg-gray-800 text-white disabled:opacity-50">Joylashuv</button>
       </div>

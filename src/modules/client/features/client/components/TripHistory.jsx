@@ -28,7 +28,7 @@ function resolveStatusIcon(status) {
   return orderAssets.history.orderCheck;
 }
 
-export default function TripHistory({ onBack }) {
+export default function TripHistory() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [trips, setTrips] = useState([]);
@@ -51,7 +51,7 @@ export default function TripHistory({ onBack }) {
     setLoading(false);
   };
 
-  const goBack = () => (typeof onBack === "function" ? onBack() : safeBack(navigate, "/client/home"));
+  const goBack = () => navigate(-1);
 
   return (
     <div style={{ padding: "20px", background: "#f8f9fa", minHeight: "100vh" }}>

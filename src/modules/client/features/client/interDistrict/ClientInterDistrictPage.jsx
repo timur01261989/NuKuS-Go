@@ -58,7 +58,7 @@ function MapClickSetter({ onPoint }) {
   return null;
 }
 
-function Inner({ onBack }) {
+function Inner() {
   const district = useDistrict();
   const controller = useInterDistrictController(district);
   const {
@@ -87,7 +87,7 @@ function Inner({ onBack }) {
 
   return (
     <div style={{ maxWidth: 560, margin: "0 auto", paddingBottom: 24 }}>
-      <DistrictHeader onBack={onBack} />
+      <DistrictHeader />
       <div style={{ padding: "0 14px" }}>
         <DistrictMap
           from={from}

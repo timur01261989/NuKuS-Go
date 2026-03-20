@@ -197,7 +197,10 @@ export default function ClientIntercityPage() {
 
   return (
     <div className="unigo-page" style={{ padding: 16, maxWidth: 820, margin: "0 auto", paddingBottom: 96 }}>
-      <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 16 }}>{t.interProvincial || cp("Viloyatlar aro")}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)} />
+        <div style={{ fontSize: 20, fontWeight: 800 }}>{t.interProvincial || cp("Viloyatlar aro")}</div>
+      </div>
 
       {/* MAP PREVIEW */}
       <div className="unigo-map-card" style={{ overflow: "hidden", marginBottom: 16 }}>
