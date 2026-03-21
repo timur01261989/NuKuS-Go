@@ -1,0 +1,30 @@
+{
+  "name": "UniGo WAF Rules",
+  "rules": [
+    {
+      "id": "block_sql_injection",
+      "description": "Block SQL Injection attempts",
+      "expression": "(http.request.uri.query contains "UNION") or (http.request.uri.query contains "SELECT") or (http.request.uri.query contains "DROP TABLE")",
+      "action": "block"
+    },
+    {
+      "id": "rate_limit_api",
+      "description": "Rate limit API — 500 req/min per IP",
+      "expression": "http.request.uri.path starts_with "/api/"",
+      "action": "rate_limit",
+      "ratelimit": { "characteristics": ["ip.src"], "period": 60, "requests_per_period": 500, "mitigation_timeout": 600 }
+    },
+    {
+      "id": "block_bad_bots",
+      "description": "Block known bad bots",
+      "expression": "(cf.threat_score gt 30) or (not cf.client.bot) and (http.request.uri.path contains "/api/auth")",
+      "action": "challenge"
+    },
+    {
+      "id": "allow_uz_region",
+      "description": "Only allow Uzbekistan + CIS region",
+      "expression": "not (ip.geoip.country in {"UZ" "KZ" "KG" "TJ" "TM" "RU" "AZ" "UA" "BY"})",
+      "action": "block"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "title": "UniGo Platform Overview",
+  "panels": [
+    { "title": "Active Orders",       "type": "stat",  "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 } },
+    { "title": "Online Drivers",      "type": "stat",  "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 } },
+    { "title": "Requests/sec",        "type": "graph", "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 } },
+    { "title": "Error Rate",          "type": "graph", "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 } },
+    { "title": "Redis Memory",        "type": "gauge", "gridPos": { "x": 0, "y": 12, "w": 6, "h": 6 } },
+    { "title": "DB Connections",      "type": "gauge", "gridPos": { "x": 6, "y": 12, "w": 6, "h": 6 } },
+    { "title": "Response Latency P99","type": "graph", "gridPos": { "x": 0, "y": 18, "w": 24, "h": 8 } }
+  ]
+}

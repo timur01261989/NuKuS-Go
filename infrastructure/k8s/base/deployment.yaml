@@ -1,0 +1,745 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  labels:
+    app: api-gateway
+    version: stable
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+        version: stable
+    spec:
+      containers:
+      - name: api-gateway
+        image: ghcr.io/unigo/api-gateway:latest
+        ports:
+        - containerPort: 8080
+        resources:
+          requests: { cpu: "100m", memory: "128Mi" }
+          limits:   { cpu: "500m", memory: "512Mi" }
+        envFrom:
+        - configMapRef:
+            name: unigo-config
+        env:
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: unigo-secrets
+              key: jwt-secret
+        livenessProbe:
+          httpGet: { path: /api/health, port: 8080 }
+          initialDelaySeconds: 15
+          periodSeconds: 30
+        readinessProbe:
+          httpGet: { path: /api/health, port: 8080 }
+          initialDelaySeconds: 5
+          periodSeconds: 10
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  labels:
+    app: auth-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      containers:
+      - name: auth-service
+        image: ghcr.io/unigo/auth-service:latest
+        ports:
+        - containerPort: 3001
+        resources:
+          requests: { cpu: "50m", memory: "64Mi" }
+          limits:   { cpu: "300m", memory: "256Mi" }
+        envFrom:
+        - configMapRef:
+            name: unigo-config
+        - secretRef:
+            name: unigo-secrets
+        livenessProbe:
+          httpGet: { path: /health, port: 3001 }
+          initialDelaySeconds: 15
+          periodSeconds: 30
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ride-service
+  labels:
+    app: ride-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ride-service
+  template:
+    metadata:
+      labels:
+        app: ride-service
+    spec:
+      containers:
+      - name: ride-service
+        image: ghcr.io/unigo/ride-service:latest
+        ports:
+        - containerPort: 3002
+        resources:
+          requests: { cpu: "50m", memory: "64Mi" }
+          limits:   { cpu: "300m", memory: "256Mi" }
+        envFrom:
+        - configMapRef:
+            name: unigo-config
+        - secretRef:
+            name: unigo-secrets
+        livenessProbe:
+          httpGet: { path: /health, port: 3002 }
+          initialDelaySeconds: 15
+          periodSeconds: 30
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: delivery-service
+  labels:
+    app: delivery-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: delivery-service
+  template:
+    metadata:
+      labels:
+        app: delivery-service
+    spec:
+      containers:
+      - name: delivery-service
+        image: ghcr.io/unigo/delivery-service:latest
+        ports:
+        - containerPort: 3003
+        resources:
+          requests: { cpu: "50m", memory: "64Mi" }
+          limits:   { cpu: "300m", memory: "256Mi" }
+        envFrom:
+        - configMapRef:
+            name: unigo-config
+        - secretRef:
+            name: unigo-secrets
+        livenessProbe:
+          httpGet: { path: /health, port: 3003 }
+          initialDelaySeconds: 15
+          periodSeconds: 30
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+  labels:
+    app: payment-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: payment-service
+  template:
+    metadata:
+      labels:
+        app: payment-service
+    spec:
+      containers:
+      - name: payment-service
+        image: ghcr.io/unigo/payment-service:latest
+        ports:
+        - containerPort: 3004
+        resources:
+          requests: { cpu: "50m", memory: "64Mi" }
+          limits:   { cpu: "300m", memory: "256Mi" }
+        envFrom:
+        - configMapRef:
+            name: unigo-config
+        - secretRef:
+            name: unigo-secrets
+        livenessProbe:
+          httpGet: { path: /health, port: 3004 }
+          initialDelaySeconds: 15
+          periodSeconds: 30
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: location-service
+  labels:
+    app: location-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: location-service
+  template:
+    metadata:
+      labels:
+        app: location-service
+    spec:
+      containers:
+      - name: location-service
+        image: ghcr.io/unigo/location-service:latest
+        ports:
+        - containerPort: 3005
+        resources:
+          requests: { cpu: "50m", memory: "64Mi" }
+          limits:   { cpu: "300m", memory: "256Mi" }
+        envFrom:
+        - configMapRef:
+            name: unigo-config
+        - secretRef:
+            name: unigo-secrets
+        livenessProbe:
+          httpGet: { path: /health, port: 3005 }
+          initialDelaySeconds: 15
+          periodSeconds: 30
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  labels:
+    app: notification-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+      - name: notification-service
+        image: ghcr.io/unigo/notification-service:latest
+        ports:
+        - containerPort: 3006
+        resources:
+          requests: { cpu: "50m", memory: "64Mi" }
+          limits:   { cpu: "300m", memory: "256Mi" }
+        envFrom:
+        - configMapRef:
+            name: unigo-config
+        - secretRef:
+            name: unigo-secrets
+        livenessProbe:
+          httpGet: { path: /health, port: 3006 }
+          initialDelaySeconds: 15
+          periodSeconds: 30
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: freight-service
+  labels:
+    app: freight-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: freight-service
+  template:
+    metadata:
+      labels:
+        app: freight-service
+    spec:
+      containers:
+      - name: freight-service
+        image: ghcr.io/unigo/freight-service:latest
+        ports:
+        - containerPort: 3007
+        resources:
+          requests: { cpu: "50m", memory: "64Mi" }
+          limits:   { cpu: "300m", memory: "256Mi" }
+        envFrom:
+        - configMapRef:
+            name: unigo-config
+        - secretRef:
+            name: unigo-secrets
+        livenessProbe:
+          httpGet: { path: /health, port: 3007 }
+          initialDelaySeconds: 15
+          periodSeconds: 30
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: intercity-service
+  labels:
+    app: intercity-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: intercity-service
+  template:
+    metadata:
+      labels:
+        app: intercity-service
+    spec:
+      containers:
+      - name: intercity-service
+        image: ghcr.io/unigo/intercity-service:latest
+        ports:
+        - containerPort: 3008
+        resources:
+          requests: { cpu: "50m", memory: "64Mi" }
+          limits:   { cpu: "300m", memory: "256Mi" }
+        envFrom:
+        - configMapRef:
+            name: unigo-config
+        - secretRef:
+            name: unigo-secrets
+        livenessProbe:
+          httpGet: { path: /health, port: 3008 }
+          initialDelaySeconds: 15
+          periodSeconds: 30
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: marketplace-service
+  labels:
+    app: marketplace-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: marketplace-service
+  template:
+    metadata:
+      labels:
+        app: marketplace-service
+    spec:
+      containers:
+      - name: marketplace-service
+        image: ghcr.io/unigo/marketplace-service:latest
+        ports:
+        - containerPort: 3009
+        resources:
+          requests: { cpu: "50m", memory: "64Mi" }
+          limits:   { cpu: "300m", memory: "256Mi" }
+        envFrom:
+        - configMapRef:
+            name: unigo-config
+        - secretRef:
+            name: unigo-secrets
+        livenessProbe:
+          httpGet: { path: /health, port: 3009 }
+          initialDelaySeconds: 15
+          periodSeconds: 30
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: food-service
+  labels:
+    app: food-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: food-service
+  template:
+    metadata:
+      labels:
+        app: food-service
+    spec:
+      containers:
+      - name: food-service
+        image: ghcr.io/unigo/food-service:latest
+        ports:
+        - containerPort: 3011
+        resources:
+          requests: { cpu: "50m", memory: "64Mi" }
+          limits:   { cpu: "300m", memory: "256Mi" }
+        envFrom:
+        - configMapRef:
+            name: unigo-config
+        - secretRef:
+            name: unigo-secrets
+        livenessProbe:
+          httpGet: { path: /health, port: 3011 }
+          initialDelaySeconds: 15
+          periodSeconds: 30
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: interdistrict-service
+  labels:
+    app: interdistrict-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: interdistrict-service
+  template:
+    metadata:
+      labels:
+        app: interdistrict-service
+    spec:
+      containers:
+      - name: interdistrict-service
+        image: ghcr.io/unigo/interdistrict-service:latest
+        ports:
+        - containerPort: 3012
+        resources:
+          requests: { cpu: "50m", memory: "64Mi" }
+          limits:   { cpu: "300m", memory: "256Mi" }
+        envFrom:
+        - configMapRef:
+            name: unigo-config
+        - secretRef:
+            name: unigo-secrets
+        livenessProbe:
+          httpGet: { path: /health, port: 3012 }
+          initialDelaySeconds: 15
+          periodSeconds: 30
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service
+  labels:
+    app: analytics-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: analytics-service
+  template:
+    metadata:
+      labels:
+        app: analytics-service
+    spec:
+      containers:
+      - name: analytics-service
+        image: ghcr.io/unigo/analytics-service:latest
+        ports:
+        - containerPort: 3013
+        resources:
+          requests: { cpu: "50m", memory: "64Mi" }
+          limits:   { cpu: "300m", memory: "256Mi" }
+        envFrom:
+        - configMapRef:
+            name: unigo-config
+        - secretRef:
+            name: unigo-secrets
+        livenessProbe:
+          httpGet: { path: /health, port: 3013 }
+          initialDelaySeconds: 15
+          periodSeconds: 30
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: search-service
+  labels:
+    app: search-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: search-service
+  template:
+    metadata:
+      labels:
+        app: search-service
+    spec:
+      containers:
+      - name: search-service
+        image: ghcr.io/unigo/search-service:latest
+        ports:
+        - containerPort: 3014
+        resources:
+          requests: { cpu: "50m", memory: "64Mi" }
+          limits:   { cpu: "300m", memory: "256Mi" }
+        envFrom:
+        - configMapRef:
+            name: unigo-config
+        - secretRef:
+            name: unigo-secrets
+        livenessProbe:
+          httpGet: { path: /health, port: 3014 }
+          initialDelaySeconds: 15
+          periodSeconds: 30
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: matching-service
+  labels:
+    app: matching-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: matching-service
+  template:
+    metadata:
+      labels:
+        app: matching-service
+    spec:
+      containers:
+      - name: matching-service
+        image: ghcr.io/unigo/matching-service:latest
+        ports:
+        - containerPort: 3015
+        resources:
+          requests: { cpu: "50m", memory: "64Mi" }
+          limits:   { cpu: "300m", memory: "256Mi" }
+        envFrom:
+        - configMapRef:
+            name: unigo-config
+        - secretRef:
+            name: unigo-secrets
+        livenessProbe:
+          httpGet: { path: /health, port: 3015 }
+          initialDelaySeconds: 15
+          periodSeconds: 30
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reward-service
+  labels:
+    app: reward-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: reward-service
+  template:
+    metadata:
+      labels:
+        app: reward-service
+    spec:
+      containers:
+      - name: reward-service
+        image: ghcr.io/unigo/reward-service:latest
+        ports:
+        - containerPort: 3016
+        resources:
+          requests: { cpu: "50m", memory: "64Mi" }
+          limits:   { cpu: "300m", memory: "256Mi" }
+        envFrom:
+        - configMapRef:
+            name: unigo-config
+        - secretRef:
+            name: unigo-secrets
+        livenessProbe:
+          httpGet: { path: /health, port: 3016 }
+          initialDelaySeconds: 15
+          periodSeconds: 30
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: routing-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: routing-service
+  template:
+    metadata:
+      labels:
+        app: routing-service
+    spec:
+      containers:
+      - name: routing-service
+        image: ghcr.io/unigo/routing-service:latest
+        ports:
+        - containerPort: 3017
+        resources:
+          requests: { cpu: "50m", memory: "64Mi" }
+          limits:   { cpu: "300m", memory: "256Mi" }
+        envFrom:
+        - configMapRef:
+            name: unigo-config
+        - secretRef:
+            name: unigo-secrets
+        livenessProbe:
+          httpGet: { path: /health, port: 3017 }
+          initialDelaySeconds: 15
+          periodSeconds: 30
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: corporate-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: corporate-service
+  template:
+    metadata:
+      labels:
+        app: corporate-service
+    spec:
+      containers:
+      - name: corporate-service
+        image: ghcr.io/unigo/corporate-service:latest
+        ports:
+        - containerPort: 3018
+        resources:
+          requests: { cpu: "50m", memory: "64Mi" }
+          limits:   { cpu: "300m", memory: "256Mi" }
+        envFrom:
+        - configMapRef:
+            name: unigo-config
+        - secretRef:
+            name: unigo-secrets
+        livenessProbe:
+          httpGet: { path: /health, port: 3018 }
+          initialDelaySeconds: 15
+          periodSeconds: 30
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: safety-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: safety-service
+  template:
+    metadata:
+      labels:
+        app: safety-service
+    spec:
+      containers:
+      - name: safety-service
+        image: ghcr.io/unigo/safety-service:latest
+        ports:
+        - containerPort: 3019
+        resources:
+          requests: { cpu: "50m", memory: "64Mi" }
+          limits:   { cpu: "300m", memory: "256Mi" }
+        envFrom:
+        - configMapRef:
+            name: unigo-config
+        - secretRef:
+            name: unigo-secrets
+        livenessProbe:
+          httpGet: { path: /health, port: 3019 }
+          initialDelaySeconds: 15
+          periodSeconds: 30
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: subscription-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: subscription-service
+  template:
+    metadata:
+      labels:
+        app: subscription-service
+    spec:
+      containers:
+      - name: subscription-service
+        image: ghcr.io/unigo/subscription-service:latest
+        ports:
+        - containerPort: 3020
+        resources:
+          requests: { cpu: "50m", memory: "64Mi" }
+          limits:   { cpu: "300m", memory: "256Mi" }
+        envFrom:
+        - configMapRef:
+            name: unigo-config
+        - secretRef:
+            name: unigo-secrets
+        livenessProbe:
+          httpGet: { path: /health, port: 3020 }
+          initialDelaySeconds: 15
+          periodSeconds: 30
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: verification-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: verification-service
+  template:
+    metadata:
+      labels:
+        app: verification-service
+    spec:
+      containers:
+      - name: verification-service
+        image: ghcr.io/unigo/verification-service:latest
+        ports:
+        - containerPort: 3021
+        resources:
+          requests: { cpu: "50m", memory: "64Mi" }
+          limits:   { cpu: "300m", memory: "256Mi" }
+        envFrom:
+        - configMapRef:
+            name: unigo-config
+        - secretRef:
+            name: unigo-secrets
+        livenessProbe:
+          httpGet: { path: /health, port: 3021 }
+          initialDelaySeconds: 15
+          periodSeconds: 30
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: promo-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: promo-service
+  template:
+    metadata:
+      labels:
+        app: promo-service
+    spec:
+      containers:
+      - name: promo-service
+        image: ghcr.io/unigo/promo-service:latest
+        ports:
+        - containerPort: 3022
+        resources:
+          requests: { cpu: "50m", memory: "64Mi" }
+          limits:   { cpu: "300m", memory: "256Mi" }
+        envFrom:
+        - configMapRef:
+            name: unigo-config
+        - secretRef:
+            name: unigo-secrets
+        livenessProbe:
+          httpGet: { path: /health, port: 3022 }
+          initialDelaySeconds: 15
+          periodSeconds: 30

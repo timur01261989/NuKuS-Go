@@ -1,0 +1,1 @@
+{"name":"@unigo/event-bus","version":"1.0.0","main":"src/index.ts","dependencies":{"kafkajs":"^2.2.4"},"devDependencies":{"typescript":"^5.4.0"}}

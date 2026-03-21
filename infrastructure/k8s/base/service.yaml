@@ -1,0 +1,263 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+spec:
+  selector:
+    app: api-gateway
+  ports:
+  - port: 80
+    targetPort: 8080
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+spec:
+  selector:
+    app: auth-service
+  ports:
+  - port: 3001
+    targetPort: 3001
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ride-service
+spec:
+  selector:
+    app: ride-service
+  ports:
+  - port: 3002
+    targetPort: 3002
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: delivery-service
+spec:
+  selector:
+    app: delivery-service
+  ports:
+  - port: 3003
+    targetPort: 3003
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-service
+spec:
+  selector:
+    app: payment-service
+  ports:
+  - port: 3004
+    targetPort: 3004
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: location-service
+spec:
+  selector:
+    app: location-service
+  ports:
+  - port: 3005
+    targetPort: 3005
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+spec:
+  selector:
+    app: notification-service
+  ports:
+  - port: 3006
+    targetPort: 3006
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: freight-service
+spec:
+  selector:
+    app: freight-service
+  ports:
+  - port: 3007
+    targetPort: 3007
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: intercity-service
+spec:
+  selector:
+    app: intercity-service
+  ports:
+  - port: 3008
+    targetPort: 3008
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: marketplace-service
+spec:
+  selector:
+    app: marketplace-service
+  ports:
+  - port: 3009
+    targetPort: 3009
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: food-service
+spec:
+  selector:
+    app: food-service
+  ports:
+  - port: 3011
+    targetPort: 3011
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: interdistrict-service
+spec:
+  selector:
+    app: interdistrict-service
+  ports:
+  - port: 3012
+    targetPort: 3012
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-service
+spec:
+  selector:
+    app: analytics-service
+  ports:
+  - port: 3013
+    targetPort: 3013
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: search-service
+spec:
+  selector:
+    app: search-service
+  ports:
+  - port: 3014
+    targetPort: 3014
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: matching-service
+spec:
+  selector:
+    app: matching-service
+  ports:
+  - port: 3015
+    targetPort: 3015
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: reward-service
+spec:
+  selector:
+    app: reward-service
+  ports:
+  - port: 3016
+    targetPort: 3016
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: routing-service
+spec:
+  selector:
+    app: routing-service
+  ports:
+  - port: 3017
+    targetPort: 3017
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: corporate-service
+spec:
+  selector:
+    app: corporate-service
+  ports:
+  - port: 3018
+    targetPort: 3018
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: safety-service
+spec:
+  selector:
+    app: safety-service
+  ports:
+  - port: 3019
+    targetPort: 3019
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: subscription-service
+spec:
+  selector:
+    app: subscription-service
+  ports:
+  - port: 3020
+    targetPort: 3020
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: verification-service
+spec:
+  selector:
+    app: verification-service
+  ports:
+  - port: 3021
+    targetPort: 3021
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: promo-service
+spec:
+  selector:
+    app: promo-service
+  ports:
+  - port: 3022
+    targetPort: 3022
+  type: ClusterIP

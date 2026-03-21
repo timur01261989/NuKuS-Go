@@ -1,9 +1,0 @@
-
-{
- "dashboard": "UniGo Metrics",
- "panels": [
-  {"type":"graph","title":"Dispatch Latency"},
-  {"type":"graph","title":"Driver Online Count"},
-  {"type":"graph","title":"Order Throughput"}
- ]
-}

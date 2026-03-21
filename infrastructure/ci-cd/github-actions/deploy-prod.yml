@@ -1,0 +1,30 @@
+name: Deploy to Production
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    needs: []
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker images
+        run: |
+          docker build -t ghcr.io/unigo/api-gateway:$GITHUB_SHA ./apps/api-gateway
+          docker build -t ghcr.io/unigo/auth-service:$GITHUB_SHA ./services/auth-service
+
+      - name: Push to registry
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
+          docker push ghcr.io/unigo/api-gateway:$GITHUB_SHA
+
+      - name: Deploy to Vercel (client-app)
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.ORG_ID }}
+          vercel-project-id: ${{ secrets.PROJECT_ID }}
+          working-directory: ./apps/client-app
+          vercel-args: "--prod"

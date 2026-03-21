@@ -1,0 +1,71 @@
+name: Deploy Production
+on:
+  push: { branches: [main] }
+
+env:
+  REGISTRY: ghcr.io
+  ORG:      ${{ github.repository_owner }}
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - api-gateway
+          - ws-gateway
+          - auth-service
+          - ride-service
+          - delivery-service
+          - payment-service
+          - location-service
+          - notification-service
+          - matching-service
+          - routing-service
+          - corporate-service
+          - safety-service
+          - subscription-service
+          - verification-service
+          - promo-service
+          - reward-service
+          - analytics-service
+          - search-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry:  ${{ env.REGISTRY }}
+          username:  ${{ github.actor }}
+          password:  ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v5
+        with:
+          context: ${{ contains(matrix.service, '-service') && format('./services/{0}', matrix.service) || format('./apps/{0}', matrix.service) }}
+          push:    true
+          tags:    ${{ env.REGISTRY }}/${{ env.ORG }}/${{ matrix.service }}:${{ github.sha }},${{ env.REGISTRY }}/${{ env.ORG }}/${{ matrix.service }}:latest
+
+  deploy-client:
+    runs-on: ubuntu-latest
+    needs: []
+    steps:
+      - uses: actions/checkout@v4
+      - uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: ./apps/client-app
+          vercel-args: "--prod"
+
+  deploy-k8s:
+    runs-on: ubuntu-latest
+    needs: [build-push]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/k8s-set-context@v3
+        with:
+          method:     kubeconfig
+          kubeconfig: ${{ secrets.KUBECONFIG }}
+      - run: |
+          for svc in auth-service ride-service payment-service location-service matching-service; do
+            kubectl set image deployment/$svc $svc=${{ env.REGISTRY }}/${{ env.ORG }}/$svc:${{ github.sha }} -n unigo-prod
+          done

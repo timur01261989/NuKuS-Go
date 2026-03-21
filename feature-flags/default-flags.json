@@ -1,0 +1,8 @@
+{
+  "autoMarket": true,
+  "foodDelivery": false,
+  "intercityRide": true,
+  "surgePrice": false,
+  "loyaltyRewards": true,
+  "voiceNavigation": false
+}

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: unigo-config
+data:
+  NODE_ENV: "production"
+  LOG_LEVEL: "warn"
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  AUTH_SERVICE_URL: "http://auth-service"
+  RIDE_SERVICE_URL: "http://ride-service"
+  DELIVERY_SERVICE_URL: "http://delivery-service"
+  PAYMENT_SERVICE_URL: "http://payment-service"
+  LOCATION_SERVICE_URL: "http://location-service"
+  FREIGHT_SERVICE_URL: "http://freight-service"
+  INTERCITY_SERVICE_URL: "http://intercity-service"
+  MARKETPLACE_SERVICE_URL: "http://marketplace-service"

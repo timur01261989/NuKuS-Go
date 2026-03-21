@@ -1,0 +1,12 @@
+{
+  "service_name": "unigo-platform",
+  "sampler": {
+    "type": "probabilistic",
+    "param": 0.1
+  },
+  "reporter": {
+    "logSpans": false,
+    "agentHost": "jaeger-agent",
+    "agentPort": 6831
+  }
+}

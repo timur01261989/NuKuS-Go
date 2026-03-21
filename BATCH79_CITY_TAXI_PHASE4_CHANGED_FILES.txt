@@ -1,7 +1,0 @@
-BATCH79 CITY TAXI PHASE4 QUALITY GATE
-- audited client taxi, driver city-taxi, shared taxi layers
-- removed empty catches from critical client taxi modules
-- routed critical fallbacks through taxiLogger
-- confirmed canonical status mapping remains active
-- confirmed client sheet split and driver controller split stay wired
-- confirmed no vendor traces remain in taxi module files

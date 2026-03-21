@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: unigo-platform
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/your-org/unigo-platform.git
+    targetRevision: HEAD
+    path: infrastructure/k8s/overlays/production
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: unigo-prod
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true

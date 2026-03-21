@@ -1,0 +1,18 @@
+{
+  "development": {
+    "autoMarket": true,
+    "foodDelivery": true,
+    "surgePrice": true,
+    "voiceNavigation": true
+  },
+  "staging": {
+    "autoMarket": true,
+    "foodDelivery": false,
+    "surgePrice": true
+  },
+  "production": {
+    "autoMarket": true,
+    "foodDelivery": false,
+    "surgePrice": false
+  }
+}

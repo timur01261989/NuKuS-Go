@@ -1,0 +1,60 @@
+export const ROUTES = {
+  auth: {
+    login: "/login",
+    register: "/register",
+    resetPassword: "/reset-password",
+  },
+  referral: {
+    shortInvite: "/r/:code",
+    invite: "/invite/:code",
+  },
+  client: {
+    home: "/",
+    taxi: "/taxi",
+    delivery: "/delivery",
+    freight: "/freight",
+    intercity: "/intercity",
+    interdistrict: "/interdistrict",
+    wallet: "/wallet",
+    profile: "/profile",
+    referral: "/referral",
+    promo: "/promo",
+    settings: "/settings",
+    autoMarket: "/auto-market",
+    navigator: "/client/navigator",
+  },
+  driver: {
+    home: "/driver",
+    register: "/driver/register",
+    pending: "/driver/pending",
+    orders: "/driver/orders",
+    activeOrder: "/driver/active-order",
+    wallet: "/driver/wallet",
+    profile: "/driver/profile",
+    settings: "/driver/settings",
+    vehicles: "/driver/vehicles",
+    insights: "/driver/insights",
+    referral: "/driver/referral",
+  },
+  legacy: {
+    clientHome: "/client/home",
+    clientTaxi: "/client/taxi",
+    clientDelivery: "/client/delivery",
+    clientFreight: "/client/freight",
+    clientInterProvincial: "/client/inter-provincial",
+    clientInterDistrict: "/client/inter-district",
+    clientWallet: "/client/wallet",
+    clientProfile: "/client/profile",
+    clientReferral: "/client/referral",
+    clientPromo: "/client/promo",
+    clientSettings: "/client/settings",
+    driverHome: "/driver/home",
+    driverDashboard: "/driver/dashboard",
+    market: "/market",
+    navigator: "/navigator",
+  },
+};
+
+export function toPath(value, fallback = ROUTES.client.home) {
+  return typeof value === "string" && value.trim() ? value : fallback;
+}

@@ -1,9 +1,0 @@
-src/modules/client/features/auth/pages/auth.helpers.js
-src/modules/client/features/auth/pages/Auth.jsx
-src/modules/driver/legacy/components/driverAuth.helpers.jsx
-src/modules/driver/legacy/components/DriverAuth.jsx
-src/modules/client/pages/pages/myAddresses.helpers.jsx
-src/modules/client/pages/pages/MyAddresses.jsx
-src/modules/driver/legacy/components/driverOrderFeed.helpers.jsx
-src/modules/driver/legacy/components/DriverOrderFeed.jsx
-tests/batch15-structure.test.js

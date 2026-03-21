@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "installCommand": "cd ../.. && npm install --legacy-peer-deps",
+  "buildCommand": "cd ../.. && npm run build:client",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/((?!assets/|icons/|sounds/|map/|manifest.webmanifest|sw.js|vite.svg|favicon.ico).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

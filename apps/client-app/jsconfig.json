@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*":              ["./src/*"],
+      "@services/*":      ["./src/services/*"],
+      "@i18n/*":          ["./src/i18n/*"],
+      "@unigo/core-types": ["../../libs/core-types/src/index.ts"],
+      "@unigo/utils":      ["../../libs/utils/src/index.ts"],
+      "@unigo/ui-kit":     ["../../libs/ui-kit/src/index.ts"],
+      "@unigo/api-client": ["../../libs/api-client/src/index.ts"]
+    }
+  }
+}

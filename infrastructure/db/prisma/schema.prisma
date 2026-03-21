@@ -1,0 +1,259 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── PROFILES ────────────────────────────────────────────────────────────────
+model Profile {
+  id           String   @id @db.Uuid
+  phone        String?  @unique
+  full_name    String?
+  avatar_url   String?
+  role         String   @default("client")
+  current_role String   @default("client")
+  language     String   @default("uz_latn")
+  is_admin     Boolean  @default(false)
+  is_blocked   Boolean  @default(false)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  orders       Order[]  @relation("ClientOrders")
+  driver       Driver?
+  wallet       Wallet?
+  subscription Subscription?
+  @@map("profiles")
+}
+
+// ─── DRIVERS ─────────────────────────────────────────────────────────────────
+model Driver {
+  id           String   @id @default(uuid()) @db.Uuid
+  user_id      String   @unique @db.Uuid
+  status       String   @default("offline")
+  rating       Decimal  @default(5.00) @db.Decimal(3,2)
+  total_rides  Int      @default(0)
+  created_at   DateTime @default(now())
+
+  profile      Profile  @relation(fields: [user_id], references: [id])
+  vehicles     Vehicle[]
+  orders       Order[]  @relation("DriverOrders")
+  presence     DriverPresence?
+  @@map("drivers")
+}
+
+// ─── DRIVER PRESENCE (real-time) ─────────────────────────────────────────────
+model DriverPresence {
+  driver_id          String   @id @db.Uuid
+  is_online          Boolean  @default(false)
+  active_service_type String  @default("taxi")
+  lat                Decimal? @db.Decimal(10,8)
+  lng                Decimal? @db.Decimal(11,8)
+  heading            Decimal? @db.Decimal(5,2)
+  speed              Decimal? @db.Decimal(6,2)
+  last_seen_at       DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  driver             Driver   @relation(fields: [driver_id], references: [id])
+  @@map("driver_presence")
+}
+
+// ─── VEHICLES ─────────────────────────────────────────────────────────────────
+model Vehicle {
+  id           String   @id @default(uuid()) @db.Uuid
+  driver_id    String   @db.Uuid
+  brand        String
+  model        String
+  year         Int
+  plate_number String   @unique
+  color        String?
+  type         String   @default("sedan")
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now())
+
+  driver       Driver   @relation(fields: [driver_id], references: [id])
+  @@map("vehicles")
+}
+
+// ─── ORDERS ──────────────────────────────────────────────────────────────────
+model Order {
+  id               String   @id @default(uuid()) @db.Uuid
+  client_id        String   @db.Uuid
+  driver_id        String?  @db.Uuid
+  service_type     String
+  status           String   @default("searching")
+  pickup_lat       Decimal  @db.Decimal(10,8)
+  pickup_lng       Decimal  @db.Decimal(11,8)
+  pickup_address   String?
+  dropoff_lat      Decimal  @db.Decimal(10,8)
+  dropoff_lng      Decimal  @db.Decimal(11,8)
+  dropoff_address  String?
+  price_uzs        BigInt   @default(0)
+  surge_multiplier Decimal  @default(1.00) @db.Decimal(4,2)
+  payment_method   String   @default("cash")
+  promo_code       String?
+  discount_uzs     BigInt   @default(0)
+  route_polyline   String?
+  distance_km      Decimal? @db.Decimal(8,3)
+  eta_minutes      Int?
+  notes            String?
+  cancelled_reason String?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  client           Profile  @relation("ClientOrders", fields: [client_id], references: [id])
+  driver           Driver?  @relation("DriverOrders", fields: [driver_id], references: [id])
+  offers           OrderOffer[]
+  payments         Payment[]
+  @@map("orders")
+}
+
+// ─── ORDER OFFERS ─────────────────────────────────────────────────────────────
+model OrderOffer {
+  id         String   @id @default(uuid()) @db.Uuid
+  order_id   String   @db.Uuid
+  driver_id  String   @db.Uuid
+  status     String   @default("sent")
+  eta_min    Int?
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  order      Order    @relation(fields: [order_id], references: [id])
+  @@map("order_offers")
+}
+
+// ─── PAYMENTS ────────────────────────────────────────────────────────────────
+model Payment {
+  id          String   @id @default(uuid()) @db.Uuid
+  order_id    String   @db.Uuid
+  user_id     String   @db.Uuid
+  provider    String
+  amount_uzs  BigInt
+  status      String   @default("pending")
+  provider_tx String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  order       Order    @relation(fields: [order_id], references: [id])
+  @@map("payments")
+}
+
+// ─── WALLETS ─────────────────────────────────────────────────────────────────
+model Wallet {
+  user_id    String   @id @db.Uuid
+  balance    BigInt   @default(0)
+  updated_at DateTime @updatedAt
+
+  user       Profile  @relation(fields: [user_id], references: [id])
+  @@map("wallets")
+}
+
+// ─── SUBSCRIPTIONS ───────────────────────────────────────────────────────────
+model Subscription {
+  id              String   @id @default(uuid()) @db.Uuid
+  user_id         String   @unique @db.Uuid
+  plan_id         String
+  billing_cycle   String
+  status          String   @default("active")
+  starts_at       DateTime
+  expires_at      DateTime
+  auto_renew      Boolean  @default(true)
+  created_at      DateTime @default(now())
+
+  user            Profile  @relation(fields: [user_id], references: [id])
+  @@map("user_subscriptions")
+}
+
+// ─── CAR ADS (Auto Market) ───────────────────────────────────────────────────
+model CarAd {
+  id           String   @id @default(uuid()) @db.Uuid
+  seller_id    String   @db.Uuid
+  brand        String
+  model        String
+  year         Int
+  mileage_km   Int      @default(0)
+  price_usd    Int
+  price_uzs    BigInt?
+  fuel_type    String   @default("petrol")
+  transmission String   @default("manual")
+  body_type    String   @default("sedan")
+  color        String?
+  photos       String[]
+  city         String   @default("Toshkent")
+  phone        String
+  status       String   @default("active")
+  views        Int      @default(0)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  @@index([brand])
+  @@index([city])
+  @@index([status])
+  @@map("car_ads")
+}
+
+// ─── DELIVERY ORDERS ─────────────────────────────────────────────────────────
+model DeliveryOrder {
+  id               String   @id @default(uuid()) @db.Uuid
+  user_id          String   @db.Uuid
+  driver_id        String?  @db.Uuid
+  status           String   @default("searching")
+  pickup_lat       Decimal  @db.Decimal(10,8)
+  pickup_lng       Decimal  @db.Decimal(11,8)
+  pickup_address   String?
+  dropoff_lat      Decimal  @db.Decimal(10,8)
+  dropoff_lng      Decimal  @db.Decimal(11,8)
+  dropoff_address  String?
+  price_uzs        BigInt   @default(0)
+  pin_code         String?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+  @@map("delivery_orders")
+}
+
+// ─── CORPORATE ───────────────────────────────────────────────────────────────
+model CorporateCompany {
+  id              String   @id @default(uuid()) @db.Uuid
+  name            String
+  bin             String   @unique
+  wallet_balance  BigInt   @default(0)
+  credit_limit    BigInt   @default(0)
+  status          String   @default("active")
+  created_at      DateTime @default(now())
+  employees       CorporateEmployee[]
+  @@map("corporate_companies")
+}
+
+model CorporateEmployee {
+  id               String  @id @default(uuid()) @db.Uuid
+  company_id       String  @db.Uuid
+  user_id          String  @db.Uuid
+  full_name        String
+  email            String?
+  department       String?
+  monthly_budget   BigInt  @default(0)
+  spent_this_month BigInt  @default(0)
+  active           Boolean @default(true)
+  added_at         DateTime @default(now())
+
+  company          CorporateCompany @relation(fields: [company_id], references: [id])
+  @@map("corporate_employees")
+}
+
+// ─── SAFETY ALERTS ───────────────────────────────────────────────────────────
+model SafetyAlert {
+  id          String   @id @default(uuid()) @db.Uuid
+  order_id    String   @db.Uuid
+  user_id     String   @db.Uuid
+  driver_id   String?  @db.Uuid
+  type        String
+  status      String   @default("active")
+  lat         Decimal  @db.Decimal(10,8)
+  lng         Decimal  @db.Decimal(11,8)
+  description String?
+  created_at  DateTime @default(now())
+  @@map("safety_alerts")
+}

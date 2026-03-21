@@ -1,0 +1,15 @@
+{
+  "name": "@unigo/testing",
+  "version": "1.0.0",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "vitest run testing/e2e"
+  },
+  "devDependencies": {
+    "vitest": "^1.5.0",
+    "@vitest/coverage-v8": "^1.5.0",
+    "typescript": "^5.4.0"
+  }
+}
