@@ -1,5 +1,6 @@
 import api from "@/modules/shared/utils/apiHelper";
 import { supabase } from "@/services/supabase/supabaseClient";
+import { compressImageToFile, UPLOAD_PRESETS } from "@/modules/shared/utils/imageUtils.js";
 
 async function post(path, body) {
   try {
@@ -75,8 +76,18 @@ export const interProvincialApi = {
 
   async uploadParcelPhoto(file, tripId) {
     if (!file) return null;
-    const path = `parcels/${tripId || 'no_trip'}/${Date.now()}_${file.name}`;
-    const { error } = await supabase.storage.from('public').upload(path, file, { upsert: true });
+    let uploadBlob = file;
+    try {
+      uploadBlob = await compressImageToFile(file, UPLOAD_PRESETS.parcel);
+    } catch {
+      uploadBlob = file;
+    }
+    const safeName = String(uploadBlob.name || 'photo.jpg').replace(/[^\w.\-]+/g, '_');
+    const path = `parcels/${tripId || 'no_trip'}/${Date.now()}_${safeName}`;
+    const { error } = await supabase.storage.from('public').upload(path, uploadBlob, {
+      upsert: true,
+      contentType: uploadBlob.type || 'image/jpeg',
+    });
     if (error) throw error;
     const { data } = supabase.storage.from('public').getPublicUrl(path);
     return data?.publicUrl || null;

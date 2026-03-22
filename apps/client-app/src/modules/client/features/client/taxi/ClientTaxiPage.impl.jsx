@@ -228,6 +228,18 @@ export default function ClientTaxiPage() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
+  const handleMapCenterChange = useCallback((ll) => {
+    setCenterLatLng(ll);
+  }, []);
+
+  const handleMapMoveStart = useCallback(() => {
+    setIsDraggingMap(true);
+  }, []);
+
+  const handleMapMoveEnd = useCallback(() => {
+    setIsDraggingMap(false);
+  }, []);
+
   const requestLocateNow = useCallback(() => {
     if (!navigator.geolocation) {
       message.error(cp("Geolokatsiya mavjud emas"));
@@ -870,31 +882,34 @@ export default function ClientTaxiPage() {
     return <Polyline positions={route.coords} pathOptions={{ weight: 6, opacity: 0.9 }} />;
   }, [route]);
 
-  // Searching overlay
-  const SearchingOverlay = step === "searching" ? (
-    <>
-      <div className="yg-wave" />
-      <div className="yg-wave" />
-      <div className="yg-wave" />
-      {(dispatchLine?.length ?? 0) > 1 ? (
-        <Polyline positions={dispatchLine} pathOptions={{ weight: 4, opacity: 0.65, dashArray: "8 10" }} />
-      ) : null}
-      {nearCars.map((c, idx) => {
-        const pos = normalizeLatLng([toNum(c.lat), toNum(c.lng)]);
-        if (!pos) return null;
-        return (
-          <VehicleMarker
-            key={c.id}
-            position={pos}
-            bearing={c.bearing}
-            label={idx === dispatchIdx ? `${Math.max(1, Math.round(durationMin / 2))} daq` : undefined}
-            color={idx === dispatchIdx ? "#f6c200" : "#ddd"}
-            durationMs={700}
-          />
-        );
-      })}
-    </>
-  ) : null;
+  // Qidiruv overlay: step yoki marker ma'lumotlari o'zgarganda qayta hisoblanadi (har renderda JSX qayta yaratilmaydi)
+  const SearchingOverlay = useMemo(() => {
+    if (step !== "searching") return null;
+    return (
+      <>
+        <div className="yg-wave" />
+        <div className="yg-wave" />
+        <div className="yg-wave" />
+        {(dispatchLine?.length ?? 0) > 1 ? (
+          <Polyline positions={dispatchLine} pathOptions={{ weight: 4, opacity: 0.65, dashArray: "8 10" }} />
+        ) : null}
+        {nearCars.map((c, idx) => {
+          const pos = normalizeLatLng([toNum(c.lat), toNum(c.lng)]);
+          if (!pos) return null;
+          return (
+            <VehicleMarker
+              key={c.id}
+              position={pos}
+              bearing={c.bearing}
+              label={idx === dispatchIdx ? `${Math.max(1, Math.round(durationMin / 2))} daq` : undefined}
+              color={idx === dispatchIdx ? "#f6c200" : "#ddd"}
+              durationMs={700}
+            />
+          );
+        })}
+      </>
+    );
+  }, [step, nearCars, dispatchLine, dispatchIdx, durationMin]);
 
   // Driver overlay
   const DriverOverlay = step === "coming" && normalizeLatLng([toNum(assignedDriver?.lat), toNum(assignedDriver?.lng)]) ? (
@@ -937,9 +952,9 @@ export default function ClientTaxiPage() {
       userLoc={userLoc}
       onRequestLocate={requestLocateNow}
       mapBottom={mapBottom}
-      onCenterChange={(ll) => setCenterLatLng(ll)}
-      onMoveStart={() => setIsDraggingMap(true)}
-      onMoveEnd={() => setIsDraggingMap(false)}
+      onCenterChange={handleMapCenterChange}
+      onMoveStart={handleMapMoveStart}
+      onMoveEnd={handleMapMoveEnd}
       routeLine={RouteLine}
       searchingOverlay={SearchingOverlay}
       driverOverlay={DriverOverlay}

@@ -1,5 +1,9 @@
 import { applyCors, json, badRequest, serverError } from '../_shared/cors.js';
 import { getSupabaseAdmin, getAuthedUserId } from '../_shared/supabase.js';
+import {
+  INTERPROV_TRIP_LIST_COLUMNS,
+  INTERPROV_SEAT_REQUEST_COLUMNS,
+} from '../_shared/supabaseColumns.js';
 import { enrichTripsWithCorridorScore } from '../../backend/src/trips/corridorMatcher.js';
 import { createSeatHold, pushWaitlist, getTripInventorySnapshot, releaseSeatHold } from '../../backend/src/trips/seatInventoryService.js';
 import { rankTrips } from '../../backend/src/trips/tripRankingService.js';
@@ -23,7 +27,7 @@ async function listOffers(sb, body) {
 
   let query = sb
     .from('interprov_trips')
-    .select('*')
+    .select(INTERPROV_TRIP_LIST_COLUMNS)
     .in('status', ['active', 'draft'])
     .order('depart_at', { ascending: true })
     .limit(50);
@@ -64,7 +68,11 @@ async function requestBooking(req, sb, body) {
   const offerId = String(body.offer_id || body.trip_id || '').trim();
   if (!offerId) return { ok: false, error: 'offer_id kerak' };
 
-  const { data: trip, error } = await sb.from('interprov_trips').select('*').eq('id', offerId).maybeSingle();
+  const { data: trip, error } = await sb
+    .from('interprov_trips')
+    .select(INTERPROV_TRIP_LIST_COLUMNS)
+    .eq('id', offerId)
+    .maybeSingle();
   if (error) throw error;
   if (!trip) return { ok: false, error: 'Trip topilmadi' };
 
@@ -85,7 +93,7 @@ async function requestBooking(req, sb, body) {
     updated_at: new Date().toISOString(),
   };
 
-  const inserted = await sb.from('inter_prov_seat_requests').insert(payload).select('*').maybeSingle();
+  const inserted = await sb.from('inter_prov_seat_requests').insert(payload).select(INTERPROV_SEAT_REQUEST_COLUMNS).maybeSingle();
   if (inserted.error) {
     releaseSeatHold({ tripId: offerId, holdId: holdResult.hold.holdId });
     throw inserted.error;
@@ -97,7 +105,11 @@ async function requestBooking(req, sb, body) {
 async function myBookings(req, sb) {
   const userId = await getAuthedUserId(req, sb);
   if (!userId) return { ok: true, bookings: [] };
-  const { data, error } = await sb.from('inter_prov_seat_requests').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+  const { data, error } = await sb
+    .from('inter_prov_seat_requests')
+    .select(INTERPROV_SEAT_REQUEST_COLUMNS)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
   if (error) throw error;
   return { ok: true, bookings: data || [] };
 }
@@ -110,7 +122,7 @@ async function cancelBooking(req, sb, body) {
 
   const { data: booking, error } = await sb
     .from('inter_prov_seat_requests')
-    .select('*')
+    .select(INTERPROV_SEAT_REQUEST_COLUMNS)
     .eq('id', bookingId)
     .eq('user_id', userId)
     .maybeSingle();
@@ -122,7 +134,7 @@ async function cancelBooking(req, sb, body) {
     .from('inter_prov_seat_requests')
     .update({ status: 'cancelled', updated_at: new Date().toISOString() })
     .eq('id', bookingId)
-    .select('*')
+    .select(INTERPROV_SEAT_REQUEST_COLUMNS)
     .maybeSingle();
 
   if (update.error) throw update.error;

@@ -85,8 +85,8 @@ async function calcDemandRatio(sb) {
   try {
     const since = new Date(Date.now() - 2 * 60 * 1000).toISOString();
     const [{ count: driverCount }, { count: orderCount }] = await Promise.all([
-      sb.from("driver_presence").select("*", { count: "exact", head: true }).eq("is_online", true).gte("updated_at", since),
-      sb.from("orders").select("*", { count: "exact", head: true }).eq("status", "searching"),
+      sb.from("driver_presence").select("driver_id", { count: "exact", head: true }).eq("is_online", true).gte("updated_at", since),
+      sb.from("orders").select("id", { count: "exact", head: true }).eq("status", "searching"),
     ]);
     if (!driverCount || driverCount === 0) return 10; // haydovchi yo'q = maksimal surge
     return (orderCount || 0) / driverCount;

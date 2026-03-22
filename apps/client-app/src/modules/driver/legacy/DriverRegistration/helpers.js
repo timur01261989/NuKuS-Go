@@ -1,3 +1,5 @@
+import { compressImageToFile } from "@/modules/shared/utils/imageUtils.js";
+
 export function digitsOnly(value = "") {
   return String(value).replace(/\D/g, "");
 }
@@ -81,47 +83,22 @@ export function docRowsToPreviewMap(rows = [], fieldMap = {}) {
   }, {});
 }
 
+/**
+ * Haydovchi ro‘yxatdan o‘tish hujjatlari — umumiy siqish moduli.
+ */
 export async function compressImage(file, options = {}) {
   if (!file) return null;
   if (!String(file.type || "").startsWith("image/")) return file;
   const { maxWidth = 1400, quality = 0.75, maxHeight = 2000 } = options;
-  const dataUrl = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(new Error("Faylni o'qishda xato"));
-    reader.readAsDataURL(file);
-  });
-  const image = await new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("Rasmni o'qishda xato"));
-    img.src = dataUrl;
-  });
-  let { width, height } = image;
-  if (width <= maxWidth && height <= maxHeight && file.size <= 700 * 1024)
+  try {
+    return await compressImageToFile(file, {
+      maxWidth,
+      maxHeight,
+      quality,
+      maxSizeMB: 1.2,
+      skipIfUnderBytes: 700 * 1024,
+    });
+  } catch {
     return file;
-  const ratio = Math.min(maxWidth / width, maxHeight / height, 1);
-  const targetWidth = Math.max(1, Math.round(width * ratio));
-  const targetHeight = Math.max(1, Math.round(height * ratio));
-  const canvas = document.createElement("canvas");
-  canvas.width = targetWidth;
-  canvas.height = targetHeight;
-  const ctx = canvas.getContext("2d", { alpha: false });
-  if (!ctx) return file;
-  ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
-  const blob = await new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (result) => {
-        if (!result) return reject(new Error("Rasmni siqishda xato yuz berdi"));
-        resolve(result);
-      },
-      "image/jpeg",
-      quality
-    );
-  });
-  const newName = String(file.name || "image").replace(/\.[^.]+$/, "") + ".jpg";
-  return new File([blob], newName, {
-    type: "image/jpeg",
-    lastModified: Date.now(),
-  });
+  }
 }

@@ -1,5 +1,6 @@
 import { withAuth } from "../_shared/withAuth.js";
 import { getServiceSupabase } from "../_shared/supabase.js";
+import { DISPATCH_DEMAND_PREDICTION_COLUMNS } from "../_shared/supabaseColumns.js";
 
 async function handler(req, res) {
   if (req.method !== "GET") {
@@ -12,7 +13,7 @@ async function handler(req, res) {
 
   const { data, error } = await supabase
     .from("dispatch_demand_predictions")
-    .select("*")
+    .select(DISPATCH_DEMAND_PREDICTION_COLUMNS)
     .order("created_at", { ascending: false })
     .limit(limit);
 

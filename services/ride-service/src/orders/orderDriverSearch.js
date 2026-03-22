@@ -23,13 +23,25 @@ export async function findDriversInRadius({ supabase, lat, lng, radiusMeters = 2
   try {
     const { data, error } = await supabase.rpc('drivers_in_radius', { lat: safeLat, lng: safeLng, radius: safeRadius });
     if (error) throw error;
-    return (Array.isArray(data) ? data : []).slice(0, safeLimit);
+    const rpcRows = (Array.isArray(data) ? data : []).slice(0, safeLimit);
+    // RPC: user_id, last_seen, dist_m — dispatch uchun eski maydon nomlari bilan moslashtiramiz
+    return rpcRows.map((row) => {
+      const distM = Number(row.dist_m);
+      return {
+        driver_id: row.user_id,
+        id: row.user_id,
+        is_online: true,
+        last_seen_at: row.last_seen,
+        updated_at: row.last_seen,
+        dist_km: Number.isFinite(distM) ? distM / 1000 : null,
+      };
+    });
   } catch (_) {
     const { data, error } = await supabase
       .from('driver_presence')
       .select('driver_id,is_online,active_service_type,lat,lng,updated_at,last_seen_at')
       .eq('is_online', true)
-      .limit(500);
+      .limit(200);
     if (error) throw error;
     const rows = Array.isArray(data) ? data : [];
     return rows

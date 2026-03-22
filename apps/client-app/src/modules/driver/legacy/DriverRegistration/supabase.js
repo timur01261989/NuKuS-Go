@@ -1,4 +1,5 @@
 import { supabase } from "@/services/supabase/supabaseClient";
+import { compressImageToFile } from "@/modules/shared/utils/imageUtils.js";
 import {
   DRIVER_DOCUMENT_FIELDS,
   DRIVER_DOCUMENT_FIELD_MAP,
@@ -304,13 +305,27 @@ export async function uploadDriverDocuments(applicationId, files = {}) {
     const file = files[field.key];
     if (!file) continue;
 
-    const extension = getFileExtension(file);
+    let uploadFile = file;
+    if (String(file.type || "").startsWith("image/")) {
+      try {
+        uploadFile = await compressImageToFile(file, {
+          maxWidth: field.maxWidth ?? 1600,
+          maxHeight: 2200,
+          quality: field.quality ?? 0.75,
+          maxSizeMB: 1.2,
+        });
+      } catch {
+        uploadFile = file;
+      }
+    }
+
+    const extension = getFileExtension(uploadFile);
     const timestamp = Date.now();
     const path = `${sanitizeSegment(user.id)}/${sanitizeSegment(applicationId)}/${sanitizeSegment(field.docType)}_${timestamp}.${extension}`;
 
     const { error: uploadError } = await supabase.storage
       .from(DOCUMENT_BUCKET)
-      .upload(path, file, {
+      .upload(path, uploadFile, {
         cacheControl: "3600",
         upsert: true,
       });
@@ -324,8 +339,8 @@ export async function uploadDriverDocuments(applicationId, files = {}) {
       .getPublicUrl(path);
 
     const safeFileName =
-      file?.name && String(file.name).trim()
-        ? file.name
+      uploadFile?.name && String(uploadFile.name).trim()
+        ? uploadFile.name
         : buildFallbackFileName(field.docType, extension);
 
     const documentPayload = {
@@ -335,8 +350,8 @@ export async function uploadDriverDocuments(applicationId, files = {}) {
       file_path: path,
       file_url: publicUrlData?.publicUrl || "",
       file_name: safeFileName,
-      file_size: file.size || 0,
-      mime_type: file.type || "image/jpeg",
+      file_size: uploadFile.size || 0,
+      mime_type: uploadFile.type || "image/jpeg",
       updated_at: new Date().toISOString(),
     };
 

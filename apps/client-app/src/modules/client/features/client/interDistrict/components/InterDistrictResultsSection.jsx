@@ -1,9 +1,8 @@
-
-import React from "react";
+import React, { memo } from "react";
 import { Typography } from "antd";
 import TripCard from "../components/Trips/TripCard";
 
-export default function InterDistrictResultsSection({ searching, trips, onRequest }) {
+function InterDistrictResultsSection({ searching, trips, onRequest }) {
   return (
     <>
       <Typography.Title level={5} style={{ margin: "14px 0 10px" }}>
@@ -19,3 +18,5 @@ export default function InterDistrictResultsSection({ searching, trips, onReques
     </>
   );
 }
+
+export default memo(InterDistrictResultsSection);

@@ -1,6 +1,7 @@
 import { json, badRequest, serverError } from '../_shared/cors.js';
 import { getSupabaseAdmin, getAuthedUserId } from '../_shared/supabase.js';
 import { processCancellationPipeline, processCompletionPipeline } from '../_shared/orders/orderCompletionPipeline.js';
+import { ORDER_SELECT } from './order.shared.js';
 
 function nowIso() { return new Date().toISOString(); }
 
@@ -47,7 +48,7 @@ export default async function handler(req, res) {
     if (next_status === 'completed') patch.completed_at = nowIso();
     if (next_status.startsWith('cancelled') || next_status === 'cancelled') patch.cancelled_at = nowIso();
 
-    const { data: updated, error: upErr } = await sb.from('orders').update(patch).eq('id', order_id).select('*').single();
+    const { data: updated, error: upErr } = await sb.from('orders').update(patch).eq('id', order_id).select(ORDER_SELECT).single();
     if (upErr) throw upErr;
 
     let pipeline = null;

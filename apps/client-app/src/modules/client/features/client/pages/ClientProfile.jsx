@@ -1,6 +1,6 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import imageCompression from 'browser-image-compression';
 import { message } from 'antd';
+import { compressImageToFile, UPLOAD_PRESETS } from '@/modules/shared/utils/imageUtils.js';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/services/supabase/supabaseClient';
 import { useLanguage } from '@/modules/shared/i18n/useLanguage.js';
@@ -78,12 +78,7 @@ const ClientProfile = memo(function ClientProfile() {
     const nextFile = event.target.files?.[0];
     if (!nextFile) return;
     try {
-      const compressedFile = await imageCompression(nextFile, {
-        maxWidthOrHeight: 1200,
-        maxSizeMB: 0.6,
-        initialQuality: 0.78,
-        useWebWorker: true,
-      });
+      const compressedFile = await compressImageToFile(nextFile, UPLOAD_PRESETS.avatar);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       const nextPreviewUrl = URL.createObjectURL(compressedFile);
       setSelectedAvatarFile(compressedFile);

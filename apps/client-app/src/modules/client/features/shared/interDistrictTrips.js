@@ -1,9 +1,14 @@
 import { normalizeInterDistrictRequestPayload, normalizeInterDistrictTripPayload } from "@/modules/shared/interdistrict/domain/interDistrictSchemas";
 import { INTERDISTRICT_TRIP_STATUS, isFinishedInterDistrictStatus, normalizeInterDistrictStatus } from "@/modules/shared/interdistrict/domain/interDistrictStatuses";
 import { supabase } from "@/services/supabase/supabaseClient";
+import {
+  DISTRICT_PITAK_COLUMNS,
+  DISTRICT_TRIP_COLUMNS,
+  DISTRICT_TRIP_REQUEST_COLUMNS,
+} from "@/data/supabaseColumnLists.js";
 
 export async function listPitaks({ region, from_district, to_district, activeOnly = true } = {}) {
-  let q = supabase.from("district_pitaks").select("*").order("updated_at", { ascending: false });
+  let q = supabase.from("district_pitaks").select(DISTRICT_PITAK_COLUMNS).order("updated_at", { ascending: false });
   if (region) q = q.eq("region", region);
   if (from_district) q = q.eq("from_district", from_district);
   if (to_district) q = q.eq("to_district", to_district);
@@ -27,7 +32,7 @@ export async function upsertPitak(pitak) {
     is_active: pitak.is_active ?? true,
     updated_at: new Date().toISOString(),
   };
-  const { data, error } = await supabase.from("district_pitaks").upsert(payload).select("*").single();
+  const { data, error } = await supabase.from("district_pitaks").upsert(payload).select(DISTRICT_PITAK_COLUMNS).single();
   if (error) throw error;
   return data;
 }
@@ -48,14 +53,18 @@ export async function createTrip(trip) {
     ...normalizeInterDistrictTripPayload(trip),
     updated_at: new Date().toISOString(),
   };
-  const { data, error } = await supabase.from("district_trips").insert(payload).select("*").single();
+  const { data, error } = await supabase.from("district_trips").insert(payload).select(DISTRICT_TRIP_COLUMNS).single();
   if (error) throw error;
   return data;
 }
 
 export async function searchTrips(params = {}) {
   const { region, from_district, to_district, depart_from, depart_to, has_ac, has_trunk, tariff, include_delivery = true } = params;
-  let q = supabase.from("district_trips").select("*").in("status", [INTERDISTRICT_TRIP_STATUS.SEARCHING, INTERDISTRICT_TRIP_STATUS.MATCHED, INTERDISTRICT_TRIP_STATUS.ACCEPTED]).order("depart_at", { ascending: true });
+  let q = supabase
+    .from("district_trips")
+    .select(DISTRICT_TRIP_COLUMNS)
+    .in("status", [INTERDISTRICT_TRIP_STATUS.SEARCHING, INTERDISTRICT_TRIP_STATUS.MATCHED, INTERDISTRICT_TRIP_STATUS.ACCEPTED])
+    .order("depart_at", { ascending: true });
   if (region) q = q.eq("region", region);
   if (from_district) q = q.eq("from_district", from_district);
   if (to_district) q = q.eq("to_district", to_district);
@@ -84,7 +93,7 @@ export async function requestTrip(req) {
     ...normalizeInterDistrictRequestPayload(req),
     updated_at: new Date().toISOString(),
   };
-  const { data, error } = await supabase.from("district_trip_requests").insert(payload).select("*").single();
+  const { data, error } = await supabase.from("district_trip_requests").insert(payload).select(DISTRICT_TRIP_REQUEST_COLUMNS).single();
   if (error) throw error;
   return data;
 }
@@ -98,7 +107,12 @@ export async function listDriverRequests({ limit = 50 } = {}) {
   if (tErr) throw tErr;
   const tripIds = (trips || []).map((t) => t.id);
   if (!tripIds.length) return [];
-  const { data, error } = await supabase.from("district_trip_requests").select("*").in("trip_id", tripIds).order("created_at", { ascending: false }).limit(limit);
+  const { data, error } = await supabase
+    .from("district_trip_requests")
+    .select(DISTRICT_TRIP_REQUEST_COLUMNS)
+    .in("trip_id", tripIds)
+    .order("created_at", { ascending: false })
+    .limit(limit);
   if (error) throw error;
   return data || [];
 }
@@ -111,7 +125,7 @@ export async function getClientActiveTrip() {
   if (!uid) throw new Error("Login qiling");
   const { data, error } = await supabase
     .from("district_trip_requests")
-    .select("*, district_trips(*)")
+    .select(`${DISTRICT_TRIP_REQUEST_COLUMNS},district_trips(${DISTRICT_TRIP_COLUMNS})`)
     .eq("user_id", uid)
     .order("updated_at", { ascending: false })
     .limit(5);
@@ -135,7 +149,7 @@ export async function cancelTripRequest({ request_id, reason }) {
     .from("district_trip_requests")
     .update(payload)
     .eq("id", request_id)
-    .select("*")
+    .select(DISTRICT_TRIP_REQUEST_COLUMNS)
     .single();
   if (error) throw error;
   return data;

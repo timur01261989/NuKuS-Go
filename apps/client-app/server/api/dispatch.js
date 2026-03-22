@@ -6,6 +6,8 @@ import { enqueueDispatch } from '../_shared/queue/orderDispatchQueue.js';
 import { enrichTripsWithCorridorScore } from '../../backend/src/trips/corridorMatcher.js';
 import { rankTrips } from '../../backend/src/trips/tripRankingService.js';
 import { getApprovedDriverCore } from '../_shared/drivers/driverCoreAccess.js';
+import { ORDER_SELECT, INTERPROV_TRIP_LIST_COLUMNS } from '../_shared/supabaseColumns.js';
+import { createDriverPresenceRepository } from '../repositories/driverPresenceRepository.js';
 
 async function driverPing(req, res, body) {
   const sb = getSupabaseAdmin();
@@ -33,14 +35,23 @@ async function driverPing(req, res, body) {
     last_seen_at: nowIso(),
     updated_at: nowIso(),
   };
-  const { error } = await sb.from('driver_presence').upsert([row], { onConflict: 'driver_id' });
-  if (error) return serverError(res, error);
-  return json(res, 200, { ok: true, presence: row });
+  try {
+    const presenceRepo = createDriverPresenceRepository(sb);
+    const saved = await presenceRepo.upsertRow(row);
+    return json(res, 200, { ok: true, presence: saved });
+  } catch (error) {
+    return serverError(res, error);
+  }
 }
 
 
 async function tripSearch(sb, body) {
-  let query = sb.from('interprov_trips').select('*').in('status', ['active', 'draft']).order('depart_at', { ascending: true }).limit(50);
+  let query = sb
+    .from('interprov_trips')
+    .select(INTERPROV_TRIP_LIST_COLUMNS)
+    .in('status', ['active', 'draft'])
+    .order('depart_at', { ascending: true })
+    .limit(50);
   if (body.from_region) query = query.eq('from_region', body.from_region);
   if (body.to_region) query = query.eq('to_region', body.to_region);
   const { data, error } = await query;
@@ -49,7 +60,7 @@ async function tripSearch(sb, body) {
 }
 
 async function resolveOrder(sb, order_id) {
-  const { data, error } = await sb.from('orders').select('*').eq('id', order_id).maybeSingle();
+  const { data, error } = await sb.from('orders').select(ORDER_SELECT).eq('id', order_id).maybeSingle();
   if (error) throw error;
   return data;
 }

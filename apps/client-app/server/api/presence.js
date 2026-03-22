@@ -1,15 +1,12 @@
 import { json, badRequest, serverError, nowIso } from '../_shared/cors.js';
 import { getSupabaseAdmin, getAuthedUserId } from '../_shared/supabase.js';
 import { getApprovedDriverCore } from '../_shared/drivers/driverCoreAccess.js';
+import { createDriverPresenceRepository } from '../repositories/driverPresenceRepository.js';
 
 function hasSupabaseEnv() {
   return !!(process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY));
 }
 
-
-async function ensureDriverAccess(sb, userId) {
-  return getApprovedDriverCore(sb, userId);
-}
 export default async function handler(req, res) {
   try {
     const url = new URL(req.url, 'http://localhost');
@@ -18,6 +15,7 @@ export default async function handler(req, res) {
 
     if (!hasSupabaseEnv()) return serverError(res, 'Server misconfigured: missing SUPABASE env');
     const sb = getSupabaseAdmin();
+    const presenceRepo = createDriverPresenceRepository(sb);
 
     if (req.method === 'POST' && (sub === 'heartbeat' || sub === 'ping' || sub === '')) {
       const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
@@ -25,7 +23,9 @@ export default async function handler(req, res) {
       const explicitDriverId = String(body.driver_id || '').trim();
       const driver_id = String(authedUserId || explicitDriverId || '').trim();
       if (!driver_id) return badRequest(res, 'Auth driver kerak');
-      if (authedUserId && explicitDriverId && authedUserId !== explicitDriverId) return badRequest(res, 'driver_id token user_id bilan mos emas');
+      if (authedUserId && explicitDriverId && authedUserId !== explicitDriverId) {
+        return badRequest(res, 'driver_id token user_id bilan mos emas');
+      }
 
       const lat = body.lat === undefined ? null : Number(body.lat);
       const lng = body.lng === undefined ? null : Number(body.lng);
@@ -37,6 +37,7 @@ export default async function handler(req, res) {
       const device_id = body.device_id ?? null;
       const platform = body.platform ?? null;
       const app_version = body.app_version ?? null;
+      const accuracy = body.accuracy === undefined ? null : Number(body.accuracy);
 
       const payload = {
         driver_id,
@@ -50,54 +51,44 @@ export default async function handler(req, res) {
       if (Number.isFinite(lng)) payload.lng = lng;
       if (Number.isFinite(speed)) payload.speed = speed;
       if (Number.isFinite(bearing)) payload.bearing = bearing;
+      if (Number.isFinite(accuracy)) payload.accuracy = accuracy;
       if (device_id) payload.device_id = String(device_id);
       if (platform) payload.platform = String(platform);
       if (app_version) payload.app_version = String(app_version);
 
-      await ensureDriverAccess(sb, driver_id);
+      await getApprovedDriverCore(sb, driver_id);
 
-      let query = sb.from('driver_presence').upsert([payload], { onConflict: 'driver_id' });
-      let { data, error } = await query
-        .select('driver_id,last_seen_at,is_online,state,active_service_type,updated_at,lat,lng,speed,bearing,device_id,platform,app_version')
-        .single();
-      if (error && String(error.message || '').match(/speed|bearing|device_id|platform|app_version/i)) {
-        const fb = { ...payload };
-        delete fb.speed; delete fb.bearing; delete fb.device_id; delete fb.platform; delete fb.app_version;
-        ({ data, error } = await sb.from('driver_presence')
-          .upsert([fb], { onConflict: 'driver_id' })
-          .select('driver_id,last_seen_at,is_online,state,active_service_type,updated_at,lat,lng')
-          .single());
-      }
-      if (error) throw error;
-
+      const data = await presenceRepo.upsertRow(payload);
       return json(res, 200, { ok: true, presence: data });
     }
 
     if (req.method === 'GET' && (sub === 'online' || sub === '')) {
-      const seconds = Number(url.searchParams.get('seconds') || 60);
-      const since = new Date(Date.now() - Math.max(5, seconds) * 1000).toISOString();
+      const seconds = Number(url.searchParams.get('seconds') || 120);
+      const since = new Date(Date.now() - Math.max(10, seconds) * 1000).toISOString();
       const serviceType = url.searchParams.get('service_type') || url.searchParams.get('service') || url.searchParams.get('active_service_type') || '';
+      const listLimit = Number(url.searchParams.get('limit') || 400);
 
-      let q = sb
-        .from('driver_presence')
-        .select('driver_id,last_seen_at,is_online,state,active_service_type,updated_at,lat,lng,speed,bearing,device_id,platform,app_version')
-        .eq('is_online', true)
-        .gte('last_seen_at', since);
+      const qLat = Number(url.searchParams.get('lat'));
+      const qLng = Number(url.searchParams.get('lng'));
+      const radiusM = Number(url.searchParams.get('radius_m') || url.searchParams.get('radius') || 0);
 
-      if (serviceType) q = q.eq('active_service_type', serviceType);
-
-      let { data, error } = await q.limit(5000);
-      if (error && String(error.message || '').match(/speed|bearing|device_id|platform|app_version/i)) {
-        ({ data, error } = await sb
-          .from('driver_presence')
-          .select('driver_id,last_seen_at,is_online,state,active_service_type,updated_at,lat,lng')
-          .eq('is_online', true)
-          .gte('last_seen_at', since)
-          .limit(5000));
+      if (Number.isFinite(qLat) && Number.isFinite(qLng) && radiusM > 0) {
+        const nearby = await presenceRepo.nearbyOnline({
+          lat: qLat,
+          lng: qLng,
+          radiusM,
+          sinceIso: since,
+          serviceType: serviceType || null,
+          limit: Math.min(Number(url.searchParams.get('limit') || 150), 500),
+        });
+        return json(res, 200, { ok: true, mode: 'nearby', online: nearby });
       }
-      if (error) throw error;
 
-      return json(res, 200, { ok: true, online: data || [] });
+      const online = await presenceRepo.listOnlineSince(since, {
+        serviceType,
+        limit: listLimit,
+      });
+      return json(res, 200, { ok: true, mode: 'list', online });
     }
 
     return json(res, 405, { ok: false, error: 'Method not allowed' });

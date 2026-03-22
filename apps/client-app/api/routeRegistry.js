@@ -12,6 +12,7 @@ import offerHandler from "../server/api/offer.js";
 import walletHandler from "../server/api/wallet.js";
 import sosHandler from "../server/api/sos.js";
 import presenceHandler from "../server/api/presence.js";
+import clientLocationHandler from "../server/api/client_location.js";
 import cronDispatchHandler from "../server/api/cron_dispatch.js";
 import notificationsHandler from "../server/api/notifications.js";
 import gamificationHandler from "../server/api/gamification.js";
@@ -70,6 +71,8 @@ export const ROUTE_REGISTRY = new Map([
   ["wallet", walletHandler],
   ["sos", sosHandler],
   ["presence", presenceHandler],
+  ["client_location", clientLocationHandler],
+  ["client-location", clientLocationHandler],
   ["cron-dispatch", cronDispatchHandler],
   ["cron_dispatch", cronDispatchHandler],
   ["notifications", notificationsHandler],

@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { useClientText } from "../../shared/i18n_clientLocalize";
 import { Button, Card, Upload, Typography } from "antd";
 import { orderAssets } from "@/assets/order";
+import { compressImageToFile, UPLOAD_PRESETS } from "@/modules/shared/utils/imageUtils.js";
 const { Text } = Typography;
 
 export default function PhotoUploader({ photos = [], onChange }) {
@@ -10,9 +11,15 @@ export default function PhotoUploader({ photos = [], onChange }) {
     accept: "image/*",
     multiple: true,
     showUploadList: false,
-    beforeUpload: (file) => {
-      const url = URL.createObjectURL(file);
-      onChange?.([...(photos || []), { file, url }]);
+    beforeUpload: async (file) => {
+      let out = file;
+      try {
+        out = await compressImageToFile(file, UPLOAD_PRESETS.delivery);
+      } catch {
+        out = file;
+      }
+      const url = URL.createObjectURL(out);
+      onChange?.([...(photos || []), { file: out, url }]);
       return false;
     },
   }), [photos, onChange]);

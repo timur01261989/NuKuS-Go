@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Marker } from "react-leaflet";
 import L from "leaflet";
 import { mapAssets } from "@/assets/map";
@@ -10,8 +10,9 @@ import { mapAssets } from "@/assets/map";
  *
  * Notes:
  * - Works without external rotatedmarker plugin (uses CSS transform)
+ * - memo + shallow prop check: xaritada ko‘p marker bo‘lganda qayta render kamayadi
  */
-export default function VehicleMarker({
+function VehicleMarker({
   position, // [lat, lng]
   bearing = 0,
   label,
@@ -85,9 +86,9 @@ export default function VehicleMarker({
           overflow: hidden;
         ">
           ${markerVisual
-            ? `<img src="${markerVisual}" alt="" style="width:${Math.round(s*0.82)}px;height:${Math.round(s*0.82)}px;object-fit:contain;" />`
+            ? `<img src="${markerVisual}" alt="" style="width:${Math.round(s * 0.82)}px;height:${Math.round(s * 0.82)}px;object-fit:contain;" />`
             : `<div style="
-            width:${Math.round(s*0.52)}px;height:${Math.round(s*0.52)}px;
+            width:${Math.round(s * 0.52)}px;height:${Math.round(s * 0.52)}px;
             border-radius: 10px;
             background: rgba(0,0,0,.18);
             position: relative;
@@ -121,3 +122,21 @@ export default function VehicleMarker({
     />
   );
 }
+
+function vehicleMarkerPropsEqual(prev, next) {
+  const pp = prev.position;
+  const np = next.position;
+  return (
+    pp?.[0] === np?.[0] &&
+    pp?.[1] === np?.[1] &&
+    prev.bearing === next.bearing &&
+    prev.label === next.label &&
+    prev.zIndexOffset === next.zIndexOffset &&
+    prev.durationMs === next.durationMs &&
+    prev.size === next.size &&
+    prev.color === next.color &&
+    prev.onClick === next.onClick
+  );
+}
+
+export default memo(VehicleMarker, vehicleMarkerPropsEqual);

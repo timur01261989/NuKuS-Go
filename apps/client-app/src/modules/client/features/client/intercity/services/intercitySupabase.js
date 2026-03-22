@@ -1,4 +1,5 @@
 import { supabase } from "@/services/supabase/supabaseClient.js";
+import { INTERPROV_TRIP_LIST_COLUMNS } from "@/data/supabaseColumnLists.js";
 
 export async function listInterProvTrips({
   fromRegionName,
@@ -9,7 +10,7 @@ export async function listInterProvTrips({
 }) {
   let q = supabase
     .from("interprov_trips")
-    .select("*")
+    .select(INTERPROV_TRIP_LIST_COLUMNS)
     .order("depart_at", { ascending: true })
     .limit(limit);
 
@@ -42,7 +43,7 @@ export async function createSeatRequest({
   const { data, error } = await supabase
     .from("inter_prov_seat_requests")
     .insert(payload)
-    .select("*")
+    .select("id,trip_id,user_id,seats,notes,hold_id,status,created_at,updated_at")
     .single();
 
   if (error) throw error;
@@ -52,7 +53,7 @@ export async function createSeatRequest({
 export async function listInterProvParcelOffers({ fromRegionName, toRegionName, limit = 20 }) {
   let q = supabase
     .from("interprov_trips")
-    .select("*")
+    .select(INTERPROV_TRIP_LIST_COLUMNS)
     .eq("parcel_enabled", true)
     .in("status", ["active", "draft"])
     .order("depart_at", { ascending: true })

@@ -1,3 +1,7 @@
+/**
+ * Dispatch API uchun haydovchi tasdiqini tekshirish (service role).
+ * services/location-service/src/drivers/driverCoreAccess.js bilan sinxron tuting.
+ */
 export function normalizeStatus(value) {
   return typeof value === 'string' ? value.trim().toLowerCase() : null;
 }
@@ -12,7 +16,6 @@ export function allowedServicesFromSettings(settings = {}) {
   return [...out];
 }
 
-/** Tasdiqlash va dispatch uchun yetarli; hujjat URL-larini har pingda yuklamaymiz */
 const DRIVER_APPLICATION_COLUMNS = [
   'id',
   'user_id',

@@ -1,5 +1,6 @@
 import { json, badRequest, serverError, nowIso } from '../_shared/cors.js';
 import { getSupabaseAdmin, getAuthedUserId } from '../_shared/supabase.js';
+import { PUSH_TOKEN_ROW_COLUMNS } from '../_shared/supabaseColumns.js';
 
 function hasEnv() {
   return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -25,13 +26,15 @@ export async function register(req, res) {
       device_id: body.device_id ?? null,
       platform: body.platform ?? null,
       app_version: body.app_version ?? null,
-      fcm_token,
+      token: fcm_token,
+      is_active: true,
       updated_at: nowIso(),
     };
 
     const { data, error } = await sb.from('push_tokens')
-      .upsert([row], { onConflict: 'user_id,role,device_id' })
-      .select('*').single();
+      .upsert([row], { onConflict: 'user_id,token' })
+      .select(PUSH_TOKEN_ROW_COLUMNS)
+      .single();
 
     if (error) throw error;
     return json(res, 200, { ok:true, token: data });

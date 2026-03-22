@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { Button, Upload } from "antd";
 import { CameraOutlined } from "@ant-design/icons";
 import { useFreight } from "../../context/FreightContext";
+import { compressImageToFile, UPLOAD_PRESETS } from "@/modules/shared/utils/imageUtils.js";
 
 export default function CargoPhotoUpload() {
   const { photoUrl, setPhotoUrl, setPhotoFile } = useFreight();
@@ -9,9 +10,15 @@ export default function CargoPhotoUpload() {
   const uploadProps = useMemo(() => ({
     accept: "image/*",
     showUploadList: false,
-    beforeUpload: (file) => {
-      setPhotoFile(file);
-      const url = URL.createObjectURL(file);
+    beforeUpload: async (file) => {
+      let out = file;
+      try {
+        out = await compressImageToFile(file, UPLOAD_PRESETS.freight);
+      } catch {
+        out = file;
+      }
+      setPhotoFile(out);
+      const url = URL.createObjectURL(out);
       setPhotoUrl(url);
       return false;
     },

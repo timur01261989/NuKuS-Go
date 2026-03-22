@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { memo, useCallback, useMemo } from "react";
 import { useClientText } from "../../../shared/i18n_clientLocalize";
 import { Card, Space, Tag, Typography, Button, Divider } from "antd";
 
@@ -15,7 +15,7 @@ import { Card, Space, Tag, Typography, Button, Divider } from "antd";
  */
 const money = (n) => (n == null ? "" : new Intl.NumberFormat("uz-UZ").format(Number(n)));
 
-export default function TripCard({ trip, onRequest }) {
+function TripCard({ trip, onRequest }) {
   const { cp } = useClientText();
   const priceLine = useMemo(() => {
     if (!trip) return "";
@@ -28,6 +28,16 @@ export default function TripCard({ trip, onRequest }) {
     return `${money(sum)} so‘m (bazaviy)`;
   }, [trip]);
 
+  const departLabel = useMemo(() => {
+    try {
+      return new Date(trip.depart_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" });
+    } catch {
+      return "—";
+    }
+  }, [trip?.depart_at]);
+
+  const handleRequest = useCallback(() => onRequest?.(trip), [onRequest, trip]);
+
   return (
     <Card style={{ borderRadius: 18, marginBottom: 12, border: "1px solid #e8e8e8" }} styles={{ body: { padding: 16 } }}>
       <Space style={{ width: "100%", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -35,11 +45,11 @@ export default function TripCard({ trip, onRequest }) {
           <Typography.Text style={{ fontWeight: 800, fontSize: 16, color: "#333" }}>
             {trip.from_district} → {trip.to_district}
           </Typography.Text>
-          
+
           {/* YANGI: Haydovchi va Mashina ma'lumotlari (Agar API'dan kelsa) */}
           <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: "8px" }}>
             <span style={{ fontSize: 13, color: "#555", fontWeight: 600 }}>
-              {trip.car_model || cp("Avtomobil nomi yo'q")} 
+              {trip.car_model || cp("Avtomobil nomi yo'q")}
             </span>
             <span style={{ fontSize: 13, color: "#888" }}>•</span>
             <span style={{ fontSize: 13, color: "#fa8c16", fontWeight: 600 }}>
@@ -51,13 +61,13 @@ export default function TripCard({ trip, onRequest }) {
             <Tag color={trip.tariff === "pitak" ? "blue" : "gold"} style={{ border: 0, fontWeight: 600 }}>
               {trip.tariff === "pitak" ? cp("Standart (Pitak)") : cp("Manzildan manzilga")}
             </Tag>
-            
+
             {/* Eski filtrlar */}
             {trip.has_ac && <Tag style={{ border: 0 }}>❄️ Konditsioner</Tag>}
             {trip.has_trunk && <Tag style={{ border: 0 }}>🧳 Yukxona</Tag>}
             {trip.is_lux && <Tag style={{ border: 0 }}>✨ Luks</Tag>}
             {trip.allow_smoking && <Tag style={{ border: 0 }}>🚬 Sigaret</Tag>}
-            
+
             {/* YANGI: Pochta belgisi aniqroq ko'rinishi uchun yashil rangda */}
             {trip.has_delivery && <Tag color="green" style={{ border: 0 }}>📦 Pochta oladi</Tag>}
 
@@ -72,7 +82,7 @@ export default function TripCard({ trip, onRequest }) {
           )}
 
           <div style={{ marginTop: 6, color: "#555", fontSize: 13 }}>
-            Ketish vaqti: <b style={{ color: "#1677ff" }}>{new Date(trip.depart_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</b>
+            Ketish vaqti: <b style={{ color: "#1677ff" }}>{departLabel}</b>
           </div>
 
           {trip.tariff === "door" && (
@@ -93,13 +103,13 @@ export default function TripCard({ trip, onRequest }) {
             <Typography.Text style={{ fontWeight: 800, fontSize: 18, color: "#fa8c16" }}>
               {priceLine}
             </Typography.Text>
-            
+
             {trip.tariff === "door" && (
               <div style={{ color: "#888", fontSize: 12, marginTop: 4 }}>
                 Uydan olish: {money(trip.pickup_fee_uzs)} so'm · Uyga borish: {money(trip.dropoff_fee_uzs)} so'm
               </div>
             )}
-            
+
             {/* Pochta narxini ko'rsatish */}
             {trip.has_delivery && trip.delivery_price_uzs != null && (
               <div style={{ color: "#1677ff", fontSize: 12, marginTop: 4, fontWeight: 500 }}>
@@ -117,9 +127,9 @@ export default function TripCard({ trip, onRequest }) {
       </Space>
 
       {/* Tugma pastga, to'liq kenglikka (width: 100%) olindi, shunda bosishga qulayroq bo'ladi */}
-      <Button 
-        type="primary" 
-        onClick={() => onRequest?.(trip)} 
+      <Button
+        type="primary"
+        onClick={handleRequest}
         style={{ width: "100%", marginTop: 16, borderRadius: 12, height: 40, fontWeight: 600 }}
       >
         Buyurtma berish
@@ -127,3 +137,9 @@ export default function TripCard({ trip, onRequest }) {
     </Card>
   );
 }
+
+function tripPropsEqual(prev, next) {
+  return prev.trip === next.trip && prev.onRequest === next.onRequest;
+}
+
+export default memo(TripCard, tripPropsEqual);

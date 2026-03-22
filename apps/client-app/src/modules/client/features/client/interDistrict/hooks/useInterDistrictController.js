@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { message } from "antd";
 import { cancelTripRequest, getClientActiveTrip, searchTrips, requestTrip, listPitaks } from "@/modules/client/features/shared/interDistrictTrips.js";
 import { nominatimReverse } from "../../shared/geo/nominatim";
@@ -182,10 +182,10 @@ export function useInterDistrictController(state) {
     }
   };
 
-  const onRequest = (trip) => {
+  const onRequest = useCallback((trip) => {
     setSelectedTrip(trip);
     setRequestOpen(true);
-  };
+  }, []);
 
   const submitRequest = async (payload) => {
     if (!selectedTrip) return;

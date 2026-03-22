@@ -1,5 +1,6 @@
 import { withAuth } from "../_shared/withAuth.js";
 import { getServiceSupabase } from "../_shared/supabase.js";
+import { OBSERVABILITY_METRIC_COLUMNS } from "../_shared/supabaseColumns.js";
 
 export function isObservabilityAdminProfile(profile) {
   const role = String(profile?.role || profile?.app_role || "").trim().toLowerCase();
@@ -41,7 +42,7 @@ async function handler(req, res) {
 
     const { data, error } = await supabase
       .from("observability_metrics")
-      .select("*")
+      .select(OBSERVABILITY_METRIC_COLUMNS)
       .order("created_at", { ascending: false })
       .limit(limit);
 

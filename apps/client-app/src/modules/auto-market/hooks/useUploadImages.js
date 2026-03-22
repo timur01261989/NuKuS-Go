@@ -1,6 +1,10 @@
 // Supabase Storage uploader (fallback: local preview)
 import { useState } from "react";
 import { supabase } from "@/services/supabase/supabaseClient.js";
+import {
+  compressImageToFile,
+  UPLOAD_PRESETS,
+} from "@/modules/shared/utils/imageUtils.js";
 
 const SB_READY =
   !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -21,23 +25,49 @@ export default function useUploadImages() {
     try {
       // Fallback: local preview urls
       if (!SB_READY) {
-        return files.map((f) => ({ name: f.name, url: URL.createObjectURL(f) }));
+        const out = [];
+        for (const raw of files) {
+          let f = raw;
+          try {
+            f = await compressImageToFile(raw, UPLOAD_PRESETS.autoMarket);
+          } catch {
+            f = raw;
+          }
+          out.push({ name: f.name, url: URL.createObjectURL(f) });
+        }
+        return out;
       }
 
       const { data: auth } = await supabase.auth.getUser();
       const userId = auth?.user?.id;
       if (!userId) {
-        // Still allow local preview, but mark as not-uploaded
-        return files.map((f) => ({ name: f.name, url: URL.createObjectURL(f), local_only: true }));
+        const out = [];
+        for (const raw of files) {
+          let f = raw;
+          try {
+            f = await compressImageToFile(raw, UPLOAD_PRESETS.autoMarket);
+          } catch {
+            f = raw;
+          }
+          out.push({ name: f.name, url: URL.createObjectURL(f), local_only: true });
+        }
+        return out;
       }
 
       const uploaded = [];
-      for (const f of files) {
-        const ext = safeExt(f.name);
+      for (const raw of files) {
+        let f = raw;
+        try {
+          f = await compressImageToFile(raw, UPLOAD_PRESETS.autoMarket);
+        } catch {
+          f = raw;
+        }
+        const ext = "jpg";
         const filename = `${userId}/${crypto.randomUUID()}.${ext}`;
         const { error } = await supabase.storage.from(BUCKET).upload(filename, f, {
           cacheControl: "3600",
           upsert: false,
+          contentType: f.type || "image/jpeg",
         });
 
         if (error) {

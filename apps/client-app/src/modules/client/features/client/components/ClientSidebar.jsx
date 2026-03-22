@@ -6,7 +6,8 @@ import { formatClientMoney } from '../shared/i18n_clientLocalize';
 
 function cx(...xs) { return xs.filter(Boolean).join(' '); }
 
-const SidebarItem = memo(function SidebarItem({ icon, label, active, onClick }) {
+const SidebarItem = memo(function SidebarItem({ icon, label, active, path, onNavigate }) {
+  const onClick = useCallback(() => onNavigate(path), [onNavigate, path]);
   return (
     <button
       type="button"
@@ -63,7 +64,6 @@ const ClientSidebar = memo(function ClientSidebar({ open, onClose, profile }) {
 
   const balanceLabel = useMemo(() => formatClientMoney(language, walletState.balanceUZS), [walletState.balanceUZS, language]);
   const bonusBalanceLabel = useMemo(() => formatClientMoney(language, walletState.bonusBalanceUZS), [walletState.bonusBalanceUZS, language]);
-  const isActive = useCallback((path) => location.pathname === path, [location.pathname]);
 
   const menuItems = useMemo(() => ([
     { key: 'profile', icon: 'person', label: t.profileSettings || 'Profil ma’lumotlari', path: '/client/profile' },
@@ -71,6 +71,9 @@ const ClientSidebar = memo(function ClientSidebar({ open, onClose, profile }) {
     { key: 'promos', icon: 'card_giftcard', label: t.promos || 'Promokodlar', path: '/client/promo' },
     { key: 'settings', icon: 'settings', label: t.settings || 'Sozlamalar', path: '/settings' },
   ]), [t, tr]);
+
+  const pathname = location.pathname;
+  const isPathActive = useCallback((path) => pathname === path || pathname === path.replace('/client', ''), [pathname]);
 
   if (!open) return null;
 
@@ -107,7 +110,7 @@ const ClientSidebar = memo(function ClientSidebar({ open, onClose, profile }) {
           <button
             type="button"
             className="mt-4 w-full rounded-[22px] bg-gradient-to-r from-[#FFF1E7] to-[#EAF2FF] p-4 text-left shadow-[0_10px_24px_rgba(28,36,48,.08)]"
-            onClick={() => go('/driver-mode', { replace: true, state: { from: location.pathname } })}
+            onClick={() => go('/driver-mode', { replace: true, state: { from: pathname } })}
           >
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -127,8 +130,9 @@ const ClientSidebar = memo(function ClientSidebar({ open, onClose, profile }) {
               key={item.key}
               icon={item.icon}
               label={item.label}
-              active={isActive(item.path.replace('/client', '')) || isActive(item.path)}
-              onClick={() => go(item.path)}
+              active={isPathActive(item.path)}
+              path={item.path}
+              onNavigate={go}
             />
           ))}
         </nav>
