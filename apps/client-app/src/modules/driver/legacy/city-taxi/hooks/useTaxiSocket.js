@@ -18,6 +18,14 @@ export function useTaxiSocket({ enabled }) {
   const realtimeChannelRef = useRef(null);
   const pollingTimerRef = useRef(null);
   const driverUserIdRef = useRef(null);
+  /** activeOrder / incomingOrder o'zgarganda realtime/polling qayta yaratilmasin */
+  const activeOrderRef = useRef(null);
+  const incomingOrderRef = useRef(null);
+
+  useEffect(() => {
+    activeOrderRef.current = state.activeOrder;
+    incomingOrderRef.current = state.incomingOrder;
+  }, [state.activeOrder, state.incomingOrder]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -53,7 +61,12 @@ export function useTaxiSocket({ enabled }) {
           return status === TaxiOrderStatus.NEW || status === TaxiOrderStatus.SEARCHING;
         });
 
-        if (newest && !seenRef.current.has(String(newest.id)) && !state.activeOrder && !state.incomingOrder) {
+        if (
+          newest &&
+          !seenRef.current.has(String(newest.id)) &&
+          !activeOrderRef.current &&
+          !incomingOrderRef.current
+        ) {
           seenRef.current.add(String(newest.id));
           const normalized = normalizeIncoming(newest);
           dispatch({ type: "orders/setIncoming", payload: normalized });
@@ -87,7 +100,7 @@ export function useTaxiSocket({ enabled }) {
           if (row.status !== "sent") return;
           if (row.expires_at && new Date(row.expires_at) < new Date()) return;
           if (seenRef.current.has(String(row.order_id))) return;
-          if (state.activeOrder || state.incomingOrder) return;
+          if (activeOrderRef.current || incomingOrderRef.current) return;
 
           seenRef.current.add(String(row.order_id));
 
@@ -143,7 +156,7 @@ export function useTaxiSocket({ enabled }) {
         realtimeChannelRef.current = null;
       }
     };
-  }, [enabled, dispatch, state.activeOrder, state.incomingOrder]);
+  }, [enabled, dispatch]);
 }
 
 function normalizeIncoming(raw) {

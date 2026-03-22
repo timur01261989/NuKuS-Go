@@ -30,13 +30,31 @@ export function validateLoginInput({ phone, password, t }) {
   return { ok: true, digits };
 }
 
-export function buildPostLoginProfileUpdate(userId) {
-  const nowIso = new Date().toISOString();
-  return {
+/**
+ * Login keyin profiles upsert uchun.
+ * @param {string | { user?: { id: string }, id?: string, fullPhone?: string, nowIso?: string }} input
+ *   — string: faqat user id (testlar / soddalashtirish)
+ *   — obyekt: { user, fullPhone?, nowIso? } — useLoginController bilan mos
+ */
+export function buildPostLoginProfileUpdate(input) {
+  const nowIso =
+    typeof input === "object" && input && input.nowIso
+      ? input.nowIso
+      : new Date().toISOString();
+  const userId =
+    typeof input === "string" ? input : input?.user?.id ?? input?.id ?? null;
+  if (!userId) {
+    throw new Error("buildPostLoginProfileUpdate: user id kerak");
+  }
+  const row = {
     id: userId,
-    role: 'client',
+    role: "client",
     phone_verified: true,
     last_sign_in_at: nowIso,
     updated_at: nowIso,
   };
+  if (typeof input === "object" && input?.fullPhone) {
+    row.phone = input.fullPhone;
+  }
+  return row;
 }
