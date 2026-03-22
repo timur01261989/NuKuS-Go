@@ -1,0 +1,45 @@
+syntax = "proto3";
+package unigo.payment;
+
+service PaymentService {
+  rpc InitiatePayment  (PaymentRequest)   returns (PaymentResponse);
+  rpc ConfirmPayment   (ConfirmRequest)   returns (PaymentResponse);
+  rpc RefundPayment    (RefundRequest)    returns (PaymentResponse);
+  rpc GetWalletBalance (WalletRequest)    returns (WalletResponse);
+  rpc DebitWallet      (DebitRequest)     returns (WalletResponse);
+  rpc CreditWallet     (CreditRequest)    returns (WalletResponse);
+}
+
+enum PaymentProvider { WALLET = 0; PAYME = 1; CLICK = 2; UZCARD = 3; HUMO = 4; CASH = 5; }
+enum PaymentStatus   { PENDING = 0; PROCESSING = 1; COMPLETED = 2; FAILED = 3; REFUNDED = 4; }
+
+message PaymentRequest {
+  string          order_id  = 1;
+  string          user_id   = 2;
+  int64           amount    = 3;  // in tiyin (UZS * 100)
+  PaymentProvider provider  = 4;
+  string          return_url = 5;
+}
+
+message ConfirmRequest { string payment_id = 1; string provider_token = 2; }
+message RefundRequest  { string payment_id = 1; int64 amount = 2; string reason = 3; }
+message WalletRequest  { string user_id = 1; }
+message DebitRequest   { string user_id = 1; int64 amount = 2; string order_id = 3; string description = 4; }
+message CreditRequest  { string user_id = 1; int64 amount = 2; string type = 3; string description = 4; }
+
+message PaymentResponse {
+  string        payment_id    = 1;
+  PaymentStatus status        = 2;
+  string        payment_url   = 3;
+  int64         amount        = 4;
+  bool          success       = 5;
+  string        error         = 6;
+}
+
+message WalletResponse {
+  string user_id      = 1;
+  int64  balance      = 2;  // tiyin
+  int64  locked       = 3;
+  bool   success      = 4;
+  string error        = 5;
+}

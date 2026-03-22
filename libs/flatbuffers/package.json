@@ -1,0 +1,8 @@
+{
+  "name": "@unigo/flatbuffers",
+  "version": "1.0.0",
+  "main": "src/location.builder.ts",
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

@@ -414,3 +414,80 @@ volumes:
       SUPABASE_URL:              ${SUPABASE_URL}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
       NOTIFICATION_SERVICE_URL:  http://notification-service:3006
+
+  graphql-gateway:
+    build: ../apps/graphql-gateway
+    ports: ["4000:4000"]
+    environment:
+      JWT_SECRET:                ${JWT_SECRET}
+      RIDE_SERVICE_URL:          http://ride-service:3002
+      AUTH_SERVICE_URL:          http://auth-service:3001
+      LOCATION_SERVICE_URL:      http://location-service:3005
+      ML_SERVICE_URL:            http://ml-service:8000
+      CHAT_SERVICE_URL:          http://chat-service:3023
+      WALLET_SERVICE_URL:        http://wallet-service:3024
+      EARNINGS_SERVICE_URL:      http://earnings-service:3025
+      SAFETY_SERVICE_URL:        http://safety-service:3019
+      SEARCH_SERVICE_URL:        http://search-service:3014
+
+  voice-service:
+    build: ../services/voice-service
+    ports: ["3028:3028"]
+    environment:
+      ML_SERVICE_URL:            http://ml-service:8000
+      SUPABASE_URL:              ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+
+  sdui-service:
+    build: ../services/sdui-service
+    ports: ["3029:3029"]
+    environment:
+      SUPABASE_URL:              ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+
+  feature-store-service:
+    build: ../services/feature-store-service
+    ports: ["3030:3030"]
+    depends_on: [redis]
+    environment:
+      SUPABASE_URL:              ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      REDIS_HOST:                redis
+
+  support-service:
+    build: ../services/support-service
+    ports: ["3031:3031"]
+    environment:
+      SUPABASE_URL:              ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      NOTIFICATION_SERVICE_URL:  http://notification-service:3006
+
+  fleet-service:
+    build: ../services/fleet-service
+    ports: ["3032:3032"]
+    environment:
+      SUPABASE_URL:              ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+
+  rating-service:
+    build: ../services/rating-service
+    ports: ["3033:3033"]
+    environment:
+      SUPABASE_URL:              ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+
+  report-service:
+    build: ../services/report-service
+    ports: ["3034:3034"]
+    environment:
+      SUPABASE_URL:              ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+
+  config-service:
+    build: ../services/config-service
+    ports: ["3035:3035"]
+    depends_on: [redis]
+    environment:
+      SUPABASE_URL:              ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      REDIS_HOST:                redis

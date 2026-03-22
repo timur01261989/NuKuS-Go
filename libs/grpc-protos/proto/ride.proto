@@ -1,0 +1,70 @@
+syntax = "proto3";
+package unigo.ride;
+option java_package = "uz.unigo.ride";
+
+service RideService {
+  rpc CreateOrder     (CreateOrderRequest)  returns (OrderResponse);
+  rpc GetOrder        (GetOrderRequest)     returns (OrderResponse);
+  rpc UpdateStatus    (UpdateStatusRequest) returns (OrderResponse);
+  rpc CancelOrder     (CancelOrderRequest)  returns (OrderResponse);
+  rpc GetClientOrders (ClientOrdersRequest) returns (OrderListResponse);
+  rpc StreamOrderStatus(GetOrderRequest)    returns (stream OrderStatusEvent);
+}
+
+message Location {
+  double lat     = 1;
+  double lng     = 2;
+  string address = 3;
+}
+
+message CreateOrderRequest {
+  string   client_id      = 1;
+  string   service_type   = 2;
+  Location pickup         = 3;
+  Location dropoff        = 4;
+  repeated Location stops = 5;
+  string   payment_method = 6;
+  string   promo_code     = 7;
+  int64    scheduled_at   = 8;  // Unix timestamp
+  string   notes          = 9;
+}
+
+message GetOrderRequest     { string order_id = 1; }
+message CancelOrderRequest  { string order_id = 1; string reason = 2; }
+message ClientOrdersRequest { string client_id = 1; int32 limit = 2; int32 offset = 3; }
+
+message UpdateStatusRequest {
+  string order_id  = 1;
+  string status    = 2;
+  string driver_id = 3;
+  int32  eta_min   = 4;
+}
+
+message OrderResponse {
+  string   id              = 1;
+  string   status          = 2;
+  string   client_id       = 3;
+  string   driver_id       = 4;
+  string   service_type    = 5;
+  Location pickup          = 6;
+  Location dropoff         = 7;
+  int64    price_uzs        = 8;
+  double   surge_multiplier = 9;
+  int32    eta_minutes      = 10;
+  string   route_polyline   = 11;
+  int64    created_at       = 12;
+  bool     success          = 13;
+  string   error            = 14;
+}
+
+message OrderListResponse  { repeated OrderResponse orders = 1; int32 total = 2; }
+
+message OrderStatusEvent {
+  string order_id  = 1;
+  string status    = 2;
+  string driver_id = 3;
+  double driver_lat = 4;
+  double driver_lng = 5;
+  int32  eta_min   = 6;
+  int64  timestamp = 7;
+}

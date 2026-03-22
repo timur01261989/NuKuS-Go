@@ -1,0 +1,80 @@
+# Chaos Mesh — Production Chaos Engineering
+# Install: helm install chaos-mesh chaos-mesh/chaos-mesh -n chaos-testing --create-namespace
+
+# ── Weekly Service Failure Test ────────────────────────────────────────────────
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: weekly-service-kill
+  namespace: unigo-prod
+spec:
+  action:     pod-kill
+  mode:       one         # Kill one random pod
+  selector:
+    namespaces: [unigo-prod]
+    labelSelectors:
+      "chaos-test": "enabled"
+  scheduler:
+    cron: "@weekly"      # Every Sunday night
+---
+# ── Network Latency Injection ──────────────────────────────────────────────────
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: latency-injection
+  namespace: unigo-prod
+spec:
+  action: delay
+  mode:   percentage
+  value:  "20"            # 20% of pods
+  selector:
+    namespaces: [unigo-prod]
+    labelSelectors:
+      app: api-gateway
+  delay:
+    latency:     100ms
+    correlation: "25"
+    jitter:      50ms
+  duration:  10m
+  scheduler:
+    cron: "0 2 * * 3"   # Wednesday 2 AM
+---
+# ── CPU Stress Test ────────────────────────────────────────────────────────────
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: cpu-stress-test
+  namespace: unigo-prod
+spec:
+  mode:     one
+  selector:
+    namespaces: [unigo-prod]
+    labelSelectors:
+      app: matching-service
+  stressors:
+    cpu:
+      workers: 2
+      load:    60         # 60% CPU load
+  duration: 5m
+  scheduler:
+    cron: "0 3 * * 0"    # Sunday 3 AM
+---
+# ── Memory Pressure ────────────────────────────────────────────────────────────
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: memory-pressure
+  namespace: unigo-prod
+spec:
+  mode: one
+  selector:
+    namespaces: [unigo-prod]
+    labelSelectors:
+      app: ride-service
+  stressors:
+    memory:
+      workers: 1
+      size:    "256MB"
+  duration: 3m
+  scheduler:
+    cron: "0 4 * * 0"

@@ -1,0 +1,52 @@
+# AWS EKS — ARM64 Graviton3 Node Pool
+# 40% better price/performance than x86
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: unigo-cluster
+  region: ap-northeast-1
+
+managedNodeGroups:
+  # ── Primary: ARM64 Graviton (40% cheaper than x86) ───────────────────────────
+  - name: graviton-primary
+    instanceType: c7g.2xlarge   # Graviton3, 8 vCPU, 16GB
+    minSize:      3
+    maxSize:      50
+    desiredCapacity: 10
+    amiFamily:    AmazonLinux2
+    iam:
+      withAddonPolicies:
+        autoScaler: true
+        cloudWatch: true
+    labels:
+      node-type: graviton
+      workload:  general
+    taints: []
+
+  # ── Spot: For analytics + batch (70-90% cheaper) ─────────────────────────────
+  - name: spot-analytics
+    instanceTypes:
+      - c7g.xlarge
+      - c6g.xlarge
+      - m7g.xlarge
+    spot:         true
+    minSize:      0
+    maxSize:      30
+    desiredCapacity: 3
+    labels:
+      node-type: spot
+      workload:  analytics
+    taints:
+      - key:    spot
+        value:  "true"
+        effect: NoSchedule
+
+  # ── On-demand: Critical services (never preempted) ────────────────────────────
+  - name: critical-ondemand
+    instanceType: c7g.4xlarge   # 16 vCPU, 32GB
+    minSize:      3
+    maxSize:      10
+    desiredCapacity: 3
+    labels:
+      node-type: critical
+      workload:  critical

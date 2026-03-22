@@ -1,0 +1,31 @@
+# Samarkand region — Secondary
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: unigo-samarkand
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: unigo-samarkand
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: api-gateway
+      region: samarkand
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+        region: samarkand
+    spec:
+      containers:
+      - name: api-gateway
+        image: ghcr.io/unigo/api-gateway:latest
+        env:
+        - name: REGION
+          value: samarkand
+        - name: PRIMARY_REGION
+          value: http://api-gateway.unigo-tashkent.svc.cluster.local

@@ -1,0 +1,56 @@
+// UniGo Location FlatBuffers Schema
+// Zero-parse: read directly from buffer without deserialization
+// 3-5x faster than Protobuf for location updates
+
+namespace unigo.fbs;
+
+// ── Location Point ────────────────────────────────────────────────────────────
+table LocationPoint {
+  lat:       double;
+  lng:       double;
+  bearing:   float;
+  speed_kmh: float;
+  accuracy:  float;
+  timestamp: long;           // Unix milliseconds
+}
+
+// ── Driver Location Update (with batch) ──────────────────────────────────────
+table DriverLocationUpdate {
+  driver_id:    string (required);
+  service_type: string;
+  is_online:    bool = true;
+  h3_cell_9:    string;      // Pre-computed H3 cell
+  current:      LocationPoint (required);
+  batch:        [LocationPoint]; // Buffered points
+  sent_at:      long;
+}
+
+// ── Nearby Drivers Response ────────────────────────────────────────────────────
+table NearbyDriver {
+  driver_id:    string (required);
+  lat:          double;
+  lng:          double;
+  distance_km:  float;
+  eta_min:      float;
+  rating:       float;
+  h3_cell:      string;
+}
+
+table NearbyDriversResponse {
+  drivers:      [NearbyDriver];
+  user_cell:    string;
+  timestamp:    long;
+}
+
+// ── Order Status Event (for real-time streaming) ──────────────────────────────
+table OrderStatusEvent {
+  order_id:     string (required);
+  status:       string (required);
+  driver_id:    string;
+  driver_lat:   double;
+  driver_lng:   double;
+  eta_min:      short;
+  timestamp:    long;
+}
+
+root_type DriverLocationUpdate;

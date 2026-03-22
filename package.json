@@ -1,6 +1,6 @@
 {
   "name": "unigo-platform",
-  "version": "8.0.0",
+  "version": "11.0.0",
   "private": true,
   "workspaces": [
     "apps/*",
@@ -36,7 +36,27 @@
     "dev:wallet": "turbo run dev --filter=@unigo/wallet-service",
     "dev:earnings": "turbo run dev --filter=@unigo/earnings-service",
     "test:load": "k6 run testing/load/ride-load-test.js",
-    "backup": "bash infrastructure/ci-cd/scripts/backup.sh"
+    "backup": "bash infrastructure/ci-cd/scripts/backup.sh",
+    "dev:graphql": "turbo run dev --filter=@unigo/graphql-gateway",
+    "dev:voice": "turbo run dev --filter=@unigo/voice-service",
+    "edge:deploy": "cd apps/edge-functions && wrangler deploy",
+    "edge:dev": "cd apps/edge-functions && wrangler dev",
+    "db:migrate:all": "for f in infrastructure/db/postgres/migrations/*.sql; do psql $DATABASE_URL -f $f; done",
+    "dev:sdui": "turbo run dev --filter=@unigo/sdui-service",
+    "dev:features": "turbo run dev --filter=@unigo/feature-store-service",
+    "chaos:apply": "kubectl apply -f infrastructure/chaos/chaos-mesh.yaml",
+    "nginx:reload": "nginx -s reload",
+    "migrate:all": "for f in infrastructure/db/postgres/migrations/*.sql; do psql $DATABASE_URL -f $f; done",
+    "shadow:apply": "kubectl apply -f infrastructure/k8s/service-mesh/traffic-shadowing.yaml",
+    "dev:support": "turbo run dev --filter=@unigo/support-service",
+    "dev:fleet": "turbo run dev --filter=@unigo/fleet-service",
+    "dev:rating": "turbo run dev --filter=@unigo/rating-service",
+    "dev:report": "turbo run dev --filter=@unigo/report-service",
+    "dev:config": "turbo run dev --filter=@unigo/config-service",
+    "dev:all": "turbo run dev",
+    "health:check": "curl -s http://localhost:8080/api/health/services | python3 -m json.tool",
+    "report:daily": "curl -X POST http://localhost:3034/reports/daily",
+    "config:init": "curl -X POST http://localhost:3035/config/init"
   },
   "devDependencies": {
     "turbo": "^1.13.0",
@@ -47,5 +67,6 @@
   },
   "engines": {
     "node": ">=20"
-  }
+  },
+  "description": "UniGo Super App \u2014 Production Platform v11 (Uber/Yandex Level)"
 }

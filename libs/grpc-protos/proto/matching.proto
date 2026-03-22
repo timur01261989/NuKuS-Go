@@ -1,0 +1,69 @@
+syntax = "proto3";
+package unigo.matching;
+
+service MatchingService {
+  rpc FindBestDriver    (MatchRequest)     returns (MatchResponse);
+  rpc ScoreDrivers      (ScoreRequest)     returns (ScoreResponse);
+  rpc PreWarmDrivers    (PreWarmRequest)   returns (PreWarmResponse);
+  rpc ComputeETA        (ETARequest)       returns (ETAResponse);
+}
+
+message MatchRequest {
+  string order_id     = 1;
+  double pickup_lat   = 2;
+  double pickup_lng   = 3;
+  string service_type = 4;
+  double radius_km    = 5;
+  int32  limit        = 6;
+}
+
+message DriverCandidate {
+  string driver_id       = 1;
+  double lat             = 2;
+  double lng             = 3;
+  double distance_km     = 4;
+  double eta_minutes     = 5;
+  double smart_score     = 6;
+  double rating          = 7;
+  double acceptance_rate = 8;
+  string h3_cell         = 9;
+}
+
+message MatchResponse {
+  bool                     found      = 1;
+  DriverCandidate          best       = 2;
+  repeated DriverCandidate candidates = 3;
+  string                   error      = 4;
+}
+
+message ScoreRequest {
+  repeated DriverCandidate drivers = 1;
+  double pickup_lat = 2;
+  double pickup_lng = 3;
+}
+
+message ScoreResponse { repeated DriverCandidate scored = 1; }
+
+message PreWarmRequest {
+  string user_id   = 1;
+  double lat       = 2;
+  double lng       = 3;
+  string predicted_destination = 4;
+}
+
+message PreWarmResponse { bool ok = 1; int32 drivers_alerted = 2; }
+
+message ETARequest {
+  double driver_lat  = 1;
+  double driver_lng  = 2;
+  double pickup_lat  = 3;
+  double pickup_lng  = 4;
+  int32  hour        = 5;
+  int32  day_of_week = 6;
+}
+
+message ETAResponse {
+  double eta_minutes  = 1;
+  double distance_km  = 2;
+  double confidence   = 3;
+}

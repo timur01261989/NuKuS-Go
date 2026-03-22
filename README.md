@@ -1,132 +1,64 @@
-# UniGo Platform — v3.0 Optimal Monorepo
-## 10M+ Users · 15 Microservices · Full-Stack
+# UniGo Platform v11.0.0
+## Enterprise-Grade Super App — Uber + Yandex darajasidan yuqori
 
 ---
 
-## 📁 Tuzilma (Optimal)
+## 📊 Statistika
+| Metrika | Qiymat |
+|---------|--------|
+| **Versiya** | 11.0.0 |
+| **Microservices** | 34 ta |
+| **Apps** | 8 ta |
+| **Shared Libs** | 21 ta |
+| **DB Migrations** | 14 ta SQL |
+| **K8s Manifests** | 17+ YAML |
+| **gRPC Proto** | 4 ta schema |
+| **GitHub Actions** | 3 workflow |
 
-```
-unigo-platform/
-│
-├── apps/                                 # Ilovalar
-│   ├── api-gateway/          :8080       # Markaziy Traffic Controller
-│   │   └── src/
-│   │       ├── controllers/             # 14 proxy controller
-│   │       ├── middlewares/             # auth, rateLimit, circuit, geo, tracing
-│   │       ├── handlers/vercel/         # Original Vercel serverless handlers
-│   │       ├── routes/                  # v1, v2
-│   │       └── utils/                   # serviceRegistry, loadBalancer, healthCheck
-│   │
-│   ├── client-app/           :5173       # React + Vite (foydalanuvchi)
-│   │   ├── src/                         # 1841 React fayl
-│   │   ├── server/                      # Vercel serverless API (production)
-│   │   │   └── api/                     # 47 API handler
-│   │   ├── supabase/                    # Edge Functions + migrations
-│   │   └── tests/                       # 104 test fayl
-│   │
-│   ├── admin-panel/          :5174       # React admin dashboard
-│   ├── driver-app/                       # React Native + Expo
-│   ├── ws-gateway/           :3010       # Socket.IO WebSocket
-│   └── ml-service/           :8000       # Python FastAPI ML
-│
-├── services/                             # Backend Microservices
-│   ├── auth-service/         :3001       # JWT + OTP + strategies
-│   ├── ride-service/         :3002       # Orders + pricing + saga
-│   │   └── src/
-│   │       ├── orders/                  # State machine, cache, dispatch
-│   │       └── pricing/                 # Surge, dynamic, predictive
-│   ├── delivery-service/     :3003       # Yetkazib berish
-│   ├── payment-service/      :3004       # Payme + Click + UzCard + wallet
-│   │   └── src/
-│   │       ├── providers/               # payme, click, humo, uzcard
-│   │       ├── wallet/                  # walletService, splitPayment
-│   │       ├── fraud/                   # fraudDetector
-│   │       └── ledger/                  # settlementEngine, ledger
-│   ├── location-service/     :3005       # Redis Geo + heatmap
-│   │   └── src/
-│   │       ├── tracking/                # driverTracker, heatmap
-│   │       ├── geofence/                # zoneManager (surge zones)
-│   │       ├── location/                # cityService, geoRedis
-│   │       └── drivers/                 # heartbeat, locationStream
-│   ├── notification-service/ :3006       # FCM + SMS + Email + InApp
-│   │   └── src/
-│   │       └── safety/                  # SOS service
-│   ├── freight-service/      :3007       # Yuk tashish
-│   ├── intercity-service/    :3008       # Shaharlararo
-│   ├── marketplace-service/  :3009       # Avto savdo
-│   ├── food-service/         :3011       # Ovqat yetkazish
-│   ├── interdistrict-service/:3012       # Tumanlararo
-│   ├── analytics-service/    :3013       # ClickHouse + real-time
-│   │   └── src/
-│   │       ├── ai/                      # demand forecast, supply, surge
-│   │       └── monitoring/              # telemetry, observability
-│   ├── search-service/       :3014       # Elasticsearch
-│   ├── matching-service/     :3015       # Driver-Rider matching + ML
-│   │   └── src/
-│   │       ├── algorithms/              # nearestDriver, batch, fairness
-│   │       ├── ml/                      # etaModel, demandPredictor
-│   │       ├── dispatch/                # smartDispatch, wave, realtime
-│   │       ├── intelligence/            # ratings, bonus, distribution
-│   │       └── queue/                   # Redis queue, autoscaling
-│   └── reward-service/       :3016       # Bonus + referral + gamification
-│
-├── libs/                                 # Umumiy kutubxonalar
-│   ├── core-types/                       # TypeScript interfaces
-│   ├── api-client/                       # Axios + auto-refresh
-│   ├── ui-kit/                           # Button, Input, Card, OtpInput
-│   ├── utils/                            # haversine, format, debounce
-│   ├── zod-schemas/                      # Runtime validation
-│   ├── event-bus/                        # Kafka publisher + topics
-│   ├── cache-lib/                        # L1(memory) + L2(Redis)
-│   ├── geo-lib/                          # H3, haversine, polyline
-│   └── feature-flags-lib/                # Feature toggle
-│
-├── supabase/                             # Supabase Edge Functions
-│   ├── functions/                        # OTP, signup, verification
-│   └── migrations/                       # Supabase DB migrations
-│
-├── infrastructure/
-│   ├── docker-compose.yml                # 22 servis
-│   ├── db/
-│   │   ├── postgres/
-│   │   │   ├── init.sql                  # Base schema
-│   │   │   └── migrations/
-│   │   │       ├── 001-006_*.sql         # Monorepo migrations
-│   │   │       ├── supabase/             # Original SQL files
-│   │   │       └── original/             # Archived originals
-│   │   ├── redis/                        # Config
-│   │   ├── kafka/                        # Config + topics.sh
-│   │   └── clickhouse/                   # Config
-│   ├── k8s/
-│   │   ├── base/                         # Deployment, HPA, PDB, ConfigMap
-│   │   ├── overlays/ (dev + prod)
-│   │   └── service-mesh/                 # Istio VirtualService, mTLS
-│   ├── ci-cd/
-│   │   ├── github-actions/               # build, deploy, security
-│   │   ├── argocd/                       # GitOps
-│   │   └── scripts/                      # db-migrate.sh
-│   ├── observability/
-│   │   ├── prometheus/
-│   │   ├── grafana/
-│   │   ├── elk-stack/
-│   │   └── jaeger/
-│   └── security/
-│       ├── vault.config.hcl
-│       ├── waf/
-│       └── ssl/
-│
-├── docs/
-│   └── architecture/                     # Arxitektura qarorlari
-│
-├── feature-flags/
-│   ├── default-flags.json
-│   └── environments.json
-│
-├── .env.example                          # Barcha env varlar
-├── .gitignore
-├── turbo.json                            # Turborepo pipeline
-└── package.json                          # Workspace root
-```
+---
+
+## 🗺️ Servislar xaritasi (3001-3035 + 8000 + 4000)
+
+| Port | Servis | Kategoriya |
+|------|--------|-----------|
+| 3001 | auth-service | Core |
+| 3002 | ride-service | Core |
+| 3003 | delivery-service | Core |
+| 3004 | payment-service | Core |
+| 3005 | location-service | Core |
+| 3006 | notification-service | Core |
+| 3007 | freight-service | Transport |
+| 3008 | intercity-service | Transport |
+| 3009 | marketplace-service | Commerce |
+| 3010 | ws-gateway (app) | Gateway |
+| 3011 | food-service | Commerce |
+| 3012 | interdistrict-service | Transport |
+| 3013 | analytics-service | Intelligence |
+| 3014 | search-service | Intelligence |
+| 3015 | matching-service | Intelligence |
+| 3016 | reward-service | Engagement |
+| 3017 | routing-service | Maps |
+| 3018 | corporate-service | B2B |
+| 3019 | safety-service | Trust & Safety |
+| 3020 | subscription-service | Monetization |
+| 3021 | verification-service | Trust & Safety |
+| 3022 | promo-service | Marketing |
+| 3023 | chat-service | Communication |
+| 3024 | wallet-service | Payments |
+| 3025 | earnings-service | Driver |
+| 3026 | ab-testing-service | Growth |
+| 3027 | privacy-service | Compliance |
+| 3028 | voice-service | AI/UX |
+| 3029 | sdui-service | Platform |
+| 3030 | feature-store-service | ML Platform |
+| 3031 | support-service | Operations |
+| 3032 | fleet-service | Driver Ops |
+| 3033 | rating-service | Trust |
+| 3034 | report-service | Analytics |
+| 3035 | config-service | Platform |
+| 4000 | graphql-gateway (app) | Gateway |
+| 8000 | ml-service (app) | AI/ML |
+| 8080 | api-gateway (app) | Gateway |
 
 ---
 
@@ -136,90 +68,100 @@ unigo-platform/
 # 1. O'rnatish
 npm install
 cp .env.example .env
+# .env ni Supabase va boshqa kalitlar bilan to'ldiring
 
-# 2. Faqat frontend
-npm run dev:client    # http://localhost:5173
-npm run dev:admin     # http://localhost:5174
+# 2. Config xizmatini ishga tushiring
+npm run dev:config
 
-# 3. To'liq stack
+# 3. To'liq Docker stack
 npm run docker:up
 
-# 4. Kafka topiclarini yarating
-docker exec kafka bash /topics.sh
+# 4. DB sxemasini yarating
+npm run migrate:all
+
+# 5. Config-ni boshlang'ich qiymatlar bilan to'ldiring
+npm run config:init
+
+# 6. Frontend
+npm run dev:client    # http://localhost:5173
+npm run dev:admin     # http://localhost:5174
 ```
-
----
-
-## 🔌 Servislar xaritasi
-
-| Port | Servis | Vazifa |
-|------|--------|--------|
-| 5173 | client-app | Foydalanuvchi |
-| 5174 | admin-panel | Admin |
-| 8080 | api-gateway | HTTP routing |
-| 3010 | ws-gateway | WebSocket |
-| 8000 | ml-service | ETA/Surge/Fraud |
-| 3001 | auth-service | Login/OTP |
-| 3002 | ride-service | Taksi |
-| 3003 | delivery-service | Yetkazish |
-| 3004 | payment-service | To'lov |
-| 3005 | location-service | GPS |
-| 3006 | notification-service | Bildirishnoma |
-| 3007 | freight-service | Yuk |
-| 3008 | intercity-service | Shaharlararo |
-| 3009 | marketplace-service | Avto savdo |
-| 3011 | food-service | Ovqat |
-| 3012 | interdistrict-service | Tumanlararo |
-| 3013 | analytics-service | Tahlil |
-| 3014 | search-service | Qidirish |
-| 3015 | matching-service | Matching |
-| 3016 | reward-service | Bonus/Referral |
 
 ---
 
 ## 🏗️ Arxitektura
 
 ```
-Internet → Cloudflare WAF → K8s Ingress → api-gateway:8080
-                                               │
-           ┌────────────────────────────────────┤
-           │          Circuit Breaker           │
-           │          Rate Limiter (200/min)    │
-           │          JWT Auth                  │
-           │          Geo Block                 │
-           └────────────────────────────────────┘
-           │
-    ┌──────┴──────────────────────────────────────────┐
-    │                  SERVICES                        │
-    │  auth → ride → delivery → payment → location    │
-    │  freight → intercity → marketplace → food       │
-    │  notification → analytics → search → matching   │
-    │  reward → interdistrict                         │
-    └──────────────────────────────────────────────────┘
-           │
-    Kafka (message broker)
-    Redis (cache + geo + pub/sub)
-    PostgreSQL (primary DB)
-    ClickHouse (analytics)
-    Elasticsearch (search)
+Foydalanuvchi (iOS/Android/Web)
+    │
+    ├─── REST ──────→ api-gateway :8080
+    ├─── GraphQL ───→ graphql-gateway :4000
+    └─── WebSocket ─→ ws-gateway :3010
+                          │
+             ┌────────────┴──────────────┐
+             │      34 Microservice      │
+             │   (har biri izolyatsiya)  │
+             └────────────┬──────────────┘
+                          │
+         ┌────────────────┼────────────────┐
+         ▼                ▼                ▼
+     PostgreSQL       Redis Cluster     Kafka
+     (primary DB)    (cache+geo+queue) (events)
+         │                                  │
+    ClickHouse                      analytics-service
+    (analytics)                       (ClickHouse)
+         │
+    Elasticsearch
+    (search-service)
 ```
 
 ---
 
-## 🔑 Muhim deployment qoidalari
+## 📐 ARCH_RULES.md — Muqaddas qoidalar
 
-**Vercel (client-app):**
-- `apps/client-app/server/` → Vercel serverless functions (hozirgi production)
-- `apps/client-app/vercel.json` → deploy config
+1. **PERFORMANCE FIRST** — API < 50ms
+2. **H3 INDEXING** — Uber H3 Res-9
+3. **PROTOBUF** — gRPC microservices
+4. **ASYNC** — Kafka events
+5. **REDLOCK** — Zero double-spend
+6. **HOT-WARM-COLD** — Data tiering
+7. **ZERO-TRUST** — Fingerprint + mTLS
+8. **OFFLINE-FIRST** — Outbox pattern
+9. **PREDICTIVE** — Pre-warm drivers
+10. **BATTERY OPT** — Dynamic GPS
 
-**Kubernetes (microservices):**
-```bash
-kubectl apply -k infrastructure/k8s/overlays/production
-```
+---
 
-**Supabase:**
-```bash
-# Edge functions deploy
-supabase functions deploy send-signup-otp
-supabase functions deploy verify-signup-otp
-```
+## 🔑 Texnologiyalar
+
+| Qatlam | Stack |
+|--------|-------|
+| Frontend | React 18 + Vite + TypeScript |
+| GraphQL | Apollo Server + DataLoader |
+| Mobile | React Native + Expo |
+| Gateway | Express + http-proxy-middleware |
+| Services | Node.js + TypeScript |
+| ML | Python FastAPI + NumPy |
+| Database | PostgreSQL 16 + Prisma |
+| Cache | Redis 7 (L1+L2) |
+| Search | Elasticsearch 8 |
+| Analytics | ClickHouse 24 |
+| Queue | Kafka + BullMQ |
+| Container | K8s + Istio + ArgoCD |
+| CDN/Edge | Cloudflare Workers |
+| Monitoring | Prometheus + Grafana + Jaeger |
+| Security | Vault + mTLS + Redlock |
+
+---
+
+## 📈 Benchmark maqsadlari
+
+| Metrika | Maqsad |
+|---------|--------|
+| API P95 latency | < 100ms |
+| API P99 latency | < 200ms |
+| WebSocket connections | 1M+ |
+| Orders/sec | 50,000 |
+| Location updates/sec | 10M |
+| Uptime | 99.99% |
+| Deploy downtime | 0 sec |

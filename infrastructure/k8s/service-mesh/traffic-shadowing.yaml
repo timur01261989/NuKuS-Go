@@ -1,0 +1,53 @@
+# Traffic Shadowing (Dark Launch) — Istio
+# Mirrors 10% of production traffic to new service version
+# WITHOUT affecting real users
+
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: matching-service-shadow
+  namespace: unigo-prod
+spec:
+  hosts: ["matching-service"]
+  http:
+  # ── Shadow 10% to v2 ──────────────────────────────────────────────────────
+  - match:
+    - headers:
+        x-shadow-test:
+          exact: "true"
+    route:
+    - destination:
+        host: matching-service
+        subset: v2
+      weight: 100
+
+  # ── Normal traffic + shadow ────────────────────────────────────────────────
+  - route:
+    - destination:
+        host: matching-service
+        subset: v1
+      weight: 100
+    mirror:
+      host:   matching-service
+      subset: v2
+    mirrorPercentage:
+      value: 10.0    # Mirror 10% of traffic to v2
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: matching-service-versions
+  namespace: unigo-prod
+spec:
+  host: matching-service
+  subsets:
+  - name: v1
+    labels:
+      version: v1
+  - name: v2
+    labels:
+      version: v2
+    trafficPolicy:
+      connectionPool:
+        tcp:  { maxConnections: 100 }
+        http: { maxRequestsPerConnection: 10 }

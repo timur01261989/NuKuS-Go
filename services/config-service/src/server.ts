@@ -1,0 +1,12 @@
+import express from "express";
+import cors from "cors";
+import { configRouter } from "./controller";
+import { ConfigService } from "./config.service";
+const app = express();
+app.use(cors()); app.use(express.json());
+app.use("/config", configRouter);
+app.get("/health", (_, res) => res.json({ service: "config", status: "ok" }));
+const PORT = Number(process.env.PORT) || 3035;
+const svc  = new ConfigService();
+svc.initDefaults().catch(console.error);
+app.listen(PORT, () => console.warn(`[config-service] :${PORT}`));

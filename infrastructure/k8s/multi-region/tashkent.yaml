@@ -1,0 +1,45 @@
+# Toshkent region — Primary
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: unigo-tashkent
+  labels:
+    region: tashkent
+    primary: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: unigo-tashkent
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: api-gateway
+      region: tashkent
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+        region: tashkent
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: topology.kubernetes.io/zone
+                operator: In
+                values: [tashkent-1, tashkent-2]
+      containers:
+      - name: api-gateway
+        image: ghcr.io/unigo/api-gateway:latest
+        env:
+        - name: REGION
+          value: tashkent
+        - name: IS_PRIMARY
+          value: "true"
+        resources:
+          requests: { cpu: "200m", memory: "256Mi" }
+          limits:   { cpu: "1000m", memory: "1Gi" }

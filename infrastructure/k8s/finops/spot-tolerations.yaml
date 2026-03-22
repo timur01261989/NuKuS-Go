@@ -1,0 +1,22 @@
+# Patch for non-critical services to run on Spot nodes
+# Apply: kubectl patch deployment analytics-service -n unigo-prod --patch-file spot-tolerations.yaml
+
+spec:
+  template:
+    spec:
+      tolerations:
+      - key:      "spot"
+        operator: "Equal"
+        value:    "true"
+        effect:   "NoSchedule"
+      nodeSelector:
+        node-type: spot
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key:      "node-type"
+                operator: In
+                values:   ["spot"]

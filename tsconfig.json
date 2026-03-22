@@ -40,6 +40,33 @@
       ],
       "@unigo/saga-lib": [
         "./libs/saga-lib/src/index.ts"
+      ],
+      "@unigo/event-sourcing": [
+        "./libs/event-sourcing/src/index.ts"
+      ],
+      "@unigo/cqrs": [
+        "./libs/cqrs/src/index.ts"
+      ],
+      "@unigo/tracing": [
+        "./libs/tracing/src/index.ts"
+      ],
+      "@unigo/redlock": [
+        "./libs/redlock/src/index.ts"
+      ],
+      "@unigo/perf-lib": [
+        "./libs/perf-lib/src/index.ts"
+      ],
+      "@unigo/offline-lib": [
+        "./libs/offline-lib/src/index.ts"
+      ],
+      "@unigo/flatbuffers": [
+        "./libs/flatbuffers/src/location.builder.ts"
+      ],
+      "@unigo/grpc-protos": [
+        "./libs/grpc-protos/src/grpc.client.ts"
+      ],
+      "@unigo/h3": [
+        "./libs/geo-lib/src/h3-real.ts"
       ]
     }
   }

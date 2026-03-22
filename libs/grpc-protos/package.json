@@ -1,0 +1,12 @@
+{
+  "name": "@unigo/grpc-protos",
+  "version": "1.0.0",
+  "main": "src/grpc.client.ts",
+  "dependencies": {
+    "@grpc/grpc-js": "^1.10.0",
+    "@grpc/proto-loader": "^0.7.13"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

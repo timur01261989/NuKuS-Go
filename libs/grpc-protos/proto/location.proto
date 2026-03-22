@@ -1,0 +1,63 @@
+syntax = "proto3";
+package unigo.location;
+
+service LocationService {
+  rpc UpdateDriverLocation (LocationUpdateRequest)  returns (LocationUpdateResponse);
+  rpc GetNearbyDrivers     (NearbyDriversRequest)   returns (NearbyDriversResponse);
+  rpc GetDriverLocation    (DriverLocationRequest)  returns (DriverLocationResponse);
+  rpc BatchUpdateLocations (stream LocationUpdateRequest) returns (BatchUpdateResponse);
+}
+
+message LocationUpdateRequest {
+  string driver_id    = 1;
+  double lat          = 2;
+  double lng          = 3;
+  double bearing      = 4;
+  double speed_kmh    = 5;
+  string service_type = 6;
+  bool   is_online    = 7;
+  int64  timestamp    = 8;
+  repeated LocationPoint batch = 9;  // Batched points
+}
+
+message LocationPoint {
+  double lat       = 1;
+  double lng       = 2;
+  double bearing   = 3;
+  double speed_kmh = 4;
+  int64  timestamp = 5;
+}
+
+message LocationUpdateResponse { bool ok = 1; string h3_cell = 2; }
+message BatchUpdateResponse    { bool ok = 1; int32 processed = 2; }
+
+message NearbyDriversRequest {
+  double lat          = 1;
+  double lng          = 2;
+  double radius_km    = 3;
+  string service_type = 4;
+  int32  limit        = 5;
+}
+
+message DriverInfo {
+  string driver_id   = 1;
+  double lat         = 2;
+  double lng         = 3;
+  double distance_km = 4;
+  double eta_minutes = 5;
+  double rating      = 6;
+  string h3_cell     = 7;
+}
+
+message NearbyDriversResponse { repeated DriverInfo drivers = 1; }
+
+message DriverLocationRequest  { string driver_id = 1; }
+message DriverLocationResponse {
+  string driver_id   = 1;
+  double lat         = 2;
+  double lng         = 3;
+  double bearing     = 4;
+  double speed_kmh   = 5;
+  bool   is_online   = 6;
+  int64  updated_at  = 7;
+}
